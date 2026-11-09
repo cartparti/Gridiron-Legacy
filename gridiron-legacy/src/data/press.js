@@ -44,7 +44,7 @@ export const HEADLINES = {
 export const FAN_POSTS = {
   great: [
     '{last} is HIM. no debate 🔥', 'just watched {last} cook for 60 minutes straight', 'put {last} in the Hall NOW',
-    'my kid wants a {last} jersey for his birthday and honestly same', '{line}?? {last} is a cheat code',
+    'my kid wants a {last} jersey for their birthday and honestly same', '{line}?? {last} is a cheat code',
   ],
   good: ['solid day from {last}', '{last} doing {last} things', 'W. {last} quietly balling'],
   bad: ['{last} was cooked today 💀', 'bench {last}?? just asking', 'that was rough to watch ngl', 'someone check on {last}'],

@@ -5,7 +5,7 @@ export function tipCard(app, id, title, text) {
   const s = app.settings;
   if (!s.tutorials || s.seenTips?.[id]) return null;
   const card = h('div.card.tip-card',
-    h('div.row.between', h('b', `💡 ${title}`), h('button.btn.small.ghost', {
+    h('div.row.between', h('b', title), h('button.btn.small.ghost', {
       onclick: () => { s.seenTips = { ...(s.seenTips ?? {}), [id]: true }; app.saveSettings(); card.remove(); },
     }, 'Got it')),
     h('p.small', text));

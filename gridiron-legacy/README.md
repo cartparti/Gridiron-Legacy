@@ -5,7 +5,8 @@ to the Hall of Fame. You play only the key moments (a throw, a cut, a catch) in 
 2.5D stadium; everything else is simulated. Around the field is a life sim: weekly schedule,
 relationships, money, fame, injuries and 125 branching story events.
 
-Mobile-first (portrait, touch), and it also works with a mouse and keyboard.
+Mobile-first (portrait, touch), and it also works with a mouse and keyboard. The look is
+retro pixel art on an angled 3D field, with a clean modern UI around it.
 
 ## Run it
 
@@ -32,26 +33,30 @@ node tools/balance.js 100 0.7   # 100 careers per strategy, as a skilled player
 
 The balance report shows legacy tiers (how often careers reach the Hall of Fame), peak
 ratings, team win rate, titles, money, draft position, stats per game and retirement reasons
-for five play styles (Balanced, Grinder, Social, Gunslinger, Cautious).
+for five play styles (Balanced, Grinder, Social, Gunslinger, Cautious), across all four positions.
 
 ## How to play
 
-1. **Create** an athlete: quarterback, running back or wide receiver, a background that
-   shapes your starting ratings, and a high school.
+1. **Create** an athlete: quarterback, running back, wide receiver or cornerback, a background
+   that shapes your starting ratings, a high school, and a difficulty (Easy / Normal / Hard / Legend).
 2. **Each week**, fill five days with activities. Each costs energy. Training raises ratings,
    people activities build relationships, media builds fame. Energy you *don't* spend becomes
    game-day freshness, which widens the timing windows in the minigames.
 3. **Random events** pop up most weeks: two or three choices with lasting consequences. 🎲
    choices are a gamble.
-4. **Game day**: the game is simulated drive by drive and pauses on 3 to 6 key moments.
+4. **Game day**: the game is simulated drive by drive and pauses on 5 to 8 key moments, plus
+   4th-down decisions, two-minute drills, and mid-game events (pregame, halftime, celebrations,
+   big hits, clutch time). Weather (rain, snow, wind, night) and momentum change the timing windows.
    Pick **Safe / Balanced / Risky**, then play the minigame:
-   - **QB**: green rings mean open. Press near a receiver, drag to where the ball should land
-     (lead him), hold to build power, release. Overpowering sails the ball; waiting too long gets you sacked.
-     Keyboard: `1` `2` `3`, arrows, hold `Space`.
-   - **RB**: follow the green arrow to the hole, tap left/right (or swipe, or `←` `→`) to cut,
-     hit JUKE (swipe up / `Space`) right before contact. Strength breaks tackles.
-   - **WR**: tap when you reach the yellow zone to snap your break, then tap again when the
-     shrinking ring meets the white ring to make the catch.
+   - **QB pass**: read the coverage (man / zone / blitz), press near a receiver, drag to where the ball
+     should land, hold for power, release. Nine route concepts. Keyboard: `1` `2` `3`, arrows, hold `Space`.
+   - **QB scramble / Hail Mary**: run for it when the pocket collapses; heave it into the end zone late.
+   - **RB run / screen**: follow the hole, tap left/right (or swipe, `←` `→`) to cut, JUKE before contact.
+     Screens start with a timed catch. **Goal-line dive**: tap fast to drive the pile, then time your leap.
+   - **WR route**: pick one of three routes, tap in the yellow zone to break, tap when the rings meet.
+     **Jump ball** and **sideline toe-tap** (tap again before you cross the line) too.
+   - **CB coverage**: drag to shadow the receiver, tap BREAK as the ball arrives for a pick or pass breakup.
+     **Open-field tackle**: read the runner's lean, shuffle into the lane, time your TACKLE.
 5. **Seasons**: standings, playoffs and a title game. End-of-season awards, records, aging.
 6. **Career**: 2 high school seasons → college recruiting (pick from offers) → 3 college
    seasons (or declare early) → the draft → pro seasons with contracts, free agency and a
@@ -79,7 +84,8 @@ gridiron-legacy/
       awards.js legacy.js press.js bot.js
     ui/                 app controller, components, screens/
     scenes/             three.js: director (renderer + HUD), stadium, actors,
-                        minigames/ (qbThrow, rbRun, wrCatch, 2D fallback)
+                        pixelart (procedural sprites), minigames/ (passPlay, runPlay,
+                        routePlay, goalLine, coverPlay, tacklePlay, 2D fallback)
     audio/sfx.js        synthesized sound effects (Web Audio)
   tests/                node:test suites
   tools/                serve.js (dev server), balance.js (balance report)

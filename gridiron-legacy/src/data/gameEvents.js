@@ -25,8 +25,8 @@ export const GAME_EVENTS = [
     id: 'g_rival_tunnel', trigger: 'pregame', cond: { rivalry: true }, title: 'Tunnel Talk',
     text: '{rival} bumps your shoulder in the tunnel. "Hope you brought a helmet for your ego."',
     choices: [
-      { label: 'Get in his face', effects: { fame: 1, rel: { rival: 8 } }, game: { momentum: 0.15, tol: -0.03 }, result: 'Both benches spill out. You are fired up, maybe too fired up.' },
-      { label: 'Smile and walk away', effects: { rel: { coach: 2 } }, game: { tol: 0.04 }, result: 'Ice in your veins. He looks rattled.' },
+      { label: 'Get in their face', effects: { fame: 1, rel: { rival: 8 } }, game: { momentum: 0.15, tol: -0.03 }, result: 'Both benches spill out. You are fired up, maybe too fired up.' },
+      { label: 'Smile and walk away', effects: { rel: { coach: 2 } }, game: { tol: 0.04 }, result: 'Ice in your veins. Your rival looks rattled.' },
     ],
   },
   {
@@ -74,7 +74,7 @@ export const GAME_EVENTS = [
   },
   {
     id: 'g_two_point', trigger: 'afterTD', cond: { trailing: true }, title: 'Go for Two?',
-    text: 'Coach is thinking about a two-point conversion. He looks at you. "Your call."',
+    text: 'Coach is thinking about a two-point conversion and looks at you. "Your call."',
     choices: [
       { label: 'Go for two', effects: {}, game: {}, chance: { p: 0.48, stat: 'skill', successGame: { points: 1, momentum: 0.2 }, successText: 'Converted! Two points, not one.', failGame: { points: -1, momentum: -0.1 }, failText: 'Stopped short. No points.' }, result: '' },
       { label: 'Kick the extra point', effects: {}, game: {}, result: 'Safe and sure.' },
@@ -84,8 +84,8 @@ export const GAME_EVENTS = [
     id: 'g_taunt', trigger: 'afterTD', cond: { rivalry: true }, title: 'Taunt Opportunity',
     text: '{rival} is standing right there on their sideline, sulking.',
     choices: [
-      { label: 'Spike it at his feet', effects: { fame: 2, rel: { rival: 10 } }, game: { flag: true, momentum: 0.1 }, result: 'Flag, worth it?' },
-      { label: 'Ignore him', effects: { rel: { coach: 2 } }, game: {}, result: 'Classy. He hates that even more.' },
+      { label: 'Spike it at their feet', effects: { fame: 2, rel: { rival: 10 } }, game: { flag: true, momentum: 0.1 }, result: 'Flag, worth it?' },
+      { label: 'Ignore it', effects: { rel: { coach: 2 } }, game: {}, result: 'Classy. That stings even more.' },
     ],
   },
   // ---------------- after a bad play
@@ -93,8 +93,8 @@ export const GAME_EVENTS = [
     id: 'g_coach_yell', trigger: 'afterBad', title: 'Coach Is Furious',
     text: 'Coach {coach} grabs your face mask on the sideline. "WHAT WAS THAT?"',
     choices: [
-      { label: '"My fault. Won\'t happen again."', effects: { rel: { coach: 3 } }, game: { tol: 0.02 }, result: 'He lets go. "Show me."' },
-      { label: 'Yell back', effects: { rel: { coach: -8 } }, game: { skip: true, momentum: -0.05 }, result: 'He sits you for a series.' },
+      { label: '"My fault. Won\'t happen again."', effects: { rel: { coach: 3 } }, game: { tol: 0.02 }, result: 'Coach lets go. "Show me."' },
+      { label: 'Yell back', effects: { rel: { coach: -8 } }, game: { skip: true, momentum: -0.05 }, result: 'Coach sits you for a series.' },
       { label: 'Walk away, reset', effects: {}, game: { tol: 0.01 }, result: 'Deep breaths on the bench.' },
     ],
   },
@@ -102,7 +102,7 @@ export const GAME_EVENTS = [
     id: 'g_shake_it_off', trigger: 'afterBad', title: 'Shake It Off',
     text: 'A veteran teammate sits next to you on the bench after that mistake.',
     choices: [
-      { label: 'Listen to his advice', effects: { rel: { teammates: 3 } }, game: { tol: 0.04 }, result: '"Next play mentality." It works.' },
+      { label: 'Listen to the advice', effects: { rel: { teammates: 3 } }, game: { tol: 0.04 }, result: '"Next play mentality." It works.' },
       { label: 'Stew on it', effects: { mood: -3 }, game: { tol: -0.03 }, result: 'You replay it in your head for a quarter.' },
     ],
   },
@@ -127,7 +127,7 @@ export const GAME_EVENTS = [
     id: 'g_hit_retaliate', trigger: 'bigHit', title: 'Late Hit',
     text: 'That hit came after the whistle. The defender is standing over you, talking trash.',
     choices: [
-      { label: 'Shove him', effects: { fame: 1 }, game: { flag: true, momentum: 0.05 }, result: 'Offsetting penalties... no, just yours.' },
+      { label: 'Shove back', effects: { fame: 1 }, game: { flag: true, momentum: 0.05 }, result: 'Offsetting penalties... no, just yours.' },
       { label: 'Let the refs handle it', effects: { rel: { coach: 3 } }, game: { momentum: 0.1 }, result: 'Flag on THEM. 15 free yards.' },
     ],
   },
@@ -151,7 +151,7 @@ export const GAME_EVENTS = [
   },
   {
     id: 'g_halftime_adjust', trigger: 'halftime', title: 'Halftime Adjustments',
-    text: 'The coordinator spots a weakness on the whiteboard. "Watch their #24. He bites on everything."',
+    text: 'The coordinator spots a weakness on the whiteboard. "Watch their #24. Bites on everything."',
     choices: [
       { label: 'Study the tape on the tablet', effects: { train: { iq: 0.3 } }, game: { tol: 0.05 }, result: 'You see it now. It is going to be a good half.' },
       { label: 'Trust your instincts', effects: {}, game: { momentum: 0.05 }, result: 'You already knew.' },
@@ -170,7 +170,7 @@ export const GAME_EVENTS = [
     id: 'g_clutch_defense', trigger: 'clutch', cond: { positions: ['CB'] }, title: 'Shadow Their Best',
     text: 'Fourth quarter. Their star receiver is killing the other corner. Coach asks if you want the assignment.',
     choices: [
-      { label: '"Put me on him."', effects: { fame: 1 }, game: { extra: true, tol: -0.02 }, result: 'You walk across the field. The crowd notices.' },
+      { label: '"Put me on their WR1."', effects: { fame: 1 }, game: { extra: true, tol: -0.02 }, result: 'You walk across the field. The crowd notices.' },
       { label: '"I\'ll play my side."', effects: {}, game: { tol: 0.02 }, result: 'Stay disciplined.' },
     ],
   },
@@ -187,7 +187,7 @@ export const GAME_EVENTS = [
     id: 'g_injured_teammate', trigger: 'random', title: 'Teammate Down',
     text: 'A teammate is carted off. The sideline is shaken.',
     choices: [
-      { label: 'Rally the troops', effects: { rel: { teammates: 4 } }, game: { momentum: 0.15 }, result: '"Let\'s win this one for him."' },
+      { label: 'Rally the troops', effects: { rel: { teammates: 4 } }, game: { momentum: 0.15 }, result: '"Let\'s win this one for #52."' },
       { label: 'Stay focused on your job', effects: {}, game: { tol: 0.02 }, result: 'Head down. Next play.' },
     ],
   },
@@ -233,9 +233,9 @@ export const GAME_EVENTS = [
   },
   {
     id: 'g_cb_bait', trigger: 'random', cond: { positions: ['CB'] }, title: 'Bait the QB?',
-    text: 'You notice the QB stares down his first read. You could play off and bait him.',
+    text: 'You notice the QB stares down the first read. You could play off and bait the throw.',
     choices: [
-      { label: 'Bait him', effects: {}, game: {}, chance: { p: 0.5, stat: 'iq', successGame: { momentum: 0.3, points: 0, extra: true }, successText: 'He takes the bait... you nearly had it. Next time.', failGame: { oppBoost: true }, failText: 'He sees through it. Big completion behind you.' }, result: '' },
+      { label: 'Bait the throw', effects: {}, game: {}, chance: { p: 0.5, stat: 'iq', successGame: { momentum: 0.3, points: 0, extra: true }, successText: 'The QB takes the bait... you nearly had it. Next time.', failGame: { oppBoost: true }, failText: 'He sees through it. Big completion behind you.' }, result: '' },
       { label: 'Play it straight', effects: {}, game: { tol: 0.02 }, result: 'Disciplined coverage.' },
     ],
   },

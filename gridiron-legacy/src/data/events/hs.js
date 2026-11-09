@@ -26,7 +26,7 @@ export const HS_EVENTS = [
   },
   {
     id: 'hs_party_fallout', title: 'Laps at Dawn', stages: ['hs'], cond: { flags: { hs_party_caught: true } },
-    text: 'Coach {coach} meets you at the track at 5:30 a.m. "You want to party? Let\'s party." He points at the bleachers.',
+    text: 'Coach {coach} meets you at the track at 5:30 a.m. "You want to party? Let\'s party." Coach points at the bleachers.',
     choices: [
       { label: 'Run every step without a word', effects: { rel: { coach: 12 }, health: -6, train: { speed: 0.6 }, clearFlags: ['hs_party_caught'] }, result: 'By the 40th flight, Coach is almost smiling.' },
       { label: 'Argue it was harmless', effects: { rel: { coach: -8 }, suspend: 1, clearFlags: ['hs_party_caught'] }, result: '"Then you can watch Friday\'s game from the bench."' },
@@ -103,7 +103,7 @@ export const HS_EVENTS = [
     id: 'hs_qb_audible', title: 'The Audible', stages: ['hs'], cond: { positions: ['QB'] },
     text: 'Coach {coach} has called the same run play six times. You see a blitz coming that would leave the slot wide open.',
     choices: [
-      { label: 'Audible to the pass', chance: { p: 0.5, stat: 'iq', success: { effects: { fame: 3, rel: { coach: 6 }, train: { iq: 1 } }, result: 'Touchdown. Coach says nothing, but he gives you the headset next week.' }, fail: { effects: { rel: { coach: -10 } }, result: 'Interception. "MY plays, son."' } } },
+      { label: 'Audible to the pass', chance: { p: 0.5, stat: 'iq', success: { effects: { fame: 3, rel: { coach: 6 }, train: { iq: 1 } }, result: 'Touchdown. Coach says nothing, but hands you the headset next week.' }, fail: { effects: { rel: { coach: -10 } }, result: 'Interception. "MY plays, son."' } } },
       { label: 'Run the call', effects: { rel: { coach: 3 } }, result: 'Two-yard gain. Safe. Boring.' },
     ],
   },
@@ -120,15 +120,15 @@ export const HS_EVENTS = [
     text: 'Someone in a college polo is sitting in the bleachers with a clipboard. Every teammate has noticed.',
     choices: [
       { label: 'Play your game', effects: { mood: 3, rel: { coach: 2 } }, result: 'Calm and steady. Exactly what scouts want to see.' },
-      { label: 'Try to show off', chance: { p: 0.5, success: { effects: { fame: 4 }, result: 'Your highlight play goes straight into his notebook.' }, fail: { effects: { fame: -1, rel: { coach: -4 } }, result: 'You freelance, it backfires, and he leaves at halftime.' } } },
+      { label: 'Try to show off', chance: { p: 0.5, success: { effects: { fame: 4 }, result: 'Your highlight play goes straight into the scout\'s notebook.' }, fail: { effects: { fame: -1, rel: { coach: -4 } }, result: 'You freelance, it backfires, and he leaves at halftime.' } } },
     ],
   },
   {
     id: 'hs_teammate_quit', title: 'Best Friend Quits', stages: ['hs'],
-    text: 'Your best friend on the team says he is quitting to work at his uncle\'s shop. He has been the guy blocking for you since peewee.',
+    text: 'Your best friend on the team says they are quitting to work at their uncle\'s shop. They have been blocking for you since peewee.',
     choices: [
-      { label: 'Talk him into staying', chance: { p: 0.6, success: { effects: { rel: { teammates: 10 }, mood: 5 }, result: 'He stays. "Somebody has to keep you upright."' }, fail: { effects: { mood: -6 }, result: 'His mind is made up. You hug it out.' } } },
-      { label: 'Support his choice', effects: { mood: -2, rel: { teammates: 3 } }, result: '"Come to my games," you tell him. He does, every single one.' },
+      { label: 'Talk them into staying', chance: { p: 0.6, success: { effects: { rel: { teammates: 10 }, mood: 5 }, result: 'They stay. "Somebody has to keep you upright."' }, fail: { effects: { mood: -6 }, result: 'His mind is made up. You hug it out.' } } },
+      { label: 'Support their choice', effects: { mood: -2, rel: { teammates: 3 } }, result: '"Come to my games," you tell them. They do, every single one.' },
     ],
   },
   {
@@ -145,7 +145,7 @@ export const HS_EVENTS = [
     text: 'Coach {coach} offers to work with you one-on-one on Saturday mornings. "You\'ve got something, kid."',
     choices: [
       { label: 'Absolutely', effects: { train: { skill: 1.2, iq: 1.2 }, rel: { coach: 8 }, mood: -2 }, result: 'Six weeks later, you are a different player.' },
-      { label: 'Saturdays are for rest', effects: { health: 4, rel: { coach: -3 } }, result: 'He nods, but you can tell he is disappointed.' },
+      { label: 'Saturdays are for rest', effects: { health: 4, rel: { coach: -3 } }, result: 'Coach nods, but you can tell they are disappointed.' },
     ],
   },
   {
@@ -159,9 +159,9 @@ export const HS_EVENTS = [
   },
   {
     id: 'hs_gatorade_bath', title: 'The Big Bet', stages: ['hs'], cond: { minWeek: 4 },
-    text: 'The team bets Coach {coach} that if you win the next two games, he has to shave his mustache.',
+    text: 'The team bets Coach {coach} that if you win the next two games, Coach has to dye their hair in team colors.',
     choices: [
-      { label: 'Hype it up', effects: { rel: { teammates: 8, coach: -2 }, mood: 6, fame: 1 }, result: 'Posters go up around school: SAVE THE STACHE?' },
+      { label: 'Hype it up', effects: { rel: { teammates: 8, coach: -2 }, mood: 6, fame: 1 }, result: 'Posters go up around school: DYE, COACH, DYE?' },
       { label: 'Stay out of it', effects: { rel: { coach: 3 } }, result: 'Coach appreciates the respect.' },
     ],
   },

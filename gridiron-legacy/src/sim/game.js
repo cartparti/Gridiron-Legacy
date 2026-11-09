@@ -207,7 +207,7 @@ function buildMoment(state, g, d, over = {}) {
     down, distance, yardLine, quarter: d.quarter, clock, clutch,
     twoMin: !!d.twoMin,
     weather: g.weather,
-    label: `${label}${ords[down]} & ${yardLine <= distance ? 'Goal' : distance} at ${yardText(yardLine)}`,
+    label: `${label}${ords[down]} and ${yardLine <= distance ? 'Goal' : distance} at ${yardText(yardLine)}`,
     trailing: userScore(g) < oppScore(g),
     situation: d.twoMin ? (isDefense(state) ? 'Final stand' : 'Two-minute drill') : clutch ? 'Clutch' : null,
   };

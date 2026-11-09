@@ -7,12 +7,14 @@ import * as flow from '../../sim/flow.js';
 import { fmtMoney, signed } from '../../core/util.js';
 import { teamBadge } from '../components.js';
 import { sfx } from '../../audio/sfx.js';
+import { icon } from '../icons.js';
 
-const AWARD_ICONS = { 'Most Valuable Player': '👑', 'Legacy Bowl Champion': '🏆', 'Heritage Bowl Champion': '🏆', 'State Champion': '🏆', 'Ironstone Trophy': '🥇', 'Legacy Bowl MVP': '⭐' };
+const AWARD_ICONS = { 'Most Valuable Player': 'crown', 'Legacy Bowl Champion': 'trophy', 'Heritage Bowl Champion': 'trophy', 'State Champion': 'trophy', 'Ironstone Trophy': 'medal', 'Legacy Bowl MVP': 'star' };
 
 export function statLine(pos, s) {
   if (pos === 'QB') return [[`${s.passComp}/${s.passAtt}`, 'Comp/Att'], [s.passYds, 'Pass Yds'], [`${s.passTD}/${s.int}`, 'TD/INT']];
   if (pos === 'RB') return [[s.rushAtt, 'Carries'], [s.rushYds, 'Rush Yds'], [s.rushTD, 'TD']];
+  if (pos === 'CB') return [[s.defInt ?? 0, 'INT'], [s.pd ?? 0, 'Pass Def'], [s.tackles ?? 0, 'Tackles']];
   return [[`${s.rec}/${s.targets}`, 'Rec/Tgt'], [s.recYds, 'Rec Yds'], [s.recTD, 'TD']];
 }
 
@@ -31,7 +33,7 @@ export function postgameScreen(app) {
         h('span.vs', 'FINAL'),
         h('div.team-badge', teamBadge(home, 50), h('span.nm', home.city), h('span.display', { style: { fontSize: '2rem' } }, g.score.home)))),
     h('div.card',
-      h('div.src.small.muted', `📰 ${g.outlet}`),
+      h('div.src.small.muted', g.outlet),
       h('h2', { style: { textTransform: 'none' } }, g.headline)),
     g.sitOut ? h('div.card', h('p', 'You watched this one from the sideline.')) : h('div.card',
       h('div.row', h('div.grade', { style: { color: g.grade >= 70 ? 'var(--good)' : g.grade >= 50 ? 'var(--warn)' : 'var(--bad)' } }, g.letter),
@@ -44,7 +46,7 @@ export function postgameScreen(app) {
       h(`span.chip.${d.fame >= 0 ? 'good' : 'bad'}`, `Fame ${signed(d.fame, 1)}`),
       h(`span.chip.${d.coach >= 0 ? 'good' : 'bad'}`, `Coach ${signed(d.coach, 1)}`),
       h(`span.chip.${d.mood >= 0 ? 'good' : 'bad'}`, `Mood ${signed(d.mood, 1)}`)),
-      g.injury ? h('p.bad', h('b', `🩹 Injured: ${g.injury.label}, out ~${g.injury.weeks} week${g.injury.weeks > 1 ? 's' : ''}.`)) : null),
+      g.injury ? h('p.bad', h('b', `Injured: ${g.injury.label}, out ~${g.injury.weeks} week${g.injury.weeks > 1 ? 's' : ''}.`)) : null),
     h('button.btn.primary.block', { onclick: () => { sfx.click(); flow.continueAfterGame(st); app.hubTab = 'week'; app.commit(); } }, 'Continue'));
 }
 
@@ -60,11 +62,11 @@ export function reviewScreen(app) {
     h('div.card',
       h('div.bigstat',
         h('div', h('b', r.record), h('span', 'Record')),
-        h('div', h('b', r.champion ? '🏆' : r.seed >= 0 ? `#${(r.seed % 4) + 1}` : '—'), h('span', r.champion ? 'Champions' : r.seed >= 0 ? 'Playoff seed' : 'No playoffs')),
+        h('div', h('b', r.champion ? '★' : r.seed >= 0 ? `#${(r.seed % 4) + 1}` : '—'), h('span', r.champion ? 'Champions' : r.seed >= 0 ? 'Playoff seed' : 'No playoffs')),
         h('div', h('b', r.perf), h('span', 'Season rating'))),
       h('p.small.muted', { style: { marginTop: '8px' } }, `${STAGES[r.stage].titleName}: ${champ.city} ${champ.name}`)),
-    r.awards.length ? h('div.col', r.awards.map((a, i) => h('div.award', { style: { animationDelay: `${i * 0.15}s` } }, h('span.ico', AWARD_ICONS[a] ?? '🏅'), h('div', h('div.nm', a), h('div.tiny.muted', `${r.year}`))))) : null,
-    r.records.length ? h('div.card', { style: { borderColor: 'var(--accent)' } }, h('h3', '📜 Records Broken'), r.records.map((x) => h('p', h('b', x)))) : null,
+    r.awards.length ? h('div.col', r.awards.map((a, i) => h('div.award', { style: { animationDelay: `${i * 0.15}s` } }, h('span.ic', icon(AWARD_ICONS[a] ?? 'medal')), h('div', h('div.nm', a), h('div.tiny.muted', `${r.year}`))))) : null,
+    r.records.length ? h('div.card', { style: { borderColor: 'var(--accent)' } }, h('h3', 'Records Broken'), r.records.map((x) => h('p', h('b', x)))) : null,
     h('div.card', h('h3', 'Season Stats'), h('div.bigstat', statLine(p.position, r.seasonStats).map(([v, l]) => h('div', h('b', v), h('span', l)))),
       h('p.tiny.muted', { style: { marginTop: '6px' } }, `${r.seasonStats.games} games played`)),
     r.leaders ? h('div.card', h('h3', 'League Leaders'), leadersTable(r.leaders, p)) : null,

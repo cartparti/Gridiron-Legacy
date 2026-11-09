@@ -1,10 +1,14 @@
-// Owns the single WebGL renderer, the stadium, the render loop, the HUD overlay,
-// and launches minigames. If WebGL is unavailable, a simple 2D timing meter is used instead.
+// Owns the single WebGL renderer (drawn at low resolution and scaled up with crisp pixels),
+// the stadium, the render loop, weather effects, the HUD overlay, and launches minigames.
+// If WebGL is unavailable, a simple 2D timing meter is used instead.
 import * as THREE from 'three';
 import { buildStadium } from './stadium.js';
-import { qbThrow } from './minigames/qbThrow.js';
-import { rbRun } from './minigames/rbRun.js';
-import { wrCatch } from './minigames/wrCatch.js';
+import { passPlay } from './minigames/passPlay.js';
+import { runPlay } from './minigames/runPlay.js';
+import { routePlay } from './minigames/routePlay.js';
+import { goalLine } from './minigames/goalLine.js';
+import { coverPlay } from './minigames/coverPlay.js';
+import { tacklePlay } from './minigames/tacklePlay.js';
 import { fallbackMeter } from './minigames/fallback.js';
 
 let R = null;
@@ -12,34 +16,39 @@ let failed = false;
 let raf = 0;
 let loopFn = null;
 let elapsed = 0;
+let shake = 0;
+
+/** Internal render width in pixels: low on purpose for the retro look. */
+function pixelWidth(w) {
+  return Math.round(Math.max(240, Math.min(440, w / 2)));
+}
 
 function ensure() {
   if (R) return R;
   if (failed) return null;
   try {
     const el = document.getElementById('stage');
-    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(1);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.domElement.classList.add('pixelated');
     el.append(renderer.domElement);
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#0d1b2a');
-    scene.fog = new THREE.Fog('#0d1b2a', 90, 220);
-    const camera = new THREE.PerspectiveCamera(55, 1, 0.3, 500);
-    scene.add(new THREE.HemisphereLight('#dbe9ff', '#2f4f2f', 1.6));
-    const sun = new THREE.DirectionalLight('#fff6e0', 1.7);
-    sun.position.set(30, 60, 25);
-    scene.add(sun);
+    scene.background = new THREE.Color('#5aa0d8');
+    const camera = new THREE.PerspectiveCamera(36, 1, 1, 600);
     const stadium = buildStadium(scene);
     const clock = new THREE.Clock();
-    R = { renderer, scene, camera, stadium, clock, el };
+    const weather = makeWeather(scene);
+    R = { renderer, scene, camera, stadium, clock, el, weather };
     const resize = () => {
       const w = window.innerWidth;
       const h = window.innerHeight;
-      renderer.setSize(w, h);
+      const pw = pixelWidth(w);
+      renderer.setSize(pw, Math.round((pw * h) / w), false);
+      renderer.domElement.style.width = '100%';
+      renderer.domElement.style.height = '100%';
       camera.aspect = w / h;
-      // Portrait phones need a taller field of view to see receivers out wide.
-      camera.fov = camera.aspect < 0.75 ? 66 : camera.aspect < 1.2 ? 58 : 50;
+      camera.fov = camera.aspect < 0.75 ? 50 : camera.aspect < 1.2 ? 40 : 32;
       camera.updateProjectionMatrix();
     };
     window.addEventListener('resize', resize);
@@ -55,8 +64,16 @@ function ensure() {
 function frame() {
   raf = requestAnimationFrame(frame);
   const dt = Math.min(0.05, R.clock.getDelta());
-  elapsed += dt;
-  if (loopFn) loopFn(dt, elapsed);
+  const slow = R.slowmo > 0 ? 0.3 : 1;
+  R.slowmo = Math.max(0, (R.slowmo ?? 0) - dt);
+  elapsed += dt * slow;
+  if (loopFn) loopFn(dt * slow, elapsed);
+  R.weather.update(dt, R.camera);
+  if (shake > 0) {
+    shake = Math.max(0, shake - dt);
+    R.camera.position.x += (Math.random() - 0.5) * shake * 1.5;
+    R.camera.position.y += (Math.random() - 0.5) * shake * 1.5;
+  }
   R.renderer.render(R.scene, R.camera);
 }
 
@@ -76,6 +93,65 @@ function stop() {
   if (R) R.el.classList.remove('on');
 }
 
+/** Camera shake (tackles, big hits). */
+export function cameraShake(s = 0.3) {
+  shake = Math.max(shake, s);
+}
+
+/** Brief slow motion (big catches, interceptions). */
+export function slowMo(seconds = 0.6) {
+  if (R) R.slowmo = seconds;
+}
+
+// ------------------------------------------------------------------ weather
+
+function makeWeather(scene) {
+  const n = 500;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(n * 3);
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({ color: '#cfe3ff', size: 0.25, transparent: true, opacity: 0.8, depthWrite: false });
+  const pts = new THREE.Points(geo, mat);
+  pts.frustumCulled = false;
+  pts.visible = false;
+  scene.add(pts);
+  let kind = 'clear';
+  const reset = (i, cam, top) => {
+    pos[i * 3] = cam.position.x + (Math.random() - 0.5) * 60;
+    pos[i * 3 + 1] = top ? 18 + Math.random() * 6 : Math.random() * 24;
+    pos[i * 3 + 2] = cam.position.z - 10 - Math.random() * 45;
+  };
+  return {
+    set(w, cam) {
+      kind = w;
+      pts.visible = w === 'rain' || w === 'snow';
+      mat.color.set(w === 'snow' ? '#ffffff' : '#a9c9ff');
+      mat.size = w === 'snow' ? 0.35 : 0.18;
+      for (let i = 0; i < n; i++) reset(i, cam, false);
+      geo.attributes.position.needsUpdate = true;
+    },
+    update(dt, cam) {
+      if (!pts.visible) return;
+      const vy = kind === 'snow' ? 3 : 28;
+      for (let i = 0; i < n; i++) {
+        pos[i * 3 + 1] -= vy * dt;
+        if (kind === 'snow') pos[i * 3] += Math.sin(elapsed * 2 + i) * dt;
+        else pos[i * 3] += 4 * dt;
+        if (pos[i * 3 + 1] < 0) reset(i, cam, true);
+      }
+      geo.attributes.position.needsUpdate = true;
+    },
+  };
+}
+
+function applyAtmosphere(r, weather) {
+  const sky = { clear: '#5aa0d8', night: '#0d1424', rain: '#4b5866', snow: '#9aa7b4', wind: '#6f9cc4' }[weather] ?? '#5aa0d8';
+  r.scene.background = new THREE.Color(sky);
+  r.scene.fog = weather === 'night' ? new THREE.Fog(sky, 120, 260) : weather === 'rain' || weather === 'snow' ? new THREE.Fog(sky, 60, 170) : null;
+  r.stadium.setTint(weather);
+  r.weather.set(weather, r.camera);
+}
+
 // ------------------------------------------------------------------ title backdrop
 
 let backdropOn = false;
@@ -83,12 +159,13 @@ export function startBackdrop() {
   const r = ensure();
   if (!r) return;
   backdropOn = true;
-  r.stadium.setTeams(['#b5121b', '#f5d547'], ['#1d3557', '#f1c40f'], 'Legacy', 'Gridiron');
+  r.stadium.setTeams(['#c1121f', '#ffd166'], ['#1d3557', '#f1c40f'], 'LEGACY', 'GRIDIRON');
   r.stadium.world.position.set(0, 0, 0);
   r.stadium.hideLines();
+  applyAtmosphere(r, 'night');
   start((dt, t) => {
-    const a = t * 0.07;
-    r.camera.position.set(Math.sin(a) * 70, 26 + Math.sin(t * 0.2) * 4, Math.cos(a) * 85);
+    const a = t * 0.06;
+    r.camera.position.set(Math.sin(a) * 75, 34 + Math.sin(t * 0.2) * 4, Math.cos(a) * 90);
     r.camera.lookAt(0, 0, 0);
     r.stadium.animateCrowd(t, 0.25);
   });
@@ -105,36 +182,47 @@ export function stopBackdrop() {
 export function makeHud() {
   const el = document.createElement('div');
   el.className = 'hud';
-  el.innerHTML = '<div class="top"><div class="sit"></div><div class="sit call"></div></div><div class="instr"></div><div class="mid"></div><div class="bottom"></div>';
+  el.innerHTML = `
+    <div class="hud-top">
+      <div class="hud-pill sit"></div>
+      <div class="hud-pill hud-call"></div>
+    </div>
+    <div class="hud-instr"></div>
+    <div class="hud-mid"></div>
+    <div class="hud-bottom"></div>`;
   document.body.append(el);
   const q = (s) => el.querySelector(s);
   let bigTimer = 0;
   return {
     el,
-    top: (left, right) => { q('.sit').textContent = left; q('.call').textContent = right; },
-    instr: (text) => { q('.instr').textContent = text; q('.instr').style.display = text ? '' : 'none'; },
+    top: (left, right) => { q('.sit').textContent = left; q('.hud-call').textContent = right; q('.hud-call').dataset.call = right.toLowerCase(); },
+    instr: (text) => { const i = q('.hud-instr'); i.textContent = text; i.classList.toggle('show', !!text); },
     big: (text, color = '#fff', ms = 1100) => {
       const b = document.createElement('div');
-      b.className = 'big';
+      b.className = 'hud-big';
       b.style.color = color;
       b.textContent = text;
-      q('.mid').append(b);
+      q('.hud-mid').replaceChildren(b);
       clearTimeout(bigTimer);
       bigTimer = setTimeout(() => b.remove(), ms);
     },
-    bottom: (node) => { const b = q('.bottom'); b.innerHTML = ''; if (node) b.append(node); },
+    bottom: (node) => { const b = q('.hud-bottom'); b.replaceChildren(); if (node) b.append(node); },
     remove: () => el.remove(),
   };
 }
 
-
 // ------------------------------------------------------------------ minigames
 
-const GAMES = { qb_throw: qbThrow, rb_run: rbRun, wr_catch: wrCatch };
+const GAMES = {
+  qb_throw: passPlay, qb_hailmary: passPlay,
+  rb_run: runPlay, qb_scramble: runPlay, rb_screen: runPlay,
+  rb_goalline: goalLine,
+  wr_route: routePlay, wr_jumpball: routePlay, wr_toetap: routePlay, wr_catch: routePlay,
+  cb_cover: coverPlay, cb_tackle: tacklePlay,
+};
 
 /**
- * Run a key-moment minigame. Resolves with
- * { quality, yards, td, turnover, sack, complete, text } or { fallbackQuality } in 2D mode.
+ * Run a key-moment minigame. Resolves with the result object, or { fallbackQuality } in 2D mode.
  */
 export function runMinigame(type, opts) {
   stopBackdrop();
@@ -151,25 +239,30 @@ export function runMinigame(type, opts) {
       app.style.visibility = '';
       resolve(result);
     };
+    const m = opts.moment;
+    const sitText = `${m.label}${m.situation ? ` · ${m.situation}` : ''}`;
+    hud.top(sitText, opts.call.toUpperCase());
     if (!r) {
       fallbackMeter({ hud, opts, done: finish, addCleanup: (f) => cleanups.push(f) });
       return;
     }
-    const m = opts.moment;
-    const offenseFar = opts.oppColors;
-    r.stadium.setTeams(offenseFar, opts.teamColors, 'OPP', 'HOME', opts.homeColors);
+    // On defense, the opponent attacks toward the far end zone (ours).
+    if (m.defense) r.stadium.setTeams(opts.teamColors, opts.oppColors, 'HOME', 'OPP', opts.homeColors);
+    else r.stadium.setTeams(opts.oppColors, opts.teamColors, 'OPP', 'HOME', opts.homeColors);
     r.stadium.setYardLine(m.yardLine, m.distance);
+    applyAtmosphere(r, m.weather ?? 'clear');
     const group = new THREE.Group();
     r.scene.add(group);
     cleanups.push(() => {
       r.scene.remove(group);
-      group.traverse((o) => { if (o.isSprite) o.material.map?.dispose(); });
+      group.traverse((o) => { if (o.isSprite && o.material.map && !o.material.map.isShared) o.material.map.dispose?.(); });
     });
     const ctx = {
-      THREE, scene: r.scene, group, camera: r.camera, stadium: r.stadium, canvas: r.renderer.domElement, hud, opts,
+      THREE, type, scene: r.scene, group, camera: r.camera, stadium: r.stadium, canvas: r.renderer.domElement, hud, opts,
       addCleanup: (f) => cleanups.push(f),
       done: finish,
-      /** Raycast a pointer event to the ground plane (y = 0). */
+      shake: cameraShake,
+      slowMo,
       groundPoint(ev) {
         const rect = r.renderer.domElement.getBoundingClientRect();
         const ndc = new THREE.Vector2(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
@@ -179,8 +272,6 @@ export function runMinigame(type, opts) {
         return ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), pt) ? pt : null;
       },
     };
-    const sitText = `${m.label}${m.clutch ? ' · CLUTCH' : ''}`;
-    hud.top(sitText, opts.call.toUpperCase());
     const update = GAMES[type](ctx);
     start((dt, t) => {
       update(dt, t);

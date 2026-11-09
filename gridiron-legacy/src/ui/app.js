@@ -105,6 +105,7 @@ export const app = {
 
   render() {
     const root = document.getElementById('app');
+    const scrollY = window.scrollY;
     closeAllModals();
     clear(root);
     root.className = '';
@@ -133,7 +134,12 @@ export const app = {
         default: view = hubScreen(this);
       }
     }
+    // Only animate when the screen actually changes, not on every redraw.
+    const key = `${this.screen}|${this.state?.phase ?? ''}|${this.hubTab}`;
+    if (key === this.ui.lastViewKey) root.classList.add('no-anim');
+    else window.scrollTo(0, 0);
+    this.ui.lastViewKey = key;
     if (view) root.append(view);
-    window.scrollTo(0, 0);
+    if (root.classList.contains('no-anim')) window.scrollTo(0, scrollY);
   },
 };

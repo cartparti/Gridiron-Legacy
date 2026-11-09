@@ -45,7 +45,7 @@ export const ANY_EVENTS = [
     id: 'any_teammate_birthday', title: 'Surprise Party', weight: 0.8, repeat: true,
     text: 'The team is throwing a surprise party for your center. Everyone is chipping in.',
     choices: [
-      { label: 'Chip in and plan it', effects: { money: -100, rel: { teammates: 7 }, mood: 4, energy: -1 }, result: 'He cries. Linemen are big softies.' },
+      { label: 'Chip in and plan it', effects: { money: -100, rel: { teammates: 7 }, mood: 4, energy: -1 }, result: 'Your center cries. Linemen are big softies.' },
       { label: 'Just show up', effects: { rel: { teammates: 2 } }, result: 'Good cake.' },
     ],
   },
@@ -170,10 +170,10 @@ export const ANY_EVENTS = [
   },
   {
     id: 'any_mentor_call', title: 'An Old Coach Calls', weight: 0.5, phase: 'offseason',
-    text: 'Your peewee coach calls out of the blue. He is retiring and wanted you to know you were his favorite.',
+    text: 'Your peewee coach calls out of the blue. They are retiring and wanted you to know you were their favorite.',
     choices: [
-      { label: 'Go to his retirement party', effects: { mood: 10, fame: 1, rel: { family: 4 } }, result: 'You give a speech. There is not a dry eye in the room.' },
-      { label: 'Send a gift', effects: { money: -200, mood: 4 }, result: 'He sends back a photo of you at age 8, in a helmet too big for you.' },
+      { label: 'Go to the retirement party', effects: { mood: 10, fame: 1, rel: { family: 4 } }, result: 'You give a speech. There is not a dry eye in the room.' },
+      { label: 'Send a gift', effects: { money: -200, mood: 4 }, result: 'Coach sends back a photo of you at age 8, in a helmet too big for you.' },
     ],
   },
   {

@@ -31,8 +31,7 @@ export function maybeTip(ctx, title, lines, start) {
   if (!ctx.opts.showTips) { start(); return; }
   const box = document.createElement('div');
   box.className = 'tipbox';
-  box.style.cssText = 'position:absolute;left:16px;right:16px;top:30%;background:rgba(10,15,12,0.92);border:2px solid #f4c430;border-radius:16px;padding:16px;pointer-events:auto;font-family:system-ui,sans-serif;text-shadow:none;text-align:left;';
-  box.innerHTML = `<div style="font-weight:900;font-size:1.2rem;text-transform:uppercase;color:#f4c430;margin-bottom:6px">${title}</div>${lines.map((l) => `<p style="margin:6px 0;font-size:0.95rem">${l}</p>`).join('')}<div style="margin-top:12px;font-weight:800;text-align:center;background:#f4c430;color:#111;border-radius:10px;padding:12px">TAP TO START</div>`;
+  box.innerHTML = `<div class="tip-k">How to play</div><div class="tip-t">${title}</div>${lines.map((l) => `<p>${l}</p>`).join('')}<div class="tip-go">Tap to start</div>`;
   ctx.hud.el.append(box);
   const go = (ev) => {
     ev?.preventDefault?.();
@@ -48,6 +47,24 @@ export function maybeTip(ctx, title, lines, start) {
   window.addEventListener('keydown', key);
 }
 
+/**
+ * Retro broadcast camera: fixed high angle behind the play, smoothly tracking a point.
+ * zoom 1 = wide (whole route tree), 0.6 = tight (run plays).
+ */
+export function rig(camera, x, z, dt, { zoom = 1, ahead = 8, k = 4, snap = false } = {}) {
+  const h = 30 * zoom;
+  const back = 26 * zoom;
+  const a = snap ? 1 : 1 - Math.exp(-k * dt);
+  camera.position.x += (x * 0.85 - camera.position.x) * a;
+  camera.position.y += (h - camera.position.y) * a;
+  camera.position.z += (z + back - camera.position.z) * a;
+  camera.userData.look = camera.userData.look ?? { x, z };
+  const L = camera.userData.look;
+  L.x += (x - L.x) * a;
+  L.z += (z - ahead - L.z) * a;
+  camera.lookAt(L.x, 0, L.z);
+}
+
 /** Smoothly move the camera toward an offset from a target and look ahead. */
 export function follow(camera, tx, tz, off, look, dt, k = 4) {
   const a = 1 - Math.exp(-k * dt);
@@ -61,16 +78,32 @@ export function follow(camera, tx, tz, off, look, dt, k = 4) {
 export function endPlay(ctx, result, { color, delay = 1600 } = {}) {
   if (ctx.ended) return;
   ctx.ended = true;
-  const big = result.td ? 'TOUCHDOWN!' : result.turnover ? (result.text?.includes('FUMBLE') ? 'FUMBLE!' : 'INTERCEPTED!') : result.sack ? 'SACKED!' : result.complete ? `${result.yards >= 0 ? '+' : ''}${result.yards} YDS` : 'INCOMPLETE';
-  ctx.hud.big(big, color ?? (result.td ? '#4ade80' : result.turnover || result.sack ? '#f87171' : result.complete ? '#ffffff' : '#fbbf24'), delay + 400);
+  let big;
+  let good;
+  if (result.defense) {
+    big = result.defTD ? 'PICK SIX!' : result.int ? 'INTERCEPTION!' : result.forcedFumble ? 'FUMBLE!' : result.pd ? 'BROKEN UP!' : result.tdAllowed ? 'TOUCHDOWN...' : result.tackle ? `STOP! ${result.yardsAllowed} YDS` : `+${result.yardsAllowed} ALLOWED`;
+    good = result.int || result.pd || result.forcedFumble || (result.tackle && result.yardsAllowed < 6);
+  } else {
+    big = result.td ? 'TOUCHDOWN!' : result.turnover ? (result.text?.includes('FUMBLE') ? 'FUMBLE!' : 'INTERCEPTED!') : result.sack ? 'SACKED!' : result.complete ? `${result.yards >= 0 ? '+' : ''}${result.yards} YDS` : 'INCOMPLETE';
+    good = result.td || (result.complete && result.yards >= 10);
+  }
+  const bad = result.defense ? result.tdAllowed || result.yardsAllowed >= 15 : result.turnover || result.sack;
+  ctx.hud.big(big, color ?? (good ? '#4ade80' : bad ? '#f87171' : '#ffffff'), delay + 400);
   ctx.hud.instr('');
-  if (result.td) sfx.touchdown();
-  else if (result.turnover) sfx.groan();
+  if (result.td || result.int || result.defTD) { sfx.touchdown(); ctx.slowMo?.(0.5); }
+  else if (result.turnover) { sfx.groan(); ctx.shake?.(0.25); }
   else if (result.complete && result.yards >= 15) sfx.cheer();
   setTimeout(() => ctx.done(result), ctx.opts.reducedMotion ? 500 : delay);
 }
 
 export function finalize(result, moment) {
+  if (result.defense) {
+    result.yardsAllowed = Math.max(0, Math.round(result.yardsAllowed ?? 0));
+    if (!result.turnover && !result.pd && result.yardsAllowed >= moment.yardLine) { result.yardsAllowed = moment.yardLine; result.tdAllowed = true; }
+    result.text = result.text ?? (result.defTD ? 'PICK SIX!' : result.int ? 'INTERCEPTED!' : result.pd ? 'Broken up!' : result.tdAllowed ? 'They scored on you.' : `${result.yardsAllowed} yards allowed.`);
+    result.quality = Math.max(0, Math.min(1, result.quality));
+    return result;
+  }
   // Clamp to the goal line and mark touchdowns.
   if (!result.turnover && result.complete && result.yards >= moment.yardLine) {
     result.yards = moment.yardLine;

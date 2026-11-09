@@ -35,7 +35,7 @@ export const PRO_EVENTS = [
   },
   {
     id: 'pro_late_night_club', title: 'Club Invitation', stages: ['pro'], cond: { minFame: 30 },
-    text: 'A famous rapper invites you to his VIP table on Thursday night. Practice is Friday at 8.',
+    text: 'A famous rapper invites you to their VIP table on Thursday night. Practice is Friday at 8.',
     choices: [
       { label: 'Go, home by midnight', effects: { mood: 8, fame: 2, health: -3 }, result: 'Photos with celebrities. Home by 12:05.' },
       { label: 'Go all night', chance: { p: 0.5, success: { effects: { mood: 14, fame: 5, health: -8 }, result: 'Legendary night. You drag yourself through practice.' }, fail: { effects: { fame: -6, rel: { coach: -12 }, scandal: true }, result: 'Paparazzi catch you stumbling out at 4 a.m. Fined by the team.' } } },
@@ -63,9 +63,9 @@ export const PRO_EVENTS = [
     id: 'pro_cousin_loan', title: 'Cousin Needs Money', stages: ['pro'], cond: { minMoney: 100000 },
     text: 'Your cousin needs $60,000 for a "can\'t-miss" restaurant idea.',
     choices: [
-      { label: 'Give it', chance: { p: 0.3, success: { effects: { money: 20000, rel: { family: 10 } }, result: 'The restaurant is a hit! He pays you back with interest.' }, fail: { effects: { money: -60000, rel: { family: 4 } }, result: 'It closes in six months. He is very sorry.' } } },
+      { label: 'Give it', chance: { p: 0.3, success: { effects: { money: 20000, rel: { family: 10 } }, result: 'The restaurant is a hit! Your cousin pays you back with interest.' }, fail: { effects: { money: -60000, rel: { family: 4 } }, result: 'It closes in six months. Your cousin is very sorry.' } } },
       { label: 'Say no kindly', effects: { rel: { family: -6 } }, result: 'Thanksgiving is a little tense this year.' },
-      { label: 'Help him write a business plan', effects: { rel: { family: 6 }, energy: -1 }, result: 'He realizes he needs more planning first. Good outcome.' },
+      { label: 'Help write a business plan', effects: { rel: { family: 6 }, energy: -1 }, result: 'Your cousin realizes the idea needs more planning first. Good outcome.' },
     ],
   },
   {
@@ -95,11 +95,11 @@ export const PRO_EVENTS = [
   },
   {
     id: 'pro_teammate_dui', title: 'Teammate in Trouble', stages: ['pro'],
-    text: 'At 1 a.m., a teammate calls. He is at a bar and too drunk to drive.',
+    text: 'At 1 a.m., a teammate calls. They are at a bar and too drunk to drive.',
     choices: [
-      { label: 'Go get him', effects: { rel: { teammates: 12 }, health: -3 }, result: 'He never forgets it.' },
+      { label: 'Go get them', effects: { rel: { teammates: 12 }, health: -3 }, result: 'They never forget it.' },
       { label: 'Send a car service', effects: { rel: { teammates: 5 }, money: -150 }, result: 'Safe at home. Good enough.' },
-      { label: 'Ignore the call', effects: { rel: { teammates: -8 } }, result: 'He is arrested the next morning. The team suffers.' },
+      { label: 'Ignore the call', effects: { rel: { teammates: -8 } }, result: 'They are arrested the next morning. The team suffers.' },
     ],
   },
   {
@@ -160,10 +160,10 @@ export const PRO_EVENTS = [
   },
   {
     id: 'pro_mentor_rookie', title: 'Rookie Asks for Help', stages: ['pro'], cond: { minAge: 27 },
-    text: 'A nervous rookie at your position asks if you would watch film with him.',
+    text: 'A nervous rookie at your position asks if you would watch film with them.',
     choices: [
-      { label: 'Take him under your wing', effects: { rel: { teammates: 10, coach: 6 }, fame: 2, energy: -1 }, result: 'Five years later, he thanks you in his own award speech.' },
-      { label: 'He\'s competition', effects: { rel: { teammates: -6 } }, result: 'He figures it out without you. He remembers.' },
+      { label: 'Take them under your wing', effects: { rel: { teammates: 10, coach: 6 }, fame: 2, energy: -1 }, result: 'Five years later, they thank you in their own award speech.' },
+      { label: 'They\'re competition', effects: { rel: { teammates: -6 } }, result: 'They figure it out without you. They remember.' },
     ],
   },
   {
@@ -265,7 +265,7 @@ export const PRO_EVENTS = [
     text: 'A stranger at a gas station offers you $50,000 to "keep it close" this Sunday.',
     choices: [
       { label: 'Report it to the league', effects: { fame: 3, rel: { coach: 6 } }, result: 'The league investigates. You are praised for integrity.' },
-      { label: 'Walk away silently', effects: {}, result: 'You never see him again.' },
+      { label: 'Walk away silently', effects: {}, result: 'You never see them again.' },
     ],
   },
 ];

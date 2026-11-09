@@ -14,7 +14,7 @@ export const COLLEGE_EVENTS = [
     choices: [
       { label: 'Take it', chance: { p: 0.65, success: { effects: { money: 5000, mood: 3, flags: { took_booster_money: true } }, result: '$5,000 in cash. Your stomach feels weird.' }, fail: { effects: { money: 5000, fame: -8, suspend: 2, rel: { coach: -15, family: -10 } }, result: 'Compliance finds out. Two-game suspension and a national story.' } } },
       { label: 'Report it to compliance', effects: { rel: { coach: 8 }, fame: 2 }, result: 'The school thanks you quietly. The booster never calls again.' },
-      { label: 'Refuse politely', effects: { rel: { family: 4 } }, result: 'He shrugs. "Your loss, kid."' },
+      { label: 'Refuse politely', effects: { rel: { family: 4 } }, result: 'The booster shrugs. "Your loss, kid."' },
     ],
   },
   {
@@ -47,8 +47,8 @@ export const COLLEGE_EVENTS = [
     id: 'col_starter_battle', title: 'Depth Chart Battle', stages: ['college'], cond: { maxWeek: 3 },
     text: 'A five-star transfer just arrived at your position. Coach {coach} says the starting job is "open."',
     choices: [
-      { label: 'Outwork him every day', effects: { train: { skill: 1, speed: 0.5, strength: 0.5 }, mood: -4, health: -4, rel: { coach: 6 } }, result: 'You win the job. He transfers again by spring.' },
-      { label: 'Befriend him', effects: { rel: { teammates: 8 }, train: { iq: 0.8 } }, result: 'You push each other. Both of you get better.' },
+      { label: 'Outwork the transfer every day', effects: { train: { skill: 1, speed: 0.5, strength: 0.5 }, mood: -4, health: -4, rel: { coach: 6 } }, result: 'You win the job. The transfer leaves again by spring.' },
+      { label: 'Befriend the transfer', effects: { rel: { teammates: 8 }, train: { iq: 0.8 } }, result: 'You push each other. Both of you get better.' },
       { label: 'Complain to Coach', effects: { rel: { coach: -10 } }, result: '"Earn it."' },
     ],
   },
@@ -57,7 +57,7 @@ export const COLLEGE_EVENTS = [
     text: 'Your roommate plays drums. At 2 a.m. Every night.',
     choices: [
       { label: 'Buy noise-cancelling headphones ($250)', effects: { money: -250, health: 4 }, result: 'Silence. Glorious silence.' },
-      { label: 'Confront him', chance: { p: 0.5, success: { effects: { health: 6, mood: 3 }, result: 'He apologizes and switches to a practice pad.' }, fail: { effects: { mood: -6 }, result: 'Now he plays louder. Out of spite.' } } },
+      { label: 'Confront your roommate', chance: { p: 0.5, success: { effects: { health: 6, mood: 3 }, result: 'Your roommate apologizes and switches to a practice pad.' }, fail: { effects: { mood: -6 }, result: 'Now he plays louder. Out of spite.' } } },
       { label: 'Move off campus ($220/wk)', effects: { setHousing: 'offcampus', mood: 4 }, result: 'Your own place. Your own rules.' },
     ],
   },
@@ -139,7 +139,7 @@ export const COLLEGE_EVENTS = [
     text: 'Scouts are saying you could be a first-round pick. Teammates keep asking if you will declare early.',
     choices: [
       { label: '"Focused on this season."', effects: { rel: { coach: 6, teammates: 4 } }, result: 'Exactly what a leader says.' },
-      { label: 'Hint you\'re leaving', effects: { fame: 3, rel: { coach: -6 } }, result: 'Mock drafts move you up. Coach moves you down his Christmas list.' },
+      { label: 'Hint you\'re leaving', effects: { fame: 3, rel: { coach: -6 } }, result: 'Mock drafts move you up. Coach moves you down the Christmas card list.' },
     ],
   },
   {

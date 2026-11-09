@@ -12,13 +12,14 @@ import { meter, teamBadge, jersey, ratingChart, statBars, openModal, changeChips
 import { sfx } from '../../audio/sfx.js';
 import { eventModal } from './event.js';
 import { tipCard } from './tips.js';
+import { icon, activityIcon } from '../icons.js';
 
 const TABS = [
-  ['week', '📅', 'Week'],
-  ['team', '🏈', 'Team'],
-  ['life', '💬', 'Life'],
-  ['career', '⭐', 'Career'],
-  ['news', '📰', 'News'],
+  ['week', 'calendar', 'Week'],
+  ['team', 'ball', 'Team'],
+  ['life', 'chat', 'Life'],
+  ['career', 'star', 'Career'],
+  ['news', 'news', 'News'],
 ];
 
 export function topBar(app) {
@@ -34,7 +35,7 @@ export function topBar(app) {
         h('div.name', `${p.first} ${p.last}`),
         h('div.sub', `#${p.number} ${p.position} · Age ${p.age} · ${team ? team.name : ''}`),
         h('div.sub', `${stageLbl} · ${st.career.year} · ${wk}`)),
-      h('button.btn.small.ghost', { style: { color: '#fff', borderColor: 'rgba(255,255,255,0.4)' }, 'aria-label': 'Settings', onclick: () => { app.ui.back = 'career'; app.go('settings'); } }, '⚙')),
+      h('button.icon-btn', { 'aria-label': 'Settings', onclick: () => { app.ui.back = 'career'; app.go('settings'); } }, icon('gear'))),
     h('div.meters',
       meter('Energy', maxEnergy(st), 12),
       meter('Mood', p.mood),
@@ -53,7 +54,7 @@ export function hubScreen(app) {
   wrap.append(body);
   wrap.append(h('nav.tabs', TABS.map(([id, ico, label]) =>
     h(`button.tab${app.hubTab === id ? '.on' : ''}`, { onclick: () => { sfx.click(); app.hubTab = id; app.render(); } },
-      h('span.ico', ico), label))));
+      icon(ico), label))));
   if (st.phase === 'event' && st.pendingEvent) setTimeout(() => eventModal(app), 30);
   return wrap;
 }
@@ -92,9 +93,9 @@ function weekView(app) {
   // Matchup card
   if (m && opp) {
     const home = m.home;
-    container.append(h('div.card',
+    container.append(h('div.card.hero',
       h('div.card-title', h('h3', m.playoff ? roundName(st.league, st.league.playoffs.round) : `Week ${st.league.week + 1} of ${st.league.schedule.length}`),
-        h('span.chip', home ? 'HOME' : 'AWAY'), opp.id === st.career.rivalTeamId ? h('span.chip.bad', '🔥 RIVALRY') : null),
+        h('div.row', { style: { gap: '6px' } }, h('span.chip.pix', home ? 'HOME' : 'AWAY'), opp.id === st.career.rivalTeamId ? h('span.chip.bad.pix', icon('flame'), 'RIVAL') : null)),
       h('div.matchup',
         h('div.team-badge', teamBadge(me, 44), h('span.nm', me.name), h('span.rec', `${me.w}-${me.l}`)),
         h('span.vs', home ? 'vs' : '@'),
@@ -115,7 +116,7 @@ function weekView(app) {
       return h(`button.slot${a ? '.filled' : ''}${app.ui.activeSlot === i ? '.active' : ''}`, {
         'aria-label': `${d}: ${a ? a.label : 'empty'}`,
         onclick: () => { sfx.click(); if (a) { plan[i] = null; app.ui.activeSlot = i; } else app.ui.activeSlot = i; app.render(); },
-      }, h('span.day', d), h('span.ico', a ? a.icon : '＋'), h('span', a ? a.label : 'Free'), a ? h('span.tiny', a.cost ? `−${a.cost}⚡` : 'free') : null);
+      }, h('span.day', d), a ? activityIcon(a.id) : icon('plus'), h('span', a ? a.label : 'Free'), a ? h('span.tiny', a.cost ? `−${a.cost} energy` : 'free') : null);
     })),
     h('p.tiny.muted', { style: { marginTop: '8px' } }, `Game-day freshness: ${Math.round((left / max) * 100)}%. Tap a filled day to clear it.`)));
 
@@ -129,8 +130,8 @@ function weekView(app) {
       for (const a of list) {
         const ok = a.cost <= left;
         grid.append(h('button.act', { disabled: !ok, onclick: () => { sfx.select(); setSlot(app.ui.activeSlot, a.id); } },
-          h('span.ico', a.icon),
-          h('span.t', a.label, ' ', h('span.cost', a.cost ? `${a.cost}⚡` : 'free')),
+          activityIcon(a.id),
+          h('span.t', h('span', a.label), h('span.cost', a.cost ? `${a.cost}⚡` : 'FREE')),
           h('span.d', fillTokens(a.desc, tokens))));
       }
     }
@@ -163,7 +164,7 @@ function weekView(app) {
       app.ui.showEventResult = false;
       app.commit();
     },
-  }, cantPlay ? `Game Day (sitting out: ${status.reason})` : status.hurt && !playHurt ? 'Game Day (sitting out)' : 'Go to Game Day 🏈'));
+  }, icon('whistle'), cantPlay ? `Game Day (out: ${status.reason})` : status.hurt && !playHurt ? 'Game Day (sitting out)' : 'Go to Game Day'));
   return container;
 }
 
@@ -184,7 +185,7 @@ function teamView(app) {
       out.append(h('div.card', c ? h('h3', `${c} Conference`) : null, h('div.scroll-x', h('table.tbl',
         h('tr', h('th', '#'), h('th', 'Team'), h('th.num', 'W'), h('th.num', 'L'), h('th.num', 'PF'), h('th.num', 'PA'), h('th.num', 'Str')),
         rows.map((t, i) => h(`tr${t.id === st.career.teamId ? '.me' : ''}`,
-          h('td', i + 1), h('td', h('span.swatch', { style: { background: t.colors[0] } }), `${t.city} ${t.name}`, t.id === st.career.rivalTeamId ? ' 🔥' : ''),
+          h('td', i + 1), h('td', h('span.swatch', { style: { background: t.colors[0] } }), `${t.city} ${t.name}`, t.id === st.career.rivalTeamId ? ' (rival)' : ''),
           h('td.num', t.w), h('td.num', t.l), h('td.num', t.pf), h('td.num', t.pa), h('td.num', t.streak > 0 ? `W${t.streak}` : t.streak < 0 ? `L${-t.streak}` : '-')))))),
         h('p.tiny.muted', `Top ${league.kind === 'pro' ? 4 : STAGES[league.kind].playoffTeams} make the playoffs.`));
     }
@@ -239,12 +240,12 @@ function teamView(app) {
 // ------------------------------------------------------------------ LIFE
 
 const REL_INFO = [
-  ['coach', '📋', 'Coach', (p) => `Coach ${p.coachName}`, 'More key moments per game when trust is high.'],
-  ['teammates', '🤜', 'Teammates', () => 'Locker room', 'Team chemistry boosts your offense.'],
-  ['family', '🏡', 'Family', () => 'Family', 'Keeps your mood steady.'],
-  ['partner', '❤️', 'Partner', (p) => p.partnerName, 'A happy relationship lifts your mood.'],
-  ['agent', '💼', 'Agent', (p) => p.agentName, 'Better contracts and sponsor deals.'],
-  ['rival', '🔥', 'Rivalry', (p) => p.rivalName, 'Big games, big headlines.'],
+  ['coach', 'clipboard', 'Coach', (p) => `Coach ${p.coachName}`, 'More key moments per game when trust is high.'],
+  ['teammates', 'users', 'Teammates', () => 'Locker room', 'Team chemistry boosts your offense.'],
+  ['family', 'home', 'Family', () => 'Family', 'Keeps your mood steady.'],
+  ['partner', 'heart', 'Partner', (p) => p.partnerName, 'A happy relationship lifts your mood.'],
+  ['agent', 'briefcase', 'Agent', (p) => p.agentName, 'Better contracts and sponsor deals.'],
+  ['rival', 'flame', 'Rivalry', (p) => p.rivalName, 'Big games, big headlines.'],
 ];
 
 function lifeView(app) {
@@ -258,10 +259,10 @@ function lifeView(app) {
     out.append(h('div.card', h('h3', 'Relationships'),
       REL_INFO.map(([k, ico, label, who, why]) => {
         const v = p.rel[k];
-        if (v === null || v === undefined) return h('div.rel-row', h('span.ico', ico), h('div', h('b', label), h('div.tiny.muted', k === 'partner' ? 'Single. Events may change that.' : 'No agent yet. They find you in college or the pros.')), h('span.muted', '—'));
-        return h('div.rel-row', h('span.ico', ico),
+        if (v === null || v === undefined) return h('div.rel-row', h('span.ic', icon(ico)), h('div', h('b', label), h('div.tiny.muted', k === 'partner' ? 'Single. Events may change that.' : 'No agent yet. They find you in college or the pros.')), h('span.muted', '—'));
+        return h('div.rel-row', h('span.ic', icon(ico)),
           h('div', h('div.row.between', h('b', who(p)), h('span.tiny.muted', label)), h('div.statbar', { style: { gridTemplateColumns: '1fr' } }, h('div.track', h('div.fill', { style: { width: `${v}%` } }))), h('div.tiny.muted', why)),
-          h('b', Math.round(v)));
+          h('b.v', Math.round(v)));
       })));
     if (st.career.stage !== 'pro') out.append(h('div.card', h('h3', 'Grades'), h('div.statbar', h('span', 'Academics'), h('div.track', h('div.fill', { style: { width: `${p.academics}%`, background: p.academics < 40 ? 'var(--bad)' : undefined } })), h('span.val', Math.round(p.academics))), h('p.tiny.muted', 'Drop below 30 and you are ineligible. Study Hall raises it.')));
   } else if (sub === 'money') {
@@ -318,6 +319,7 @@ function careerView(app) {
   const team = getTeam(st.league, st.career.teamId);
   const s = p.seasonStats;
   const posLine = (x) => (p.position === 'QB' ? `${x.passComp}/${x.passAtt}, ${x.passYds} yds, ${x.passTD} TD, ${x.int} INT`
+    : p.position === 'CB' ? `${x.defInt ?? 0} INT, ${x.pd ?? 0} PD, ${x.tackles ?? 0} tkl, ${x.defTD ?? 0} TD · ${x.ydsAllowed ?? 0} yds allowed`
     : p.position === 'RB' ? `${x.rushAtt} car, ${x.rushYds} yds, ${x.rushTD} TD · ${x.rec} rec ${x.recYds} yds`
       : `${x.rec} rec, ${x.recYds} yds, ${x.recTD} TD · ${x.drops} drops`);
   const awardCounts = {};
@@ -329,18 +331,18 @@ function careerView(app) {
         h('span.small.muted', `${POSITIONS[p.position].label} · ${p.hometown}`),
         h('span.small', `${team.city} ${team.name}`),
         p.draft ? h('span.small.muted', p.draft.undrafted ? 'Undrafted free agent' : `Drafted ${ordinal(p.draft.pick)} overall (${p.draft.year})`) : null,
-        p.injury ? h('span.chip.bad', `🩹 ${p.injury.label} · ${p.injury.weeks} wk`) : null,
+        p.injury ? h('span.chip.bad', icon('bandage'), `${p.injury.label} · ${p.injury.weeks} wk`) : null,
         p.suspended ? h('span.chip.bad', `Suspended ${p.suspended}`) : null))),
     h('div.card', h('div.card-title', h('h3', 'Ratings'), h('span.display', { style: { fontSize: '1.4rem' } }, `${Math.round(p.ovr)} OVR`)), statBars(p.stats, POSITIONS[p.position].statNotes)),
     h('div.card', h('h3', 'Overall by Season'), ratingChart(p.history, Math.round(p.ovr * 10) / 10)),
     h('div.card', h('h3', `This Season (${s.games} games)`), h('p.small', posLine(s)),
       s.games ? h('p.tiny.muted', `Average grade ${Math.round(s.grades / s.games)} · Season rating ${Math.round(seasonPerf(p.position, s))}`) : null),
     h('div.card', h('h3', 'Trophy Case'),
-      Object.keys(awardCounts).length ? h('div.row.wrap', Object.entries(awardCounts).map(([n, c]) => h('span.chip.gold', `🏆 ${c > 1 ? `${c}× ` : ''}${n}`))) : h('p.small.muted', 'Empty, for now.'),
-      p.records.length ? h('div.row.wrap', { style: { marginTop: '8px' } }, p.records.map((r) => h('span.chip', `📜 ${r.label} (${r.year})`))) : null),
+      Object.keys(awardCounts).length ? h('div.row.wrap', Object.entries(awardCounts).map(([n, c]) => h('span.chip.gold', icon('trophy'), `${c > 1 ? `${c}× ` : ''}${n}`))) : h('p.small.muted', 'Empty, for now.'),
+      p.records.length ? h('div.row.wrap', { style: { marginTop: '8px' } }, p.records.map((r) => h('span.chip', icon('scroll'), `${r.label} (${r.year})`))) : null),
     p.history.length ? h('div.card', h('h3', 'Career History'), h('div.scroll-x', h('table.tbl',
       h('tr', h('th', 'Year'), h('th', 'Team'), h('th.num', 'Age'), h('th.num', 'OVR'), h('th', 'Rec'), h('th', 'Line')),
-      p.history.slice().reverse().map((x) => h('tr', h('td', x.year), h('td', h('span.swatch', { style: { background: x.colors[0] } }), x.teamId, x.champion ? ' 🏆' : ''), h('td.num', x.age), h('td.num', Math.round(x.ovr)), h('td', x.record), h('td.tiny', posLine(x.seasonStats))))))) : null,
+      p.history.slice().reverse().map((x) => h('tr', h('td', x.year), h('td', h('span.swatch', { style: { background: x.colors[0] } }), x.teamId, x.champion ? ' ★' : ''), h('td.num', x.age), h('td.num', Math.round(x.ovr)), h('td', x.record), h('td.tiny', posLine(x.seasonStats))))))) : null,
     h('div.card', h('h3', 'Career Totals'), h('p.small', posLine(p.careerStats)), st.career.stage === 'pro' || p.proCareerStats.games ? h('p.small.muted', `Pro: ${posLine(p.proCareerStats)}`) : null));
 }
 
@@ -348,11 +350,11 @@ function careerView(app) {
 
 function newsView(app) {
   const st = app.state;
-  const icons = { headline: '📰', fan: '💬', injury: '🩹', money: '💰', scandal: '⚠️', award: '🏆', record: '📜', story: '📣' };
+  const icons = { headline: 'news', fan: 'chat', injury: 'bandage', money: 'dollar', scandal: 'alert', award: 'trophy', record: 'scroll', story: 'mic' };
   return h('div.col', { style: { gap: '14px' } },
-    h('h2', 'News & Feed'),
+    h('h2', 'News and Feed'),
     h('div.card', st.news.length ? st.news.map((n) => h(`div.news-item.${n.kind}`,
-      h('div.src', n.kind === 'fan' ? n.handle : `${icons[n.kind] ?? '•'} ${n.outlet ?? n.kind} · ${n.year} wk ${n.week}`),
+      h('div.src', n.kind === 'fan' ? n.handle : [icon(icons[n.kind] ?? 'news'), `${n.outlet ?? n.kind} · ${n.year} wk ${n.week}`]),
       h('div.txt', n.text))) : h('p.muted', 'Quiet so far.')));
 }
 

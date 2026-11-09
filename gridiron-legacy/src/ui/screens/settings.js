@@ -1,6 +1,7 @@
 import { h } from '../dom.js';
 import { sfx } from '../../audio/sfx.js';
 import { confirmDialog } from '../components.js';
+import { DIFFICULTIES } from '../../data/config.js';
 
 export function settingsScreen(app) {
   const s = app.settings;
@@ -16,6 +17,16 @@ export function settingsScreen(app) {
       opt('Reduced motion', 'reducedMotion', [[false, 'Off'], [true, 'On']]),
       opt('Tutorial tips', 'tutorials', [[true, 'On'], [false, 'Off']]))),
     h('div.card',
+      h('h3', app.state ? 'Difficulty (this career)' : 'Default difficulty'),
+      h('div.diff-cards', { style: { marginTop: '10px' } }, Object.entries(DIFFICULTIES).map(([id, d]) => {
+        const cur = app.state ? (app.state.difficulty ?? 'normal') : (s.difficulty ?? 'normal');
+        return h(`button.pick-card${cur === id ? '.on' : ''}`, { onclick: () => {
+          if (app.state) { app.state.difficulty = id; app.save(); } else { s.difficulty = id; app.saveSettings(); }
+          sfx.click(); app.render();
+        } }, h('b', d.label));
+      })),
+      h('p.tiny.muted', { style: { marginTop: '8px' } }, 'Harder settings shrink timing windows and boost your final legacy score.')),
+    h('div.card',
       h('h3', 'Controls'),
       h('p.small', 'Touch: tap and drag on the field. Mouse works the same way.'),
       h('p.small', 'Keyboard: ', h('span.kbd', '1'), ' ', h('span.kbd', '2'), ' ', h('span.kbd', '3'), ' pick a receiver, ', h('span.kbd', '←'), h('span.kbd', '→'), ' cut or aim, ', h('span.kbd', 'Space'), ' throw / juke / catch.')),
@@ -23,6 +34,6 @@ export function settingsScreen(app) {
       h('h3', 'Career'),
       h('div.col',
         h('button.btn.block', { onclick: () => { s.seenTips = {}; app.saveSettings(); sfx.click(); } }, 'Replay tutorial tips'),
-        h('button.btn.danger.block', { onclick: async () => { if (await confirmDialog('Quit to title?', 'Your career is saved automatically.', 'Quit')) app.quitToTitle(); } }, 'Save & quit to title'))) : null,
+        h('button.btn.danger.block', { onclick: async () => { if (await confirmDialog('Quit to title?', 'Your career is saved automatically.', 'Quit')) app.quitToTitle(); } }, 'Save and quit'))) : null,
     h('p.tiny.muted.center', 'Gridiron Legacy · v0.1 · all names fictional'));
 }

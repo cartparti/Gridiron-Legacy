@@ -21,7 +21,7 @@ export function campScreen(app) {
     st.lastEventResult && st.phase === 'camp' ? h('div.card.flat', h('div.small.muted', st.lastEventResult.title), h('p.small', st.lastEventResult.result)) : null,
     h('div.col', STAT_KEYS.map((k) => h('button.btn.block', { style: { justifyContent: 'space-between' }, onclick: () => choose(k) },
       h('span', `${STAT_LABELS[k]} camp`), h('span.small', `${Math.round(p.stats[k])} · ${Math.round(w[k] * 100)}% of OVR`))),
-    h('button.btn.block.team', { onclick: () => choose('rest') }, `Rest & recover (health ${Math.round(p.health)} → 100)`)),
+    h('button.btn.block.team', { onclick: () => choose('rest') }, `Rest and recover (health ${Math.round(p.health)} → 100)`)),
     flow.canRetire(st) ? h('button.btn.danger.block', {
       onclick: async () => { if (await confirmDialog('Retire?', 'Hang up the cleats and see your legacy. This ends your career.', 'Retire')) { flow.chooseCamp(st, 'retire'); app.commit(); } },
     }, 'Retire from football') : null));

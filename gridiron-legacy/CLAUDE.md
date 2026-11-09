@@ -40,8 +40,17 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Title backdrop, light/dark theme, synthesized SFX, tutorial tips, settings, export/import saves.
 - Tests: `npm test`. Balance: `npm run balance`.
 
+## v0.2 changes
+- Retro pixel-art look: scene rendered at low resolution and scaled up crisply; procedural pixel
+  sprites (`src/scenes/pixelart.js`); flat-color stadium; weather particles; slow-mo and screen shake.
+- Cornerback position (coverage + open-field tackle), with defensive stats, DPOY, INT records.
+- 11 minigame types, route concepts and coverages, harder default timing, difficulty setting.
+- In-game: 26 mid-game events (`src/data/gameEvents.js`), 4th-down decisions, two-minute drills /
+  final stands, weather, momentum, 5-8 moments per game.
+- Modern UI: Inter + Silkscreen fonts (vendored), SVG icon set (`src/ui/icons.js`), glass HUD.
+
 ## Known gaps / next ideas
-- Defense and special teams minigames (tackle, pass rush, kicking) not built yet.
+- Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).
 - Events: 125 written; brief asks for hundreds. Add more, especially multi-step storylines.
 - AI pro rosters are simple (no depth charts or AI trades); the player's team role is always starter.

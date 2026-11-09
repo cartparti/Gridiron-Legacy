@@ -7,18 +7,17 @@ const FIELD_W = 53.3;
 const FIELD_L = 120;
 
 function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWAY') {
-  const ppy = 10; // pixels per yard
+  const ppy = 5; // pixels per yard: low on purpose for a chunky retro look
   const cw = Math.round(FIELD_W * ppy);
   const ch = FIELD_L * ppy;
   const c = document.createElement('canvas');
-  c.width = 512;
-  c.height = 1200;
+  c.width = cw;
+  c.height = ch;
   const g = c.getContext('2d');
-  const sx = c.width / cw;
-  g.scale(sx, 1);
+  g.imageSmoothingEnabled = false;
   // Grass stripes every 5 yards.
   for (let y = 0; y < FIELD_L; y += 5) {
-    g.fillStyle = Math.floor(y / 5) % 2 ? '#2f7d3b' : '#358a42';
+    g.fillStyle = Math.floor(y / 5) % 2 ? '#3f9a3c' : '#4aab44';
     g.fillRect(0, y * ppy, cw, 5 * ppy);
   }
   // End zones.
@@ -27,7 +26,7 @@ function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWA
     g.fillRect(0, y0 * ppy, cw, 10 * ppy);
     g.save();
     g.fillStyle = col[1];
-    g.font = `900 ${6 * ppy}px Arial Black, Arial, sans-serif`;
+    g.font = `900 ${5 * ppy}px "Silkscreen", "Courier New", monospace`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.translate(cw / 2, (y0 + 5) * ppy);
@@ -38,23 +37,15 @@ function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWA
   ez(0, homeColors, homeName);
   ez(110, awayColors, awayName);
   // Lines.
-  g.strokeStyle = 'rgba(255,255,255,0.92)';
-  g.fillStyle = 'rgba(255,255,255,0.92)';
-  g.lineWidth = 3;
-  g.strokeRect(1.5, 1.5, cw - 3, ch - 3);
-  for (let y = 10; y <= 110; y += 5) {
-    g.lineWidth = y === 10 || y === 110 ? 5 : 2.5;
-    g.beginPath();
-    g.moveTo(0, y * ppy);
-    g.lineTo(cw, y * ppy);
-    g.stroke();
-  }
+  g.fillStyle = '#ffffff';
+  g.fillRect(0, 0, cw, 2); g.fillRect(0, ch - 2, cw, 2); g.fillRect(0, 0, 2, ch); g.fillRect(cw - 2, 0, 2, ch);
+  for (let y = 10; y <= 110; y += 5) g.fillRect(0, Math.round(y * ppy) - 1, cw, y === 10 || y === 110 ? 3 : 1);
   // Hash marks.
   for (let y = 11; y < 110; y++) {
-    for (const hx of [1, 18.4, FIELD_W - 18.4 - 1, FIELD_W - 2]) g.fillRect(hx * ppy, y * ppy - 1, ppy, 2);
+    for (const hx of [1, 18.4, FIELD_W - 18.4 - 1, FIELD_W - 2]) g.fillRect(Math.round(hx * ppy), Math.round(y * ppy), 3, 1);
   }
   // Numbers.
-  g.font = `bold ${2.6 * ppy}px Arial, sans-serif`;
+  g.font = `bold ${Math.round(2.6 * ppy)}px "Silkscreen", "Courier New", monospace`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   for (let y = 20; y <= 100; y += 10) {
@@ -79,17 +70,20 @@ function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWA
   g.stroke();
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
   return tex;
 }
 
 export function buildStadium(scene) {
   const world = new THREE.Group();
   scene.add(world);
-  const lambert = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, flatShading: true, ...extra });
+  // Flat, unlit colors read as clean pixel art once the scene is rendered at low resolution.
+  const lambert = (color, extra = {}) => new THREE.MeshBasicMaterial({ color, ...extra });
 
   // Surrounding turf / track.
-  const apron = new THREE.Mesh(new THREE.PlaneGeometry(FIELD_W + 24, FIELD_L + 24), lambert('#245e2e'));
+  const apron = new THREE.Mesh(new THREE.PlaneGeometry(FIELD_W + 24, FIELD_L + 24), lambert('#2f7f33'));
   apron.rotation.x = -Math.PI / 2;
   apron.position.y = -0.02;
   world.add(apron);
@@ -98,14 +92,14 @@ export function buildStadium(scene) {
   track.position.y = -0.05;
   world.add(track);
 
-  const fieldMat = new THREE.MeshLambertMaterial({ map: fieldTexture(['#1d3557', '#f1c40f'], ['#b5121b', '#f5d547']) });
+  const fieldMat = new THREE.MeshBasicMaterial({ map: fieldTexture(['#1d3557', '#f1c40f'], ['#b5121b', '#f5d547']) });
   const field = new THREE.Mesh(new THREE.PlaneGeometry(FIELD_W, FIELD_L), fieldMat);
   field.rotation.x = -Math.PI / 2; // canvas top ends up at -z (the end zone the offense attacks)
   world.add(field);
 
   // Stands: stepped tiers on all four sides.
-  const standMat = lambert('#39424e');
-  const standMat2 = lambert('#2c333c');
+  const standMat = lambert('#3b4252');
+  const standMat2 = lambert('#2e3440');
   const crowdPositions = [];
   const addStand = (cx, cz, len, alongX, facing) => {
     for (let tier = 0; tier < 7; tier++) {
@@ -130,7 +124,7 @@ export function buildStadium(scene) {
   addStand(0, -FIELD_L / 2 - 4, FIELD_W + 20, true, -1);
 
   const crowdGeo = new THREE.BoxGeometry(0.7, 0.9, 0.5);
-  const crowd = new THREE.InstancedMesh(crowdGeo, new THREE.MeshLambertMaterial({ flatShading: true }), crowdPositions.length);
+  const crowd = new THREE.InstancedMesh(crowdGeo, new THREE.MeshBasicMaterial(), crowdPositions.length);
   const dummy = new THREE.Object3D();
   crowdPositions.forEach((p, i) => {
     dummy.position.copy(p);
@@ -202,6 +196,12 @@ export function buildStadium(scene) {
       los.visible = true;
     },
     hideLines() { los.visible = false; fd.visible = false; },
+    /** Darken / cool the scene for night and bad weather. */
+    setTint(weather) {
+      const t = { night: 0x8a93b8, rain: 0xb5bcc4, snow: 0xe8eef4, wind: 0xf2f2f2 }[weather] ?? 0xffffff;
+      fieldMat.color.setHex(t);
+      apron.material.color.setHex(weather === 'snow' ? 0xdfe8ee : weather === 'night' ? 0x1f5a24 : 0x2f7f33);
+    },
     /** Make the crowd bounce (excitement 0..1). */
     animateCrowd(t, excitement = 0.2) {
       const base = crowd.userData.base;

@@ -6,13 +6,25 @@ import { calcOverall } from '../../sim/player.js';
 import { newCareer } from '../../sim/flow.js';
 import { jersey, teamBadge, stars } from '../components.js';
 import { sfx } from '../../audio/sfx.js';
+import { DIFFICULTIES } from '../../data/config.js';
+import { playerSheet, FW, FH } from '../../scenes/pixelart.js';
+
+/** Front-facing pixel sprite of the athlete in school colors. */
+function spritePreview(colors) {
+  const c = document.createElement('canvas');
+  c.width = FW;
+  c.height = FH;
+  c.className = 'sprite-preview';
+  try { c.getContext('2d').drawImage(playerSheet(colors, 2), 0, FH, FW, FH, 0, 0, FW, FH); } catch { /* no canvas */ }
+  return c;
+}
 
 const rnd = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 export function createScreen(app) {
   const f = app.ui.form ?? (app.ui.form = {
     first: rnd(FIRST_NAMES), last: rnd(LAST_NAMES), position: 'QB', background: 'natural',
-    number: 7, hometown: rnd(HOMETOWNS), hsTeamId: 'WFW',
+    number: 7, hometown: rnd(HOMETOWNS), hsTeamId: 'WFW', difficulty: app.settings.difficulty ?? 'normal',
   });
   const wrap = h('div.screen');
   const draw = () => {
@@ -26,7 +38,7 @@ export function createScreen(app) {
       h('div.row.between', h('h1', 'New Athlete'), h('button.btn.small.ghost', { onclick: () => app.go('slots') }, 'Back')),
       h('div.card',
         h('div.row', { style: { alignItems: 'flex-start' } },
-          jersey({ last: f.last || 'PLAYER', number: f.number }, school.colors, 110),
+          h('div.col', { style: { alignItems: 'center', gap: '4px' } }, spritePreview(school.colors), h('span.tiny.muted', school.name)),
           h('div.col.grow', { style: { gap: '8px' } },
             h('label.field', 'First name', h('input', { type: 'text', value: f.first, maxlength: 14, oninput: (e) => { f.first = e.target.value; } , onchange: draw })),
             h('label.field', 'Last name', h('input', { type: 'text', value: f.last, maxlength: 14, oninput: (e) => { f.last = e.target.value; }, onchange: draw })),
@@ -54,6 +66,11 @@ export function createScreen(app) {
         h('div.list', HS_TEAMS.map((t) =>
           h('button.li', { style: { background: f.hsTeamId === t.id ? 'color-mix(in srgb, var(--accent) 16%, transparent)' : 'none', border: '0', borderBottom: '1px solid var(--line)', cursor: 'pointer', textAlign: 'left', minHeight: '48px', color: 'inherit' }, onclick: () => { sfx.click(); f.hsTeamId = t.id; draw(); } },
             teamBadge(t, 30), h('span.grow', h('b', `${t.city} ${t.name}`)), stars(Math.max(1, Math.round((t.base - 45) / 4))))))),
+      h('div.card',
+        h('h2', 'Difficulty'),
+        h('div.diff-cards', Object.entries(DIFFICULTIES).map(([id, d]) =>
+          h(`button.pick-card${f.difficulty === id ? '.on' : ''}`, { onclick: () => { sfx.click(); f.difficulty = id; draw(); } }, h('b', d.label)))),
+        h('p.small.muted', { style: { marginTop: '8px' } }, DIFFICULTIES[f.difficulty].desc, f.difficulty !== 'normal' ? ` Legacy ×${DIFFICULTIES[f.difficulty].legacy}.` : '')),
       h('div.card',
         h('label.field', 'Hometown',
           h('select', { onchange: (e) => { f.hometown = e.target.value; } }, HOMETOWNS.map((t) => h('option', { value: t, selected: t === f.hometown }, t))))),
