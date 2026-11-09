@@ -3,6 +3,8 @@ import { ACTIVITIES } from '../data/activities.js';
 import { HOUSING, CARS, PERKS } from '../data/lifestyle.js';
 import { BASE_ENERGY, SLOTS_PER_WEEK, STAGES } from '../data/config.js';
 import { clamp } from '../core/util.js';
+import { addXp } from './progress.js';
+import { homePerks, applyHomeWeekly } from './home.js';
 import { applyEffects } from './effects.js';
 import { addNews } from './press.js';
 import { itemWeekly } from './shop.js';
@@ -15,7 +17,7 @@ function perkBonus(p, key) {
 
 export function maxEnergy(state) {
   const p = state.player;
-  return Math.max(3, BASE_ENERGY + Math.floor(p.health / 25) + perkBonus(p, 'energy') + itemWeekly(p).energy + (state.week?.energyBonus ?? 0));
+  return Math.max(3, BASE_ENERGY + Math.floor(p.health / 25) + perkBonus(p, 'energy') + itemWeekly(p).energy + homePerks(p).energy + (state.week?.energyBonus ?? 0));
 }
 
 export function isAvailable(state, act) {
@@ -57,7 +59,8 @@ export function applyPlan(state, plan) {
     if (!id || typeof id === 'object') return;
     const act = ACTIVITY_BY_ID[id];
     if (!act || !isAvailable(state, act)) return;
-    all.push(...applyEffects(state, drillScaled(act.effects, state.week.drills?.[i])));
+    all.push(...applyEffects(state, drillScaled(act.effects, state.week.drills?.[i], homePerks(state.player).train)));
+    if (act.effects.train) addXp(state, Math.round(12 * (state.week.drills?.[i] !== undefined ? 0.6 + state.week.drills[i] : 1)));
   });
   state.week.plan = plan.slice();
   state.week.freshness = clamp((max - cost) / max, 0, 1);
@@ -69,9 +72,9 @@ export function applyPlan(state, plan) {
 export function drillMultiplier(q) {
   return q === undefined || q === null ? 1 : 0.6 + 0.9 * Math.max(0, Math.min(1, q));
 }
-function drillScaled(effects, q) {
-  if (q === undefined || q === null || !effects.train) return effects;
-  const k = drillMultiplier(q);
+function drillScaled(effects, q, gym = 0) {
+  if (!effects.train || ((q === undefined || q === null) && !gym)) return effects;
+  const k = drillMultiplier(q) * (1 + gym);
   const train = {};
   for (const [stat, v] of Object.entries(effects.train)) train[stat] = v * k;
   return { ...effects, train };
@@ -114,6 +117,7 @@ export function weeklyUpkeep(state) {
   const iw = itemWeekly(p);
   expenses += iw.cost;
   p.money += income - expenses;
+  applyHomeWeekly(state);
 
   // Mood drifts toward a baseline set by family, partner, lifestyle and finances.
   let base = 50 + (p.rel.family - 50) * 0.15;

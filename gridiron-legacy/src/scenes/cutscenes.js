@@ -156,7 +156,7 @@ export function draftCutscene(opts) {
     commish.rotation.y = Math.PI + 0.4;
     commish.userData.u.targetYaw = commish.rotation.y;
     g.add(commish);
-    const me = makePerson({ ...opts.look, shirt: '#16181f', pants: '#16181f', shoe: '#111111' });
+    const me = makePerson({ ...opts.look, outfit: 'gala' });
     me.position.set(5, 1, 0.8);
     g.add(me);
     const card = jerseyCard(opts.colors, opts.number);
@@ -277,7 +277,7 @@ export function hofCutscene(opts) {
     celebrate(statue, 'point');
     for (let i = 0; i < 8; i++) animateRun(statue, 0.2, 0);
     statue.userData.frozen = true;
-    const me = makePerson({ ...opts.look, shirt: '#e8c547', pants: '#1a1c22' });
+    const me = makePerson({ ...opts.look, outfit: 'gala' });
     me.position.set(1.4, 0, 0.6);
     me.rotation.y = Math.PI - 0.3;
     me.userData.u.targetYaw = me.rotation.y;

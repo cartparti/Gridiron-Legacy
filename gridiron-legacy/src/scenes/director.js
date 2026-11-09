@@ -346,6 +346,7 @@ export function runMinigame(type, opts) {
     else r.stadium.setTeams(opts.oppColors, opts.teamColors, oppName, myName, opts.homeColors);
     if (opts.scoreInfo) { r.stadium.setScoreboard(opts.scoreInfo); hud.score(opts.scoreInfo); }
     if (opts.lastName) hud.tag(opts.number ?? '', opts.lastName, opts.look?.heightIn ? `${Math.floor(opts.look.heightIn / 12)}'${opts.look.heightIn % 12}" · ${opts.look.weightLb} lb` : '');
+    r.stadium.setBigGame?.(opts.bigGame);
     r.stadium.setLevel?.(opts.stage ?? 'pro');
     r.stadium.setYardLine(m.yardLine, m.distance);
     applyAtmosphere(r, m.weather ?? 'clear');

@@ -737,28 +737,75 @@ export function freePlay(ctx) {
     const done = () => { clearInterval(timer); bar.remove(); window.removeEventListener('keydown', key); proceed(); };
     const go = () => {
       clearInterval(timer); bar.remove(); window.removeEventListener('keydown', key);
-      replay = { t: 0, cam: (replay?.cam ?? Math.floor(Math.random() * 3)) + 1, proceed };
+      replay = { t: 0, cam: (replay?.cam ?? Math.floor(Math.random() * 3)) + 1, proceed, speed: 0.45, paused: false, yourCam: false, yaw: 0.6, pitch: 0.35, dist: 12 };
       phase = 'replay';
       document.body.classList.add('cine', 'replaying');
       sfx.click();
+      showReplayControls();
     };
     const key = (ev) => { if (ev.key === 'r' || ev.key === 'R') go(); else if (ev.key === 'Enter' || ev.key === ' ') done(); };
     window.addEventListener('keydown', key);
     for (const [sel, fn] of [['.rp-go', go], ['.rp-skip', done]]) bar.querySelector(sel).addEventListener('pointerdown', (ev) => { ev.preventDefault(); ev.stopPropagation(); fn(); });
   };
+  let rpBar = null;
+  const showReplayControls = () => {
+    rpBar?.remove();
+    rpBar = document.createElement('div');
+    rpBar.className = 'rp-controls';
+    rpBar.innerHTML = '<div class="rp-title pix">THE REPLAY</div><div class="rp-row"><button data-a="pause">II</button><button data-a="speed">0.5x</button><button data-a="cam">AUTO CAM</button><button data-a="save" class="gold">SAVE</button><button data-a="close">✕</button></div><div class="rp-hint">Your cam: drag to swing the camera</div><i class="rp-prog"></i>';
+    hud.el.append(rpBar);
+    const label = () => {
+      rpBar.querySelector('[data-a=pause]').textContent = replay.paused ? '▶' : 'II';
+      rpBar.querySelector('[data-a=speed]').textContent = replay.speed >= 0.9 ? '1x' : '0.5x';
+      rpBar.querySelector('[data-a=cam]').textContent = replay.yourCam ? 'YOUR CAM' : 'AUTO CAM';
+      rpBar.classList.toggle('yourcam', replay.yourCam);
+    };
+    rpBar.addEventListener('pointerdown', (ev) => {
+      const a = ev.target.dataset?.a;
+      if (!a) return;
+      ev.preventDefault(); ev.stopPropagation();
+      sfx.click();
+      if (a === 'pause') replay.paused = !replay.paused;
+      if (a === 'speed') replay.speed = replay.speed >= 0.9 ? 0.45 : 1;
+      if (a === 'cam') replay.yourCam = !replay.yourCam;
+      if (a === 'save') {
+        ctx.snapshot?.((img) => { if (img) { highlights.push({ img, label: 'Saved replay' }); hud.big('SAVED!', '#4ade80', 700); } });
+      }
+      if (a === 'close') { replay.t = 1e9; }
+      label();
+    });
+    // drag anywhere to orbit in YOUR CAM mode
+    let drag = null;
+    const down = (ev) => { if (!replay?.yourCam || ev.target.closest('.rp-controls button')) return; drag = { x: ev.clientX, y: ev.clientY, yaw: replay.yaw, pitch: replay.pitch }; };
+    const move = (ev) => { if (!drag) return; replay.yaw = drag.yaw + (ev.clientX - drag.x) * 0.01; replay.pitch = Math.max(0.08, Math.min(1.3, drag.pitch + (ev.clientY - drag.y) * 0.006)); };
+    const up = () => { drag = null; };
+    window.addEventListener('pointerdown', down);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    rpBar.cleanup = () => { window.removeEventListener('pointerdown', down); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    label();
+  };
+  const hideReplayControls = () => { rpBar?.cleanup?.(); rpBar?.remove(); rpBar = null; };
+  ctx.addCleanup?.(hideReplayControls);
   const runReplay = (dt) => {
-    replay.t += dt * 0.45; // slow motion
+    if (!replay.paused) replay.t += dt * replay.speed; // slow motion by default
     const n = rec.frames.length;
     const idx = Math.min(n - 1, Math.floor(replay.t * 30));
     applyFrame(rec.frames[idx]);
     const bx = rec.frames[idx][0];
     const bz = rec.frames[idx][2];
-    // broadcast angles: low sideline, end zone, sky cam
+    if (rpBar) rpBar.querySelector('.rp-prog').style.width = `${Math.min(100, (idx / Math.max(1, n - 1)) * 100)}%`;
+    // broadcast angles: low sideline, end zone, sky cam; or your own orbit camera
     const c = replay.cam % 3;
-    if (c === 0) { camera.position.set(bx + 11, 2.6, bz + 3); camera.lookAt(bx, 1.1, bz - 1); }
+    if (replay.yourCam) {
+      const r2 = replay.dist;
+      camera.position.set(bx + Math.sin(replay.yaw) * Math.cos(replay.pitch) * r2, 1 + Math.sin(replay.pitch) * r2, bz + Math.cos(replay.yaw) * Math.cos(replay.pitch) * r2);
+      camera.lookAt(bx, 1, bz);
+    } else if (c === 0) { camera.position.set(bx + 11, 2.6, bz + 3); camera.lookAt(bx, 1.1, bz - 1); }
     else if (c === 1) { camera.position.set(bx * 0.6, 3.2, bz - 13); camera.lookAt(bx, 1, bz + 1); }
     else { camera.position.set(bx - 4, 16, bz + 9); camera.lookAt(bx, 0, bz - 2); }
     if (idx >= n - 1) {
+      hideReplayControls();
       document.body.classList.remove('cine', 'replaying');
       phase = 'over';
       replayPrompt(replay.proceed);

@@ -111,6 +111,9 @@ export function createUserGame(state, league, sched, { playoff = false, round = 
     moments: [], userStats: emptyStats(), finished: false, week: state.league.week,
     momentum: 0, tolMod: 1, extraPending: sitOut ? 0 : (state.week?.extraMoments ?? 0), skipNext: false, flagNext: false, userOut: false,
     eventsFired: [], pregameDone: false, halfDone: false, twoMinDone: false,
+    // game plan, energy and live rating (shown on the match screen)
+    plan: { approach: 'balanced', intensity: 'mid' },
+    energy: Math.round(70 + (state.week?.freshness ?? 0) * 30), rating: 6.0, ratingHist: [6.0], lastDelta: 0, chart: [],
   };
 }
 
@@ -141,6 +144,7 @@ export function stepGame(state) {
     if (!g.halfDone && d.quarter >= 3) {
       g.halfDone = true;
       g.log.push({ q: 2, clock: '0:00', team: '', user: false, out: 'HALF', text: 'Halftime', score: `${g.score.away}-${g.score.home}`, key: false });
+      g.energy = Math.min(100, (g.energy ?? 80) + 10); // catch your breath
       if (!g.sitOut && !g.userOut && maybeEvent(state, 'halftime', 0.5)) return { type: 'gameEvent', event: g.pendingEvent };
     }
     const active = !g.sitOut && !g.userOut;
@@ -174,7 +178,9 @@ export function stepGame(state) {
         return { type: 'moment', moment: g.pending };
       }
     }
-    const out = driveOutcome(state, g.ratings[d.side].off, g.ratings[otherSide(d.side)].def, g.toBonus[d.side] + momentumBonus(g, d.side));
+    let out = driveOutcome(state, g.ratings[d.side].off, g.ratings[otherSide(d.side)].def, g.toBonus[d.side] + momentumBonus(g, d.side) + planBonus(state, g, d.side));
+    out = planRisk(state, g, d.side, out);
+    if (active && d.side === (isDefense(state) ? otherSide(g.userSide) : g.userSide)) g.energy = Math.max(0, (g.energy ?? 80) - 0.8);
     g.toBonus[d.side] = 0;
     finishDrive(state, g, d, out, null);
     g.cursor++;
@@ -182,6 +188,32 @@ export function stepGame(state) {
   }
   endGame(state, g);
   return { type: 'end' };
+}
+
+// ---------------- game plan (approach + intensity)
+const INTENSITY = { low: { tol: 0.95, drain: 4 }, mid: { tol: 1, drain: 6 }, high: { tol: 1.07, drain: 9 } };
+/** Change the game plan mid-game. key 'approach' (aggressive/balanced/conservative) or 'intensity' (low/mid/high). */
+export function setGamePlan(state, key, value) {
+  const g = state.game;
+  if (!g) return;
+  g.plan ??= { approach: 'balanced', intensity: 'mid' };
+  g.plan[key] = value;
+}
+/** The unit you influence: your offense (or the opponent's offense if you play defense). */
+const userUnitSide = (state, g) => (isDefense(state) ? otherSide(g.userSide) : g.userSide);
+function planBonus(state, g, side) {
+  const a = g.plan?.approach ?? 'balanced';
+  if (side !== userUnitSide(state, g)) return 0;
+  const sign = isDefense(state) ? -1 : 1; // aggressive defense makes their drives worse
+  return a === 'aggressive' ? 0.035 * sign : a === 'conservative' ? -0.03 * sign : 0;
+}
+function planRisk(state, g, side, out) {
+  const a = g.plan?.approach ?? 'balanced';
+  if (side !== userUnitSide(state, g) || a !== 'aggressive') return out;
+  // aggressive football: more turnovers on offense, more big plays allowed on defense
+  if (!isDefense(state) && out === 'PUNT' && chance(state, 0.14)) return 'TO';
+  if (isDefense(state) && out === 'PUNT' && chance(state, 0.08)) return 'TD';
+  return out;
 }
 
 function isLastDriveFor(g, idx, side) {
@@ -243,12 +275,15 @@ export function tolerance(state, call = 'balanced', type = state.game?.pending?.
   if (p.health < 60) t *= 0.75 + p.health / 240;
   t *= 0.9 + p.mood / 1000;
   t *= 1 + (state.week?.freshness ?? 0) * 0.15;
+  if (state.week?.studied) t *= 1.04;
   t *= DIFFICULTIES[state.difficulty ?? 'normal'].tol;
   t *= 1 + gearBonus(p, type);
   if (g) {
     const w = WEATHER[g.weather] ?? WEATHER.clear;
     t *= w.tol * (type && PASS_TYPES.has(type) ? w.pass : 1);
     t *= g.tolMod;
+    t *= INTENSITY[g.plan?.intensity ?? 'mid'].tol;
+    if ((g.energy ?? 100) < 50) t *= 0.8 + (g.energy ?? 100) / 250;
     t *= 1 + g.momentum * 0.06;
     if (g.playingHurt) t *= 0.75;
   }
@@ -353,6 +388,17 @@ export function resolveMoment(state, result) {
     applyEffects(state, { injury: true });
     g.userOut = true;
     g.log.push({ q: m.quarter, clock: m.clock, team: '', user: true, out: 'INFO', text: `${state.player.last} is helped off the field${state.player.injury ? ` (${state.player.injury.label.toLowerCase()})` : ''}.`, score: `${g.score.away}-${g.score.home}`, key: true });
+  }
+
+  // energy and live rating
+  g.energy = Math.max(0, (g.energy ?? 80) - INTENSITY[g.plan?.intensity ?? 'mid'].drain);
+  {
+    const big = result.td || result.int || result.defTD || result.sack && m.defense;
+    const bad = (!m.defense && (result.turnover || result.sack)) || result.tdAllowed;
+    const delta = (result.quality - 0.5) * 1.5 + (big ? 0.5 : 0) - (bad ? 0.5 : 0);
+    g.rating = clamp((g.rating ?? 6) + delta, 3, 10);
+    g.lastDelta = delta;
+    (g.ratingHist ??= [6]).push(Math.round(g.rating * 10) / 10);
   }
 
   if (m.defense) {
@@ -495,6 +541,7 @@ function finishDrive(state, g, d, out, momentInfo) {
       if (!isUserTeam && isDefense(state)) autoDefenseStats(state, g, out);
     }
   }
+  (g.chart ??= []).push({ m: g.momentum, out, user: isUserTeam, q: d.quarter });
   const verb = { TD: 'Touchdown', FG: 'Field goal', TO: 'Turnover', PUNT: 'Punt', DOWNS: 'Turnover on downs' }[out];
   const who = momentInfo ? `${state.player.last}: ${momentInfo.result.text} → ` : '';
   g.log.push({

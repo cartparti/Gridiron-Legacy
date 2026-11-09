@@ -18,6 +18,9 @@ import { placeCards, enterWorld } from './world.js';
 import { openPhone, phoneBadge } from './phone.js';
 import { openLookModal } from './look.js';
 import { socialView } from './social.js';
+import { lineupView } from './lineup.js';
+import { homeView } from './home.js';
+import { careerStatsSections, legendsPage, racePage } from './careerStats.js';
 import { DRILLS, DRILL_NAMES, openDrill, grade } from './drills.js';
 import { teamKits } from '../../data/kits.js';
 import { fmtSize } from '../../data/looks.js';
@@ -56,7 +59,7 @@ export function topBar(app) {
       h('div.grow',
         h('div.name', `${p.first} ${p.last}`),
         h('div.sub', `#${p.number} ${p.position} · Age ${p.age} · ${team ? team.name : ''}`),
-        h('div.sub', `${stageLbl} · ${st.career.year} · ${wk}`)),
+        h('div.sub', `${stageLbl} · ${st.career.year} · ${wk} · LV ${p.level ?? 1}${p.skillPoints ? ` · ${p.skillPoints} pts` : ''}`)),
       h('button.icon-btn.phone-btn', { 'aria-label': 'Phone', onclick: () => openPhone(app) }, icon('chat'), phoneBadge(st) ? h('span.app-badge', phoneBadge(st)) : null),
       h('button.icon-btn', { 'aria-label': 'Settings', onclick: () => { app.ui.back = 'career'; app.go('settings'); } }, icon('gear'))),
     h('div.meters',
@@ -92,6 +95,27 @@ export function hubScreen(app) {
 }
 
 // ------------------------------------------------------------------ WEEK
+
+/** Last 5 results as colored chips (newest last). */
+function formChips(st, teamId) {
+  const res = [];
+  for (const wk of st.league.schedule) for (const gm of wk) if (gm.result && (gm.home === teamId || gm.away === teamId)) {
+    const us = gm.home === teamId ? gm.result.home : gm.result.away;
+    const them = gm.home === teamId ? gm.result.away : gm.result.home;
+    res.push(us > them ? 'W' : 'L');
+  }
+  const last = res.slice(-5);
+  while (last.length < 5) last.unshift('-');
+  return h('div.form.form-lg', last.map((r) => h(`i.${r === 'W' ? 'w' : r === 'L' ? 'l' : 'n'}`, r)));
+}
+
+/** "The Stands": a scrolling ticker of fan posts. */
+function standsTicker(st) {
+  const posts = (st.news ?? []).filter((n) => n.kind === 'fan').slice(0, 6);
+  if (!posts.length) return null;
+  const line = posts.map((n) => `${n.handle}: ${n.text}`).join('   •   ');
+  return h('div.stands', h('span.st-tag.pix', 'THE STANDS'), h('div.st-wrap', h('div.st-run', `${line}   •   ${line}`)));
+}
 
 function weekView(app) {
   const st = app.state;
@@ -154,9 +178,10 @@ function weekView(app) {
       h('div.card-title', h('h3', m.playoff ? roundName(st.league, st.league.playoffs.round) : `Week ${st.league.week + 1} of ${st.league.schedule.length}`),
         h('div.row', { style: { gap: '6px' } }, h('span.chip.pix', home ? 'HOME' : 'AWAY'), opp.id === st.career.rivalTeamId ? h('span.chip.bad.pix', icon('flame'), 'RIVAL') : null)),
       h('div.matchup',
-        h('div.team-badge', teamBadge(me, 56), h('span.nm', me.name), h('span.rec', `${me.w}-${me.l}`)),
+        h('div.team-badge', teamBadge(me, 56), h('span.nm', me.name), h('span.rec', `${me.w}-${me.l}`), formChips(st, me.id)),
         h('span.vs.pix', home ? 'VS' : 'AT'),
-        h('div.team-badge', teamBadge(opp, 56), h('span.nm', opp.name), h('span.rec', `${opp.w}-${opp.l}`))),
+        h('div.team-badge', teamBadge(opp, 56), h('span.nm', opp.name), h('span.rec', `${opp.w}-${opp.l}`), formChips(st, opp.id))),
+      standsTicker(st),
       h('div.row.between.small.muted', { style: { marginTop: '8px' } },
         h('span', `Your OFF ${Math.round(me.off)} · DEF ${Math.round(me.def)}`),
         h('span', `Their OFF ${Math.round(opp.off)} · DEF ${Math.round(opp.def)}`)),
@@ -259,12 +284,13 @@ function weekView(app) {
 function teamView(app) {
   const st = app.state;
   const league = st.league;
-  const sub = app.ui.teamSub ?? 'standings';
-  const tabs = h('div.subtabs', [['standings', 'Standings'], ['schedule', 'Schedule'], ['playoffs', 'Playoffs'], ['roster', 'Roster'], ['history', 'History']]
+  const sub = app.ui.teamSub ?? 'lineup';
+  const tabs = h('div.subtabs', [['lineup', 'Lineup'], ['standings', 'Standings'], ['schedule', 'Schedule'], ['playoffs', 'Playoffs'], ['roster', 'Roster'], ['history', 'History']]
     .filter(([id]) => (id === 'roster' ? league.kind === 'pro' : id === 'history' ? st.proHistory.length || st.records : true))
     .map(([id, l]) => h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { app.ui.teamSub = id; app.render(); } }, l)));
   const out = h('div.col', { style: { gap: '14px' } }, h('h2', STAGES[league.kind].leagueName), tabs);
-  if (sub === 'standings') {
+  if (sub === 'lineup') out.append(lineupView(app));
+  else if (sub === 'standings') {
     const confs = league.kind === 'pro' ? ['Summit', 'Coastal'] : league.kind === 'college' ? [...new Set(league.teams.map((t) => t.conf))].sort((a, b) => (a === getTeam(league, st.career.teamId).conf ? -1 : b === getTeam(league, st.career.teamId).conf ? 1 : 0)) : [null];
     // last-5 form from the schedule
     const form = {};
@@ -350,9 +376,10 @@ function lifeView(app) {
   const p = st.player;
   const sub = app.ui.lifeSub ?? 'social';
   const out = h('div.col', { style: { gap: '14px' } },
-    h('div.subtabs', [['social', 'Social'], ['people', 'People'], ['store', 'Store'], ['money', 'Money'], ['lifestyle', 'Housing & Cars'], ['invest', 'Invest']].map(([id, l]) =>
+    h('div.subtabs', [['social', 'Social'], ['home', 'Home'], ['people', 'People'], ['store', 'Store'], ['money', 'Money'], ['lifestyle', 'Housing & Cars'], ['invest', 'Invest']].map(([id, l]) =>
       h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { app.ui.lifeSub = id; app.render(); } }, l))));
   if (sub === 'social') out.append(socialView(app));
+  else if (sub === 'home') out.append(homeView(app));
   else if (sub === 'people') {
     out.append(peopleView(app));
     if (st.career.stage !== 'pro') out.append(h('div.card', h('h3', 'Grades'), h('div.statbar', h('span', 'Academics'), h('div.track', h('div.fill', { style: { width: `${p.academics}%`, background: p.academics < 40 ? 'var(--bad)' : undefined } })), h('span.val', Math.round(p.academics))), h('p.tiny.muted', 'Drop below 30 and you are ineligible. Study Hall raises it.')));
@@ -408,9 +435,14 @@ function lifeView(app) {
 
 function careerView(app) {
   const sub = app.ui.careerSub ?? 'profile';
-  const tabs = h('div.subtabs', [['profile', 'Profile'], ['awards', 'Awards'], ['league', 'League Awards']].map(([id, l]) =>
+  const tabs = h('div.subtabs', [['profile', 'Career'], ['awards', 'Trophies'], ['race', 'Award Race'], ['legends', 'Legends'], ['league', 'League Awards']].map(([id, l]) =>
     h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { sfx.click(); app.ui.careerSub = id; app.render(); } }, l)));
-  const body = sub === 'awards' ? awardsView(app) : sub === 'league' ? leagueAwardsView(app) : profileView(app);
+  let body;
+  if (sub === 'awards') body = awardsView(app);
+  else if (sub === 'league') body = leagueAwardsView(app);
+  else if (sub === 'legends') body = legendsPage(app);
+  else if (sub === 'race') body = racePage(app);
+  else { body = profileView(app); body.append(...careerStatsSections(app)); }
   return h('div.col', { style: { gap: '14px' } }, tabs, body);
 }
 

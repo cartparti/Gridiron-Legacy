@@ -114,21 +114,21 @@ export function defaultLook(position = 'QB') {
     tatL: 'none', tatR: 'none', heightIn: h, weightLb: w, gloves: null, cleats: '#16181c', wristband: 'none', wristColor: '#f2f2f2',
     sleeve: 'none', sleeveColor: '#16181c', visor: 'none', eyeBlack: true, celebration: 'pump',
     cleatAccent: '#f2f2f2', spats: 'none', kneeBrace: 'none', kneeColor: '#16181c', legSleeve: 'none', legSleeveColor: '#16181c',
-    elbowPad: 'none', elbowColor: '#16181c', towel: 'none', handWarmer: false, chain: 'none',
+    elbowPad: 'none', elbowColor: '#16181c', towel: 'none', handWarmer: false, chain: 'none', suit: '#16181f', tie: '#c92a2a',
     shirt: '#3a86ff', pants: '#2b2d42', shoe: '#f1f1f1',
   };
 }
 
 const SWAG_DEFAULTS = {
   cleatAccent: '#f2f2f2', spats: 'none', kneeBrace: 'none', kneeColor: '#16181c', legSleeve: 'none', legSleeveColor: '#16181c',
-  elbowPad: 'none', elbowColor: '#16181c', towel: 'none', handWarmer: false, chain: 'none',
+  elbowPad: 'none', elbowColor: '#16181c', towel: 'none', handWarmer: false, chain: 'none', suit: '#16181f', tie: '#c92a2a',
 };
 const OLD_STYLES = ['short', 'buzz', 'bun', 'afro'];
 /** Upgrade an older save's simple look ({ skin 0-4, hair, hairStyle 0-3 }) to the full look. */
 export function normalizeLook(look, seed = 'x') {
   if (!look) return randomLook(seed);
   if (typeof look.hairStyle === 'string' && look.eyes) {
-    if (look.spats === undefined) return { ...SWAG_DEFAULTS, ...look };
+    if (look.spats === undefined || look.suit === undefined) return { ...SWAG_DEFAULTS, ...look };
     return look;
   }
   const base = randomLook(seed);

@@ -30,6 +30,7 @@ import { rollEvent, chooseOption } from './events.js';
 import { newWeek, applyPlan } from './week.js';
 import { newInjury, applyInjury, genPersonName } from './effects.js';
 import { addNews, postGamePress } from './press.js';
+import { addXp } from './progress.js';
 import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf, recordLeagueAwards } from './awards.js';
 import { computeLegacy } from './legacy.js';
 import { genTeammates } from './social.js';
@@ -193,6 +194,7 @@ export function finishGame(state) {
     p.rel.coach = clamp(p.rel.coach + (g.grade - 58) / 9, 0, 100);
     p.rel.teammates = clamp(p.rel.teammates + (g.won ? 2 : -1), 0, 100);
     p.mood = clamp(p.mood + (g.won ? 5 : -4) + (g.grade - 60) / 10, 0, 100);
+    g.levelUps = addXp(state, Math.round(10 + g.grade * 0.55 + (g.won ? 10 : 0) + (g.playoff ? 15 : 0)));
     p.health = clamp(p.health - (4 + g.moments.length * 1.5), 0, 100);
     if (g.rivalry) p.rel.rival = clamp(p.rel.rival + 5, 0, 100);
     // Injury roll.
@@ -290,6 +292,7 @@ export function endSeason(state) {
   const aw = seasonAwards(state, { champion, titleGrade, rookie: c.stage === 'pro' && proSeasonsBefore === 0, missedLastSeason });
   const records = c.stage === 'pro' ? checkRecords(state, league) : [];
   recordLeagueAwards(state, aw.awards);
+  addXp(state, aw.awards.length * 60 + (champion ? 120 : 0));
   const entry = {
     year: c.year,
     age: p.age,

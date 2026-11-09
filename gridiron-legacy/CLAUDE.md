@@ -170,6 +170,27 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   events limited to college/pro, no brand tags in HS. Stadium `setLevel('hs'|'college'|'pro')`: HS bleachers +
   fence + press box + small scoreboard, college bowl + band section, pro upper deck + roof + big board.
 
+## v0.13 changes (owner's screen-recording reference: soccer career game)
+- Live match screen (gameday.js): sticky match header (crests, score, LIVE, clock), drive chart canvas (bar per
+  drive up/down by team, height by result, T/F markers, momentum line), headline, icon feed, bottom bar with live
+  RATING (+delta, sparkline), ENERGY, APPROACH (attacking/balanced/careful) and INTENSITY (low/mid/high) toggles,
+  pause and x1/x2/x3 reveal speed, TOUCHDOWN banner, pregame "where you line up" diagram (`positionDiagram`).
+  Sim: g.plan, g.energy, g.rating/ratingHist/lastDelta, g.chart; `setGamePlan`, `planBonus`/`planRisk`, INTENSITY.
+- Replay controls: pause, 0.5x/1x, YOUR CAM (drag to orbit), SAVE to highlight reel, close; progress bar.
+- Career: `src/sim/legends.js` (generated legends per save seed, `legendBoard`, `allTimeRank`, `awardRace`,
+  `marketValue`, `journey`), `src/ui/screens/careerStats.js` (level/skill points card, all-time rank teaser,
+  overall cards, by-season bars + table, by level, journey, market/NIL value). Tabs: Career / Trophies /
+  Award Race (podium + young-player race) / Legends / League Awards.
+- Levels & skill points: `src/sim/progress.js` (XP from games, training, awards; 1 point per level; cost rises
+  at 80+/90+).
+- Team → Lineup (`src/ui/screens/lineup.js`): formation of your unit with portrait cards, captain C, bench.
+- Life → Home (`src/data/home.js`, `src/sim/home.js`, `src/ui/screens/home.js`): 8 upgrade lines x3 levels
+  (energy/health/mood/fame/training perks), 2 free home actions per week (physio, sleep, eat, study = +4%
+  timing, stretch = half training injury risk), Visit my home.
+- Outfits: Casual + Gala tabs in the look editor; `outfit: 'gala'` suit with tie used in draft/HOF cutscenes.
+- Stadium: triangle bunting and a tifo banner (big games / college / pro), `setBigGame`.
+- Week: last-5 form chips for both teams, "The Stands" fan ticker.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

@@ -176,7 +176,7 @@ export function applyEffects(state, eff, ctx = {}) {
     state.career.pendingMove = t.id; // applied at a safe point (between games)
     out.push({ label: eff.trade ? 'Traded' : 'Transfer', delta: 0, text: `${t.city} ${t.name}` });
   }
-  if (eff.risk && chance(state, eff.risk)) {
+  if (eff.risk && chance(state, eff.risk * (state.week?.stretched ? 0.5 : 1))) {
     if (chance(state, 0.5)) {
       const inj = newInjury(state);
       inj.weeks = Math.min(inj.weeks, 2);

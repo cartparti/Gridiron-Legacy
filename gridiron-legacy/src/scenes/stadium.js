@@ -389,6 +389,40 @@ export function buildStadium(scene) {
   const losStick = stick('#ff7a1a');
   const fdStick = stick('#ffd43b');
 
+  // Bunting: little triangle pennants strung along the front of the stands.
+  const flagGeo = new THREE.BufferGeometry();
+  {
+    const pos = [];
+    for (const sd of [-1, 1]) for (let z = -FIELD_L / 2; z < FIELD_L / 2; z += 1.6) {
+      const x = sd * (FIELD_W / 2 + 9.2);
+      pos.push(x, 3.4, z, x, 3.4, z + 1.2, x, 2.5, z + 0.6);
+    }
+    flagGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    flagGeo.setAttribute('color', new THREE.Float32BufferAttribute(new Array(pos.length).fill(1), 3));
+  }
+  const bunting = new THREE.Mesh(flagGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+  world.add(bunting);
+  // Tifo: a giant fan banner over the stands behind the far end zone.
+  const tifoCanvas = document.createElement('canvas');
+  tifoCanvas.width = 128; tifoCanvas.height = 40;
+  const tifoTex = new THREE.CanvasTexture(tifoCanvas);
+  tifoTex.magFilter = THREE.NearestFilter;
+  tifoTex.colorSpace = THREE.SRGBColorSpace;
+  const tifo = new THREE.Mesh(new THREE.PlaneGeometry(52, 16), new THREE.MeshBasicMaterial({ map: tifoTex }));
+  tifo.position.set(0, 9.5, -FIELD_L / 2 - 14);
+  tifo.rotation.x = -0.62;
+  world.add(tifo);
+  const paintTifo = (cols, text) => {
+    const g = tifoCanvas.getContext('2d');
+    g.fillStyle = cols[0]; g.fillRect(0, 0, 128, 40);
+    g.fillStyle = cols[1];
+    for (let x = -40; x < 128; x += 16) { g.beginPath(); g.moveTo(x, 40); g.lineTo(x + 8, 40); g.lineTo(x + 28, 0); g.lineTo(x + 20, 0); g.fill(); }
+    g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(8, 9, 112, 22);
+    g.fillStyle = '#ffffff'; g.font = 'bold 14px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(String(text).toUpperCase().slice(0, 12), 64, 21);
+    tifoTex.needsUpdate = true;
+  };
+
   // High school extras: chain-link fence and a little press box.
   const hsParts = [];
   const fenceMat = new THREE.MeshBasicMaterial({ color: '#b8c0c8', transparent: true, opacity: 0.55 });
@@ -473,6 +507,12 @@ export function buildStadium(scene) {
       };
       paint(1, nearColors);
       paint(-1, farColors);
+      // bunting + tifo in the home crowd's colors
+      const bc = [new THREE.Color(crowdColors[0]), new THREE.Color(crowdColors[1]), new THREE.Color('#ffffff')];
+      const col = flagGeo.attributes.color;
+      for (let i = 0; i < col.count; i += 3) { const c = bc[(i / 3) % 3]; for (let k = 0; k < 3; k++) col.setXYZ(i + k, c.r, c.g, c.b); }
+      col.needsUpdate = true;
+      paintTifo(crowdColors, crowdColors === nearColors ? nearName : farName);
     },
     /** Place the world so the opponent goal line is `yardLine` yards ahead of z = 0. */
     setYardLine(yardLine, distance) {
@@ -498,6 +538,8 @@ export function buildStadium(scene) {
       heads.material.color.copy(crowd.material.color);
     },
     /** Make the crowd bounce (excitement 0..1). */
+    /** Big games (playoffs, rivalries) bring out the tifo even in high school. */
+    setBigGame(on) { this.bigGame = !!on; tifo.visible = this.level !== 'hs' || this.bigGame; },
     /** Match the venue to the level: 'hs' bleachers, 'college' bowl + band, 'pro' upper deck + roof. */
     setLevel(level = 'pro') {
       const maxTier = level === 'hs' ? 3 : level === 'college' ? 7 : 11;
@@ -506,6 +548,8 @@ export function buildStadium(scene) {
       crowdMeta.forEach((c) => { c.hidden = !(c.tier < maxTier && (ends || !c.end)) || (level === 'hs' && Math.random() < 0.35); });
       for (const r of roofParts) r.visible = level === 'pro';
       for (const p2 of hsParts) p2.visible = level === 'hs';
+      tifo.visible = level !== 'hs' || this.bigGame;
+      tifo.position.y = level === 'pro' ? 13 : 9.5;
       jumbo.scale.setScalar(level === 'hs' ? 0.42 : level === 'college' ? 0.72 : 1);
       jumbo.position.y = level === 'hs' ? 9 : level === 'college' ? 22 : 33;
       const metal = level === 'hs';

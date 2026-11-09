@@ -9,7 +9,9 @@ import { portraitImg } from '../../scenes/portrait.js';
 import { sfx } from '../../audio/sfx.js';
 import { STAT_LABELS } from '../../data/positions.js';
 
-const TABS = [['body', 'Body'], ['hair', 'Hair'], ['face', 'Face'], ['ink', 'Ink'], ['gear', 'Gear'], ['swag', 'Swag'], ['celeb', 'Celebrate']];
+const TABS = [['body', 'Body'], ['hair', 'Hair'], ['face', 'Face'], ['ink', 'Ink'], ['gear', 'Gear'], ['swag', 'Swag'], ['casual', 'Casual'], ['gala', 'Gala'], ['celeb', 'Celebrate']];
+const CLOTHES = ['#f4f4f4', '#16181c', '#3a86ff', '#e63946', '#2a9d8f', '#f4a261', '#6d597a', '#ff006e', '#8ac926', '#264653', '#c8b38a', '#6c757d', '#1d3557', '#9c3d2b'];
+const SUITS = ['#16181f', '#1d2a44', '#3b3f48', '#5a1e2a', '#f2f2f2', '#2f4a3a', '#7a5a2a'];
 
 /**
  * Build the editor. opts: { look (mutated), uniform, number, position, lockBody, onChange }
@@ -36,7 +38,7 @@ export function lookEditor(opts) {
     h('input.slider', { type: 'range', min: a, max: b, value: L[key], oninput: (e) => { L[key] = Number(e.target.value); opts.onChange?.(L); draw(); } }));
 
   const preview = () => {
-    const spec = { uniform: opts.uniform, look: { ...L }, number: opts.number ?? 1, helmet: st.helmet };
+    const spec = st.tab === 'casual' ? { ...L, outfit: 'casual' } : st.tab === 'gala' ? { ...L, outfit: 'gala' } : { uniform: opts.uniform, look: { ...L }, number: opts.number ?? 1, helmet: st.helmet };
     return h('div.look-preview',
       h('div.look-stage', portraitImg(spec, 200, { full: true, big: true, yaw: st.yaw })),
       h('div.row', { style: { justifyContent: 'center', gap: '6px' } },
@@ -91,6 +93,8 @@ export function lookEditor(opts) {
         h(`button.opt${!L.handWarmer ? '.on' : ''}`, { onclick: () => set('handWarmer', false) }, 'Off'))),
       chips('Chain', CHAINS, 'chain'),
     ],
+    casual: () => [swatches('Shirt', CLOTHES, 'shirt'), swatches('Pants', CLOTHES, 'pants'), swatches('Shoes', CLOTHES, 'shoe'), h('p.tiny.muted', 'What you wear around town, at home and on your phone.')],
+    gala: () => [swatches('Suit', SUITS, 'suit'), swatches('Tie', ['#c92a2a', '#1c7ed6', '#e8b730', '#16181c', '#f4f4f4', '#2f9e44', '#ae3ec9'], 'tie'), h('p.tiny.muted', 'Worn on draft night, award shows and the Hall of Fame.')],
     celeb: () => [chips('Touchdown celebration', CELEBRATIONS, 'celebration'), h('p.tiny.muted', 'Shown in the end zone after you score.')],
   };
 

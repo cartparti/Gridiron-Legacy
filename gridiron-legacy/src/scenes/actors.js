@@ -248,12 +248,18 @@ function padsMat(un) {
   });
 }
 
-function shirtMat(color, side) {
-  const key = `shirt|${color}|${side}`;
+function shirtMat(color, side, tie = null) {
+  const key = `shirt|${color}|${side}|${tie}`;
   return pixMat(key, 12, 14, (g) => {
     px(g, 0, 0, color, 12, 14);
     px(g, 0, 12, shade(color, -0.15), 12, 2);
-    if (side === 'front') { px(g, 4, 0, shade(color, -0.3), 4, 1); px(g, 5, 1, shade(color, -0.3), 2, 1); }
+    if (side === 'front' && tie) {
+      // suit: white shirt V, lapels, tie
+      px(g, 4, 0, '#f4f4f4', 4, 5); px(g, 5, 5, '#f4f4f4', 2, 2);
+      px(g, 5, 1, tie, 2, 8); px(g, 5, 9, shade(tie, -0.2), 2, 1);
+      px(g, 3, 0, shade(color, -0.25), 1, 6); px(g, 8, 0, shade(color, -0.25), 1, 6);
+      px(g, 2, 8, shade(color, 0.2), 1, 1);
+    } else if (side === 'front') { px(g, 4, 0, shade(color, -0.3), 4, 1); px(g, 5, 1, shade(color, -0.3), 2, 1); }
   });
 }
 
@@ -369,7 +375,7 @@ function buildRig(o) {
   hips.add(spine);
   const tm = football
     ? sixFaces(jerseyMat(un, undefined, 'side'), jerseyMat(un, undefined, 'side'), toon(un.jersey), toon(un.jersey), jerseyMat(un, o.number, 'back'), jerseyMat(un, o.number, 'front'))
-    : sixFaces(toon(shirtC), toon(shirtC), toon(shirtC), toon(shirtC), shirtMat(shirtC, 'back'), shirtMat(shirtC, 'front'));
+    : sixFaces(toon(shirtC), toon(shirtC), toon(shirtC), toon(shirtC), shirtMat(shirtC, 'back'), shirtMat(shirtC, 'front', o.tie));
   const torso = new THREE.Mesh(g.torso, tm);
   torso.position.y = -0.02;
   spine.add(torso);
@@ -419,7 +425,7 @@ function buildRig(o) {
     sh.position.set(side * (football ? 0.3 : 0.27), -0.06, 0);
     const tat = side < 0 ? L.tatL : L.tatR;
     const sleeveOn = football && (L.sleeve === 'both' || L.sleeve === (side < 0 ? 'left' : 'right'));
-    const armSleeve = sleeveOn ? L.sleeveColor : null;
+    const armSleeve = sleeveOn ? L.sleeveColor : o.tie ? shirtC : null; // suits have long sleeves
     sh.add(new THREE.Mesh(g.upper, armMat(skinC, shirtC, football ? un.trim : null, tat, 'upper', armSleeve)));
     const el = new THREE.Group();
     el.position.y = -0.31;
@@ -526,6 +532,7 @@ export function makePlayer(colors, { highlight = false, number, uniform, look, h
 /** Person in casual clothes. look = full look (shirt, pants, shoe + face/hair/body fields). */
 export function makePerson(look, { highlight = false } = {}) {
   const L = normalizeLook(look, JSON.stringify(look ?? {}).length);
+  if (L.outfit === 'gala') return buildRig({ football: false, look: L, shirt: L.suit ?? '#16181f', pants: L.suit ?? '#16181f', shoe: '#111111', tie: L.tie ?? '#c92a2a', highlight });
   return buildRig({ football: false, look: L, shirt: L.shirt ?? '#3a86ff', pants: L.pants ?? '#34495e', shoe: L.shoe ?? '#f1f1f1', highlight });
 }
 
