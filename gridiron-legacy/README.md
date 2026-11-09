@@ -42,6 +42,15 @@ for five play styles (Balanced, Grinder, Social, Gunslinger, Cautious), across a
 2. **Each week**, fill five days with activities. Each costs energy. Training raises ratings,
    people activities build relationships, media builds fame. Energy you *don't* spend becomes
    game-day freshness, which widens the timing windows in the minigames.
+   You can also **walk around** your house, Riverside Park, the stadium and downtown (drag
+   anywhere to move, or WASD / arrows; E or Space to interact). Using the weight room, film room,
+   jogging trail, your desk and so on fills your next day slot, just like the planner. Talk to
+   teammates, your coach, family, your partner, fans and your rival; shop downtown.
+   **People** (Life tab): chat for free once a week, or spend a day hanging out, training together,
+   watching film with Coach, going on dates, and more. Short dialogue choices change relationships.
+   You have three named teammates on every team. Give gifts bought in the **Store**.
+   **Store** (Life tab or downtown): gear that widens your timing windows on the field, plus style,
+   home upgrades, pets, big-ticket toys and gifts.
 3. **Random events** pop up most weeks: two or three choices with lasting consequences. 🎲
    choices are a gamble.
 4. **Game day**: the game is simulated drive by drive and pauses on 5 to 8 key moments, plus
@@ -78,13 +87,15 @@ gridiron-legacy/
     data/               ALL tunable content: config, teams, names, positions,
                         activities, lifestyle (housing/cars/perks/investments/
                         sponsors/injuries), press templates, events/
+    data/items.js, interactions.js, places.js   store, personal interactions, walkable maps
     sim/                pure game logic, no DOM (runs in Node for tests)
+      shop.js social.js store purchases & gear bonuses; people & interactions
       flow.js           the career state machine: the API the UI and the bot use
       player.js league.js game.js week.js events.js effects.js
       awards.js legacy.js press.js bot.js
     ui/                 app controller, components, screens/
     scenes/             three.js: director (renderer + HUD), stadium, actors,
-                        pixelart (procedural sprites), minigames/ (passPlay, runPlay,
+                        world.js (walkable places), pixelart (procedural sprites), minigames/ (passPlay, runPlay,
                         routePlay, goalLine, coverPlay, tacklePlay, 2D fallback)
     audio/sfx.js        synthesized sound effects (Web Audio)
   tests/                node:test suites

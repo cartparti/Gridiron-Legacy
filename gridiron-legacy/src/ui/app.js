@@ -13,6 +13,7 @@ import { gamedayScreen } from './screens/gameday.js';
 import { postgameScreen, reviewScreen } from './screens/results.js';
 import { campScreen, recruitingScreen, declareScreen, draftScreen, contractScreen } from './screens/offseason.js';
 import { legacyScreen } from './screens/legacy.js';
+import { worldScreen } from './screens/world.js';
 import { stopBackdrop } from '../scenes/director.js';
 
 export const app = {
@@ -106,6 +107,8 @@ export const app = {
   render() {
     const root = document.getElementById('app');
     const scrollY = window.scrollY;
+    this.ui.cleanupWorld?.(); // leaving or redrawing a walkable place
+    this.ui.cleanupWorld = null;
     closeAllModals();
     clear(root);
     root.className = '';
@@ -118,9 +121,10 @@ export const app = {
       else view = titleScreen(this);
     } else {
       if (this.screen !== 'settings') stopBackdrop();
+      if (this.ui.world && this.state.phase !== 'plan') this.ui.world = null;
       switch (this.state.phase) {
-        case 'event':
-        case 'plan': view = hubScreen(this); break;
+        case 'event': view = hubScreen(this); break;
+        case 'plan': view = this.ui.world ? worldScreen(this) : hubScreen(this); break;
         case 'game': view = gamedayScreen(this); break;
         case 'postgame': view = postgameScreen(this); break;
         case 'review': view = reviewScreen(this); break;

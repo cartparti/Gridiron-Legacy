@@ -49,6 +49,16 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   final stands, weather, momentum, 5-8 moments per game.
 - Modern UI: Inter + Silkscreen fonts (vendored), SVG icon set (`src/ui/icons.js`), glass HUD.
 
+## v0.3 changes
+- Sharper sprites: 24x32 skeleton-posed pixel art with shading, 28 poses, casual-clothes style.
+  Animation system in `src/scenes/actors.js` (one-shot actions, held poses, backpedal, celebrations).
+- Fixed minigame spawns near the goal line (all positions relative to the field); goalposts fade.
+- Store (`src/data/items.js`, `src/sim/shop.js`): 40+ items; gear adds to minigame tolerance.
+- People & interactions (`src/data/interactions.js`, `src/sim/social.js`): 3 named teammates per team,
+  dialogue choices, gifts; chats free weekly, bigger plans use a day slot ({ done } plan entries).
+- Walkable places (`src/data/places.js` text maps, `src/scenes/world.js`, `src/ui/screens/world.js`):
+  Home, Park, Stadium, Downtown. Activities there fill the week plan.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

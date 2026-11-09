@@ -1,6 +1,7 @@
 // The player's athlete: overall rating, training and aging.
 import { POSITIONS, STAT_KEYS, BACKGROUNDS } from '../data/positions.js';
 import { PERKS } from '../data/lifestyle.js';
+import { itemTrainBonus } from './shop.js';
 import { clamp } from '../core/util.js';
 import { gauss, randRange } from '../core/rng.js';
 
@@ -46,6 +47,8 @@ export function createAthlete(state, opts) {
     housing: 'parents',
     car: 'none',
     perks: [],
+    items: {},
+    inventory: {},
     investments: {},
     sponsors: [],
     business: null,
@@ -98,7 +101,7 @@ export function trainingGain(p, stat, units) {
   const ageF = p.age <= 18 ? 1.25 : p.age <= 22 ? 1.1 : p.age <= 26 ? 0.95 : p.age <= 29 ? 0.7 : 0.45;
   const moodF = 0.7 + (p.mood / 100) * 0.5;
   const room = clamp((100 - cur) / 50, 0.04, 1.3);
-  const perk = 1 + perkTrainBonus(p, stat);
+  const perk = 1 + perkTrainBonus(p, stat) + itemTrainBonus(p, stat);
   return units * 0.4 * ageF * p.potential * moodF * room * perk;
 }
 

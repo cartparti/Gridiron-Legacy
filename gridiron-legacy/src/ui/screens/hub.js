@@ -13,6 +13,10 @@ import { sfx } from '../../audio/sfx.js';
 import { eventModal } from './event.js';
 import { tipCard } from './tips.js';
 import { icon, activityIcon } from '../icons.js';
+import { peopleView, storeView } from './people.js';
+import { placeCards, enterWorld } from './world.js';
+
+const DONE_ICONS = { coach: 'clipboard', teammate: 'users', family: 'home', partner: 'heart', agent: 'briefcase', rival: 'flame', fan: 'star' };
 
 const TABS = [
   ['week', 'calendar', 'Week'],
@@ -64,8 +68,8 @@ export function hubScreen(app) {
 function weekView(app) {
   const st = app.state;
   const p = st.player;
-  const plan = app.ui.plan ?? (app.ui.plan = Array(5).fill(null));
-  if (app.ui.activeSlot === undefined) app.ui.activeSlot = plan.findIndex((x) => !x);
+  const plan = st.week.plan; // shared with the walkable world: things done there fill these days
+  if (app.ui.activeSlot === undefined || plan[app.ui.activeSlot]) app.ui.activeSlot = plan.findIndex((x) => !x);
   const max = maxEnergy(st);
   const cost = planCost(plan);
   const left = max - cost;
@@ -78,6 +82,7 @@ function weekView(app) {
 
   const setSlot = (i, id) => {
     plan[i] = id;
+    app.save();
     const next = plan.findIndex((x) => !x);
     app.ui.activeSlot = next;
     app.render();
@@ -105,6 +110,11 @@ function weekView(app) {
         h('span', `Their OFF ${Math.round(opp.off)} · DEF ${Math.round(opp.def)}`))));
   }
 
+  // Walkable places: doing things there fills your days.
+  container.append(h('div.card',
+    h('div.card-title', h('h3', 'Go somewhere'), h('span.tiny.muted', 'Activities there fill your days')),
+    placeCards(app, (id) => enterWorld(app, id))));
+
   // Energy + days
   const pips = [];
   for (let i = 0; i < max; i++) pips.push(h(`span.pip${i >= left ? '.used' : ''}`));
@@ -112,10 +122,15 @@ function weekView(app) {
     h('div.card-title', h('h3', 'This Week'), h('span.small', h('b', `${left}`), ` / ${max} energy left`)),
     h('div.pips', pips),
     h('div.days', { style: { marginTop: '12px' } }, DAYS.map((d, i) => {
-      const a = plan[i] ? ACTIVITY_BY_ID[plan[i]] : null;
+      const e = plan[i];
+      if (e && typeof e === 'object') {
+        return h('button.slot.filled.done', { 'aria-label': `${d}: ${e.label}`, title: 'Already done this week' },
+          h('span.day', d), icon(DONE_ICONS[e.icon] ?? 'check'), h('span', e.label), h('span.tiny', e.cost ? `−${e.cost} energy` : 'done'));
+      }
+      const a = e ? ACTIVITY_BY_ID[e] : null;
       return h(`button.slot${a ? '.filled' : ''}${app.ui.activeSlot === i ? '.active' : ''}`, {
         'aria-label': `${d}: ${a ? a.label : 'empty'}`,
-        onclick: () => { sfx.click(); if (a) { plan[i] = null; app.ui.activeSlot = i; } else app.ui.activeSlot = i; app.render(); },
+        onclick: () => { sfx.click(); if (a) { plan[i] = null; app.ui.activeSlot = i; app.save(); } else app.ui.activeSlot = i; app.render(); },
       }, h('span.day', d), a ? activityIcon(a.id) : icon('plus'), h('span', a ? a.label : 'Free'), a ? h('span.tiny', a.cost ? `−${a.cost} energy` : 'free') : null);
     })),
     h('p.tiny.muted', { style: { marginTop: '8px' } }, `Game-day freshness: ${Math.round((left / max) * 100)}%. Tap a filled day to clear it.`)));
@@ -158,7 +173,6 @@ function weekView(app) {
         toast('That plan uses more energy than you have.');
         return;
       }
-      app.ui.plan = null;
       app.ui.activeSlot = undefined;
       app.ui.playHurt = false;
       app.ui.showEventResult = false;
@@ -239,32 +253,19 @@ function teamView(app) {
 
 // ------------------------------------------------------------------ LIFE
 
-const REL_INFO = [
-  ['coach', 'clipboard', 'Coach', (p) => `Coach ${p.coachName}`, 'More key moments per game when trust is high.'],
-  ['teammates', 'users', 'Teammates', () => 'Locker room', 'Team chemistry boosts your offense.'],
-  ['family', 'home', 'Family', () => 'Family', 'Keeps your mood steady.'],
-  ['partner', 'heart', 'Partner', (p) => p.partnerName, 'A happy relationship lifts your mood.'],
-  ['agent', 'briefcase', 'Agent', (p) => p.agentName, 'Better contracts and sponsor deals.'],
-  ['rival', 'flame', 'Rivalry', (p) => p.rivalName, 'Big games, big headlines.'],
-];
 
 function lifeView(app) {
   const st = app.state;
   const p = st.player;
   const sub = app.ui.lifeSub ?? 'people';
   const out = h('div.col', { style: { gap: '14px' } },
-    h('div.subtabs', [['people', 'People'], ['money', 'Money'], ['lifestyle', 'Lifestyle'], ['invest', 'Invest']].map(([id, l]) =>
+    h('div.subtabs', [['people', 'People'], ['store', 'Store'], ['money', 'Money'], ['lifestyle', 'Housing & Cars'], ['invest', 'Invest']].map(([id, l]) =>
       h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { app.ui.lifeSub = id; app.render(); } }, l))));
   if (sub === 'people') {
-    out.append(h('div.card', h('h3', 'Relationships'),
-      REL_INFO.map(([k, ico, label, who, why]) => {
-        const v = p.rel[k];
-        if (v === null || v === undefined) return h('div.rel-row', h('span.ic', icon(ico)), h('div', h('b', label), h('div.tiny.muted', k === 'partner' ? 'Single. Events may change that.' : 'No agent yet. They find you in college or the pros.')), h('span.muted', '—'));
-        return h('div.rel-row', h('span.ic', icon(ico)),
-          h('div', h('div.row.between', h('b', who(p)), h('span.tiny.muted', label)), h('div.statbar', { style: { gridTemplateColumns: '1fr' } }, h('div.track', h('div.fill', { style: { width: `${v}%` } }))), h('div.tiny.muted', why)),
-          h('b.v', Math.round(v)));
-      })));
+    out.append(peopleView(app));
     if (st.career.stage !== 'pro') out.append(h('div.card', h('h3', 'Grades'), h('div.statbar', h('span', 'Academics'), h('div.track', h('div.fill', { style: { width: `${p.academics}%`, background: p.academics < 40 ? 'var(--bad)' : undefined } })), h('span.val', Math.round(p.academics))), h('p.tiny.muted', 'Drop below 30 and you are ineligible. Study Hall raises it.')));
+  } else if (sub === 'store') {
+    out.append(storeView(app));
   } else if (sub === 'money') {
     const house = HOUSING.find((x) => x.id === p.housing);
     const car = CARS.find((x) => x.id === p.car);

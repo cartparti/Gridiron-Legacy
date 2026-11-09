@@ -31,6 +31,7 @@ import { newInjury, applyInjury, genPersonName } from './effects.js';
 import { addNews, postGamePress } from './press.js';
 import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf } from './awards.js';
 import { computeLegacy } from './legacy.js';
+import { genTeammates } from './social.js';
 
 // ---------------------------------------------------------------- new career
 
@@ -76,6 +77,8 @@ function pickRivalTeam(state) {
 function newCoach(state) {
   state.player.coachName = genPersonName(state);
   state.player.rel.coach = 50;
+  state.player.coachLook = null;
+  genTeammates(state); // new team, new friends
 }
 
 // ---------------------------------------------------------------- weekly loop

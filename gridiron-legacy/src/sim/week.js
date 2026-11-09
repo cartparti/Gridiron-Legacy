@@ -5,6 +5,7 @@ import { BASE_ENERGY, SLOTS_PER_WEEK, STAGES } from '../data/config.js';
 import { clamp } from '../core/util.js';
 import { applyEffects } from './effects.js';
 import { addNews } from './press.js';
+import { itemWeekly } from './shop.js';
 
 export const ACTIVITY_BY_ID = Object.fromEntries(ACTIVITIES.map((a) => [a.id, a]));
 
@@ -14,7 +15,7 @@ function perkBonus(p, key) {
 
 export function maxEnergy(state) {
   const p = state.player;
-  return Math.max(3, BASE_ENERGY + Math.floor(p.health / 25) + perkBonus(p, 'energy') + (state.week?.energyBonus ?? 0));
+  return Math.max(3, BASE_ENERGY + Math.floor(p.health / 25) + perkBonus(p, 'energy') + itemWeekly(p).energy + (state.week?.energyBonus ?? 0));
 }
 
 export function isAvailable(state, act) {
@@ -34,12 +35,13 @@ export function availableActivities(state) {
   return ACTIVITIES.filter((a) => isAvailable(state, a));
 }
 
+/** Plan entries are activity ids (applied when you submit) or { done, cost } records of things already done. */
 export function planCost(plan) {
-  return plan.reduce((a, id) => a + (id ? ACTIVITY_BY_ID[id]?.cost ?? 0 : 0), 0);
+  return plan.reduce((a, e) => a + (!e ? 0 : typeof e === 'object' ? e.cost ?? 0 : ACTIVITY_BY_ID[e]?.cost ?? 0), 0);
 }
 
 export function newWeek(state) {
-  state.week = { plan: Array(SLOTS_PER_WEEK).fill(null), energyBonus: 0, freshness: 0, summary: null };
+  state.week = { plan: Array(SLOTS_PER_WEEK).fill(null), energyBonus: 0, freshness: 0, summary: null, chats: {}, extraMoments: 0 };
 }
 
 /**
@@ -52,7 +54,7 @@ export function applyPlan(state, plan) {
   if (cost > max) throw new Error('Plan exceeds energy');
   const all = [];
   for (const id of plan) {
-    if (!id) continue;
+    if (!id || typeof id === 'object') continue;
     const act = ACTIVITY_BY_ID[id];
     if (!act || !isAvailable(state, act)) continue;
     all.push(...applyEffects(state, act.effects));
@@ -97,12 +99,14 @@ export function weeklyUpkeep(state) {
   if (stage === 'pro' && p.agentName) expenses += Math.round(income * 0.03);
   expenses += house.rent + car.upkeep;
   for (const id of p.perks) expenses += PERKS.find((x) => x.id === id)?.weekly ?? 0;
+  const iw = itemWeekly(p);
+  expenses += iw.cost;
   p.money += income - expenses;
 
   // Mood drifts toward a baseline set by family, partner, lifestyle and finances.
   let base = 50 + (p.rel.family - 50) * 0.15;
   if (p.partnerName) base += 3 + (p.rel.partner - 50) * 0.15;
-  base += house.mood + car.mood + perkBonus(p, 'mood');
+  base += house.mood + car.mood + perkBonus(p, 'mood') + Math.min(12, iw.mood);
   if (p.money < 0) base -= 12;
   if (p.flags.has_dog) base += 2;
   if (p.injury) base -= 6;

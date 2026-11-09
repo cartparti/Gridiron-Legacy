@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { buildStadium } from './stadium.js';
 import { nextFrame, tickIdle } from './actors.js';
+import { buildWorld } from './world.js';
 import { passPlay } from './minigames/passPlay.js';
 import { runPlay } from './minigames/runPlay.js';
 import { routePlay } from './minigames/routePlay.js';
@@ -75,7 +76,7 @@ function frame() {
     R.camera.position.x += (Math.random() - 0.5) * shake * 1.5;
     R.camera.position.y += (Math.random() - 0.5) * shake * 1.5;
   }
-  R.renderer.render(R.scene, R.camera);
+  R.renderer.render(R.active ?? R.scene, R.camera);
 }
 
 function start(fn) {
@@ -281,4 +282,37 @@ export function runMinigame(type, opts) {
       r.stadium.animateCrowd(t, 0.35);
     });
   });
+}
+
+// ------------------------------------------------------------------ walkable world
+
+let world = null;
+
+/** Start a walkable place. ctx: { state, lookFor, nameFor, check, onFocus }. Returns the world controller. */
+export function runWorld(placeId, ctx) {
+  stopBackdrop();
+  stopWorld();
+  const r = ensure();
+  if (!r) return null;
+  const scene = new THREE.Scene();
+  const outdoor = ['park', 'downtown'].includes(placeId);
+  scene.background = new THREE.Color(outdoor ? '#8fd0f2' : '#14181d');
+  if (outdoor) scene.fog = new THREE.Fog('#8fd0f2', 60, 140);
+  R.active = scene;
+  world = buildWorld(placeId, { ...ctx, scene, camera: r.camera });
+  start((dt) => {
+    nextFrame();
+    world?.update(dt);
+  });
+  return world;
+}
+
+export function stopWorld() {
+  if (world) { world.dispose(); world = null; }
+  if (R) R.active = null;
+  stop();
+}
+
+export function webglAvailable() {
+  return !!ensure();
 }

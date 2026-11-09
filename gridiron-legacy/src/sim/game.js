@@ -16,6 +16,7 @@ import { gameRatings, driveOutcome, POINTS, breakTie, getTeam } from './league.j
 import { emptyStats } from './player.js';
 import { applyEffects } from './effects.js';
 import { eventTokens } from './events.js';
+import { gearBonus } from './shop.js';
 
 // Moment types per position with relative weights.
 const MOMENT_POOL = {
@@ -94,7 +95,7 @@ export function createUserGame(state, league, sched, { playoff = false, round = 
     toBonus: { home: 0, away: 0 },
     drives, cursor: 0, log: [], pending: null, pendingDecision: null, pendingEvent: null,
     moments: [], userStats: emptyStats(), finished: false, week: state.league.week,
-    momentum: 0, tolMod: 1, extraPending: 0, skipNext: false, flagNext: false, userOut: false,
+    momentum: 0, tolMod: 1, extraPending: sitOut ? 0 : (state.week?.extraMoments ?? 0), skipNext: false, flagNext: false, userOut: false,
     eventsFired: [], pregameDone: false, halfDone: false, twoMinDone: false,
   };
 }
@@ -222,6 +223,7 @@ export function tolerance(state, call = 'balanced', type = state.game?.pending?.
   t *= 0.9 + p.mood / 1000;
   t *= 1 + (state.week?.freshness ?? 0) * 0.15;
   t *= DIFFICULTIES[state.difficulty ?? 'normal'].tol;
+  t *= 1 + gearBonus(p, type);
   if (g) {
     const w = WEATHER[g.weather] ?? WEATHER.clear;
     t *= w.tol * (type && PASS_TYPES.has(type) ? w.pass : 1);
