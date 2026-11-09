@@ -66,6 +66,15 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   randomized offers; pick-by-pick draft with team needs (`teamNeed`, `draftStock` in flow.js).
 - Phone (`src/sim/phone.js`, `src/ui/screens/phone.js`): texts, Huddle social feed/posts, bank, calendar.
 
+## v0.5 (round 1 of 5) changes
+- Low-poly 3D jointed rig with toon shading (`src/scenes/actors.js`) for players and townspeople;
+  procedural poses/actions/celebrations; 3D menu portraits (`src/scenes/portrait.js`). Pixel art removed.
+- Free-control plays (`src/scenes/play/engine.js`, `controls.js`, `src/data/playbook.js`): 22 live
+  players, joystick/WASD, sprint/juke/spin/stiff/dive, OL/DL engagement, man/zone coverage, tackle
+  tells (red ring + windup), AI QB reads, TD celebration cutscene. Smooth full-res rendering.
+- Remaining rounds: 2 customization + unique NPCs + jerseys; 3 graphics; 4 team-colored menus +
+  awards/standings; 5 message responses, field minigames, story cutscenes, training minigames.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

@@ -6,7 +6,7 @@ to the Hall of Fame. You play only the key moments (a throw, a cut, a catch) in 
 relationships, money, fame, injuries and 125 branching story events.
 
 Mobile-first (portrait, touch), and it also works with a mouse and keyboard. The look is
-retro pixel art on an angled 3D field, with a clean modern UI around it.
+low-poly 3D players with a smooth toon look on an angled field, with a clean modern UI around it.
 
 ## Run it
 
@@ -60,16 +60,18 @@ for five play styles (Balanced, Grinder, Social, Gunslinger, Cautious), across a
 4. **Game day**: the game is simulated drive by drive and pauses on 5 to 8 key moments, plus
    4th-down decisions, two-minute drills, and mid-game events (pregame, halftime, celebrations,
    big hits, clutch time). Weather (rain, snow, wind, night) and momentum change the timing windows.
-   Pick **Safe / Balanced / Risky**, then play the minigame:
-   - **QB pass**: read the coverage (man / zone / blitz), press near a receiver, drag to where the ball
-     should land, hold for power, release. Nine route concepts. Keyboard: `1` `2` `3`, arrows, hold `Space`.
-   - **QB scramble / Hail Mary**: run for it when the pocket collapses; heave it into the end zone late.
-   - **RB run / screen**: follow the hole, tap left/right (or swipe, `←` `→`) to cut, JUKE before contact.
-     Screens start with a timed catch. **Goal-line dive**: tap fast to drive the pile, then time your leap.
-   - **WR route**: pick one of three routes, tap in the yellow zone to break, tap when the rings meet.
-     **Jump ball** and **sideline toe-tap** (tap again before you cross the line) too.
-   - **CB coverage**: drag to shadow the receiver, tap BREAK as the ball arrives for a pick or pass breakup.
-     **Open-field tackle**: read the runner's lean, shuffle into the lane, time your TACKLE.
+   Each key moment is a **free-control play**: pick one of three plays (Safe / Balanced / Risky,
+   keys `1` `2` `3`), then you control your athlete anywhere on the field with all 22 players live.
+   - **Move**: floating joystick on the left half of the screen (mobile) or `WASD` / arrows (PC).
+     Hold the SPRINT button or `Shift` to sprint (drains stamina).
+   - **Ball carrier** (RB, scrambling QB, WR after the catch): JUKE `J`, SPIN `K`, STIFF ARM `L`,
+     DIVE `F`. Defenders flash a **red ring** and wind up just before they lunge - that is your cue.
+   - **QB**: drop back, then tap a receiver on the field or press `1`-`5` to throw. Pressure and
+     wind affect accuracy. Run if the pocket collapses.
+   - **WR**: run your route (or freelance), `C` to call for the ball, `Space` to catch as it arrives.
+   - **CB**: shadow your man, `Space` to swat / pick the pass, `F` to tackle. Pick-sixes are live.
+   - **Goal-line dive**: tap fast to drive the pile, then time your leap.
+   - Touchdowns trigger a celebration cutscene.
 5. **Seasons**: standings, playoffs and a title game. End-of-season awards, records, aging.
 6. **Career**: pick a hometown and one of its 2-3 high schools (the crosstown school is your rival) →
    2 high school seasons → offers from a random mix of 32 colleges in 4 conferences → 3 college
@@ -101,8 +103,8 @@ gridiron-legacy/
       awards.js legacy.js press.js bot.js
     ui/                 app controller, components, screens/
     scenes/             three.js: director (renderer + HUD), stadium, actors,
-                        world.js (walkable places), pixelart (procedural sprites), minigames/ (passPlay, runPlay,
-                        routePlay, goalLine, coverPlay, tacklePlay, 2D fallback)
+                        world.js (walkable places), portrait.js (3D menu portraits),
+                        play/ (free-control engine + touch/keyboard controls), minigames/ (goalLine, 2D fallback)
     audio/sfx.js        synthesized sound effects (Web Audio)
   tests/                node:test suites
   tools/                serve.js (dev server), balance.js (balance report)

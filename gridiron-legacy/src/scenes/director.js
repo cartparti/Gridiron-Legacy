@@ -5,12 +5,8 @@ import * as THREE from 'three';
 import { buildStadium } from './stadium.js';
 import { nextFrame, tickIdle } from './actors.js';
 import { buildWorld } from './world.js';
-import { passPlay } from './minigames/passPlay.js';
-import { runPlay } from './minigames/runPlay.js';
-import { routePlay } from './minigames/routePlay.js';
 import { goalLine } from './minigames/goalLine.js';
-import { coverPlay } from './minigames/coverPlay.js';
-import { tacklePlay } from './minigames/tacklePlay.js';
+import { freePlay } from './play/engine.js';
 import { fallbackMeter } from './minigames/fallback.js';
 
 let R = null;
@@ -20,33 +16,32 @@ let loopFn = null;
 let elapsed = 0;
 let shake = 0;
 
-/** Internal render width in pixels: low on purpose for the retro look. */
-function pixelWidth(w) {
-  return Math.round(Math.max(320, Math.min(640, w / 1.25)));
-}
-
 function ensure() {
   if (R) return R;
   if (failed) return null;
   try {
     const el = document.getElementById('stage');
-    const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(1);
+    // Smooth, full-resolution rendering (capped for phone performance).
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.domElement.classList.add('pixelated');
     el.append(renderer.domElement);
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#5aa0d8');
     const camera = new THREE.PerspectiveCamera(36, 1, 1, 600);
     const stadium = buildStadium(scene);
+    // Lighting for the cel-shaded players (the field and stands use flat colors).
+    scene.add(new THREE.HemisphereLight('#ffffff', '#4a6a4a', 1.5));
+    const sun = new THREE.DirectionalLight('#fff3dc', 1.9);
+    sun.position.set(-20, 40, 25);
+    scene.add(sun);
     const clock = new THREE.Clock();
     const weather = makeWeather(scene);
     R = { renderer, scene, camera, stadium, clock, el, weather };
     const resize = () => {
       const w = window.innerWidth;
       const h = window.innerHeight;
-      const pw = pixelWidth(w);
-      renderer.setSize(pw, Math.round((pw * h) / w), false);
+      renderer.setSize(w, h, false);
       renderer.domElement.style.width = '100%';
       renderer.domElement.style.height = '100%';
       camera.aspect = w / h;
@@ -247,11 +242,10 @@ export function makeHud() {
 // ------------------------------------------------------------------ minigames
 
 const GAMES = {
-  qb_throw: passPlay, qb_hailmary: passPlay,
-  rb_run: runPlay, qb_scramble: runPlay, rb_screen: runPlay,
-  rb_goalline: goalLine,
-  wr_route: routePlay, wr_jumpball: routePlay, wr_toetap: routePlay, wr_catch: routePlay,
-  cb_cover: coverPlay, cb_tackle: tacklePlay,
+  qb_throw: freePlay, qb_hailmary: freePlay, qb_scramble: freePlay,
+  rb_run: freePlay, rb_screen: freePlay, rb_goalline: goalLine,
+  wr_route: freePlay, wr_jumpball: freePlay, wr_toetap: freePlay,
+  cb_cover: freePlay, cb_tackle: freePlay,
 };
 
 /**

@@ -7,16 +7,11 @@ import { newCareer } from '../../sim/flow.js';
 import { jersey, teamBadge, stars } from '../components.js';
 import { sfx } from '../../audio/sfx.js';
 import { DIFFICULTIES } from '../../data/config.js';
-import { playerSheet, FW, FH } from '../../scenes/pixelart.js';
+import { portraitImg } from '../../scenes/portrait.js';
 
-/** Front-facing pixel sprite of the athlete in school colors. */
-function spritePreview(colors) {
-  const c = document.createElement('canvas');
-  c.width = FW;
-  c.height = FH;
-  c.className = 'sprite-preview';
-  try { c.getContext('2d').drawImage(playerSheet(colors, 2), 0, FH, FW, FH, 0, 0, FW, FH); } catch { /* no canvas */ }
-  return c;
+/** Full-body 3D preview of the athlete in school colors. */
+function spritePreview(colors, number) {
+  return portraitImg({ colors, number, skin: 2 }, 120, { full: true });
 }
 
 const rnd = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -38,7 +33,7 @@ export function createScreen(app) {
       h('div.row.between', h('h1', 'New Athlete'), h('button.btn.small.ghost', { onclick: () => app.go('slots') }, 'Back')),
       h('div.card',
         h('div.row', { style: { alignItems: 'flex-start' } },
-          h('div.col', { style: { alignItems: 'center', gap: '4px' } }, spritePreview(school.colors), h('span.tiny.muted', school.name)),
+          h('div.col', { style: { alignItems: 'center', gap: '4px' } }, spritePreview(school.colors, f.number), h('span.tiny.muted', school.name)),
           h('div.col.grow', { style: { gap: '8px' } },
             h('label.field', 'First name', h('input', { type: 'text', value: f.first, maxlength: 14, oninput: (e) => { f.first = e.target.value; } , onchange: draw })),
             h('label.field', 'Last name', h('input', { type: 'text', value: f.last, maxlength: 14, oninput: (e) => { f.last = e.target.value; }, onchange: draw })),

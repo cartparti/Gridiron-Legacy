@@ -7,7 +7,7 @@
 | Sound effects | Synthesized at runtime with the Web Audio API (`src/audio/sfx.js`) | Original, part of this project |
 | Silkscreen font (`vendor/fonts/silkscreen-*.woff2`) | Jason Kottke / Google Fonts, via npm `@fontsource/silkscreen` | SIL Open Font License 1.1, see `vendor/fonts/SILKSCREEN_LICENSE.txt` |
 | Inter font (`vendor/fonts/inter-latin-wght-normal.woff2`) | Rasmus Andersson, via npm `@fontsource-variable/inter` | SIL Open Font License 1.1, see `vendor/fonts/INTER_LICENSE.txt` |
-| Pixel-art players, ball and labels | Drawn procedurally in code (`src/scenes/pixelart.js`) | Original, part of this project |
+| Low-poly 3D players, people, ball and labels | Built procedurally in code (`src/scenes/actors.js`) | Original, part of this project |
 | Walkable-world props and buildings | Built from simple shapes in code (`src/scenes/world.js`) | Original, part of this project |
 | UI icons | Hand-drawn SVG paths (`src/ui/icons.js`) | Original, part of this project |
 

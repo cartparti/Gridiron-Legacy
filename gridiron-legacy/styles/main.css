@@ -425,3 +425,20 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-family: var(
 .quick-replies { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 10px; }
 .bank-card { background: linear-gradient(135deg, #2f7cf6, #7b2cbf); border-radius: 18px; padding: 16px; }
 .bank-bal { font-family: var(--pixel); font-size: 1.8rem; margin: 4px 0; }
+
+/* ---------- free-control plays ---------- */
+.fc-buttons { position: absolute; right: 12px; bottom: calc(var(--safe-bottom) + 16px); display: grid; grid-template-columns: repeat(2, auto); gap: 10px; pointer-events: auto; justify-items: center; align-items: center; }
+.fc-btn { appearance: none; border: 2px solid rgba(255,255,255,0.65); background: var(--glass); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; font-family: var(--pixel); font-size: 0.62rem; letter-spacing: 0.04em; text-transform: uppercase; width: 72px; height: 72px; border-radius: 50%; cursor: pointer; touch-action: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px; line-height: 1.1; }
+.fc-btn small { font-family: var(--body); font-size: 0.55rem; opacity: 0.6; text-transform: none; letter-spacing: 0; }
+.fc-btn.big { width: 92px; height: 92px; font-size: 0.72rem; grid-column: span 2; }
+.fc-btn.gold { border-color: var(--accent); }
+.fc-btn.red { border-color: #ff5d5d; }
+.fc-btn.on { background: var(--accent); color: #111; transform: scale(0.94); }
+.fc-joy { position: fixed; width: 120px; height: 120px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); background: rgba(0,0,0,0.2); pointer-events: none; transform: translate(-50%, -50%); z-index: 4; display: none; }
+.fc-joy i { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; background: rgba(255,255,255,0.6); }
+.fc-plays { position: absolute; left: 12px; right: 12px; bottom: calc(var(--safe-bottom) + 16px); display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; pointer-events: auto; max-width: 520px; margin: 0 auto; }
+.fc-play { appearance: none; border: 1px solid rgba(255,255,255,0.2); background: rgba(8,12,18,0.88); color: #fff; border-radius: 16px; padding: 12px 8px; text-align: left; display: flex; flex-direction: column; gap: 4px; cursor: pointer; font-family: var(--body); min-height: 120px; }
+.fc-play .k { font-family: var(--pixel); color: var(--accent); font-size: 0.62rem; }
+.fc-play b { font-family: var(--pixel); font-size: 0.78rem; text-transform: uppercase; line-height: 1.15; }
+.fc-play small { font-size: 0.7rem; opacity: 0.75; line-height: 1.25; }
+.fc-play:active { transform: scale(0.97); border-color: var(--accent); }

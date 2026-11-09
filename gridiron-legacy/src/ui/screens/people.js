@@ -4,19 +4,14 @@ import { openModal, changeChips, toast } from '../components.js';
 import { people, findPerson, interactionsFor, openInteraction, respond, giveGift, giftsOwned } from '../../sim/social.js';
 import { ITEM_CATS, ITEMS } from '../../data/items.js';
 import { buyItem, canBuy, owned, gearBonus } from '../../sim/shop.js';
-import { casualSheet, FW, FH } from '../../scenes/pixelart.js';
+import { portraitImg } from '../../scenes/portrait.js';
 import { fmtMoney } from '../../core/util.js';
 import { icon } from '../icons.js';
 import { sfx } from '../../audio/sfx.js';
 
-/** Pixel portrait (front idle frame) of a person. */
+/** 3D portrait of a person. */
 export function portrait(look, size = 48) {
-  const c = document.createElement('canvas');
-  c.width = FW;
-  c.height = FH;
-  c.style.cssText = `width:${size * (FW / FH)}px;height:${size}px;image-rendering:pixelated;flex:none`;
-  try { if (look) c.getContext('2d').drawImage(casualSheet(look), 0, FH, FW, FH, 0, 0, FW, FH); } catch { /* no canvas */ }
-  return c;
+  return look ? portraitImg(look, size) : document.createElement('span');
 }
 
 const KIND_ICON = { coach: 'clipboard', teammate: 'users', family: 'home', partner: 'heart', agent: 'briefcase', rival: 'flame', fan: 'star' };

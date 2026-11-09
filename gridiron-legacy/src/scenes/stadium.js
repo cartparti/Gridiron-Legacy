@@ -7,14 +7,14 @@ const FIELD_W = 53.3;
 const FIELD_L = 120;
 
 function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWAY') {
-  const ppy = 8; // pixels per yard: low on purpose for a chunky retro look
+  const ppy = 14; // pixels per yard: low on purpose for a chunky retro look
   const cw = Math.round(FIELD_W * ppy);
   const ch = FIELD_L * ppy;
   const c = document.createElement('canvas');
   c.width = cw;
   c.height = ch;
   const g = c.getContext('2d');
-  g.imageSmoothingEnabled = false;
+  
   // Grass stripes every 5 yards.
   for (let y = 0; y < FIELD_L; y += 5) {
     g.fillStyle = Math.floor(y / 5) % 2 ? '#3f9a3c' : '#4aab44';
@@ -70,9 +70,7 @@ function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWA
   g.stroke();
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.magFilter = THREE.NearestFilter;
-  tex.minFilter = THREE.NearestFilter;
-  tex.generateMipmaps = false;
+  tex.anisotropy = 8;
   return tex;
 }
 
