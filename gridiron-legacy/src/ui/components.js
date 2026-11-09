@@ -1,4 +1,5 @@
 // Reusable UI pieces: badges, jerseys, charts, stat bars, modals, toasts.
+import { crest } from './crest.js';
 import { h, clear } from './dom.js';
 import { STAT_KEYS, STAT_LABELS } from '../data/positions.js';
 import { sfx } from '../audio/sfx.js';
@@ -6,14 +7,9 @@ import { sfx } from '../audio/sfx.js';
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 /** Shield logo generated from team colors + abbreviation. */
+/** Team crest (pixel shield with the mascot). */
 export function teamBadge(team, size = 48) {
-  const [a, b] = team.colors;
-  const svg = `<svg viewBox="0 0 48 54" width="${size}" height="${size * 1.125}" aria-label="${esc(team.city)} ${esc(team.name)}">
-    <path d="M24 2 L45 9 V27 C45 40 35 48 24 52 C13 48 3 40 3 27 V9 Z" fill="${a}" stroke="${b}" stroke-width="3"/>
-    <path d="M24 8 L39 13 V27 C39 36 32 42 24 45 Z" fill="${b}" opacity="0.22"/>
-    <text x="24" y="33" text-anchor="middle" font-family="Arial Narrow, Arial, sans-serif" font-weight="900" font-size="14" fill="${b}" letter-spacing="0.5">${esc(team.id)}</text>
-  </svg>`;
-  return h('span', { html: svg, style: { display: 'inline-flex' } });
+  return h('span.badge-wrap', { style: { display: 'inline-flex', width: `${Math.round(size * 0.85)}px`, justifyContent: 'center', flex: 'none' } }, crest(team, Math.round(size * 0.85)));
 }
 
 /** Jersey with name and number. */

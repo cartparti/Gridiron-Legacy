@@ -533,6 +533,8 @@ export function makePerson(look, { highlight = false } = {}) {
 
 let FRAME = 0;
 export function nextFrame() { FRAME++; }
+/** Mark a character as already animated this frame (used by instant replay). */
+export function markTicked(p) { p.userData.ticked = FRAME; }
 export function tickIdle(root, dt) {
   root.traverse((o) => { if (o.userData?.rig && o.userData.ticked !== FRAME) animateRun(o, dt, 0); });
 }

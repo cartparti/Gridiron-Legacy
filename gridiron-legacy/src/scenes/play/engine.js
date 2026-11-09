@@ -7,7 +7,7 @@
 //
 // Returns the same result objects as the old minigames, so the game simulation is unchanged.
 import * as THREE from 'three';
-import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, confetti, ragdoll, bloodBurst, dustPuff } from '../actors.js';
+import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, confetti, ragdoll, bloodBurst, dustPuff, markTicked } from '../actors.js';
 import { rig, endPlay, finalize, weatherFx, gaussR } from '../minigames/common.js';
 import { makeControls } from './controls.js';
 import { PLAYS, OFF_FORMATION, OL_X, playMode, dealPlays } from '../../data/playbook.js';
@@ -665,6 +665,90 @@ export function freePlay(ctx) {
   };
 
   // ---------------- contact resolution
+  // ---------------- instant replay: record every body pose ~30 times a second
+  const partsOf = (mesh) => { const r = mesh.userData.rig; return [r.body, r.hips, r.spine, r.chest, r.neck, r.legL.hip, r.legL.knee, r.legR.hip, r.legR.knee, r.armL.sh, r.armL.el, r.armR.sh, r.armR.el]; };
+  const REC = 3 + 3 + 13 * 3 + 1; // root x/z/yaw, body pos, 13 joint rotations, rotation order
+  const rec = { frames: [], acc: 0 };
+  const record = (dt) => {
+    rec.acc += dt;
+    if (rec.acc < 1 / 30 || rec.frames.length > 420) return;
+    rec.acc = 0;
+    const f = new Float32Array(4 + ents.length * REC);
+    f[0] = ball.position.x; f[1] = ball.position.y; f[2] = ball.position.z; f[3] = ball.visible ? 1 : 0;
+    ents.forEach((e, i) => {
+      let o = 4 + i * REC;
+      const msh = e.mesh;
+      f[o++] = msh.position.x; f[o++] = msh.position.z; f[o++] = msh.rotation.y;
+      const b = msh.userData.rig.body;
+      f[o++] = b.position.x; f[o++] = b.position.y; f[o++] = b.position.z;
+      for (const p of partsOf(msh)) { f[o++] = p.rotation.x; f[o++] = p.rotation.y; f[o++] = p.rotation.z; }
+      f[o] = b.rotation.order === 'YXZ' ? 1 : 0;
+    });
+    rec.frames.push(f);
+  };
+  const applyFrame = (f) => {
+    ball.position.set(f[0], f[1], f[2]); ball.visible = f[3] > 0.5;
+    ball.userData.shadow.position.set(f[0], 0.03, f[2]);
+    ents.forEach((e, i) => {
+      let o = 4 + i * REC;
+      const msh = e.mesh;
+      msh.position.set(f[o], 0, f[o + 1]); msh.rotation.y = f[o + 2]; o += 3;
+      const b = msh.userData.rig.body;
+      b.rotation.order = f[4 + i * REC + REC - 1] > 0.5 ? 'YXZ' : 'XYZ';
+      b.position.set(f[o], f[o + 1], f[o + 2]); o += 3;
+      for (const p of partsOf(msh)) { p.rotation.set(f[o], f[o + 1], f[o + 2]); o += 3; }
+      if (msh.userData.shadow) { msh.userData.shadow.position.x = b.position.x; msh.userData.shadow.position.z = b.position.z; }
+      markTicked(msh);
+    });
+  };
+  let replay = null;
+  /** After the play: offer an instant replay (auto-continues after a few seconds). */
+  const replayPrompt = (proceed) => {
+    if (rec.frames.length < 20 || opts.reducedMotion) { proceed(); return; }
+    controls.setButtons([]);
+    const bar = document.createElement('div');
+    bar.className = 'replay-bar';
+    bar.innerHTML = '<button class="btn rp-go">▶ REPLAY</button><button class="btn primary rp-skip">CONTINUE ▸</button><i class="rp-timer"></i>';
+    hud.el.append(bar);
+    let left = replay ? 6 : 4;
+    const timer = setInterval(() => { left -= 0.1; bar.querySelector('.rp-timer').style.width = `${Math.max(0, left / 4) * 100}%`; if (left <= 0) done(); }, 100);
+    const done = () => { clearInterval(timer); bar.remove(); window.removeEventListener('keydown', key); proceed(); };
+    const go = () => {
+      clearInterval(timer); bar.remove(); window.removeEventListener('keydown', key);
+      replay = { t: 0, cam: (replay?.cam ?? Math.floor(Math.random() * 3)) + 1, proceed };
+      phase = 'replay';
+      document.body.classList.add('cine', 'replaying');
+      sfx.click();
+    };
+    const key = (ev) => { if (ev.key === 'r' || ev.key === 'R') go(); else if (ev.key === 'Enter' || ev.key === ' ') done(); };
+    window.addEventListener('keydown', key);
+    for (const [sel, fn] of [['.rp-go', go], ['.rp-skip', done]]) bar.querySelector(sel).addEventListener('pointerdown', (ev) => { ev.preventDefault(); ev.stopPropagation(); fn(); });
+  };
+  const runReplay = (dt) => {
+    replay.t += dt * 0.45; // slow motion
+    const n = rec.frames.length;
+    const idx = Math.min(n - 1, Math.floor(replay.t * 30));
+    applyFrame(rec.frames[idx]);
+    const bx = rec.frames[idx][0];
+    const bz = rec.frames[idx][2];
+    // broadcast angles: low sideline, end zone, sky cam
+    const c = replay.cam % 3;
+    if (c === 0) { camera.position.set(bx + 11, 2.6, bz + 3); camera.lookAt(bx, 1.1, bz - 1); }
+    else if (c === 1) { camera.position.set(bx * 0.6, 3.2, bz - 13); camera.lookAt(bx, 1, bz + 1); }
+    else { camera.position.set(bx - 4, 16, bz + 9); camera.lookAt(bx, 0, bz - 2); }
+    if (idx >= n - 1) {
+      document.body.classList.remove('cine', 'replaying');
+      phase = 'over';
+      replayPrompt(replay.proceed);
+    }
+  };
+
+  // highlight pictures for the menus (max 2 per play)
+  const highlights = [];
+  const snap = (label, delay = 0) => {
+    if (highlights.length >= 2 || !ctx.snapshot) return;
+    setTimeout(() => ctx.snapshot((img) => { if (img && highlights.length < 2) highlights.push({ img, label }); }), delay);
+  };
   const fxList = [];
   let cineUsed = 0;
   let scuffle = null;
@@ -696,6 +780,7 @@ export function freePlay(ctx) {
     if (involved && cineUsed < 1 && !opts.reducedMotion && (globalThis.__forceBigHit || Math.random() < 0.6)) {
       cineUsed++;
       ctx.cinematic?.(() => target.pos, 1.4);
+      snap(tackler.user ? 'Big hit!' : 'Leveled', 450);
     }
     if (opts.blood !== false && (globalThis.__forceBigHit || Math.random() < 0.3)) {
       const d = pushDir(tackler, target);
@@ -763,7 +848,7 @@ export function freePlay(ctx) {
       const timing = swatPress === null ? 9 : Math.abs(f.t0 + f.T - swatPress - 0.12);
       const win = (0.16 + (st.skill ?? 60) / 100 * 0.12) * tol;
       if (timing <= win && dist(user.pos, land) <= dR + 0.5) {
-        if (Math.random() < 0.55 + (st.skill ?? 60) / 400) { holder = user; carrier = user; user.int = true; hud.big('INTERCEPTION!', '#4ade80', 900); ctx.slowMo(0.5); sfx.catch(); setButtonsFor(); return; }
+        if (Math.random() < 0.55 + (st.skill ?? 60) / 400) { holder = user; carrier = user; user.int = true; snap('Interception!', 150); hud.big('INTERCEPTION!', '#4ade80', 900); ctx.slowMo(0.5); sfx.catch(); setButtonsFor(); return; }
         whistle('pd'); return;
       }
       if (timing <= win * 2.2 || dist(user.pos, land) < 0.9) { whistle('pd'); return; }
@@ -879,6 +964,7 @@ export function freePlay(ctx) {
     }
     maybeFlag();
     if (user.injured && result) result.injured = true;
+    if (!def && result.complete && result.yards >= 20) snap(`${result.yards}-yard gain`, 100);
   };
 
   // Penalty flags: occasionally a yellow flag changes the outcome of the play.
@@ -903,6 +989,7 @@ export function freePlay(ctx) {
     celebrate(who.mesh);
     hud.big('TOUCHDOWN!', '#4ade80', 2600);
     say(scorer.team === 'def' ? 'pick' : 'td');
+    snap(scorer.team === (m.defense ? 'def' : 'off') ? (scorer.team === 'def' ? 'Pick six!' : 'Touchdown!') : 'They scored', 900);
     const userScored = scorer.team === (m.defense ? 'def' : 'off');
     crowd('td', userScored);
     ctx.hype?.(1, 5);
@@ -948,8 +1035,15 @@ export function freePlay(ctx) {
   // ---------------- main loop
   return (dt) => {
     t += dt;
-    if (fx && !fx(dt)) fx = null;
-    for (let i = fxList.length - 1; i >= 0; i--) if (!fxList[i](dt)) fxList.splice(i, 1);
+    // visual effects must never be able to freeze a play
+    try { if (fx && !fx(dt)) fx = null; } catch (err) { console.warn('fx error', err); fx = null; }
+    for (let i = fxList.length - 1; i >= 0; i--) {
+      let keep = false;
+      try { keep = fxList[i](dt); } catch (err) { console.warn('fx error', err); }
+      if (!keep) fxList.splice(i, 1);
+    }
+    if (phase === 'replay') { runReplay(dt); return; }
+    if (phase === 'live' || phase === 'dead' || phase === 'celebrate') record(dt);
     if (phase === 'pick' || phase === 'over') return;
     if (phase === 'pre') {
       rig(camera, (user?.pos.x ?? 0) * 0.4, -4, dt, { zoom: mode === 'pass' ? 1.1 : 0.95, k: 3 });
@@ -1014,7 +1108,7 @@ export function freePlay(ctx) {
         user.lunge -= dt;
         user.vel.x = user.lungeDir.x * 9.5; user.vel.z = user.lungeDir.z * 9.5;
         if (carrier && carrier !== user && dist(user.pos, carrier.pos) < 1.15) tryTackle(user, carrier);
-        else if (!carrier && holder === qb && !flight && passD && dist(user.pos, qb.pos) < 1.2) { qb.down = true; user.lunge = 0; hardHit(user, qb); hud.big('SACK!', '#4ade80', 1100); sfx.cheer(); whistle('sack', user); }
+        else if (!carrier && holder === qb && !flight && passD && dist(user.pos, qb.pos) < 1.2) { qb.down = true; user.lunge = 0; hardHit(user, qb); hud.big('SACK!', '#4ade80', 1100); sfx.cheer(); snap('Sack!', 200); whistle('sack', user); }
         if (user.lunge <= 0 && phase === 'live') { user.out = 0.7; knockDown(user.mesh, 1); }
       } else if (user.engagedBy) {
         // locked up with a blocker: drive into him to build leverage, use moves to break free
@@ -1165,7 +1259,7 @@ export function freePlay(ctx) {
         camera.position.set(side * (22 + k * 2), 3 + k, scorer.pos.z + 4 - k * 3);
         camera.lookAt(side * 44, 9, scorer.pos.z - 4 - k * 3);
       }
-      if (t > 4.2) { phase = 'over'; endPlay(ctx, finalize(result, m), { delay: 300 }); }
+      if (t > 4.2) { phase = 'over'; endPlay(ctx, Object.assign(finalize(result, m), { highlights }), { delay: 300, beforeDone: replayPrompt }); }
       return;
     }
     if (phase === 'dead') {
@@ -1206,7 +1300,7 @@ export function freePlay(ctx) {
           ctx.shake(0.08);
         }
       }
-      if (t > 1.6) { phase = 'over'; endPlay(ctx, finalize(result, m), { delay: 900 }); }
+      if (t > 1.6) { phase = 'over'; endPlay(ctx, Object.assign(finalize(result, m), { highlights }), { delay: 900, beforeDone: replayPrompt }); }
     }
   };
 

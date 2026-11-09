@@ -243,6 +243,13 @@ export function gamedayScreen(app) {
       health: st.player.health,
     });
     ui.busy = false;
+    // keep highlight pictures for the menus (last 8)
+    if (res.highlights?.length) {
+      st.highlights ??= [];
+      for (const hl of res.highlights) st.highlights.unshift({ img: hl.img, label: hl.label, opp: opp.name, oppId: opp.id, week: (league.week ?? 0) + 1, year: st.career.year });
+      st.highlights.length = Math.min(st.highlights.length, 8);
+    }
+    delete res.highlights;
     if (res.fallbackQuality !== undefined) res = outcomeFromQuality(st, m, res.fallbackQuality, call);
     finishMoment({ ...res, call, played: true });
   };

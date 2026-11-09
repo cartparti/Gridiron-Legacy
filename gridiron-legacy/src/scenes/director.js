@@ -90,6 +90,22 @@ function frame() {
     R.camera.position.y += (Math.random() - 0.5) * shake * 1.5;
   }
   R.renderer.render(R.active ?? R.scene, R.camera);
+  // highlight snapshot: copy the frame we just drew into a small JPEG
+  if (R.snapReq) {
+    const cb = R.snapReq;
+    R.snapReq = null;
+    try {
+      const src = R.renderer.domElement;
+      const c = document.createElement('canvas');
+      c.width = 240; c.height = 180;
+      const sw = Math.min(src.width, src.height * 4 / 3);
+      const sh = sw * 3 / 4;
+      const g = c.getContext('2d');
+      g.imageSmoothingEnabled = false;
+      g.drawImage(src, (src.width - sw) / 2, (src.height - sh) / 2, sw, sh, 0, 0, 240, 180);
+      cb(c.toDataURL('image/jpeg', 0.72));
+    } catch { cb(null); }
+  }
 }
 
 function start(fn) {
@@ -344,6 +360,8 @@ export function runMinigame(type, opts) {
       shake: cameraShake,
       slowMo,
       cinematic,
+      /** Grab the next rendered frame as a highlight picture. */
+      snapshot(cb) { r.snapReq = cb; },
       /** Crowd hype: level 0..1 for some seconds (bouncing fans, camera flashes). */
       hype(level, seconds = 2) { r.hype = { level, until: performance.now() + seconds * 1000 }; },
       groundPoint(ev) {
@@ -356,9 +374,14 @@ export function runMinigame(type, opts) {
       },
     };
     const update = GAMES[type](ctx);
+    let errors = 0;
     start((dt, t) => {
       nextFrame();
-      update(dt, t);
+      try { update(dt, t); } catch (err) {
+        console.error('play error', err);
+        // never leave the player stuck on a frozen play: auto-sim it instead
+        if (++errors > 5) { finish({ fallbackQuality: 0.5 }); return; }
+      }
       tickIdle(group, dt);
       const ex = r.hype && performance.now() < r.hype.until ? r.hype.level : 0.35;
       r.stadium.setExcitement(ex);

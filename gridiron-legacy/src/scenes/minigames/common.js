@@ -82,7 +82,7 @@ export function follow(camera, tx, tz, off, look, dt, k = 4) {
 }
 
 /** Show the outcome, wait, then hand the result back. */
-export function endPlay(ctx, result, { color, delay = 1600 } = {}) {
+export function endPlay(ctx, result, { color, delay = 1600, beforeDone = null } = {}) {
   if (ctx.ended) return;
   ctx.ended = true;
   let big;
@@ -100,12 +100,12 @@ export function endPlay(ctx, result, { color, delay = 1600 } = {}) {
   if (result.td || result.int || result.defTD) { sfx.touchdown(); ctx.slowMo?.(0.5); }
   else if (result.turnover) { sfx.groan(); ctx.shake?.(0.25); }
   else if (result.complete && result.yards >= 15) sfx.cheer();
-  setTimeout(() => ctx.done(result), ctx.opts.reducedMotion ? 500 : delay);
+  setTimeout(() => (beforeDone ? beforeDone(() => ctx.done(result)) : ctx.done(result)), ctx.opts.reducedMotion ? 500 : delay);
 }
 
 export function finalize(result, moment) {
   if (result.defense) {
-    result.yardsAllowed = Math.max(0, Math.round(result.yardsAllowed ?? 0));
+    result.yardsAllowed = result.sack || result.tfl ? Math.round(result.yardsAllowed ?? 0) : Math.max(0, Math.round(result.yardsAllowed ?? 0));
     if (!result.turnover && !result.pd && result.yardsAllowed >= moment.yardLine) { result.yardsAllowed = moment.yardLine; result.tdAllowed = true; }
     result.text = result.text ?? (result.defTD ? 'PICK SIX!' : result.int ? 'INTERCEPTED!' : result.pd ? 'Broken up!' : result.tdAllowed ? 'They scored on you.' : `${result.yardsAllowed} yards allowed.`);
     result.quality = Math.max(0, Math.min(1, result.quality));

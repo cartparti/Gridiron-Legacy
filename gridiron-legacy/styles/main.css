@@ -647,3 +647,51 @@ body.cine .hud-score, body.cine .hud-tag { opacity: 0; }
 .lineup-side { display: flex; flex-direction: column; align-items: center; }
 .lineup-size { font-size: 0.58rem; color: #fff; background: rgba(0,0,0,0.55); padding: 2px 6px; border-radius: 3px; margin: -4px 0 6px; }
 .hud-tag span small { display: block; font-size: 0.5rem; opacity: 0.85; margin-top: 1px; }
+
+/* ---------- instant replay ---------- */
+.replay-bar { position: absolute; left: 50%; bottom: calc(var(--safe-bottom) + 70px); transform: translateX(-50%); display: flex; gap: 10px; pointer-events: auto; z-index: 8; }
+.replay-bar .btn { min-width: 132px; }
+.replay-bar .rp-timer { position: absolute; left: 0; bottom: -8px; height: 4px; background: var(--accent); border-radius: 2px; width: 100%; }
+body.replaying .hud-comm, body.replaying .hud-instr { opacity: 0 !important; }
+body.replaying::after { content: ''; }
+body.replaying .hud::before { content: '● REPLAY'; position: absolute; top: calc(var(--safe-top) + 13vh + 8px); left: 14px; font-family: var(--pixel); font-weight: 700; color: #fff; background: #d6202b; padding: 4px 10px; border: 2px solid #07080a; border-radius: 4px; animation: rp-blink 1s steps(2) infinite; z-index: 9; }
+@keyframes rp-blink { 50% { opacity: 0.55; } }
+
+/* ---------- crests, team hero, highlight reel ---------- */
+img.crest { image-rendering: pixelated; display: block; filter: drop-shadow(0 3px 0 rgba(0,0,0,0.45)); }
+.team-hero {
+  position: relative; display: flex; gap: 14px; align-items: center; padding: 16px; border-radius: 8px; overflow: hidden;
+  border: 2px solid #07080a; box-shadow: 0 4px 0 rgba(0,0,0,0.5), inset 0 -5px 0 var(--team2);
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 10px, transparent 10px 20px),
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--team) 95%, #fff 5%), color-mix(in srgb, var(--team) 55%, #000) 70%);
+}
+.team-hero::after { content: ''; position: absolute; right: -30px; bottom: -40px; width: 180px; height: 180px; border-radius: 50%; background: color-mix(in srgb, var(--team2) 25%, transparent); filter: blur(2px); }
+.th-crest { flex: none; z-index: 1; animation: crest-in 0.5s cubic-bezier(.2,1.5,.4,1); }
+@keyframes crest-in { from { transform: scale(0.4) rotate(-10deg); opacity: 0; } to { transform: none; opacity: 1; } }
+.th-info { z-index: 1; color: #fff; min-width: 0; }
+.th-kicker { font-size: 0.6rem; color: var(--team2); letter-spacing: 0.1em; text-shadow: 1px 1px 0 #000; }
+.th-name { font-size: clamp(1.5rem, 8vw, 2.3rem); line-height: 1; text-transform: uppercase; text-shadow: 3px 3px 0 #000, 1.5px 0 rgba(255,40,90,0.5), -1.5px 0 rgba(40,200,255,0.5); }
+.th-city { font-size: 0.85rem; opacity: 0.85; margin-top: 2px; }
+.th-stats { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; font-size: 0.72rem; opacity: 0.95; }
+.th-stats b { font-family: var(--pixel); font-size: 0.9rem; color: var(--team2); text-shadow: 1px 1px 0 #000; }
+.reel { display: flex; gap: 12px; overflow-x: auto; padding: 6px 2px 10px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.polaroid { margin: 0; flex: none; width: 150px; background: #f3efe6; padding: 6px 6px 8px; border-radius: 3px; box-shadow: 0 4px 0 rgba(0,0,0,0.45); transform: rotate(-2deg); scroll-snap-align: start; color: #1b1b1b; }
+.polaroid.tilt { transform: rotate(2.5deg); }
+.polaroid img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; image-rendering: pixelated; border: 1px solid #0003; }
+.polaroid figcaption { display: flex; flex-direction: column; margin-top: 5px; font-size: 0.66rem; line-height: 1.2; }
+.polaroid figcaption b { font-family: var(--pixel); font-size: 0.66rem; text-transform: uppercase; }
+.polaroid figcaption span { color: #555; }
+.polaroid.empty .ph { aspect-ratio: 4 / 3; display: grid; place-items: center; background: repeating-linear-gradient(45deg, #ddd6c7 0 8px, #e8e2d4 8px 16px); opacity: 0.7; }
+.side-deco { display: none; }
+@media (min-width: 1100px) {
+  .side-deco { display: flex; flex-direction: column; align-items: center; gap: 14px; position: fixed; top: 140px; width: calc((100vw - 520px) / 2 - 40px); max-width: 300px; z-index: 0; pointer-events: none; }
+  .side-deco.left { left: 20px; }
+  .side-deco.right { right: 20px; }
+  .side-deco .polaroid { width: 170px; }
+  .sd-name { font-size: 2rem; text-transform: uppercase; color: var(--team2); text-shadow: 3px 3px 0 #000; }
+  .sd-city { color: var(--muted); }
+  .sd-empty { color: var(--muted); font-size: 0.7rem; text-align: center; max-width: 180px; opacity: 0.7; }
+}
+.matchup .vs { font-size: 1.2rem; color: var(--team2); text-shadow: 2px 2px 0 #000; }
+.replay-bar .btn { white-space: nowrap; }

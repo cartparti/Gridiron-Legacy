@@ -145,6 +145,16 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   and hit power by mass, catch radius and contested catches by height, bull rush by mass. Pre-snap shows the
   size matchup; HUD tag, pregame lineup and profile show height/weight.
 
+## v0.11 changes
+- Fixed: every touchdown froze the game (flameJet color index went negative). Effects now run in try/catch,
+  and runMinigame auto-sims a play (fallbackQuality) after repeated update errors instead of freezing.
+- Sacks/TFL now keep negative yardsAllowed through `finalize` (ball moves back).
+- Instant replay: engine records root/body/joint transforms ~30 fps (`record`/`applyFrame`); after each play a
+  REPLAY / CONTINUE prompt; slow-mo playback with sideline / end zone / sky-cam angles (`runReplay`).
+- Pixel team crests with mascot glyphs (`src/ui/crest.js`), used by `teamBadge` everywhere.
+- Week tab: team hero banner (crest, mascot name, record, streak, rank), Highlight Reel of real snapshots
+  (`ctx.snapshot` in director → result.highlights → state.highlights, last 8), side decorations on wide screens.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

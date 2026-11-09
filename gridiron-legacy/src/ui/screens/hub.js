@@ -20,6 +20,7 @@ import { openLookModal } from './look.js';
 import { DRILLS, DRILL_NAMES, openDrill, grade } from './drills.js';
 import { teamKits } from '../../data/kits.js';
 import { fmtSize } from '../../data/looks.js';
+import { crest, mascotKind } from '../crest.js';
 import { portraitImg } from '../../scenes/portrait.js';
 import { people } from '../../sim/social.js';
 
@@ -73,6 +74,15 @@ export function hubScreen(app) {
   const views = { week: weekView, team: teamView, life: lifeView, career: careerView, news: newsView };
   body.append(views[app.hubTab](app));
   wrap.append(body);
+  // decorations beside the app on wide screens: crest + highlight photos
+  const myTeam = getTeam(st.league, st.career.teamId);
+  if (myTeam) {
+    const hl = (st.highlights ?? []).slice(0, 4);
+    wrap.append(
+      h('div.side-deco.left', crest(myTeam, 150), h('div.sd-name.pix', myTeam.name), h('div.sd-city', `${myTeam.city} · ${myTeam.w}-${myTeam.l}`)),
+      h('div.side-deco.right', hl.length ? hl.map((x, i) => h('figure.polaroid', { style: { transform: `rotate(${[-6, 4, -3, 7][i]}deg)` } }, h('img', { src: x.img, alt: x.label }), h('figcaption', h('b', x.label), h('span', `vs ${x.opp}`))))
+        : h('div.sd-empty.pix', 'Your highlights will hang here')));
+  }
   wrap.append(h('nav.tabs', TABS.map(([id, ico, label]) =>
     h(`button.tab${app.hubTab === id ? '.on' : ''}`, { onclick: () => { sfx.click(); app.hubTab = id; app.render(); } },
       icon(ico), label))));
@@ -112,6 +122,30 @@ function weekView(app) {
     container.append(h('div.card.flat', h('div.small.muted', st.lastEventResult.title), h('p', st.lastEventResult.result), changeChips(st.lastEventResult.changes)));
   }
 
+  // Team banner: crest, mascot, record, streak, rank
+  {
+    const conf = st.league.kind === 'pro' ? me.conf : null;
+    const rank = standings(st.league, conf).findIndex((t) => t.id === me.id) + 1;
+    const streak = me.streak > 0 ? `W${me.streak}` : me.streak < 0 ? `L${-me.streak}` : '-';
+    container.append(h('div.team-hero',
+      h('div.th-crest', crest(me, 92)),
+      h('div.th-info',
+        h('div.th-kicker.pix', `${STAGES[st.career.stage]?.label ?? ''} · ${st.career.year}`),
+        h('div.th-name.pix', me.name),
+        h('div.th-city', me.city),
+        h('div.th-stats',
+          h('span', h('b', `${me.w}-${me.l}`), ' record'),
+          h('span', h('b', streak), ' streak'),
+          h('span', h('b', `#${rank}`), conf ? ` ${conf}` : ' league')))));
+  }
+
+  // Highlight reel: pictures from your big plays
+  const reel = st.highlights ?? [];
+  container.append(h('div.card.reel-card',
+    h('div.card-title', h('h3', 'Highlight Reel'), h('span.tiny.muted', reel.length ? `${reel.length} clip${reel.length === 1 ? '' : 's'}` : 'Make some plays!')),
+    h('div.reel', reel.length ? reel.map((x, i) => h(`figure.polaroid${i % 2 ? '.tilt' : ''}`, h('img', { src: x.img, alt: x.label }), h('figcaption', h('b', x.label), h('span', `vs ${x.opp} · Wk ${x.week}`))))
+      : [0, 1, 2].map(() => h('figure.polaroid.empty', h('div.ph', crest(me, 40)), h('figcaption', h('b', 'Your highlight'), h('span', 'TDs, big hits, picks')))))));
+
   // Matchup card
   if (m && opp) {
     const home = m.home;
@@ -119,9 +153,9 @@ function weekView(app) {
       h('div.card-title', h('h3', m.playoff ? roundName(st.league, st.league.playoffs.round) : `Week ${st.league.week + 1} of ${st.league.schedule.length}`),
         h('div.row', { style: { gap: '6px' } }, h('span.chip.pix', home ? 'HOME' : 'AWAY'), opp.id === st.career.rivalTeamId ? h('span.chip.bad.pix', icon('flame'), 'RIVAL') : null)),
       h('div.matchup',
-        h('div.team-badge', teamBadge(me, 44), h('span.nm', me.name), h('span.rec', `${me.w}-${me.l}`)),
-        h('span.vs', home ? 'vs' : '@'),
-        h('div.team-badge', teamBadge(opp, 44), h('span.nm', opp.name), h('span.rec', `${opp.w}-${opp.l}`))),
+        h('div.team-badge', teamBadge(me, 56), h('span.nm', me.name), h('span.rec', `${me.w}-${me.l}`)),
+        h('span.vs.pix', home ? 'VS' : 'AT'),
+        h('div.team-badge', teamBadge(opp, 56), h('span.nm', opp.name), h('span.rec', `${opp.w}-${opp.l}`))),
       h('div.row.between.small.muted', { style: { marginTop: '8px' } },
         h('span', `Your OFF ${Math.round(me.off)} · DEF ${Math.round(me.def)}`),
         h('span', `Their OFF ${Math.round(opp.off)} · DEF ${Math.round(opp.def)}`)),

@@ -22,7 +22,7 @@ export function flameJet(scene, pos, dur = 1.8) {
       const k = p.life > 0 ? Math.max(0.01, 1.2 - p.life * 1.6) : 0.001;
       d.position.set(p.x, p.y, p.z); d.scale.setScalar(k); d.updateMatrix();
       mesh.setMatrixAt(i, d.matrix);
-      mesh.setColorAt(i, cols[Math.min(3, Math.floor(p.life * 5))]);
+      mesh.setColorAt(i, cols[Math.max(0, Math.min(3, Math.floor(p.life * 5)))]);
     });
     mesh.instanceMatrix.needsUpdate = true;
     mesh.instanceColor.needsUpdate = true;
