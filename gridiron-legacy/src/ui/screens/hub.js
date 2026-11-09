@@ -17,6 +17,7 @@ import { peopleView, storeView } from './people.js';
 import { placeCards, enterWorld } from './world.js';
 import { openPhone, phoneBadge } from './phone.js';
 import { openLookModal } from './look.js';
+import { socialView } from './social.js';
 import { DRILLS, DRILL_NAMES, openDrill, grade } from './drills.js';
 import { teamKits } from '../../data/kits.js';
 import { fmtSize } from '../../data/looks.js';
@@ -347,11 +348,12 @@ function teamView(app) {
 function lifeView(app) {
   const st = app.state;
   const p = st.player;
-  const sub = app.ui.lifeSub ?? 'people';
+  const sub = app.ui.lifeSub ?? 'social';
   const out = h('div.col', { style: { gap: '14px' } },
-    h('div.subtabs', [['people', 'People'], ['store', 'Store'], ['money', 'Money'], ['lifestyle', 'Housing & Cars'], ['invest', 'Invest']].map(([id, l]) =>
+    h('div.subtabs', [['social', 'Social'], ['people', 'People'], ['store', 'Store'], ['money', 'Money'], ['lifestyle', 'Housing & Cars'], ['invest', 'Invest']].map(([id, l]) =>
       h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { app.ui.lifeSub = id; app.render(); } }, l))));
-  if (sub === 'people') {
+  if (sub === 'social') out.append(socialView(app));
+  else if (sub === 'people') {
     out.append(peopleView(app));
     if (st.career.stage !== 'pro') out.append(h('div.card', h('h3', 'Grades'), h('div.statbar', h('span', 'Academics'), h('div.track', h('div.fill', { style: { width: `${p.academics}%`, background: p.academics < 40 ? 'var(--bad)' : undefined } })), h('span.val', Math.round(p.academics))), h('p.tiny.muted', 'Drop below 30 and you are ineligible. Study Hall raises it.')));
   } else if (sub === 'store') {

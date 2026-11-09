@@ -600,6 +600,7 @@ function eventEligible(state, g, ev) {
   if (c.positions && !c.positions.includes(p.position)) return false;
   if (c.weather && !c.weather.includes(g.weather)) return false;
   if (c.minFame && p.fame < c.minFame) return false;
+  if (c.stages && !c.stages.includes(state.career.stage)) return false;
   return true;
 }
 

@@ -1,4 +1,5 @@
 // Small line-icon set (24x24, stroke = currentColor). Original, drawn for this project.
+import { pixelIconURL } from './pixelIcons.js';
 import { h } from './dom.js';
 
 const P = {
@@ -63,5 +64,7 @@ export const ACTIVITY_ICONS = {
 
 export function activityIcon(id) {
   const [name, color] = ACTIVITY_ICONS[id] ?? ['star', '#ffcc33'];
+  const url = pixelIconURL(id);
+  if (url) return h('span.ic.pix-ic', { style: { '--ic': color } }, h('img', { src: url, alt: '' }));
   return h('span.ic', { style: { background: `color-mix(in srgb, ${color} 18%, transparent)`, color } }, icon(name));
 }

@@ -145,17 +145,21 @@ export function buildStadium(scene) {
   const standMat = new THREE.MeshBasicMaterial({ map: tierTex('#3b4252') });
   const standMat2 = new THREE.MeshBasicMaterial({ map: tierTex('#323847') });
   const crowdPositions = [];
+  const standMeshes = [];
+  const crowdMeta = [];
   const addStand = (cx, cz, len, alongX, facing) => {
-    for (let tier = 0; tier < 7; tier++) {
+    for (let tier = 0; tier < 11; tier++) { // tiers 7-10 are the pro upper deck
       const depth = 3;
       const geo = new THREE.BoxGeometry(alongX ? len : depth, 1.6 + tier * 1.6, alongX ? depth : len);
       const m = new THREE.Mesh(geo, tier % 2 ? standMat : standMat2);
       const off = 6 + tier * depth;
       m.position.set(alongX ? cx : cx + facing * off, (1.6 + tier * 1.6) / 2, alongX ? cz + facing * off : cz);
       world.add(m);
+      standMeshes.push({ m, tier, end: alongX });
       const n = Math.floor(len / 1.3);
       for (let i = 0; i < n; i++) {
         const along = -len / 2 + (i + 0.5) * (len / n) + (Math.random() - 0.5) * 0.4;
+        crowdMeta.push({ tier, end: alongX, band: alongX && facing < 0 && tier < 3 && Math.abs(along) < 12 });
         crowdPositions.push(alongX
           ? new THREE.Vector3(cx + along, 1.6 + tier * 1.6 + 0.45, cz + facing * off)
           : new THREE.Vector3(cx + facing * off, 1.6 + tier * 1.6 + 0.45, cz + along));
@@ -277,17 +281,21 @@ export function buildStadium(scene) {
 
 
   // Roof canopies over the sideline stands, with a strip of lights underneath.
+  const roofParts = [];
   for (const sd of [-1, 1]) {
     const roof = new THREE.Mesh(new THREE.BoxGeometry(14, 1.2, FIELD_L + 10), lambert('#1c2029'));
-    roof.position.set(sd * (FIELD_W / 2 + 22), 15.5, 0);
+    roofParts.push(roof);
+    roof.position.set(sd * (FIELD_W / 2 + 26), 20.5, 0);
     world.add(roof);
     const strip = new THREE.Mesh(new THREE.BoxGeometry(1, 0.3, FIELD_L + 6), new THREE.MeshBasicMaterial({ color: '#fff6d8' }));
-    strip.position.set(sd * (FIELD_W / 2 + 16), 14.8, 0);
+    strip.position.set(sd * (FIELD_W / 2 + 20), 19.8, 0);
     world.add(strip);
+    roofParts.push(strip);
     for (let z = -FIELD_L / 2; z <= FIELD_L / 2; z += 15) {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.6, 15, 0.6), lambert('#2a2f3a'));
-      post.position.set(sd * (FIELD_W / 2 + 28), 7.5, z);
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.6, 20, 0.6), lambert('#2a2f3a'));
+      post.position.set(sd * (FIELD_W / 2 + 37), 10, z);
       world.add(post);
+      roofParts.push(post);
     }
   }
 
@@ -381,6 +389,26 @@ export function buildStadium(scene) {
   const losStick = stick('#ff7a1a');
   const fdStick = stick('#ffd43b');
 
+  // High school extras: chain-link fence and a little press box.
+  const hsParts = [];
+  const fenceMat = new THREE.MeshBasicMaterial({ color: '#b8c0c8', transparent: true, opacity: 0.55 });
+  for (const sd of [-1, 1]) {
+    const fence = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.6, FIELD_L + 8), fenceMat);
+    fence.position.set(sd * (FIELD_W / 2 + 8.5), 0.8, 0);
+    world.add(fence); hsParts.push(fence);
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, FIELD_L + 8), lambert('#8a939e'));
+    rail.position.set(sd * (FIELD_W / 2 + 8.5), 1.6, 0);
+    world.add(rail); hsParts.push(rail);
+  }
+  const press = new THREE.Group();
+  const pb = new THREE.Mesh(new THREE.BoxGeometry(16, 3.2, 3.5), lambert('#3a3f4a'));
+  const win = new THREE.Mesh(new THREE.BoxGeometry(14, 1.2, 0.1), new THREE.MeshBasicMaterial({ color: '#9fd3ff' }));
+  win.position.set(0, 0.2, -1.8);
+  press.add(pb, win);
+  press.rotation.y = Math.PI / 2;
+  press.position.set(FIELD_W / 2 + 18, 7.5, 0);
+  world.add(press); hsParts.push(press);
+
   // Light towers.
   const poleMat = lambert('#9aa3ad');
   const lampMat = new THREE.MeshBasicMaterial({ color: '#fffbe6' });
@@ -432,7 +460,7 @@ export function buildStadium(scene) {
       border.material.color.set(crowdColors[0]).multiplyScalar(0.55);
       fieldMat.needsUpdate = true;
       const palette = [crowdColors[0], crowdColors[1], crowdColors[0], farColors[0], '#d9d9d9', '#6c757d', crowdColors[0]].map((c) => new THREE.Color(c));
-      for (let i = 0; i < crowd.count; i++) crowd.setColorAt(i, palette[Math.floor(Math.random() * palette.length)]);
+      for (let i = 0; i < crowd.count; i++) crowd.setColorAt(i, crowdMeta[i]?.band && this.level === 'college' ? new THREE.Color(i % 2 ? '#f4f4f4' : crowdColors[0]) : palette[Math.floor(Math.random() * palette.length)]);
       crowd.instanceColor.needsUpdate = true;
       const skinsA = ['#f7dcc0', '#e0ab7f', '#cc9260', '#b07646', '#8f5a34', '#6e4126'].map((cc) => new THREE.Color(cc));
       for (let i = 0; i < arms.count; i++) arms.setColorAt(i, Math.random() < 0.5 ? skinsA[i % skinsA.length] : palette[i % palette.length]);
@@ -470,9 +498,29 @@ export function buildStadium(scene) {
       heads.material.color.copy(crowd.material.color);
     },
     /** Make the crowd bounce (excitement 0..1). */
+    /** Match the venue to the level: 'hs' bleachers, 'college' bowl + band, 'pro' upper deck + roof. */
+    setLevel(level = 'pro') {
+      const maxTier = level === 'hs' ? 3 : level === 'college' ? 7 : 11;
+      const ends = level !== 'hs';
+      for (const s2 of standMeshes) s2.m.visible = s2.tier < maxTier && (ends || !s2.end);
+      crowdMeta.forEach((c) => { c.hidden = !(c.tier < maxTier && (ends || !c.end)) || (level === 'hs' && Math.random() < 0.35); });
+      for (const r of roofParts) r.visible = level === 'pro';
+      for (const p2 of hsParts) p2.visible = level === 'hs';
+      jumbo.scale.setScalar(level === 'hs' ? 0.42 : level === 'college' ? 0.72 : 1);
+      jumbo.position.y = level === 'hs' ? 9 : level === 'college' ? 22 : 33;
+      const metal = level === 'hs';
+      standMat.color.set(metal ? '#c8d0d8' : '#ffffff');
+      standMat2.color.set(metal ? '#aeb6bf' : '#ffffff');
+      this.level = level;
+      // camera flashes only where people are sitting
+      const vis = crowdPositions.filter((_, i) => !crowdMeta[i].hidden);
+      for (let i = 0; i < flashN; i++) { const p2 = vis[Math.floor(Math.random() * vis.length)] ?? crowdPositions[0]; fpos.set([p2.x, p2.y + 0.9, p2.z], i * 3); }
+      flashGeo.attributes.position.needsUpdate = true;
+      this.animateCrowd(0, 0, true);
+    },
     /** How hyped the crowd is (more bouncing and camera flashes). */
     setExcitement(e) { flashRate = 0.003 + e * 0.02; },
-    animateCrowd(t, excitement = 0.2) {
+    animateCrowd(t, excitement = 0.2, force = false) {
       const base = crowd.userData.base;
       // camera flashes
       for (let i = 0; i < flashN; i++) { const on = Math.random() < flashRate ? 1 : fcol[i * 3] * 0.6; fcol[i * 3] = fcol[i * 3 + 1] = fcol[i * 3 + 2] = on > 0.05 ? on : 0; }
@@ -481,7 +529,7 @@ export function buildStadium(scene) {
       cheerIdx.forEach((ci, k) => {
         const p = base[ci];
         const bob = Math.max(0, Math.sin(t * 9 + ci * 1.7)) * 0.35 * excitement;
-        dummy.position.set(p.x, p.y + 0.3 + bob, p.z);
+        dummy.position.set(p.x, crowdMeta[ci]?.hidden ? -200 : p.y + 0.3 + bob, p.z);
         dummy.rotation.set(0, 0, Math.sin(t * 6 + ci) * 0.25 * excitement);
         dummy.updateMatrix();
         arms.setMatrixAt(k, dummy.matrix);
@@ -491,7 +539,7 @@ export function buildStadium(scene) {
       for (const mm of signMeshes) {
         mm.userData.list.forEach((ci, k) => {
           const p = base[ci];
-          dummy.position.set(p.x, p.y + 1.45 + Math.max(0, Math.sin(t * 7 + ci)) * 0.3 * excitement, p.z);
+          dummy.position.set(p.x, crowdMeta[ci]?.hidden ? -200 : p.y + 1.45 + Math.max(0, Math.sin(t * 7 + ci)) * 0.3 * excitement, p.z);
           dummy.lookAt(0, p.y + 1.4, p.z * 0.6);
           dummy.updateMatrix();
           mm.setMatrixAt(k, dummy.matrix);
@@ -499,10 +547,10 @@ export function buildStadium(scene) {
         dummy.rotation.set(0, 0, 0);
         mm.instanceMatrix.needsUpdate = true;
       }
-      const step = base.length > 2500 ? 2 : 1;
+      const step = force ? 1 : base.length > 2500 ? 2 : 1;
       for (let i = 0; i < base.length; i += step) {
         const p = base[i];
-        dummy.position.set(p.x, p.y + Math.max(0, Math.sin(t * 9 + i * 1.7)) * 0.35 * excitement, p.z);
+        dummy.position.set(p.x, crowdMeta[i]?.hidden ? -200 : p.y + Math.max(0, Math.sin(t * 9 + i * 1.7)) * 0.35 * excitement, p.z);
         dummy.updateMatrix();
         crowd.setMatrixAt(i, dummy.matrix);
         heads.setMatrixAt(i, dummy.matrix);

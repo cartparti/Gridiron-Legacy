@@ -62,3 +62,26 @@ test('tags land in Huddle Mentions with varied, answerable replies', async () =>
   for (let i = 0; i < 12; i++) { const s2 = career(); s2.rngState = 1000 + i * 77; const ph = await import('../src/sim/phone.js'); ph.postGameTexts(s2, { grade: 80, won: true }); const o = ph.replyOptions(s2, 'coach'); if (o[0]) labels.add(o[0]); }
   assert.ok(labels.size >= 2, 'reply wording varies');
 });
+
+test('dating: meet someone, first date, then date nights and hangouts use a day', async () => {
+  const L = await import('../src/sim/life.js');
+  const st = career();
+  st.player.money = 2000;
+  st.player.partnerName = null;
+  const c = L.meetSomeone(st);
+  const pers = L.PERSONALITIES.find((x) => x.id === c.personality);
+  let res;
+  const { FIRST_DATE } = await import('../src/data/life.js');
+  for (let r = 0; r < FIRST_DATE.length; r++) res = L.answerDate(st, FIRST_DATE[r].choices.findIndex((x) => x.style === pers.likes));
+  assert.ok(res.done && res.success, 'answering to their personality wins them over');
+  assert.equal(st.player.partnerName, c.name);
+  assert.ok(st.week.plan.some((x) => x && x.done));
+  const before = st.player.rel.partner;
+  L.openDate(st, 'arcade');
+  L.finishDate(st, 'arcade', 2);
+  assert.ok(st.player.rel.partner > before);
+  L.openHangout(st, 'bowling');
+  const r2 = L.finishHangout(st, 'bowling', 0);
+  assert.ok(r2.changes.length);
+  assert.equal(st.week.plan.filter((x) => x && x.done).length, 3);
+});

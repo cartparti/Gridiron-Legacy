@@ -339,6 +339,79 @@ export const GAME_EVENTS = [
       { label: 'Stay inside, collapse the pocket', effects: { rel: { coach: 2 } }, game: { tol: 0.03 }, result: 'Push the middle so he can\'t step up.' },
     ],
   },
+  // ---------------- level-specific flavor
+  {
+    id: 'hs_band', trigger: 'pregame', cond: { stages: ['hs'] }, title: 'Friday Night Lights',
+    text: 'The marching band is blasting your fight song. Half the town is in the bleachers, and your little cousin made a sign with your name on it.',
+    choices: [
+      { label: 'Run over and high-five the band', effects: { fame: 0.5, mood: 3 }, game: { momentum: 0.1 }, result: 'The drumline goes wild. The student section starts a chant.' },
+      { label: 'Find your cousin and point at the sign', effects: { rel: { family: 4 }, mood: 2 }, game: { tol: 0.02 }, result: 'They scream so loud you hear it on the field.' },
+    ],
+  },
+  {
+    id: 'hs_youth_coach', trigger: 'pregame', cond: { stages: ['hs'] }, title: 'Familiar Face',
+    text: 'Your old youth league coach is in the front row wearing your number.',
+    choices: [
+      { label: 'Go say thanks before kickoff', effects: { mood: 4 }, game: { tol: 0.03 }, result: '"I always knew," he says. You play with a full heart.' },
+      { label: 'Give a nod and lock in', effects: {}, game: { tol: 0.02 }, result: 'Business first. He gets it.' },
+    ],
+  },
+  {
+    id: 'hs_homecoming', trigger: 'halftime', cond: { stages: ['hs'] }, title: 'Homecoming Court',
+    text: 'It\'s homecoming. You were voted onto the court, and they want you out there at halftime... in pads.',
+    choices: [
+      { label: 'Walk out in full uniform', effects: { fame: 1, mood: 4, rel: { teammates: 2 } }, game: { momentum: 0.1 }, result: 'The crowd loves it. Your teammates roast you all second half.' },
+      { label: 'Stay in the locker room for adjustments', effects: { rel: { coach: 3 } }, game: { tol: 0.03 }, result: 'Coach appreciates the focus.' },
+    ],
+  },
+  {
+    id: 'col_student_section', trigger: 'pregame', cond: { stages: ['college'] }, title: 'The Student Section',
+    text: '20,000 students are painted head to toe. They\'re chanting your name before warmups even start.',
+    choices: [
+      { label: 'Run over and lead a chant', effects: { fame: 1.2, mood: 3 }, game: { momentum: 0.15, tol: -0.02 }, result: 'The whole stadium is shaking. You\'re fired up.' },
+      { label: 'Salute them and get loose', effects: { fame: 0.5 }, game: { tol: 0.03 }, result: 'Calm and confident.' },
+    ],
+  },
+  {
+    id: 'col_gameday_show', trigger: 'pregame', cond: { stages: ['college'], minFame: 15 }, title: 'National TV Pregame Show',
+    text: 'The big college pregame show is broadcasting from campus. A host wants a quick interview.',
+    choices: [
+      { label: 'Do the interview', effects: { fame: 2 }, game: { tol: -0.02 }, result: 'You crush it on live TV. Your phone explodes.' },
+      { label: 'Politely decline, stay focused', effects: { rel: { coach: 2 } }, game: { tol: 0.03 }, result: 'Coach nods. All business today.' },
+    ],
+  },
+  {
+    id: 'col_scouts', trigger: 'random', cond: { stages: ['college'] }, title: 'Scouts in the Stands',
+    text: 'Word on the sideline: pro scouts from three teams are watching you today.',
+    choices: [
+      { label: 'Play your game, don\'t think about it', effects: {}, game: { tol: 0.03 }, result: 'Nothing changes. That\'s the point.' },
+      { label: 'Try to make a highlight play', effects: { fame: 0.5 }, game: { extra: true, tol: -0.03 }, result: 'You get one more shot to impress. Make it count.' },
+    ],
+  },
+  {
+    id: 'pro_primetime', trigger: 'pregame', cond: { stages: ['pro'] }, title: 'Primetime',
+    text: 'Sunday night, national TV, millions watching. The cameras follow you through the tunnel.',
+    choices: [
+      { label: 'Big entrance for the cameras', effects: { fame: 1.5 }, game: { momentum: 0.1, tol: -0.02 }, result: 'Your entrance is the top clip of the night.' },
+      { label: 'Headphones on, eyes down', effects: {}, game: { tol: 0.04 }, result: 'Locked in like a veteran.' },
+    ],
+  },
+  {
+    id: 'pro_incentive', trigger: 'clutch', cond: { stages: ['pro'] }, title: 'Contract Incentive',
+    text: 'Your agent texted before the game: one more big play today hits a bonus in your contract.',
+    choices: [
+      { label: 'Go get that bag', effects: {}, game: { extra: true, tol: -0.02 }, result: 'One more chance. Cash it in.' },
+      { label: 'Forget the money, win the game', effects: { rel: { teammates: 2 } }, game: { tol: 0.03 }, result: 'Team first. Your teammates notice.' },
+    ],
+  },
+  {
+    id: 'pro_holdout', trigger: 'random', cond: { stages: ['pro'] }, title: 'Teammate Holdout',
+    text: 'Reporters on the sideline ask about your teammate who\'s holding out for a new contract.',
+    choices: [
+      { label: '"Pay the man."', effects: { rel: { teammates: 4, coach: -2 }, fame: 0.5 }, game: {}, result: 'The locker room loves you. The front office... less so.' },
+      { label: '"I only worry about this game."', effects: { rel: { coach: 2 } }, game: { tol: 0.02 }, result: 'No drama. Back to work.' },
+    ],
+  },
   // ---------------- more random / on-field happenings
   {
     id: 'g_fumble_scrum', trigger: 'random', title: 'Loose Ball!',

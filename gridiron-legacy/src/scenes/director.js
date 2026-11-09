@@ -65,7 +65,7 @@ function frame() {
   raf = requestAnimationFrame(frame);
   const dt = Math.min(0.05, R.clock.getDelta());
   const cine = R.cine;
-  const slow = cine ? 0.2 : R.slowmo > 0 ? 0.3 : 1;
+  const slow = (cine ? 0.2 : R.slowmo > 0 ? 0.3 : 1) * (R.timeScale ?? 1);
   R.slowmo = Math.max(0, (R.slowmo ?? 0) - dt);
   elapsed += dt * slow;
   if (loopFn) loopFn(dt * slow, elapsed);
@@ -321,6 +321,7 @@ export function runMinigame(type, opts) {
     const cleanups = [];
     startCrowd(0.3);
     const finish = (result) => {
+      if (R) R.timeScale = 1;
       stopCrowd();
       stopMusic();
       if (R) { R.cine = null; document.body.classList.remove('cine'); }
@@ -345,6 +346,7 @@ export function runMinigame(type, opts) {
     else r.stadium.setTeams(opts.oppColors, opts.teamColors, oppName, myName, opts.homeColors);
     if (opts.scoreInfo) { r.stadium.setScoreboard(opts.scoreInfo); hud.score(opts.scoreInfo); }
     if (opts.lastName) hud.tag(opts.number ?? '', opts.lastName, opts.look?.heightIn ? `${Math.floor(opts.look.heightIn / 12)}'${opts.look.heightIn % 12}" · ${opts.look.weightLb} lb` : '');
+    r.stadium.setLevel?.(opts.stage ?? 'pro');
     r.stadium.setYardLine(m.yardLine, m.distance);
     applyAtmosphere(r, m.weather ?? 'clear');
     const group = new THREE.Group();
@@ -360,6 +362,8 @@ export function runMinigame(type, opts) {
       shake: cameraShake,
       slowMo,
       cinematic,
+      /** Slow the whole play down (quick-time events). 1 = normal. */
+      setTimeScale(s) { r.timeScale = s; },
       /** Grab the next rendered frame as a highlight picture. */
       snapshot(cb) { r.snapReq = cb; },
       /** Crowd hype: level 0..1 for some seconds (bouncing fans, camera flashes). */

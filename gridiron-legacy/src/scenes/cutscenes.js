@@ -38,7 +38,8 @@ function smoke(group, origin, n = 40) {
   };
 }
 
-const stadiumSetup = (colors, name) => (r) => {
+const stadiumSetup = (colors, name, level = 'pro') => (r) => {
+  r.stadium.setLevel?.(level);
   r.stadium.setTeams(colors, colors, name, name, colors);
   r.stadium.setYardLine(50, 10);
   r.stadium.hideLines();
@@ -99,7 +100,7 @@ export function tunnelCutscene(opts) {
       ], T);
       return T < 6.8;
     };
-  }, { setup: stadiumSetup(opts.colors, opts.teamName) });
+  }, { setup: stadiumSetup(opts.colors, opts.teamName, opts.stage) });
 }
 
 // ------------------------------------------------------------------ draft night
@@ -255,7 +256,7 @@ export function trophyCutscene(opts) {
       ctx.camera.lookAt(0, 1.8, 0);
       return T < 8;
     };
-  }, { setup: stadiumSetup(opts.colors, opts.teamName) });
+  }, { setup: stadiumSetup(opts.colors, opts.teamName, opts.stage) });
 }
 
 // ------------------------------------------------------------------ hall of fame

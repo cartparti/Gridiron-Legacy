@@ -297,6 +297,7 @@ export function freePlay(ctx) {
 
   const controls = makeControls(ctx, {
     onPress: (id) => {
+      if (qteActive) return;
       if (phase === 'pick' && /^key[1-3]$/.test(id)) return choose(Number(id.slice(3)) - 1);
       if (phase !== 'live') return;
       if (/^key[1-5]$/.test(id) && user.role === 'QB' && holder === user && !user.runner) return throwTo(receivers[Number(id.slice(3)) - 1]);
@@ -373,7 +374,25 @@ export function freePlay(ctx) {
     // lead the receiver: iterate the intercept time
     let T = dist(qbP, r.pos) / v;
     let lead = { ...r.pos };
-    for (let i = 0; i < 3; i++) { lead = { x: r.pos.x + r.vel.x * T, z: r.pos.z + r.vel.z * T }; T = Math.max(0.35, dist(qbP, lead) / v); }
+    if (r.user && mode === 'route' && r.route && !callForBall) {
+      // throw to where YOUR ROUTE will be (run it right and the ball is there; call for it to change that)
+      // how far along the route you are (closest point on the route), and how fast you're moving
+      let total = 0;
+      let best = { d: 1e9, s: 0 };
+      for (let i = 1; i < r.route.length; i++) {
+        const a = r.route[i - 1];
+        const b = r.route[i];
+        const len = Math.hypot(b.x - a.x, b.z - a.z) || 0.001;
+        const k = Math.max(0, Math.min(1, ((r.pos.x - a.x) * (b.x - a.x) + (r.pos.z - a.z) * (b.z - a.z)) / (len * len)));
+        const d = Math.hypot(a.x + (b.x - a.x) * k - r.pos.x, a.z + (b.z - a.z) * k - r.pos.z);
+        if (d < best.d) best = { d, s: total + k * len };
+        total += len;
+      }
+      const spd = Math.max(5, Math.min(9.5, Math.hypot(r.vel.x, r.vel.z)));
+      for (let i = 0; i < 3; i++) { lead = routePoint(r, Math.min(total, best.s + (r.sit && best.s >= total - 0.5 ? 0 : spd * T))); T = Math.max(0.35, dist(qbP, lead) / v); }
+    } else {
+      for (let i = 0; i < 3; i++) { lead = { x: r.pos.x + r.vel.x * T, z: r.pos.z + r.vel.z * T }; T = Math.max(0.35, dist(qbP, lead) / v); }
+    }
     const isUserQB = user === qb;
     const sd = isUserQB ? ((1.35 - (st.skill ?? 60) * 0.009) / tol) * (pressure < 2.5 ? 1.6 : 1) * (moving > 3 ? 1.3 : 1) : 0.7;
     const to = clampPos({ x: lead.x + gaussR() * sd * 0.7 + wfx.wind.x * T * 0.45, z: lead.z + gaussR() * sd + wfx.wind.z * T * 0.45 });
@@ -451,7 +470,9 @@ export function freePlay(ctx) {
         // drive the defender away from the play
         const hx = play.hole ? (play.hole[0] + play.hole[1]) / 2 : 0;
         const away = runPush ? Math.sign(d.pos.x - hx || 1) * 0.6 : 0;
-        moveToward(e, d.pos.x + away, d.pos.z + (runPush ? -0.3 : 0.9), 1.6 * Math.max(0.7, Math.min(1.45, e.mass / d.mass)), dt);
+        // run: drive them off the ball. pass: fire out and punch for a second, then anchor and give ground slowly
+        const zPush = runPush ? -0.3 : t < 1.1 ? -0.45 : t < 2.4 ? 0.05 : 0.3;
+        moveToward(e, d.pos.x + away, d.pos.z + zPush, (runPush ? 1.6 : 1.9) * Math.max(0.7, Math.min(1.45, e.mass / d.mass)), dt);
         d.pos.x += e.vel.x * dt; d.pos.z += e.vel.z * dt;
         battle(e, d, dt);
       }
@@ -583,7 +604,7 @@ export function freePlay(ctx) {
     if (e.out > 0) { e.out -= dt; if (e.out <= 0 && isDown(e.mesh)) knockDown(e.mesh, 0); return; }
     if (e.engagedBy) {
       // Blocked: try to shed the block over time.
-      e.shed += dt * ((mode === 'run' ? 0.2 : 0.32) + (call === 'risky' ? 0.12 : 0) + (m.defense ? -0.05 : 0.06) + (e.blitz ? 0.1 : 0));
+      e.shed += dt * ((mode === 'run' ? 0.2 : mode === 'pass' || mode === 'route' ? 0.2 : 0.32) + (call === 'risky' ? 0.1 : 0) + (m.defense ? -0.05 : 0.03) + (e.blitz ? 0.1 : 0));
       if (Math.random() < e.shed * dt * 1.6 || t > 4.5) { const b = e.engagedBy; b.engaged = null; e.engagedBy = null; setPose(b.mesh, null); setPose(e.mesh, null); e.out = 0.25; }
       return;
     }
@@ -619,8 +640,9 @@ export function freePlay(ctx) {
         r.vel.x += (Math.random() - 0.5) * 4;
       }
       if (e.handT > 0) e.handT -= dt;
-      const lag = (mode === 'pass' ? 0.2 : 0.28) + Math.random() * 0.05;
-      moveToward(e, r.pos.x - r.vel.x * lag + (r.pos.x < 0 ? 0.5 : -0.5), r.pos.z - r.vel.z * lag - 0.6, e.maxSpeed, dt, 18);
+      const onUser = r.user && mode === 'route';
+      const lag = (onUser ? 0.12 : mode === 'pass' ? 0.2 : 0.28) + Math.random() * 0.05;
+      moveToward(e, r.pos.x - r.vel.x * lag + (r.pos.x < 0 ? 0.5 : -0.5), r.pos.z - r.vel.z * lag - 0.6, e.maxSpeed * (onUser ? 1.05 : 1), dt, onUser ? 24 : 18);
       backpedalFace(e, e.vel.z < -0.3 && t < 1.8, r);
       return;
     }
@@ -749,6 +771,64 @@ export function freePlay(ctx) {
     if (highlights.length >= 2 || !ctx.snapshot) return;
     setTimeout(() => ctx.snapshot((img) => { if (img && highlights.length < 2) highlights.push({ img, label }); }), delay);
   };
+  // ---------------- quick-time events (contested catches, breakups, fighting for yards)
+  let qteActive = false;
+  let qteUsed = 0;
+  /** kind 'ring': tap when the shrinking ring hits the target. kind 'mash': tap fast. onDone(success). */
+  const startQte = (kind, label, onDone) => {
+    qteActive = true;
+    qteUsed++;
+    ctx.setTimeScale?.(0.07);
+    sfx.select();
+    const ov = document.createElement('div');
+    ov.className = `qte qte--${kind}`;
+    ov.innerHTML = kind === 'ring'
+      ? `<div class="qte-label">${label}</div><div class="qte-zone"><i class="qte-target"></i><i class="qte-ring"></i></div><div class="qte-hint">TAP / SPACE</div>`
+      : `<div class="qte-label">${label}</div><div class="qte-mash"><i></i></div><div class="qte-hint">MASH! TAP / SPACE</div>`;
+    hud.el.append(ov);
+    const t0 = performance.now();
+    const DUR = kind === 'ring' ? 1150 : 1500;
+    const need = Math.round(8 - Math.min(2, (st.strength ?? 60) / 50));
+    let taps = 0;
+    let over = false;
+    const finish2 = (ok) => {
+      if (over) return;
+      over = true;
+      ov.classList.add(ok ? 'win' : 'lose');
+      ov.querySelector('.qte-label').textContent = ok ? 'YES!' : 'NO!';
+      window.removeEventListener('keydown', key);
+      cancelAnimationFrame(raf);
+      if (ok) sfx.catch(); else sfx.error?.();
+      setTimeout(() => { ov.remove(); ctx.setTimeScale?.(1); qteActive = false; onDone(ok); }, 380);
+    };
+    const press = () => {
+      if (over) return;
+      const k = (performance.now() - t0) / DUR;
+      if (kind === 'ring') {
+        // ring shrinks from 1 to 0; target window around 0.32 (bigger with skill / tolerance)
+        const size = 1 - k;
+        const win = 0.09 + (st.skill ?? 60) / 1200 + (tol - 1) * 0.05;
+        finish2(Math.abs(size - 0.32) <= win);
+      } else {
+        taps++;
+        sfx.tick();
+        ov.querySelector('.qte-mash i').style.width = `${Math.min(100, (taps / need) * 100)}%`;
+        if (taps >= need) finish2(true);
+      }
+    };
+    const key = (ev) => { if (ev.code === 'Space' || ev.key === 'Enter' || ev.key === 'f' || ev.key === 'F') { ev.preventDefault(); press(); } };
+    window.addEventListener('keydown', key);
+    ov.addEventListener('pointerdown', (ev) => { ev.preventDefault(); ev.stopPropagation(); press(); });
+    let raf = 0;
+    const tick = () => {
+      const k = (performance.now() - t0) / DUR;
+      if (kind === 'ring') ov.querySelector('.qte-ring').style.transform = `scale(${Math.max(0, 1 - k)})`;
+      if (k >= 1) { finish2(false); return; }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+  };
+
   const fxList = [];
   let cineUsed = 0;
   let scuffle = null;
@@ -794,7 +874,7 @@ export function freePlay(ctx) {
   };
 
   const tryTackle = (tackler, target) => {
-    if (target.down) return;
+    if (target.down || qteActive) return;
     const u = target === user;
     tackler.lunge = 0;
     if (u && (moves.juke > 0 || moves.spin > 0)) {
@@ -812,6 +892,21 @@ export function freePlay(ctx) {
         tackler.out = 1.2; flatten(tackler, target, 0.9); moves.slow = 0.3;
         hud.big('STIFF ARM!', '#fbbf24', 700); sfx.hit(); ctx.shake(0.25); return;
       }
+    }
+    if (u && qteUsed < 2 && !opts.reducedMotion && (globalThis.__forceQte || Math.random() < 0.3 || target.pos.z - goalZ < 3)) {
+      target.vel.x *= 0.3; target.vel.z *= 0.3;
+      startQte('mash', target.pos.z - goalZ < 3 ? 'REACH FOR THE END ZONE!' : 'FIGHT FOR YARDS!', (ok) => {
+        if (phase !== 'live') return;
+        if (ok) {
+          target.broken = (target.broken ?? 0) + 1;
+          tackler.out = 1.2; flatten(tackler, target, 0.7);
+          target.pos.z -= 1.8; target.vel.z = -6;
+          hud.big('BREAKS FREE!', '#4ade80', 800); ctx.cinematic?.(() => target.pos, 1.0); snap('Broke free!', 200);
+          return;
+        }
+        playAction(tackler.mesh, 'tackle'); target.down = true; hardHit(tackler, target); sfx.hit(); whistle('tackle', tackler);
+      });
+      return;
     }
     const str = target.user ? (st.strength ?? 60) : 60;
     const pBreak = (str / 100) * 0.3 * (target.user ? (0.6 + tol * 0.4) : mode === 'pass' ? 0.35 : 0.6) * Math.pow(0.5, target.broken ?? 0) + (tackler.user ? -0.1 : 0);
@@ -844,6 +939,18 @@ export function freePlay(ctx) {
     const dD = Math.min(...defs.map((d) => dist(d.pos, land)));
     const crowd = defs.filter((d) => dist(d.pos, land) < 2).length;
     // --- defense player (you) trying to swat / pick
+    if (user.team === 'def' && swatPress === null && qteUsed < 2 && dist(user.pos, land) < 1.7 && dR < 1.8 && !opts.reducedMotion) {
+      ball.position.set(land.x, 1.6, land.z);
+      startQte('ring', 'BREAK IT UP!', (ok) => {
+        if (phase !== 'live') return;
+        if (ok) {
+          if (Math.random() < 0.45 + (st.skill ?? 60) / 500) { holder = user; carrier = user; user.int = true; snap('Interception!', 100); hud.big('INTERCEPTION!', '#4ade80', 900); ctx.cinematic?.(() => user.pos, 1.3); sfx.catch(); setButtonsFor(); return; }
+          playAction(user.mesh, 'dive'); hud.big('BROKEN UP!', '#4ade80', 800); ctx.cinematic?.(() => user.pos, 1.1); whistle('pd'); return;
+        }
+        completeCatch(r, land);
+      });
+      return;
+    }
     if (user.team === 'def' && dist(user.pos, land) < 1.8 + tol * 0.3) {
       const timing = swatPress === null ? 9 : Math.abs(f.t0 + f.T - swatPress - 0.12);
       const win = (0.16 + (st.skill ?? 60) / 100 * 0.12) * tol;
@@ -853,7 +960,21 @@ export function freePlay(ctx) {
       }
       if (timing <= win * 2.2 || dist(user.pos, land) < 0.9) { whistle('pd'); return; }
     }
-    // --- you are the receiver
+    // --- you are the receiver: contested balls become a quick-time event
+    if (r === user && qteUsed < 2 && !opts.reducedMotion) {
+      const nearD0 = defs.reduce((a, d) => (dist(d.pos, land) < dist(a.pos, land) ? d : a), defs[0]);
+      if (nearD0 && dist(nearD0.pos, land) < 1.7 && dR < 1.9 + (user.hIn - 73) * 0.04) {
+        ball.position.set(land.x, 1.7, land.z);
+        playAction(user.mesh, f.H > 3 ? 'jump' : 'catch');
+        startQte('ring', 'CONTESTED CATCH!', (ok) => {
+          if (phase !== 'live') return;
+          if (ok) { hud.big('MOSSED HIM!', '#4ade80', 900); ctx.cinematic?.(() => user.pos, 1.3); snap('Contested catch!', 250); completeCatch(r, land); return; }
+          if (Math.random() < 0.25) { holder = nearD0; carrier = nearD0; whistle('int'); return; }
+          whistle('incomplete', null, 'Ripped away at the catch point!');
+        });
+        return;
+      }
+    }
     let catchOk;
     if (r === user) {
       const timing = catchPress === null ? 9 : Math.abs(f.t0 + f.T - catchPress - 0.1);
@@ -885,11 +1006,24 @@ export function freePlay(ctx) {
     if (!catchOk) { whistle('incomplete'); return; }
     // Toe-tap: you must be in bounds.
     if (Math.abs(r.pos.x) > FIELD_X) { whistle('incomplete', null, 'Out of bounds. No catch.'); return; }
+    completeCatch(r, land);
+  };
+  /** Ball secured. Long reaches become diving catches with a slow-mo moment. */
+  const completeCatch = (r, land) => {
     holder = r;
     carrier = r;
     sfx.catch();
-    playAction(r.mesh, 'catch');
-    say('catch');
+    const reach = land ? dist(r.pos, land) : 0;
+    const involved = r.user || user === qb;
+    if (reach > 0.95 || (involved && Math.random() < 0.12)) {
+      playAction(r.mesh, 'dive', { dur: 0.6 });
+      r.out = 0.55; // takes a moment to get up from the layout
+      if (involved && !opts.reducedMotion && cineUsed < 2) { cineUsed++; ctx.cinematic?.(() => r.pos, 1.3); snap('Diving catch!', 300); }
+      hud.say?.(line('diving', opts.lastName ?? ''));
+    } else {
+      playAction(r.mesh, 'catch');
+      say('catch');
+    }
     // defenders nearby close fast on the catch
     for (const d of defenders) if (dist(d.pos, r.pos) < 10) d.burst = 1.1;
     if (r === user) setButtonsFor();
@@ -937,6 +1071,8 @@ export function freePlay(ctx) {
     const def = m.defense;
     if (why === 'td') {
       scorer = carrier;
+      const chaser = defenders.concat(ents.filter((x) => x.team === 'off')).filter((d) => d.team !== carrier.team && !d.down).sort((a, b) => dist(a.pos, carrier.pos) - dist(b.pos, carrier.pos))[0];
+      if (chaser && dist(chaser.pos, carrier.pos) < 2.6 && !opts.reducedMotion) { playAction(carrier.mesh, 'dive', { dur: 0.5 }); ctx.cinematic?.(() => carrier.pos, 1.2); snap('Dives in!', 200); }
       result = def ? (carrier.team === 'def' ? { defense: true, int: true, turnover: true, defTD: true, quality: 0.98, text: 'PICK SIX!' } : { defense: true, caught: true, yardsAllowed: m.yardLine, tdAllowed: true, quality: 0.05, text: 'They score.' })
         : { complete: true, yards: m.yardLine, td: true, quality: 0.95, text: 'TOUCHDOWN!' };
       if ((def && carrier.team === 'def') || (!def && carrier.team === 'off')) startCelebration();
@@ -1056,6 +1192,14 @@ export function freePlay(ctx) {
         react('snap', m.defense ? userHome : !userHome);
         hud.instr('');
         for (const e of ents) setPose(e.mesh, null);
+        if (!runO && mode !== 'rush') {
+          // Pass protection: every lineman fires out and locks onto a rusher at the snap.
+          const free = blockers.slice();
+          for (const d of defenders.filter((x) => x.role === 'DL')) {
+            const o = nearest(d, free);
+            if (o) { o.engaged = d; d.engagedBy = o; d.shed = -0.3; setPose(o.mesh, 'block'); setPose(d.mesh, 'block'); free.splice(free.indexOf(o), 1); }
+          }
+        }
         if (mode === 'rush') {
           // Pass rush: the nearest lineman locks onto you right away. Win the battle!
           const o = nearest(user, blockers);

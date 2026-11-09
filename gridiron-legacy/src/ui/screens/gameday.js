@@ -190,7 +190,10 @@ export function gamedayScreen(app) {
         h('h2', { style: { marginTop: '4px' } }, ev.title),
         h('p', { style: { margin: '8px 0 12px' } }, ev.text),
         h('div.col', ev.choices.map((c, i) => h('button.btn.block.choice', {
-          onclick: () => {
+          onclick: (e) => {
+            if (card.dataset.busy) return; // one choice only (Space/Enter can re-trigger a focused button)
+            card.dataset.busy = '1';
+            e?.currentTarget?.blur?.();
             sfx.click();
             if (c.play && !app.ui.game?.skipAnim) {
               clutchChallenge({ title: c.label, kind: c.play, p: c.p ?? 0.5 }, (ok) => showRes(i, ok));
@@ -232,6 +235,7 @@ export function gamedayScreen(app) {
       number: st.player.number,
       lastName: st.player.last,
       userHome: g.userSide === 'home',
+      stage: st.career.stage,
       teamName: me.name,
       oppName: opp.name,
       scoreInfo: { home: home.name, away: away.name, homePts: g.score.home, awayPts: g.score.away, homeColors: home.colors, awayColors: away.colors, clock: `Q${m.quarter} ${m.clock}` },
@@ -333,7 +337,7 @@ export function gamedayScreen(app) {
           app.save();
           const me = getTeam(league, st.career.teamId);
           const { mine } = gameKits(st, me, getTeam(league, g.oppId));
-          await tunnelCutscene({ colors: me.colors, uniform: kitUniform(mine), look: st.player.look, number: st.player.number, teamName: me.name,
+          await tunnelCutscene({ stage, colors: me.colors, uniform: kitUniform(mine), look: st.player.look, number: st.player.number, teamName: me.name,
             title: { hs: 'Friday Night Lights', college: 'Welcome to College Football', pro: 'Welcome to the League' }[stage] ?? 'Game Time', sub: `${me.city} ${me.name} take the field` });
         }
         sfx.whistle(); ui.started = true; clear(momentSlot); controls.append(simRestBtn()); advance();

@@ -71,7 +71,7 @@ export const ANY_EVENTS = [
     ],
   },
   {
-    id: 'any_podcast', title: 'Podcast Invite', cond: { minFame: 15 }, weight: 0.8,
+    id: 'any_podcast', stages: ['college', 'pro'], title: 'Podcast Invite', cond: { minFame: 15 }, weight: 0.8,
     text: 'A popular football podcast wants you for an hour-long interview.',
     choices: [
       { label: 'Open up about your journey', effects: { fame: 4, mood: 3, rel: { family: 3 } }, result: 'Your story about {hometown} resonates. Downloads explode.' },
@@ -96,7 +96,7 @@ export const ANY_EVENTS = [
     ],
   },
   {
-    id: 'any_hometown_hero', title: 'Hometown Mural', cond: { minFame: 40 }, weight: 0.8,
+    id: 'any_hometown_hero', stages: ['college', 'pro'], title: 'Hometown Mural', cond: { minFame: 40 }, weight: 0.8,
     text: 'An artist in {hometown} wants to paint a mural of you on the side of the old diner.',
     choices: [
       { label: 'Attend the unveiling', effects: { fame: 4, mood: 10, rel: { family: 8 } }, result: 'The whole town comes out. There is a marching band.' },
@@ -104,7 +104,7 @@ export const ANY_EVENTS = [
     ],
   },
   {
-    id: 'any_tax_bill', title: 'Tax Time', cond: { minMoney: 20000 }, weight: 0.6, phase: 'offseason',
+    id: 'any_tax_bill', stages: ['pro'], title: 'Tax Time', cond: { minMoney: 20000 }, weight: 0.6, phase: 'offseason',
     text: 'Your accountant calls with bad news: you owe more taxes than you thought.',
     choices: [
       { label: 'Pay it', effects: { moneyPct: -0.08 }, result: 'Painful. Legal.' },
@@ -128,7 +128,7 @@ export const ANY_EVENTS = [
     ],
   },
   {
-    id: 'any_crypto', title: 'Hot Tip', weight: 0.5, cond: { minMoney: 2000 },
+    id: 'any_crypto', stages: ['college', 'pro'], title: 'Hot Tip', weight: 0.5, cond: { minMoney: 2000 },
     text: 'A teammate swears a meme coin called GRIDCOIN is about to "moon."',
     choices: [
       { label: 'Put in 25% of your cash', chance: { p: 0.25, success: { effects: { moneyPct: 0.5 }, result: 'It moons! You cash out at the top. Genius.' }, fail: { effects: { moneyPct: -0.22 }, result: 'It crashes 90% overnight.' } } },
@@ -185,7 +185,7 @@ export const ANY_EVENTS = [
     ],
   },
   {
-    id: 'any_charity_auction', title: 'Charity Auction', weight: 0.6, cond: { minFame: 20 },
+    id: 'any_charity_auction', stages: ['college', 'pro'], title: 'Charity Auction', weight: 0.6, cond: { minFame: 20 },
     text: 'A children\'s charity is auctioning "lunch with you." Bids are already high.',
     choices: [
       { label: 'Add a signed jersey too', effects: { fame: 3, mood: 6 }, result: 'It raises $40,000 for kids.' },
@@ -201,7 +201,7 @@ export const ANY_EVENTS = [
     ],
   },
   {
-    id: 'any_doc_film', title: 'Documentary Crew', weight: 0.5, cond: { minFame: 35 },
+    id: 'any_doc_film', stages: ['college', 'pro'], title: 'Documentary Crew', weight: 0.5, cond: { minFame: 35 },
     text: 'A streaming service wants to follow you with cameras for a season-long documentary.',
     choices: [
       { label: 'Let them in', effects: { fame: 8, sponsor: 0.8, rel: { teammates: -4, coach: -3 }, mood: -3 }, result: 'Cameras everywhere. Ratings will be huge.' },

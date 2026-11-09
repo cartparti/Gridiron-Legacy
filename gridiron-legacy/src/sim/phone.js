@@ -127,7 +127,7 @@ function sendTemplate(state, tid) {
 /** Someone tags you on Huddle. when: great / bad / any. Lands in the "Huddle Mentions" thread. */
 export function sendTag(state, when = 'any') {
   const p = state.player;
-  const pool = TAGS.map((tg, i) => ({ tg, i })).filter(({ tg }) => tg.when === 'any' || tg.when === when);
+  const pool = TAGS.map((tg, i) => ({ tg, i })).filter(({ tg }) => (tg.when === 'any' || tg.when === when) && (tg.who !== 'brand' || state.career.stage !== 'hs'));
   if (!pool.length) return;
   const { tg, i } = pick(state, pool);
   const handle = pick(state, FAN_HANDLES).replace('@', '');

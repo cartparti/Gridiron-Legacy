@@ -62,7 +62,7 @@ export function reviewScreen(app) {
     r.cutPlayed = true;
     app.save();
     const titleName = STAGES[st.career.stage]?.titleName ?? 'Championship';
-    setTimeout(() => trophyCutscene({ colors: champ.colors, uniform: teamKits(champ).home, look: p.look, number: p.number, teamName: champ.name,
+    setTimeout(() => trophyCutscene({ stage: st.career.stage, colors: champ.colors, uniform: teamKits(champ).home, look: p.look, number: p.number, teamName: champ.name,
       title: 'Champions!', sub: `${champ.city} ${champ.name} win the ${titleName}` }), 50);
   }
   const delta = r.ovrAfter - r.ovrBefore;

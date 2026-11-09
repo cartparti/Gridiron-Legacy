@@ -15,6 +15,7 @@ export const COMMENTARY = {
   sackBy: ['{name} gets HOME! Sack!', 'Beat his man and buried the quarterback!', 'What a pass rush by {name}!'],
   pancake: ['Pancaked! He put that lineman on his back.', 'Bull rush... and he is flat on the turf!'],
   scuffle: ['Some pushing and shoving after the whistle!', 'Tempers flaring out there!', 'The refs step in to separate them.', 'Somebody did not like that hit.'],
+  diving: ['LAYS OUT! What a diving catch!', 'Full extension! He caught it!', 'Diving grab! Unbelievable concentration!'],
   pd: ['Broken up! Great coverage by {name}.', 'Swatted away!', 'Knocked down at the last second!'],
   stop: ['{name} makes the stop!', 'Big hit! {name} wraps him up.', 'Textbook tackle by {name}.'],
   allowed: ['He slips through. Gain on the play.', 'They found a seam there.', 'Got behind the coverage...'],

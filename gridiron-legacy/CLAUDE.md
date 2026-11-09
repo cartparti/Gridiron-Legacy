@@ -155,6 +155,21 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Week tab: team hero banner (crest, mascot name, record, streak, rank), Highlight Reel of real snapshots
   (`ctx.snapshot` in director → result.highlights → state.highlights, last 8), side decorations on wide screens.
 
+## v0.12 changes
+- O-line: pass pro locks every lineman onto a rusher at the snap; they punch forward ~1s, then anchor and give
+  ground slowly; rushers shed slower when you're on offense.
+- WR: the QB throws to where YOUR ROUTE will be (closest point on the route + your speed) unless you CALL FOR
+  IT; tighter man coverage on the user receiver.
+- Quick-time events (`startQte` in engine; `ctx.setTimeScale` in director): contested catch (ring), CB breakup
+  (ring), fight for yards / reach for the end zone (mash). Max 2 per play. CSS `.qte--ring/.qte--mash`.
+- Slow-mo: diving catches (`completeCatch`), goal-line dives on TDs, QTE wins; all snap highlight pictures.
+- Pixel activity icons (`src/ui/pixelIcons.js`, used by `activityIcon`), livelier week UI.
+- Life → Social (`src/data/life.js`, `src/sim/life.js`, `src/ui/screens/social.js`): meet someone (personality-
+  driven 3-round first date → partner), 6 date-night venues, 6 hangouts; each uses a day via `useDaySlot`.
+- Level-appropriate content: game events can have cond.stages (new hs/college/pro events), some "any" weekly
+  events limited to college/pro, no brand tags in HS. Stadium `setLevel('hs'|'college'|'pro')`: HS bleachers +
+  fence + press box + small scoreboard, college bowl + band section, pro upper deck + roof + big board.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).
