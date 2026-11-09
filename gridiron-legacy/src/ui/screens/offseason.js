@@ -8,6 +8,7 @@ import { teamBadge, stars, confirmDialog } from '../components.js';
 import { sfx } from '../../audio/sfx.js';
 import { eventModal } from './event.js';
 import { topBar } from './hub.js';
+import { draftCutscene } from '../../scenes/cutscenes.js';
 
 export function campScreen(app) {
   const st = app.state;
@@ -57,6 +58,12 @@ export function draftScreen(app) {
   const p = st.player;
   const team = getTeam(st.league, d.teamId);
   setTimeout(() => sfx.cheer(true), 300);
+  if (!d.undrafted && !d.cutPlayed && !app.settings.reducedMotion) {
+    d.cutPlayed = true;
+    app.save();
+    setTimeout(() => draftCutscene({ colors: team.colors, teamName: `${team.city} ${team.name}`, look: p.look, number: p.number,
+      pickText: `With pick #${d.pick} in round ${d.round}...`, playerName: `${p.first} ${p.last}`, sub: `${p.position} · ${team.name}` }), 50);
+  }
   return h('div.screen',
     h('h1', 'Draft Night'),
     h('div.card.center', { style: { borderColor: team.colors[0], borderWidth: '3px' } },

@@ -17,6 +17,7 @@ import { peopleView, storeView } from './people.js';
 import { placeCards, enterWorld } from './world.js';
 import { openPhone, phoneBadge } from './phone.js';
 import { openLookModal } from './look.js';
+import { DRILLS, DRILL_NAMES, openDrill, grade } from './drills.js';
 import { teamKits } from '../../data/kits.js';
 import { portraitImg } from '../../scenes/portrait.js';
 import { people } from '../../sim/social.js';
@@ -146,10 +147,29 @@ function weekView(app) {
       const a = e ? ACTIVITY_BY_ID[e] : null;
       return h(`button.slot${a ? '.filled' : ''}${app.ui.activeSlot === i ? '.active' : ''}`, {
         'aria-label': `${d}: ${a ? a.label : 'empty'}`,
-        onclick: () => { sfx.click(); if (a) { plan[i] = null; app.ui.activeSlot = i; app.save(); } else app.ui.activeSlot = i; app.render(); },
+        onclick: () => { sfx.click(); if (a) { plan[i] = null; if (st.week.drills) delete st.week.drills[i]; app.ui.activeSlot = i; app.save(); } else app.ui.activeSlot = i; app.render(); },
       }, h('span.day', d), a ? activityIcon(a.id) : icon('plus'), h('span', a ? a.label : 'Free'), a ? h('span.tiny', a.cost ? `−${a.cost} energy` : 'free') : null);
     })),
     h('p.tiny.muted', { style: { marginTop: '8px' } }, `Game-day freshness: ${Math.round((left / max) * 100)}%. Tap a filled day to clear it.`)));
+
+  // Playable training drills for planned training days
+  const drillSlots = plan.map((id, i) => ({ id, i })).filter(({ id }) => typeof id === 'string' && DRILLS[id]);
+  if (drillSlots.length) {
+    container.append(h('div.card',
+      h('div.card-title', h('h3', 'Training Drills'), h('span.tiny.muted', 'Play them for bigger gains')),
+      h('div.col', { style: { gap: '8px' } }, drillSlots.map(({ id, i }) => {
+        const q = st.week.drills?.[i];
+        return h('div.row.drill-row',
+          activityIcon(id),
+          h('div.grow', h('b.small', `${DAYS[i]} · ${ACTIVITY_BY_ID[id].label}`), h('div.tiny.muted', DRILL_NAMES[DRILLS[id]])),
+          q !== undefined ? h('span.chip.gold.pix', `GRADE ${grade(q)}`) : null,
+          h(`button.btn.small${q === undefined ? '.primary' : ''}`, { onclick: () => {
+            sfx.click();
+            openDrill(id, (res) => { st.week.drills ??= {}; st.week.drills[i] = Math.max(res, q ?? 0); app.save(); app.render(); });
+          } }, q === undefined ? '▶ Play' : 'Retry'));
+      })),
+      h('p.tiny.muted', { style: { marginTop: '8px' } }, 'Great drills give up to +50% training that day; a bad one cuts it to 60%. Skip it for normal gains.')));
+  }
 
   // Activity picker
   if (app.ui.activeSlot >= 0) {

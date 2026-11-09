@@ -71,7 +71,12 @@ for five play styles (Balanced, Grinder, Social, Gunslinger, Cautious), across a
    - **WR**: run your route (or freelance), `C` to call for the ball, `Space` to catch as it arrives.
    - **CB**: shadow your man, `Space` to swat / pick the pass, `F` to tackle. Pick-sixes are live.
    - **Goal-line dive**: tap fast to drive the pile, then time your leap.
-   - Touchdowns trigger a celebration cutscene.
+   - Touchdowns trigger a celebration cutscene. Big hits send players flying (ragdolls), sometimes in a
+     slow-motion replay, with occasional pixel blood (turn it off in Settings). Hard hits can injure you.
+   - Risky choices in mid-game events are quick challenges: stop the marker in the zone, or mash.
+   - Training days have optional drills (Training Drills card under This Week): play them for up to +50% gains.
+   - Phone texts have reply choices that change your relationships; you can answer trolls on your posts.
+   - Cutscenes: running out of the tunnel, draft night, lifting a title trophy, the Hall of Fame.
 5. **Seasons**: standings, playoffs and a title game. End-of-season awards, records, aging.
 6. **Your look**: build your athlete in the creator (skin, hair, face, tattoos, gear, height and
    weight, touchdown celebration, plus swag: arm/leg sleeves, knee braces, elbow pads, two-tone cleats,

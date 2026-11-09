@@ -6,6 +6,7 @@ import { fmtMoney } from '../../core/util.js';
 import { sfx } from '../../audio/sfx.js';
 import { statLine } from './results.js';
 import { icon } from '../icons.js';
+import { hofCutscene } from '../../scenes/cutscenes.js';
 
 const REASONS = {
   age: 'Father Time remains undefeated.',
@@ -22,6 +23,11 @@ export function legacyScreen(app) {
   const colors = last?.colors ?? ['#333', '#f4c430'];
   const hof = L.tier.id === 'hof';
   setTimeout(() => (hof ? sfx.touchdown() : sfx.cheer()), 300);
+  if (hof && !L.cutPlayed && !app.settings.reducedMotion) {
+    L.cutPlayed = true;
+    app.save();
+    setTimeout(() => hofCutscene({ look: p.look, name: `${p.first} ${p.last}`, year: (last?.year ?? 2040) + 5, colors }), 50);
+  }
   const awardCounts = {};
   for (const a of p.awards) awardCounts[a.name] = (awardCounts[a.name] ?? 0) + 1;
   return h('div.screen',

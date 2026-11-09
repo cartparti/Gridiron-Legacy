@@ -115,7 +115,7 @@ export function importSave(slot, text) {
   }
 }
 
-const DEFAULT_SETTINGS = { theme: 'auto', sound: true, reducedMotion: false, tutorials: true, lastSlot: null, seenTips: {} };
+const DEFAULT_SETTINGS = { theme: 'auto', sound: true, reducedMotion: false, blood: true, tutorials: true, lastSlot: null, seenTips: {} };
 
 export function loadSettings() {
   try {

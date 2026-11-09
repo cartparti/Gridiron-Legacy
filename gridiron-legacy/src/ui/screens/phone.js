@@ -1,7 +1,7 @@
 // The phone: Huddle (social media), Messages, Bank, Calendar, News, Contacts.
 import { h, clear } from '../dom.js';
 import { changeChips } from '../components.js';
-import { phoneState, followers, fmtCount, feed, postOptions, canPost, makePost, markRead, reply, replyOptions, contactName } from '../../sim/phone.js';
+import { phoneState, followers, fmtCount, feed, postOptions, canPost, makePost, markRead, reply, replyOptions, contactName, replyToComment, commentReplyOptions } from '../../sim/phone.js';
 import { people } from '../../sim/social.js';
 import { getTeam } from '../../sim/league.js';
 import { HOUSING, CARS, PERKS } from '../../data/lifestyle.js';
@@ -52,6 +52,19 @@ export function openPhone(app, startApp = null) {
 
   const open = (id) => ({ huddle, messages, bank, calendar, news, contacts })[id]();
 
+  // comments on your posts, with reply buttons (trolls can be clapped back at)
+  const commentList = (post, redraw) => h('div.post-comments', post.comments.map((c, ci) => h('div.comment',
+    h('div.tiny', h('b', c.handle), ` ${c.text}`, c.troll ? h('span.troll-tag', ' TROLL') : null),
+    c.replied ? (c.replied === 'ignored' ? h('div.tiny.muted', '(ignored)') : h('div.tiny.reply-me', `↳ You: ${c.replied}`))
+      : h('div.row.wrap', { style: { gap: '4px', marginTop: '3px' } }, commentReplyOptions(c).map((label, i) => h('button.btn.tiny-btn', { onclick: () => {
+        const r = replyToComment(st, post.id, ci, i);
+        app.save();
+        if (r?.text) toastLite(r.text);
+        sfx.click();
+        redraw();
+      } }, label))))));
+  const toastLite = (txt) => { const t = h('div.phone-toast', txt); screen.append(t); setTimeout(() => t.remove(), 2200); };
+
   // ---------------- Huddle (social)
   const huddle = () => {
     clear(screen);
@@ -69,7 +82,7 @@ export function openPhone(app, startApp = null) {
         h('div.post-head', h('b', it.name), h('span.tiny.muted', ` ${it.author} · ${it.year} wk ${it.week}`)),
         h('div.post-text', it.text),
         it.mine ? h('div.post-meta', `♥ ${fmtCount(it.likes)}  ·  ${it.comments.length} comments`) : null,
-        it.mine ? h('div.post-comments', it.comments.map((c) => h('div.tiny', h('b', c.handle), ` ${c.text}`))) : null));
+        it.mine ? commentList(phoneState(st).posts.find((x) => x.id === it.id) ?? it, huddle) : null));
     }
   };
   const compose = () => {
@@ -84,7 +97,7 @@ export function openPhone(app, startApp = null) {
         app.save();
         clear(body);
         body.append(h('div.post.mine', h('div.post-text', r.post.text), h('div.post-meta', `♥ ${fmtCount(r.post.likes)}  ·  ${r.post.comments.length} comments`),
-          h('div.post-comments', r.post.comments.map((c) => h('div.tiny', h('b', c.handle), ` ${c.text}`)))),
+          commentList(r.post, huddle)),
         changeChips(r.changes), h('button.btn.primary.block', { onclick: huddle }, 'Back to feed'));
       } }, o.label))));
   };
@@ -112,14 +125,32 @@ export function openPhone(app, startApp = null) {
         h('div.grow', h('div.row.between', h('b', contactName(st, k)), unread ? h('span.unread-dot') : null), h('div.tiny.muted.ellipsis', last.text))));
     }
   };
+  let justReplied = null;
+  let lastChanges = null;
   const thread = (key) => {
     markRead(st, key);
     app.save();
     clear(screen);
     const body = h('div.phone-body.thread');
     screen.append(statusBar(), header(contactName(st, key), messages), body);
-    for (const m of phoneState(st).threads[key] ?? []) body.append(h(`div.bubble.${m.from}`, m.text));
-    body.append(h('div.quick-replies', replyOptions().map((label, i) => h('button.btn.small', { onclick: () => { const b = reply(st, key, i); app.save(); thread(key); if (b) sfx.select(); } }, label))));
+    const msgs = phoneState(st).threads[key] ?? [];
+    msgs.forEach((m, i) => {
+      // their quick answer to your reply appears after a short "typing..." beat
+      if (i === msgs.length - 1 && m.from === 'them' && justReplied === key) {
+        const typing = h('div.bubble.them.typing', h('i'), h('i'), h('i'));
+        body.append(typing);
+        setTimeout(() => { typing.replaceWith(h('div.bubble.them', m.text)); body.scrollTop = body.scrollHeight; }, 900);
+      } else body.append(h(`div.bubble.${m.from}`, m.text));
+    });
+    justReplied = null;
+    if (lastChanges) { body.append(h('div.reply-effects', changeChips(lastChanges))); lastChanges = null; }
+    const opts = replyOptions(st, key);
+    if (opts.length) body.append(h('div.quick-replies.col', opts.map((label, i) => h('button.btn.small.block.reply-opt', { onclick: () => {
+      const r = reply(st, key, i);
+      app.save();
+      if (r) { sfx.select(); lastChanges = r.changes?.length ? r.changes : null; justReplied = r.back ? key : null; }
+      thread(key);
+    } }, label))));
     setTimeout(() => { body.scrollTop = body.scrollHeight; }, 0);
   };
 

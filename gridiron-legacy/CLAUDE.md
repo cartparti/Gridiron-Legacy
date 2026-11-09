@@ -109,6 +109,20 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Standings: badges, W-L, games back, point diff, last-5 form, playoff line. Team colors carried through menus
   (card tops, subtabs, labels, tabs) with `--team-ink` for contrast.
 
+## v0.9 (round 5 of 5) changes
+- Ragdoll tackles (`ragdoll`/`endRagdoll` in actors.js: physics tumble of the body inside the root, ground contact
+  from the real bounding box, flailing limbs, settles flat). Hard hits (`hardHit` in engine.js): BIG HIT/BOOM,
+  slow-mo replay camera (`cinematic` in director.js, letterbox via body.cine), optional pixel blood
+  (`bloodBurst`, Settings → Blood effects), and a chance of a real injury (result.injured → sim injury, userOut).
+- Training drills (`src/ui/screens/drills.js`): Sprint Ladder, Power Reps, Cone Reaction, Film Room; result stored
+  in `state.week.drills[slot]`, scales training 0.6x–1.5x (`drillMultiplier` in week.js).
+- Phone (`src/data/texts.js`): templated texts with contextual replies (bond + effects + their answer),
+  troll comments on your posts with clapback risk (`replyToComment`).
+- In-game event risky choices are playable (`clutchChallenge`: timing or mash), outcome forced into
+  `resolveGameEvent(state, idx, forced)`.
+- Cutscenes (`src/scenes/cutscenes.js`, `runCutscene` in director): tunnel run-out (first game at each level),
+  draft night, trophy lift (champions), Hall of Fame induction. Skippable; off with Reduced motion.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

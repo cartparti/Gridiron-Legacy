@@ -16,6 +16,8 @@ import { icon } from '../icons.js';
 import { teamKits, oppKitFor, kitUniform, KIT_IDS } from '../../data/kits.js';
 import { randomLook } from '../../data/looks.js';
 import { portraitImg } from '../../scenes/portrait.js';
+import { clutchChallenge } from './drills.js';
+import { tunnelCutscene } from '../../scenes/cutscenes.js';
 
 /** Small pixel jersey icon for a kit. */
 export function kitIcon(kit, number = '') {
@@ -190,14 +192,21 @@ export function gamedayScreen(app) {
         h('div.col', ev.choices.map((c, i) => h('button.btn.block.choice', {
           onclick: () => {
             sfx.click();
-            const res = resolveGameEvent(st, i);
+            if (c.play && !app.ui.game?.skipAnim) {
+              clutchChallenge({ title: c.label, kind: c.play, p: c.p ?? 0.5 }, (ok) => showRes(i, ok));
+              return;
+            }
+            showRes(i);
+          },
+        }, h('span', c.label), c.risky ? h('span.dice', icon(c.play === 'mash' ? 'bolt' : 'target'), c.play === 'mash' ? ' MASH' : ' CLUTCH') : null))));
+    };
+    const showRes = (i, forced) => {
+            const res = resolveGameEvent(st, i, forced);
             app.save();
             clear(card);
             card.append(h('h2', ev.title), h('p', { style: { margin: '8px 0' } }, res.text), changeChips(res.changes),
               h('button.btn.primary.block', { onclick: () => { clear(momentSlot); setScore(); advance(); } }, 'Back to the game'));
             setScore();
-          },
-        }, h('span', c.label), c.risky ? h('span.dice', icon('dice'), ' RISKY') : null))));
     };
     draw();
     momentSlot.append(card);
@@ -229,6 +238,8 @@ export function gamedayScreen(app) {
       showTips: app.settings.tutorials && !app.settings.seenTips?.[`mg_${m.type}`],
       markTip: () => { app.settings.seenTips = { ...(app.settings.seenTips ?? {}), [`mg_${m.type}`]: true }; app.saveSettings(); },
       reducedMotion: app.settings.reducedMotion,
+      blood: app.settings.blood !== false,
+      health: st.player.health,
     });
     ui.busy = false;
     if (res.fallbackQuality !== undefined) res = outcomeFromQuality(st, m, res.fallbackQuality, call);
@@ -306,7 +317,19 @@ export function gamedayScreen(app) {
       h('p.center.small.muted', { style: { marginTop: '10px' } }, g.sitOut ? 'You are sitting out this one.'
         : `${g.drives.filter((d) => d.moment).length}+ ${defense ? 'defensive snaps' : 'key moments'} expected · freshness ${Math.round((st.week.freshness ?? 0) * 100)}%`),
       g.sitOut ? null : kitPicker(),
-      h('button.btn.primary.block.big', { style: { marginTop: '12px' }, onclick: () => { sfx.whistle(); ui.started = true; clear(momentSlot); controls.append(simRestBtn()); advance(); } },
+      h('button.btn.primary.block.big', { style: { marginTop: '12px' }, onclick: async () => {
+        const stage = st.career.stage;
+        st.career.tunnelSeen ??= {};
+        if (!g.sitOut && !st.career.tunnelSeen[stage] && !app.settings.reducedMotion) {
+          st.career.tunnelSeen[stage] = true;
+          app.save();
+          const me = getTeam(league, st.career.teamId);
+          const { mine } = gameKits(st, me, getTeam(league, g.oppId));
+          await tunnelCutscene({ colors: me.colors, uniform: kitUniform(mine), look: st.player.look, number: st.player.number, teamName: me.name,
+            title: { hs: 'Friday Night Lights', college: 'Welcome to College Football', pro: 'Welcome to the League' }[stage] ?? 'Game Time', sub: `${me.city} ${me.name} take the field` });
+        }
+        sfx.whistle(); ui.started = true; clear(momentSlot); controls.append(simRestBtn()); advance();
+      } },
         g.sitOut ? 'Watch from the sideline' : 'Kick Off')));
   } else if (g.finished) showEnd();
   else if (g.pendingEvent) showGameEvent(g.pendingEvent);

@@ -441,6 +441,7 @@ function buildRig(o) {
   shadow.rotation.x = -Math.PI / 2;
   shadow.position.y = 0.02;
   root.add(shadow);
+  root.userData.shadow = shadow;
   if (o.highlight) {
     const ring = makeRing('#ffd43b', 0.55, 0.72, 1);
     root.add(ring);
@@ -647,6 +648,10 @@ function computePose(u, dt) {
 function applyPose(p, P, dt) {
   const r = p.userData.rig;
   const u = p.userData.u;
+  if (u.rag) { applyRag(p, dt); return; }
+  // ease back any offset left from a ragdoll
+  r.body.position.z += (0 - r.body.position.z) * Math.min(1, dt * 5);
+  if (p.userData.shadow) { p.userData.shadow.position.x = r.body.position.x; p.userData.shadow.position.z = r.body.position.z; }
   const k = 1 - Math.exp(-16 * dt);
   const L = (obj, prop, v) => { obj[prop] += (v - obj[prop]) * k; };
   L(r.legL.hip.rotation, 'x', P.lh); L(r.legL.knee.rotation, 'x', -P.lk);
@@ -670,6 +675,113 @@ function applyPose(p, P, dt) {
   while (d > Math.PI) d -= Math.PI * 2;
   while (d < -Math.PI) d += Math.PI * 2;
   p.rotation.y += d * (1 - Math.exp(-12 * dt));
+}
+
+// ------------------------------------------------------------------ ragdoll tumble
+
+/**
+ * Knock a character flying: a simple physics tumble of the whole body plus flailing limbs, ending
+ * flat on the ground. dir = world-space push direction {x, z}; power ~ 0.5 (light) .. 2 (huge hit).
+ * The root stays where the game put it; only the body inside it moves, so gameplay positions are safe.
+ */
+export function ragdoll(p, dir = { x: 0, z: -1 }, power = 1) {
+  const u = p.userData.u;
+  const yaw = p.rotation.y;
+  // world -> local (root is rotated by yaw around y)
+  const lx = dir.x * Math.cos(yaw) - dir.z * Math.sin(yaw);
+  const lz = dir.x * Math.sin(yaw) + dir.z * Math.cos(yaw);
+  const n = Math.hypot(lx, lz) || 1;
+  const sp = 1.6 + power * 1.7;
+  u.rag = {
+    t: 0, vx: (lx / n) * sp, vz: (lz / n) * sp, vy: 1.6 + power * 1.8,
+    // tumble: pitch around local x (forward/back), some roll
+    wx: (lz / n) * (5 + power * 4) * (Math.random() < 0.5 ? 1 : -1) * -1, wz: (Math.random() - 0.5) * 6 * power, wy: (Math.random() - 0.5) * 4,
+    flail: 0, targets: null, settled: false, bounce: 0,
+  };
+  u.celebrate = null;
+  u.action = null;
+  u.hold = null;
+  u.down = true;
+  u.downT = 0;
+  u.targetYaw = p.rotation.y;
+}
+
+const _box = new THREE.Box3();
+function applyRag(p, dt) {
+  const r = p.userData.rig;
+  const u = p.userData.u;
+  const g = u.rag;
+  const b = r.body;
+  g.t += dt;
+  u.downT += dt;
+  if (b.rotation.order !== 'YXZ') b.rotation.order = 'YXZ';
+  if (!g.settled) {
+    g.vy -= 14 * dt;
+    b.position.x += g.vx * dt;
+    b.position.z += g.vz * dt;
+    b.position.y += g.vy * dt;
+    b.rotation.x += g.wx * dt;
+    b.rotation.z += g.wz * dt;
+    b.rotation.y += g.wy * dt;
+    // limbs flail wildly while airborne
+    g.flail -= dt;
+    if (g.flail <= 0 || !g.targets) {
+      g.flail = 0.09;
+      const R = () => (Math.random() - 0.5);
+      g.targets = { ls: R() * 4, rs: R() * 4, le: Math.random() * 1.8, re: Math.random() * 1.8, lh: R() * 2.2, rh: R() * 2.2, lk: Math.random() * 1.8, rk: Math.random() * 1.8, lo: R() * 1.6, ro: R() * 1.6 };
+    }
+    if (g.t > 2.5) g.settled = true;
+  } else {
+    // settle flat on the back or the front, limbs sprawled
+    if (g.faceX === undefined) {
+      let x = b.rotation.x % (Math.PI * 2);
+      if (x > Math.PI) x -= Math.PI * 2;
+      if (x < -Math.PI) x += Math.PI * 2;
+      b.rotation.x = x;
+      g.faceX = x >= 0 ? Math.PI / 2 : -Math.PI / 2;
+    }
+    b.rotation.x += (g.faceX - b.rotation.x) * Math.min(1, dt * 6);
+    b.rotation.z += (0 - b.rotation.z) * Math.min(1, dt * 6);
+    g.targets = g.rest ?? (g.rest = { ls: 2.2, rs: 1.4, le: 0.3, re: 0.6, lh: 0.3, rh: -0.2, lk: 0.5, rk: 0.2, lo: 0.6, ro: -0.4 });
+  }
+  // ground contact from the body's real lowest point (works in any orientation)
+  p.updateMatrixWorld(true);
+  _box.setFromObject(b);
+  const low = _box.min.y - p.position.y;
+  if (low < 0.02) {
+    b.position.y += 0.02 - low;
+    if (!g.settled && g.vy < 0) {
+      g.bounce++;
+      g.vy = -g.vy * 0.3;
+      g.vx *= 0.45; g.vz *= 0.45; g.wx *= 0.4; g.wz *= 0.4; g.wy *= 0.4;
+      if (g.bounce >= 2 || Math.abs(g.vy) < 0.7) g.settled = true;
+    }
+  } else if (g.settled) b.position.y -= Math.min(low - 0.02, dt * 3);
+  const sh = p.userData.shadow;
+  if (sh) { sh.position.x = b.position.x; sh.position.z = b.position.z; }
+  const k = Math.min(1, dt * (g.settled ? 6 : 18));
+  const T = g.targets;
+  const L = (o, prop, v) => { o[prop] += (v - o[prop]) * k; };
+  L(r.armL.sh.rotation, 'x', T.ls); L(r.armR.sh.rotation, 'x', T.rs);
+  L(r.armL.el.rotation, 'x', T.le); L(r.armR.el.rotation, 'x', T.re);
+  L(r.armL.sh.rotation, 'z', -T.lo); L(r.armR.sh.rotation, 'z', -T.ro);
+  L(r.legL.hip.rotation, 'x', T.lh); L(r.legR.hip.rotation, 'x', T.rh);
+  L(r.legL.knee.rotation, 'x', -T.lk); L(r.legR.knee.rotation, 'x', -T.rk);
+  L(r.spine.rotation, 'x', 0); L(r.neck.rotation, 'x', g.settled ? 0 : (Math.random() - 0.5) * 0.6);
+}
+
+/** Bring a ragdolled character back to normal animation (they get up). */
+export function endRagdoll(p) {
+  const u = p.userData.u;
+  if (!u.rag) return;
+  const b = p.userData.rig.body;
+  u.rag = null;
+  // convert the tumble into the standard "lying down" pose so get-up blends from there
+  b.rotation.order = 'XYZ';
+  b.rotation.y = 0;
+  b.rotation.z = 0;
+  b.rotation.x = -1.45;
+  b.position.y = -0.62;
 }
 
 /** Advance this character's animation. speed in yards/sec. */
@@ -734,7 +846,7 @@ export function stopCelebrate(p) { p.userData.u.celebrate = null; }
 /** Tackled: wrap, fall, then lie on the ground. knockDown(p, 0) gets them up again. */
 export function knockDown(p, t = 1) {
   const u = p.userData.u;
-  if (t <= 0) { u.down = false; playAction(p, 'getup'); return; }
+  if (t <= 0) { endRagdoll(p); u.down = false; playAction(p, 'getup'); return; }
   u.celebrate = null;
   playAction(p, 'fall', { then: 'down' });
 }
@@ -834,6 +946,48 @@ export function confetti(scene, origin, colors) {
     }
     geoP.attributes.position.needsUpdate = true;
     if (life > 3) { scene.remove(pts); geoP.dispose(); return false; }
+    return true;
+  };
+}
+
+/**
+ * A short burst of pixel blood after a rough hit: small red voxels that arc out, fall,
+ * and leave a few splats on the turf. Returns an updater (false when done).
+ */
+export function bloodBurst(scene, origin, dir = { x: 0, z: -1 }) {
+  const n = 18;
+  const geoB = new THREE.BoxGeometry(0.07, 0.07, 0.07);
+  const mat = new THREE.MeshBasicMaterial({ color: '#b3001b' });
+  const drops = new THREE.InstancedMesh(geoB, mat, n);
+  const P = [];
+  for (let i = 0; i < n; i++) P.push({ x: origin.x, y: origin.y, z: origin.z, vx: dir.x * 2 + (Math.random() - 0.5) * 3, vy: 1.5 + Math.random() * 2.5, vz: dir.z * 2 + (Math.random() - 0.5) * 3, landed: false });
+  scene.add(drops);
+  const splats = [];
+  const splatMat = new THREE.MeshBasicMaterial({ color: '#8a0014', transparent: true, opacity: 0.85, depthWrite: false });
+  const d = new THREE.Object3D();
+  let life = 0;
+  return (dt) => {
+    life += dt;
+    P.forEach((p, i) => {
+      if (!p.landed) {
+        p.vy -= 12 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+        if (p.y <= 0.03) {
+          p.landed = true; p.y = 0.03;
+          if (splats.length < 6 && Math.random() < 0.5) {
+            const sp = new THREE.Mesh(new THREE.PlaneGeometry(0.12 + Math.random() * 0.18, 0.12 + Math.random() * 0.14), splatMat);
+            sp.rotation.x = -Math.PI / 2; sp.position.set(p.x, 0.025, p.z);
+            scene.add(sp); splats.push(sp);
+          }
+        }
+      }
+      d.position.set(p.x, p.landed ? -5 : p.y, p.z);
+      d.updateMatrix();
+      drops.setMatrixAt(i, d.matrix);
+    });
+    drops.instanceMatrix.needsUpdate = true;
+    if (life > 1.6 && drops.parent) { scene.remove(drops); geoB.dispose(); }
+    if (life > 6) { for (const sp of splats) { scene.remove(sp); sp.geometry.dispose(); } return false; }
+    if (life > 4.5) splatMat.opacity = Math.max(0, 0.85 * (6 - life) / 1.5);
     return true;
   };
 }

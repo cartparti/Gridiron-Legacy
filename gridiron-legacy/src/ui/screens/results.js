@@ -8,6 +8,8 @@ import { fmtMoney, signed } from '../../core/util.js';
 import { teamBadge } from '../components.js';
 import { sfx } from '../../audio/sfx.js';
 import { icon } from '../icons.js';
+import { trophyCutscene } from '../../scenes/cutscenes.js';
+import { teamKits } from '../../data/kits.js';
 
 const AWARD_ICONS = { 'Most Valuable Player': 'crown', 'Legacy Bowl Champion': 'trophy', 'Heritage Bowl Champion': 'trophy', 'State Champion': 'trophy', 'Ironstone Trophy': 'medal', 'Legacy Bowl MVP': 'star' };
 
@@ -55,6 +57,13 @@ export function reviewScreen(app) {
   const r = st.review;
   const p = st.player;
   const champ = getTeam(st.league, r.championId);
+  if (r.champion && !r.cutPlayed && !app.settings.reducedMotion) {
+    r.cutPlayed = true;
+    app.save();
+    const titleName = STAGES[st.career.stage]?.titleName ?? 'Championship';
+    setTimeout(() => trophyCutscene({ colors: champ.colors, uniform: teamKits(champ).home, look: p.look, number: p.number, teamName: champ.name,
+      title: 'Champions!', sub: `${champ.city} ${champ.name} win the ${titleName}` }), 50);
+  }
   const delta = r.ovrAfter - r.ovrBefore;
   setTimeout(() => (r.awards.length ? sfx.levelUp() : null), 300);
   return h('div.screen',

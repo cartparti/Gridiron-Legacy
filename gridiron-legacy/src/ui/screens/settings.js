@@ -15,6 +15,7 @@ export function settingsScreen(app) {
       opt('Theme (menus)', 'theme', [['auto', 'Auto'], ['dark', 'Dark'], ['light', 'Light']]),
       opt('Sound effects', 'sound', [[true, 'On'], [false, 'Off']]),
       opt('Reduced motion', 'reducedMotion', [[false, 'Off'], [true, 'On']]),
+      opt('Blood effects', 'blood', [[true, 'On'], [false, 'Off']]),
       opt('Tutorial tips', 'tutorials', [[true, 'On'], [false, 'Off']]))),
     h('div.card',
       h('h3', app.state ? 'Difficulty (this career)' : 'Default difficulty'),

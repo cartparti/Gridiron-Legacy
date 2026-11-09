@@ -7,7 +7,7 @@
 //
 // Returns the same result objects as the old minigames, so the game simulation is unchanged.
 import * as THREE from 'three';
-import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, confetti } from '../actors.js';
+import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, confetti, ragdoll, bloodBurst } from '../actors.js';
 import { rig, endPlay, finalize, weatherFx, gaussR } from '../minigames/common.js';
 import { makeControls } from './controls.js';
 import { PLAYS, OFF_FORMATION, OL_X, playMode } from '../../data/playbook.js';
@@ -562,23 +562,59 @@ export function freePlay(ctx) {
   };
 
   // ---------------- contact resolution
+  const fxList = [];
+  let cineUsed = 0;
+  const pushDir = (from, to) => {
+    const dx = to.pos.x - from.pos.x;
+    const dz = to.pos.z - from.pos.z;
+    const n = Math.hypot(dx, dz) || 1;
+    return { x: dx / n, z: dz / n };
+  };
+  /** Send someone flying. power ~0.4 (stumble) .. 2 (huge hit). */
+  const flatten = (victim, hitter, power) => {
+    ragdoll(victim.mesh, pushDir(hitter, victim), power);
+  };
+  /** Hard tackle: ragdoll, maybe slow-mo replay, maybe blood, maybe an injury. */
+  const hardHit = (tackler, target) => {
+    const rel = Math.hypot(tackler.vel.x - target.vel.x, tackler.vel.z - target.vel.z);
+    const big = globalThis.__forceBigHit || rel > 10 || Math.random() < 0.14;
+    flatten(target, tackler, big ? 1.5 + Math.random() * 0.5 : 0.55 + Math.random() * 0.3);
+    if (!big) return;
+    const involved = target.user || tackler.user;
+    hud.big(tackler.user ? 'BOOM!' : 'BIG HIT!', '#ff6b6b', 900);
+    ctx.shake(0.6);
+    if (involved && cineUsed < 1 && !opts.reducedMotion && (globalThis.__forceBigHit || Math.random() < 0.6)) {
+      cineUsed++;
+      ctx.cinematic?.(() => target.pos, 1.4);
+    }
+    if (opts.blood !== false && (globalThis.__forceBigHit || Math.random() < 0.3)) {
+      const d = pushDir(tackler, target);
+      fxList.push(bloodBurst(group, { x: target.pos.x, y: 1.6, z: target.pos.z }, d));
+    }
+    // the hit can hurt you (more likely when already banged up)
+    if (target.user && Math.random() < 0.07 * (1.6 - (opts.health ?? 100) / 100)) {
+      target.injured = true;
+      setTimeout(() => { hud.big('INJURED', '#ff6b6b', 1600); hud.say?.(`${opts.lastName ?? 'He'} is slow to get up... trainers are running out.`, 3000); }, 700);
+    }
+  };
+
   const tryTackle = (tackler, target) => {
     if (target.down) return;
     const u = target === user;
     tackler.lunge = 0;
     if (u && (moves.juke > 0 || moves.spin > 0)) {
-      tackler.out = 1.4; knockDown(tackler.mesh, 1);
+      tackler.out = 1.4; flatten(tackler, target, 0.5);
       const perfect = moves.juke > 0.12 || moves.spin > 0.2;
       hud.big(perfect ? 'PERFECT JUKE!' : moves.spin > 0 ? 'SPIN MOVE!' : 'JUKE!', perfect ? '#4ade80' : '#fff', 700);
       if (perfect) ctx.slowMo(0.35);
       sfx.cheer();
       return;
     }
-    if (!u && target.juking > 0) { tackler.out = 1.1; knockDown(tackler.mesh, 1); return; }
+    if (!u && target.juking > 0) { tackler.out = 1.1; flatten(tackler, target, 0.45); return; }
     if (u && moves.stiff > 0) {
       const facing = (tackler.pos.z < target.pos.z + 0.5);
       if (facing && Math.random() < 0.35 + (st.strength ?? 60) / 160) {
-        tackler.out = 1.2; knockDown(tackler.mesh, 1); moves.slow = 0.3;
+        tackler.out = 1.2; flatten(tackler, target, 0.9); moves.slow = 0.3;
         hud.big('STIFF ARM!', '#fbbf24', 700); sfx.hit(); ctx.shake(0.25); return;
       }
     }
@@ -586,7 +622,7 @@ export function freePlay(ctx) {
     const pBreak = (str / 100) * 0.3 * (target.user ? (0.6 + tol * 0.4) : 0.7) * Math.pow(0.5, target.broken ?? 0) + (tackler.user ? -0.1 : 0);
     if (Math.random() < pBreak) {
       target.broken = (target.broken ?? 0) + 1;
-      tackler.out = 1.0; knockDown(tackler.mesh, 1);
+      tackler.out = 1.0; flatten(tackler, target, 0.6);
       if (target.user) { moves.slow = 0.4; hud.big('BROKE A TACKLE!', '#fbbf24', 700); }
       sfx.hit(); ctx.shake(0.2);
       return;
@@ -594,7 +630,7 @@ export function freePlay(ctx) {
     // Tackled.
     playAction(tackler.mesh, 'tackle', { then: null });
     target.down = true;
-    knockDown(target.mesh, 1);
+    hardHit(tackler, target);
     sfx.hit();
     ctx.shake(0.4);
     const fumbleP = 0.012 * (call === 'risky' ? 2 : 1) + wfx.slip * 0.25 + (tackler.user ? 0.04 : 0);
@@ -702,6 +738,7 @@ export function freePlay(ctx) {
       }
     }
     maybeFlag();
+    if (user.injured && result) result.injured = true;
   };
 
   // Penalty flags: occasionally a yellow flag changes the outcome of the play.
@@ -761,6 +798,7 @@ export function freePlay(ctx) {
   return (dt) => {
     t += dt;
     if (fx && !fx(dt)) fx = null;
+    for (let i = fxList.length - 1; i >= 0; i--) if (!fxList[i](dt)) fxList.splice(i, 1);
     if (phase === 'pick' || phase === 'over') return;
     if (phase === 'pre') {
       rig(camera, (user?.pos.x ?? 0) * 0.4, -4, dt, { zoom: mode === 'pass' ? 1.1 : 0.95, k: 3 });
@@ -849,7 +887,7 @@ export function freePlay(ctx) {
           if (target === qb && holder === qb && !carrier) {
             // sack (QB can still dodge with moves if he is the user and scrambling)
             if (user === qb && (moves.juke > 0 || moves.spin > 0)) { e.out = 1.2; knockDown(e.mesh, 1); hud.big('ESCAPED!', '#4ade80', 600); }
-            else { qb.down = true; knockDown(qb.mesh, 1); playAction(e.mesh, 'tackle'); sfx.hit(); ctx.shake(0.4); whistle('sack'); }
+            else { qb.down = true; hardHit(e, qb); playAction(e.mesh, 'tackle'); sfx.hit(); ctx.shake(0.4); whistle('sack'); }
           } else tryTackle(e, target);
           e.lunge = 0;
         }

@@ -63,10 +63,24 @@ function ensure() {
 function frame() {
   raf = requestAnimationFrame(frame);
   const dt = Math.min(0.05, R.clock.getDelta());
-  const slow = R.slowmo > 0 ? 0.3 : 1;
+  const cine = R.cine;
+  const slow = cine ? 0.2 : R.slowmo > 0 ? 0.3 : 1;
   R.slowmo = Math.max(0, (R.slowmo ?? 0) - dt);
   elapsed += dt * slow;
   if (loopFn) loopFn(dt * slow, elapsed);
+  if (cine) {
+    // dramatic low orbit around the action, then hand the camera back
+    cine.t += dt;
+    const tg = cine.target();
+    const a = cine.ang + cine.t * 0.55;
+    const k = Math.min(1, cine.t * 3);
+    const cx = tg.x + Math.sin(a) * 6.5;
+    const cz = tg.z + Math.cos(a) * 6.5;
+    if (!cine.from) cine.from = R.camera.position.clone();
+    R.camera.position.set(cine.from.x + (cx - cine.from.x) * k, cine.from.y + (2.4 - cine.from.y) * k, cine.from.z + (cz - cine.from.z) * k);
+    R.camera.lookAt(tg.x, 0.9, tg.z);
+    if (cine.t > cine.dur) { R.cine = null; document.body.classList.remove('cine'); }
+  }
   R.weather.update(dt, R.camera);
   if (!R.active) updateLightning(R, dt);
   if (shake > 0) {
@@ -96,6 +110,13 @@ function stop() {
 /** Camera shake (tackles, big hits). */
 export function cameraShake(s = 0.3) {
   shake = Math.max(shake, s);
+}
+
+/** Slow-motion replay camera on a target: target() returns {x, z} each frame. */
+export function cinematic(target, seconds = 1.6) {
+  if (!R || R.cine) return;
+  R.cine = { target: typeof target === 'function' ? target : () => target, dur: seconds, t: 0, ang: Math.random() * Math.PI * 2, from: null };
+  document.body.classList.add('cine');
 }
 
 /** Brief slow motion (big catches, interceptions). */
@@ -271,6 +292,7 @@ export function runMinigame(type, opts) {
   return new Promise((resolve) => {
     const cleanups = [];
     const finish = (result) => {
+      if (R) { R.cine = null; document.body.classList.remove('cine'); }
       for (const c of cleanups.reverse()) { try { c(); } catch { /* ignore */ } }
       stop();
       hud.remove();
@@ -305,6 +327,7 @@ export function runMinigame(type, opts) {
       done: finish,
       shake: cameraShake,
       slowMo,
+      cinematic,
       groundPoint(ev) {
         const rect = r.renderer.domElement.getBoundingClientRect();
         const ndc = new THREE.Vector2(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
@@ -320,6 +343,64 @@ export function runMinigame(type, opts) {
       update(dt, t);
       tickIdle(group, dt);
       r.stadium.animateCrowd(t, 0.35);
+    });
+  });
+}
+
+// ------------------------------------------------------------------ cutscenes
+
+/**
+ * Play a scripted cutscene in the stadium scene. build(ctx) returns update(dt, t) -> false when done.
+ * ctx: { THREE, scene, group, camera, stadium, caption(text, sub), shake, slowMo }.
+ * Resolves when it finishes or the player taps Skip. Without WebGL it resolves immediately.
+ */
+export function runCutscene(build, { setup } = {}) {
+  stopBackdrop();
+  const r = ensure();
+  if (!r) return Promise.resolve();
+  const app = document.getElementById('app');
+  app.style.visibility = 'hidden';
+  const ui = document.createElement('div');
+  ui.className = 'cutscene-ui';
+  ui.innerHTML = '<div class="cut-caption"><div class="cut-main"></div><div class="cut-sub"></div></div><button class="btn small cut-skip">Skip ▸</button>';
+  document.body.append(ui);
+  document.body.classList.add('cine');
+  return new Promise((resolve) => {
+    const group = new THREE.Group();
+    r.scene.add(group);
+    r.stadium.hideLines();
+    applyAtmosphere(r, 'clear');
+    setup?.(r);
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      stop();
+      r.scene.remove(group);
+      ui.remove();
+      document.body.classList.remove('cine');
+      app.style.visibility = '';
+      resolve();
+    };
+    ui.querySelector('.cut-skip').onclick = finish;
+    const main = ui.querySelector('.cut-main');
+    const sub = ui.querySelector('.cut-sub');
+    const ctx = {
+      THREE, scene: r.scene, group, camera: r.camera, stadium: r.stadium, shake: cameraShake, slowMo,
+      caption(text, subText = '') {
+        main.textContent = text;
+        sub.textContent = subText;
+        ui.querySelector('.cut-caption').classList.remove('show');
+        void main.offsetWidth;
+        ui.querySelector('.cut-caption').classList.add('show');
+      },
+    };
+    const update = build(ctx);
+    start((dt, t) => {
+      nextFrame();
+      if (update(dt, t) === false) finish();
+      tickIdle(group, dt);
+      r.stadium.animateCrowd(t, 0.8);
     });
   });
 }

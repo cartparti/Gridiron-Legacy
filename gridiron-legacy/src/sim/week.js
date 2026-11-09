@@ -53,16 +53,28 @@ export function applyPlan(state, plan) {
   const cost = planCost(plan);
   if (cost > max) throw new Error('Plan exceeds energy');
   const all = [];
-  for (const id of plan) {
-    if (!id || typeof id === 'object') continue;
+  plan.forEach((id, i) => {
+    if (!id || typeof id === 'object') return;
     const act = ACTIVITY_BY_ID[id];
-    if (!act || !isAvailable(state, act)) continue;
-    all.push(...applyEffects(state, act.effects));
-  }
+    if (!act || !isAvailable(state, act)) return;
+    all.push(...applyEffects(state, drillScaled(act.effects, state.week.drills?.[i])));
+  });
   state.week.plan = plan.slice();
   state.week.freshness = clamp((max - cost) / max, 0, 1);
   const upkeep = weeklyUpkeep(state);
   return { changes: mergeChanges(all), upkeep, freshness: state.week.freshness };
+}
+
+/** Training drill result q (0..1) scales training gains: 0.6x (botched) .. 1.5x (perfect). */
+export function drillMultiplier(q) {
+  return q === undefined || q === null ? 1 : 0.6 + 0.9 * Math.max(0, Math.min(1, q));
+}
+function drillScaled(effects, q) {
+  if (q === undefined || q === null || !effects.train) return effects;
+  const k = drillMultiplier(q);
+  const train = {};
+  for (const [stat, v] of Object.entries(effects.train)) train[stat] = v * k;
+  return { ...effects, train };
 }
 
 function mergeChanges(list) {

@@ -338,6 +338,11 @@ export function resolveMoment(state, result) {
   let out = null;
   let yl = m.yardLine;
   let converted = false;
+  if (result.injured && !g.userOut) {
+    applyEffects(state, { injury: true });
+    g.userOut = true;
+    g.log.push({ q: m.quarter, clock: m.clock, team: '', user: true, out: 'INFO', text: `${state.player.last} is helped off the field${state.player.injury ? ` (${state.player.injury.label.toLowerCase()})` : ''}.`, score: `${g.score.away}-${g.score.home}`, key: true });
+  }
 
   if (m.defense) {
     s.tgtAgainst += m.type === 'cb_cover' ? 1 : 0;
@@ -595,7 +600,11 @@ function maybeEvent(state, trigger, p) {
   const tokens = eventTokens(state);
   g.pendingEvent = {
     id: ev.id, trigger, title: ev.title, text: fillTokens(ev.text, tokens),
-    choices: ev.choices.map((c) => ({ label: fillTokens(c.label, tokens), risky: !!c.chance })),
+    choices: ev.choices.map((c) => ({
+      label: fillTokens(c.label, tokens), risky: !!c.chance,
+      play: c.chance ? (c.play ?? (/dive|fumble|loose|pile|scrum/i.test(c.label + ev.title) ? 'mash' : 'timing')) : null,
+      p: c.chance ? Math.min(0.95, c.chance.p + (c.chance.stat ? (state.player.stats[c.chance.stat] - 50) / 200 : 0)) : null,
+    })),
   };
   return true;
 }
@@ -611,7 +620,7 @@ function afterMomentEvents(state, result, m) {
 }
 
 /** Apply a mid-game event choice. */
-export function resolveGameEvent(state, idx) {
+export function resolveGameEvent(state, idx, forced = undefined) {
   const g = state.game;
   const pe = g.pendingEvent;
   const ev = GAME_EVENTS.find((e) => e.id === pe.id);
@@ -624,7 +633,7 @@ export function resolveGameEvent(state, idx) {
   if (choice.chance) {
     const c = choice.chance;
     const bonus = c.stat ? (state.player.stats[c.stat] - 50) / 200 : 0;
-    success = rand(state) < Math.min(0.95, c.p + bonus);
+    success = typeof forced === 'boolean' ? forced : rand(state) < Math.min(0.95, c.p + bonus);
     if (success) {
       effects = { ...effects, ...(c.successEffects ?? {}) };
       game = { ...game, ...(c.successGame ?? {}) };

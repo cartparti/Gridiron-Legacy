@@ -4,6 +4,8 @@ import { clamp, fillTokens } from '../core/util.js';
 import { rand, randInt, pick, chance } from '../core/rng.js';
 import { applyEffects } from './effects.js';
 import { people } from './social.js';
+import { TEXTS, AFTER_GAME, WEEKLY, TROLL_COMMENTS, COMMENT_REPLIES, CLAPBACKS } from '../data/texts.js';
+import { addNews } from './press.js';
 
 const MAX_MSGS = 40;
 const MAX_POSTS = 40;
@@ -25,10 +27,10 @@ export function fmtCount(n) {
 }
 
 /** Someone texts you. key = person key (coach, mate0, family, partner, agent, rival). */
-export function textFrom(state, key, text) {
+export function textFrom(state, key, text, tid = null) {
   const ph = phone(state);
   const t = (ph.threads[key] = ph.threads[key] ?? []);
-  t.push({ from: 'them', text, year: state.career.year, week: (state.league?.week ?? 0) + 1, read: false });
+  t.push({ from: 'them', text, tid, year: state.career.year, week: (state.league?.week ?? 0) + 1, read: false });
   if (t.length > MAX_MSGS) t.shift();
   ph.unread = Object.values(ph.threads).reduce((a, th) => a + th.filter((m) => !m.read && m.from === 'them').length, 0);
 }
@@ -44,24 +46,85 @@ const REPLIES = [
   { label: 'Thanks! Means a lot.', bond: 2 },
   { label: '👍', bond: 1 },
 ];
-export const replyOptions = () => REPLIES.map((r) => r.label);
 
-/** Quick reply (small relationship bump, once per contact per week). */
-export function reply(state, key, idx) {
-  const ph = phone(state);
-  const r = REPLIES[idx];
-  (ph.threads[key] = ph.threads[key] ?? []).push({ from: 'me', text: r.label, year: state.career.year, week: (state.league?.week ?? 0) + 1, read: true });
-  state.week = state.week ?? {};
-  state.week.replied = state.week.replied ?? {};
-  if (state.week.replied[key]) return null;
-  state.week.replied[key] = true;
+/** The message in this thread waiting for an answer (latest from them, not yet answered). */
+export function pendingMessage(state, key) {
+  const t = phone(state).threads[key] ?? [];
+  const last = t[t.length - 1];
+  return last && last.from === 'them' && !last.answered ? last : null;
+}
+
+/** Reply choices for a thread: contextual for templated texts, generic otherwise. */
+export function replyOptions(state, key) {
+  const m = state ? pendingMessage(state, key) : null;
+  if (!m) return [];
+  const tpl = m.tid ? TEXTS[m.tid] : null;
+  return (tpl?.replies ?? REPLIES).map((r) => r.label);
+}
+
+const bump = (state, key, d) => {
   const p = state.player;
+  if (!d) return null;
   if (key.startsWith('mate')) {
     const m = p.teammates?.find((x) => x.id === key);
-    if (m) m.bond = clamp(m.bond + r.bond, 0, 100);
-  } else if (p.rel[key] !== null && p.rel[key] !== undefined) p.rel[key] = clamp(p.rel[key] + r.bond, 0, 100);
-  return r.bond;
+    if (m) m.bond = clamp(m.bond + d, 0, 100);
+  } else if (p.rel[key] !== null && p.rel[key] !== undefined) p.rel[key] = clamp(p.rel[key] + d, 0, 100);
+  else return null;
+  return { label: contactName(state, key), delta: d, text: `${d > 0 ? '+' : ''}${d}` };
+};
+
+/** Answer the pending message. Returns { changes, back } (their response is added to the thread). */
+export function reply(state, key, idx) {
+  const ph = phone(state);
+  const m = pendingMessage(state, key);
+  if (!m) return null;
+  const tpl = m.tid ? TEXTS[m.tid] : null;
+  const r = (tpl?.replies ?? REPLIES)[idx];
+  if (!r) return null;
+  m.answered = true;
+  const wk = (state.league?.week ?? 0) + 1;
+  const t = (ph.threads[key] = ph.threads[key] ?? []);
+  t.push({ from: 'me', text: r.label, year: state.career.year, week: wk, read: true });
+  const changes = [];
+  const b = bump(state, key, r.bond);
+  if (b) changes.push(b);
+  if (r.effects) changes.push(...applyEffects(state, r.effects));
+  if (r.back) t.push({ from: 'them', text: r.back, year: state.career.year, week: wk, read: true, answered: true });
+  if (t.length > MAX_MSGS) t.splice(0, t.length - MAX_MSGS);
+  return { changes, back: r.back };
 }
+
+/** Send a templated text from a contact. who = coach/family/partner/agent/rival/mate. */
+function sendTemplate(state, tid) {
+  const tpl = TEXTS[tid];
+  const p = state.player;
+  if (!tpl) return;
+  if (tpl.who === 'partner' && !p.partnerName) return;
+  if (tpl.who === 'agent' && !p.agentName) return;
+  const key = tpl.who === 'mate' ? (p.teammates?.length ? pick(state, p.teammates).id : null) : tpl.who;
+  if (!key) return;
+  textFrom(state, key, pick(state, tpl.text), tid);
+}
+
+/** Reply to a comment on one of your posts. kind 'fan' or 'troll'. */
+export function replyToComment(state, postId, ci, idx) {
+  const ph = phone(state);
+  const post = ph.posts.find((x) => x.id === postId);
+  const c = post?.comments?.[ci];
+  if (!c || c.replied) return null;
+  const opts = COMMENT_REPLIES[c.troll ? 'troll' : 'fan'];
+  const r = opts[idx];
+  c.replied = r.label === 'Ignore' ? 'ignored' : r.label === 'Clap back' ? pick(state, CLAPBACKS) : r.label;
+  const changes = applyEffects(state, r.effects ?? {});
+  let text = null;
+  if (r.risk && chance(state, r.risk)) {
+    changes.push(...applyEffects(state, { mood: -3, rel: { coach: -2 }, fame: -0.5 }));
+    addNews(state, 'scandal', `${state.player.first} ${state.player.last} gets into it with fans online. The clapback is going viral, and not in a good way.`);
+    text = 'It blew up. Your coach saw it. Not great.';
+  } else if (r.risk) text = 'The internet loves it. 🔥';
+  return { changes, text };
+}
+export const commentReplyOptions = (c) => COMMENT_REPLIES[c.troll ? 'troll' : 'fan'].map((r) => r.label);
 
 // ------------------------------------------------------------------ automatic texts
 
@@ -98,37 +161,21 @@ export function postGameTexts(state, lg) {
   const p = state.player;
   if (!lg || lg.sitOut) return;
   const tier = lg.grade >= 75 ? 'great' : lg.grade >= 55 ? 'good' : 'bad';
-  textFrom(state, 'coach', pick(state, GAME_TEXTS.coach[tier]));
-  if (lg.injury) textFrom(state, 'family', pick(state, GAME_TEXTS.family.hurt));
-  else if (chance(state, 0.55)) textFrom(state, 'family', pick(state, GAME_TEXTS.family[lg.won ? 'win' : 'loss']));
-  if (p.partnerName && chance(state, 0.6)) textFrom(state, 'partner', pick(state, GAME_TEXTS.partner[lg.won ? 'win' : 'loss']));
-  if (lg.won && p.teammates?.length && chance(state, 0.6)) {
-    const m = pick(state, p.teammates);
-    textFrom(state, m.id, pick(state, GAME_TEXTS.mate[tier === 'great' ? 'great' : 'win']));
-  }
-  if (p.agentName && tier === 'great' && chance(state, 0.5)) textFrom(state, 'agent', pick(state, GAME_TEXTS.agent.great));
-  if (lg.rivalry) textFrom(state, 'rival', pick(state, GAME_TEXTS.rival[lg.won ? 'beat' : 'lost']));
+  sendTemplate(state, AFTER_GAME.coach[tier]);
+  if (lg.injury) sendTemplate(state, AFTER_GAME.family.hurt);
+  else if (chance(state, 0.55)) sendTemplate(state, AFTER_GAME.family[lg.won ? 'win' : 'loss']);
+  if (p.partnerName && chance(state, 0.6)) sendTemplate(state, AFTER_GAME.partner[lg.won ? 'win' : 'loss']);
+  if (lg.won && p.teammates?.length && chance(state, 0.6)) sendTemplate(state, AFTER_GAME.mate[tier === 'great' ? 'great' : 'win']);
+  if (p.agentName && tier === 'great' && chance(state, 0.5)) sendTemplate(state, AFTER_GAME.agent.great);
+  if (lg.rivalry) sendTemplate(state, AFTER_GAME.rival[lg.won ? 'beat' : 'lost']);
 }
-
-const WEEK_TEXTS = [
-  ['mate', 'Anyone down for wings Thursday?'],
-  ['mate', 'Did you see the new playbook install? My brain hurts'],
-  ['mate', 'Lift at 6am. Don\'t be late 😤'],
-  ['family', 'Don\'t forget to eat a vegetable this week.'],
-  ['family', 'Your little cousin wore your jersey to school today!'],
-  ['coach', 'Extra film session available Wednesday if you want it.'],
-  ['partner', 'Miss you. Movie night soon?'],
-  ['agent', 'A couple of brands asked about you. Let\'s talk.'],
-];
 
 /** Occasional texts at the start of a week. */
 export function weeklyTexts(state) {
   const p = state.player;
-  if (!chance(state, 0.45)) return;
-  const options = WEEK_TEXTS.filter(([k]) => (k !== 'partner' || p.partnerName) && (k !== 'agent' || p.agentName));
-  const [k, text] = pick(state, options);
-  const key = k === 'mate' ? (p.teammates?.length ? pick(state, p.teammates).id : 'family') : k;
-  textFrom(state, key, text);
+  if (!chance(state, 0.6)) return;
+  const options = WEEKLY.filter((tid) => (TEXTS[tid].who !== 'partner' || p.partnerName) && (TEXTS[tid].who !== 'agent' || p.agentName));
+  sendTemplate(state, pick(state, options));
 }
 
 // ------------------------------------------------------------------ social media
@@ -177,6 +224,7 @@ export function makePost(state, typeId) {
   const comments = [];
   const n = randInt(state, 2, 3);
   for (let i = 0; i < n; i++) comments.push({ handle: pick(state, FAN_HANDLES), text: pick(state, COMMENTS[t.id]) });
+  if (chance(state, 0.45)) comments.push({ handle: pick(state, FAN_HANDLES), text: pick(state, TROLL_COMMENTS), troll: true });
   const post = { id: ph.nextId++, kind: t.id, text: caption, likes, comments, year: state.career.year, week: (state.league?.week ?? 0) + 1, mine: true };
   ph.posts.unshift(post);
   if (ph.posts.length > MAX_POSTS) ph.posts.length = MAX_POSTS;
@@ -186,7 +234,7 @@ export function makePost(state, typeId) {
     p.money += bonus;
     changes.push({ label: 'Sponsor bonus', delta: 1, text: `+$${bonus.toLocaleString()}` });
   }
-  if (t.id === 'rival' && chance(state, 0.6)) textFrom(state, 'rival', pick(state, ['Cute post. 🙄', 'Keep my name out your mouth.', 'Screenshot saved. See you on the field.']));
+  if (t.id === 'rival' && chance(state, 0.6)) sendTemplate(state, 'rival_trash');
   return { post, changes };
 }
 
