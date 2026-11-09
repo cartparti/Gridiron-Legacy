@@ -118,7 +118,7 @@ export function randomCareerOpts(seed, position) {
     last: `Player${seed}`,
     position: position ?? ['QB', 'RB', 'WR', 'CB'][seed % 4],
     number: 7,
-    hometown: 'Ashwood',
+    hometown: 'Westfield',
     background: ['natural', 'gymrat', 'student', 'technician'][seed % 4],
     hsTeamId: 'WFW',
   };

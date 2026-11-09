@@ -1,6 +1,6 @@
 import { h, clear } from '../dom.js';
-import { POSITIONS, BACKGROUNDS, HOMETOWNS, STAT_KEYS, STAT_LABELS } from '../../data/positions.js';
-import { HS_TEAMS } from '../../data/teams.js';
+import { POSITIONS, BACKGROUNDS, STAT_KEYS, STAT_LABELS } from '../../data/positions.js';
+import { HS_TEAMS, CITIES } from '../../data/teams.js';
 import { FIRST_NAMES, LAST_NAMES } from '../../data/names.js';
 import { calcOverall } from '../../sim/player.js';
 import { newCareer } from '../../sim/flow.js';
@@ -24,7 +24,7 @@ const rnd = (arr) => arr[Math.floor(Math.random() * arr.length)];
 export function createScreen(app) {
   const f = app.ui.form ?? (app.ui.form = {
     first: rnd(FIRST_NAMES), last: rnd(LAST_NAMES), position: 'QB', background: 'natural',
-    number: 7, hometown: rnd(HOMETOWNS), hsTeamId: 'WFW', difficulty: app.settings.difficulty ?? 'normal',
+    number: 7, hometown: 'Westfield', hsTeamId: 'WFW', difficulty: app.settings.difficulty ?? 'normal',
   });
   const wrap = h('div.screen');
   const draw = () => {
@@ -61,9 +61,13 @@ export function createScreen(app) {
             h('b', b.label), h('span.lbl', b.desc)))),
         h('p.small', { style: { marginTop: '10px' } }, 'Starting overall: ', h('b', `~${ovr}`))),
       h('div.card',
-        h('h2', 'High School'),
-        h('p.small.muted', 'Stronger programs win more, but you will share the spotlight less with a weak one.'),
-        h('div.list', HS_TEAMS.map((t) =>
+        h('h2', 'Hometown'),
+        h('div.subtabs', { style: { flexWrap: 'wrap' } }, CITIES.map((c) => h(`button.subtab${f.hometown === c.name ? '.on' : ''}`, { onclick: () => {
+          sfx.click(); f.hometown = c.name; f.hsTeamId = c.schools[0].id; draw();
+        } }, c.name))),
+        h('h2', { style: { marginTop: '16px' } }, 'High School'),
+        h('p.small.muted', `${f.hometown} has ${CITIES.find((c) => c.name === f.hometown).schools.length} high schools. The other one in town will be your crosstown rival.`),
+        h('div.list', HS_TEAMS.filter((t) => t.town === f.hometown).map((t) =>
           h('button.li', { style: { background: f.hsTeamId === t.id ? 'color-mix(in srgb, var(--accent) 16%, transparent)' : 'none', border: '0', borderBottom: '1px solid var(--line)', cursor: 'pointer', textAlign: 'left', minHeight: '48px', color: 'inherit' }, onclick: () => { sfx.click(); f.hsTeamId = t.id; draw(); } },
             teamBadge(t, 30), h('span.grow', h('b', `${t.city} ${t.name}`)), stars(Math.max(1, Math.round((t.base - 45) / 4))))))),
       h('div.card',
@@ -71,9 +75,6 @@ export function createScreen(app) {
         h('div.diff-cards', Object.entries(DIFFICULTIES).map(([id, d]) =>
           h(`button.pick-card${f.difficulty === id ? '.on' : ''}`, { onclick: () => { sfx.click(); f.difficulty = id; draw(); } }, h('b', d.label)))),
         h('p.small.muted', { style: { marginTop: '8px' } }, DIFFICULTIES[f.difficulty].desc, f.difficulty !== 'normal' ? ` Legacy ×${DIFFICULTIES[f.difficulty].legacy}.` : '')),
-      h('div.card',
-        h('label.field', 'Hometown',
-          h('select', { onchange: (e) => { f.hometown = e.target.value; } }, HOMETOWNS.map((t) => h('option', { value: t, selected: t === f.hometown }, t))))),
       h('button.btn.primary.block', {
         onclick: () => {
           if (!f.first.trim() || !f.last.trim()) return;

@@ -48,7 +48,7 @@ export function createLeague(state, kind) {
     year: state.career.year,
     nextId: 1,
     teams: defs.map((d) => ({
-      id: d.id, city: d.city, name: d.name, colors: d.colors.slice(), conf: d.conf ?? null, div: d.div ?? null,
+      id: d.id, city: d.city, name: d.name, colors: d.colors.slice(), conf: d.conf ?? null, div: d.div ?? null, town: d.town ?? null,
       base: d.base, prestige: d.prestige ?? null, off: 0, def: 0, w: 0, l: 0, pf: 0, pa: 0, streak: 0,
     })),
     players: [],

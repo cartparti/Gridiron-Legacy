@@ -71,6 +71,7 @@ function frame() {
   elapsed += dt * slow;
   if (loopFn) loopFn(dt * slow, elapsed);
   R.weather.update(dt, R.camera);
+  if (!R.active) updateLightning(R, dt);
   if (shake > 0) {
     shake = Math.max(0, shake - dt);
     R.camera.position.x += (Math.random() - 0.5) * shake * 1.5;
@@ -108,11 +109,12 @@ export function slowMo(seconds = 0.6) {
 // ------------------------------------------------------------------ weather
 
 function makeWeather(scene) {
-  const n = 500;
+  const n = 900;
   const geo = new THREE.BufferGeometry();
   const pos = new Float32Array(n * 3);
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  const mat = new THREE.PointsMaterial({ color: '#cfe3ff', size: 0.25, transparent: true, opacity: 0.8, depthWrite: false });
+  // Fixed pixel size (not shrinking with distance) so drops read clearly at low resolution.
+  const mat = new THREE.PointsMaterial({ color: '#cfe3ff', size: 2, sizeAttenuation: false, transparent: true, opacity: 0.85, depthWrite: false });
   const pts = new THREE.Points(geo, mat);
   pts.frustumCulled = false;
   pts.visible = false;
@@ -121,24 +123,27 @@ function makeWeather(scene) {
   const reset = (i, cam, top) => {
     pos[i * 3] = cam.position.x + (Math.random() - 0.5) * 60;
     pos[i * 3 + 1] = top ? 18 + Math.random() * 6 : Math.random() * 24;
-    pos[i * 3 + 2] = cam.position.z - 10 - Math.random() * 45;
+    pos[i * 3 + 2] = cam.position.z - 6 - Math.random() * 40;
   };
   return {
     set(w, cam) {
       kind = w;
-      pts.visible = w === 'rain' || w === 'snow';
-      mat.color.set(w === 'snow' ? '#ffffff' : '#a9c9ff');
-      mat.size = w === 'snow' ? 0.35 : 0.18;
+      pts.visible = ['rain', 'snow', 'storm', 'wind'].includes(w);
+      mat.color.set(w === 'snow' ? '#ffffff' : w === 'wind' ? '#c8a26a' : '#a9c9ff');
+      mat.size = w === 'snow' ? 3 : w === 'storm' ? 2.5 : 2;
+      mat.opacity = w === 'wind' ? 0.6 : 0.8;
       for (let i = 0; i < n; i++) reset(i, cam, false);
       geo.attributes.position.needsUpdate = true;
     },
     update(dt, cam) {
       if (!pts.visible) return;
-      const vy = kind === 'snow' ? 3 : 28;
+      const vy = kind === 'snow' ? 3 : kind === 'wind' ? 0.6 : kind === 'storm' ? 36 : 28;
+      const vx = kind === 'wind' ? 22 : kind === 'storm' ? 12 : 4;
       for (let i = 0; i < n; i++) {
         pos[i * 3 + 1] -= vy * dt;
         if (kind === 'snow') pos[i * 3] += Math.sin(elapsed * 2 + i) * dt;
-        else pos[i * 3] += 4 * dt;
+        else pos[i * 3] += vx * dt;
+        if (kind === 'wind' && pos[i * 3] > cam.position.x + 30) pos[i * 3] -= 60;
         if (pos[i * 3 + 1] < 0) reset(i, cam, true);
       }
       geo.attributes.position.needsUpdate = true;
@@ -147,11 +152,31 @@ function makeWeather(scene) {
 }
 
 function applyAtmosphere(r, weather) {
-  const sky = { clear: '#5aa0d8', night: '#0d1424', rain: '#4b5866', snow: '#9aa7b4', wind: '#6f9cc4' }[weather] ?? '#5aa0d8';
-  r.scene.background = new THREE.Color(sky);
-  r.scene.fog = weather === 'night' ? new THREE.Fog(sky, 120, 260) : weather === 'rain' || weather === 'snow' ? new THREE.Fog(sky, 60, 170) : null;
+  const sky = { clear: '#5aa0d8', night: '#0d1424', rain: '#4b5866', storm: '#2b3038', snow: '#9aa7b4', wind: '#6f9cc4', fog: '#aab3bb' }[weather] ?? '#5aa0d8';
+  r.sky = new THREE.Color(sky);
+  r.scene.background = r.sky.clone();
+  r.scene.fog = weather === 'fog' ? new THREE.Fog(sky, 18, 55)
+    : weather === 'night' ? new THREE.Fog(sky, 120, 260)
+      : weather === 'rain' || weather === 'snow' || weather === 'storm' ? new THREE.Fog(sky, 50, 150) : null;
   r.stadium.setTint(weather);
   r.weather.set(weather, r.camera);
+  r.lightning = weather === 'storm' ? { next: 2 + Math.random() * 4, flash: 0 } : null;
+}
+
+/** Thunderstorm lightning: brief white flashes plus a rumble. */
+function updateLightning(r, dt) {
+  const L = r.lightning;
+  if (!L) return;
+  L.next -= dt;
+  if (L.next <= 0) {
+    L.flash = 0.18;
+    L.next = 4 + Math.random() * 7;
+    import('../audio/sfx.js').then((m) => m.sfx.thunder?.()).catch(() => {});
+  }
+  if (L.flash > 0) {
+    L.flash -= dt;
+    r.scene.background = L.flash > 0.09 || (L.flash > 0 && L.flash < 0.04) ? new THREE.Color('#e8eef7') : r.sky.clone();
+  }
 }
 
 // ------------------------------------------------------------------ title backdrop
@@ -187,7 +212,7 @@ export function makeHud() {
   el.innerHTML = `
     <div class="hud-top">
       <div class="hud-pill sit"></div>
-      <div class="hud-pill hud-call"></div>
+      <div class="hud-right"><div class="hud-pill hud-call"></div><div class="hud-pill hud-wx"></div></div>
     </div>
     <div class="hud-instr"></div>
     <div class="hud-mid"></div>
@@ -198,6 +223,12 @@ export function makeHud() {
   return {
     el,
     top: (left, right) => { q('.sit').textContent = left; q('.hud-call').textContent = right; q('.hud-call').dataset.call = right.toLowerCase(); },
+    weather: (label, wind) => {
+      const el = q('.hud-wx');
+      if (!label) { el.style.display = 'none'; return; }
+      const deg = wind ? (Math.atan2(wind.z, wind.x) * 180) / Math.PI : 0;
+      el.innerHTML = `${label}${wind && wind.mph >= 4 ? ` <span class="wind-arrow" style="transform:rotate(${deg}deg)">➜</span> ${wind.mph} mph` : ''}`;
+    },
     instr: (text) => { const i = q('.hud-instr'); i.textContent = text; i.classList.toggle('show', !!text); },
     big: (text, color = '#fff', ms = 1100) => {
       const b = document.createElement('div');
@@ -244,6 +275,7 @@ export function runMinigame(type, opts) {
     const m = opts.moment;
     const sitText = `${m.label}${m.situation ? ` · ${m.situation}` : ''}`;
     hud.top(sitText, opts.call.toUpperCase());
+    hud.weather(m.weather && m.weather !== 'clear' ? ({ night: 'Night', rain: 'Rain', storm: 'Storm', snow: 'Snow', wind: 'Wind', fog: 'Fog' }[m.weather] ?? '') : (m.wind?.mph >= 4 ? 'Breezy' : ''), m.wind);
     if (!r) {
       fallbackMeter({ hud, opts, done: finish, addCleanup: (f) => cleanups.push(f) });
       return;
@@ -296,13 +328,18 @@ export function runWorld(placeId, ctx) {
   if (!r) return null;
   const scene = new THREE.Scene();
   const outdoor = ['park', 'downtown'].includes(placeId);
-  scene.background = new THREE.Color(outdoor ? '#8fd0f2' : '#14181d');
-  if (outdoor) scene.fog = new THREE.Fog('#8fd0f2', 60, 140);
+  const wx = outdoor ? ctx.weather ?? 'clear' : 'clear';
+  const sky = { rain: '#7d8a99', storm: '#4a525c', snow: '#c4ccd4', fog: '#c0c6cc', night: '#8fd0f2' }[wx] ?? '#8fd0f2';
+  scene.background = new THREE.Color(outdoor ? sky : '#14181d');
+  if (outdoor) scene.fog = new THREE.Fog(sky, wx === 'fog' ? 14 : 60, wx === 'fog' ? 50 : 140);
   R.active = scene;
   world = buildWorld(placeId, { ...ctx, scene, camera: r.camera });
+  const particles = outdoor ? makeWeather(scene) : null;
+  particles?.set(wx === 'night' ? 'clear' : wx, r.camera);
   start((dt) => {
     nextFrame();
     world?.update(dt);
+    particles?.update(dt, r.camera);
   });
   return world;
 }

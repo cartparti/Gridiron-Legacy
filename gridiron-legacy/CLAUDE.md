@@ -59,6 +59,13 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Walkable places (`src/data/places.js` text maps, `src/scenes/world.js`, `src/ui/screens/world.js`):
   Home, Park, Stadium, Downtown. Activities there fill the week plan.
 
+## v0.4 changes
+- Weather: weekly forecast (`state.week.forecast`), storm and fog added; wind drifts passes, rain/storm
+  slip (drops, fumbles, slips on cuts), snow slows players, fog hides reads; lightning; world weather.
+- Cities with 2-3 high schools (`CITIES` in teams.js), crosstown rivals; 32 colleges / 4 conferences;
+  randomized offers; pick-by-pick draft with team needs (`teamNeed`, `draftStock` in flow.js).
+- Phone (`src/sim/phone.js`, `src/ui/screens/phone.js`): texts, Huddle social feed/posts, bank, calendar.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

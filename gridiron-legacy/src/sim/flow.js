@@ -16,15 +16,16 @@
 //   retired          career over (state.legacy)
 import { STAGES, START_YEAR, RETIRE_AGE, EARLY_RETIRE_AGE, MIN_SALARY, ROOKIE_CONTRACT_YEARS } from '../data/config.js';
 import { STAT_KEYS } from '../data/positions.js';
+import { COLLEGE_TEAMS } from '../data/teams.js';
 import { INVESTMENTS } from '../data/lifestyle.js';
 import { clamp } from '../core/util.js';
-import { newSeed, gauss, chance, pick, randInt, shuffle } from '../core/rng.js';
+import { newSeed, gauss, chance, pick, randInt, shuffle, rand } from '../core/rng.js';
 import { createAthlete, emptyStats, addStats, applyTraining, ageProgression, refreshOverall } from './player.js';
 import {
   createLeague, getTeam, findGame, recordResult, simOtherGames, seedPlayoffs, advancePlayoffRound,
   isEliminated, proOffseason, resetSeason, standings, salaryFor, capSpace, genName, roundName,
 } from './league.js';
-import { createUserGame, letterGrade } from './game.js';
+import { createUserGame, letterGrade, chooseWeather, initWeather } from './game.js';
 import { rollEvent, chooseOption } from './events.js';
 import { newWeek, applyPlan } from './week.js';
 import { newInjury, applyInjury, genPersonName } from './effects.js';
@@ -32,6 +33,7 @@ import { addNews, postGamePress } from './press.js';
 import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf } from './awards.js';
 import { computeLegacy } from './legacy.js';
 import { genTeammates } from './social.js';
+import { postGameTexts, weeklyTexts, textFrom } from './phone.js';
 
 // ---------------------------------------------------------------- new career
 
@@ -69,9 +71,14 @@ export function teamName(state, id = state.career.teamId) {
 }
 
 function pickRivalTeam(state) {
+  const mine = getTeam(state.league, state.career.teamId);
   const others = state.league.teams.filter((t) => t.id !== state.career.teamId);
-  const strongest = others.slice().sort((a, b) => b.base - a.base).slice(0, 4);
-  state.career.rivalTeamId = pick(state, strongest).id;
+  // High school: the crosstown school is the rival.
+  const crosstown = others.filter((t) => t.town && mine?.town && t.town === mine.town);
+  if (crosstown.length) { state.career.rivalTeamId = pick(state, crosstown).id; return; }
+  const sameConf = others.filter((t) => t.conf && t.conf === mine?.conf);
+  const pool = (sameConf.length ? sameConf : others).slice().sort((a, b) => b.base - a.base).slice(0, 4);
+  state.career.rivalTeamId = pick(state, pool).id;
 }
 
 function newCoach(state) {
@@ -100,11 +107,16 @@ export function beginWeek(state) {
     addNews(state, 'story', `${p.first} ${p.last} leaves the ${old} for the ${teamName(state)}.`);
   }
   newWeek(state);
+  {
+    const m = currentMatchup(state);
+    state.week.forecast = chooseWeather(state, state.league, !!m?.playoff, m ? m.oppId === c.rivalTeamId : false);
+  }
   if (c.stage !== 'pro' && p.academics < 30 && !p.suspended) {
     p.suspended = 1;
     state.week.notice = 'Your grades dropped too low. You are academically ineligible this week.';
     addNews(state, 'scandal', `${p.first} ${p.last} ruled academically ineligible.`);
   }
+  weeklyTexts(state);
   const ev = rollEvent(state, 'season', 0.5);
   if (ev) {
     state.pendingEvent = ev;
@@ -146,7 +158,7 @@ export function submitPlan(state, plan, { playHurt = false } = {}) {
   const sched = findGame(league, state.career.teamId);
   const playoff = league.phase === 'playoffs';
   const round = playoff ? league.playoffs.round : 0;
-  state.game = createUserGame(state, league, sched, { playoff, round, sitOut, playingHurt: !sitOut && !!state.player.injury });
+  state.game = initWeather(state, createUserGame(state, league, sched, { playoff, round, sitOut, playingHurt: !sitOut && !!state.player.injury }));
   state.game.isTitle = playoff && league.playoffs.rounds[round].length === 1;
   state.game.roundName = playoff ? roundName(league, round) : `Week ${league.week + 1}`;
   state.week.summary = summary;
@@ -231,6 +243,7 @@ export function finishGame(state) {
     log: g.log,
     weather: g.weather,
   };
+  postGameTexts(state, state.lastGame);
   state.game = null;
   state.phase = 'postgame';
 }
@@ -419,24 +432,29 @@ function startNewSeason(state, { reset }) {
 
 // ---------------------------------------------------------------- college recruiting
 
+/**
+ * College offers: every school rolls its own interest based on your rating, fame and awards
+ * versus its prestige, plus a big dose of luck, so each career sees a different mix of schools.
+ */
 export function collegeOffers(state) {
   const p = state.player;
   const awardsHs = p.awards.filter((a) => a.stage === 'hs').length;
-  const score = p.ovr + p.fame * 0.25 + awardsHs * 2.5 + gauss(state, 0, 2);
-  const list = createLeague(state, 'college').teams; // fresh copy for prestige/base
+  const hsGames = p.history.filter((h) => h.stage === 'hs');
+  const perfAvg = hsGames.length ? hsGames.reduce((a, h) => a + (h.perf ?? 50), 0) / hsGames.length : 50;
+  const score = p.ovr + p.fame * 0.2 + awardsHs * 2 + (perfAvg - 50) * 0.15;
+  const list = createLeague(state, 'college').teams;
   const offers = [];
-  for (const t of list) {
-    const need = 40 + t.prestige * 4.5 + gauss(state, 0, 2.5);
-    if (score >= need) offers.push(t);
+  for (const t of shuffle(state, list)) {
+    const need = 46 + t.prestige * 3.2;
+    const pInterest = clamp(0.12 + (score - need) * 0.06, 0.03, 0.85);
+    if (rand(state) < pInterest) offers.push(t);
   }
-  const sorted = list.slice().sort((a, b) => a.prestige - b.prestige);
-  for (const t of sorted) {
-    if (offers.length >= 2) break;
-    if (!offers.includes(t)) offers.push(t);
-  }
-  const pitches = ['Starting job from day one.', 'National TV every Saturday.', 'Our offense was built for a player like you.', 'Family atmosphere. Coach calls your mom weekly.', 'State-of-the-art facilities.', 'We develop pros.'];
-  return shuffle(state, offers).sort((a, b) => b.prestige - a.prestige).slice(0, 4).map((t) => ({
-    teamId: t.id, city: t.city, name: t.name, colors: t.colors, prestige: t.prestige, base: t.base, pitch: pick(state, pitches),
+  // Always a couple of options, from random smaller programs.
+  const small = shuffle(state, list.filter((t) => t.prestige <= 2 && !offers.includes(t)));
+  while (offers.length < 3 && small.length) offers.push(small.pop());
+  const pitches = ['Starting job from day one.', 'National TV every Saturday.', 'Our offense was built for a player like you.', 'Family atmosphere. Coach calls your mom weekly.', 'State-of-the-art facilities.', 'We develop pros.', 'Early playing time, guaranteed.', 'A degree that opens doors.', 'Our fans sell out every game.', 'Close to home.'];
+  return offers.sort((a, b) => b.prestige - a.prestige).slice(0, 6).map((t) => ({
+    teamId: t.id, city: t.city, name: t.name, colors: t.colors, prestige: t.prestige, base: t.base, conf: t.conf, pitch: pick(state, pitches),
   }));
 }
 
@@ -454,6 +472,7 @@ export function chooseCollege(state, teamId) {
   p.fame = p.fame * 0.85;
   state.offers = null;
   addNews(state, 'story', `${p.first} ${p.last} commits to ${offer.city}!`);
+  textFrom(state, 'family', `${offer.city}!!! We are so proud of you. Your mom already ordered the sweatshirt.`);
   startNewSeason(state, { reset: false });
 }
 
@@ -470,6 +489,28 @@ function rookieSalary(pick) {
   return Math.max(MIN_SALARY, Math.round((11e6 * Math.exp(-(pick - 1) / 20)) / 10000) * 10000);
 }
 
+/** How badly a pro team needs a position: weak or aging starters create need. 0..~30 */
+export function teamNeed(league, teamId, pos) {
+  const roster = league.players.filter((x) => x.teamId === teamId && x.pos === pos).sort((a, b) => b.ovr - a.ovr);
+  const take = { QB: 1, RB: 1, WR: 3, TE: 1, OL: 5, DL: 4, LB: 3, CB: 3, S: 2, K: 1 }[pos] ?? 1;
+  const starters = roster.slice(0, take);
+  if (!starters.length) return 30;
+  const worst = starters[starters.length - 1];
+  return clamp((76 - worst.ovr) * 1.1 + Math.max(0, worst.age - 30) * 3 + (roster.length < take ? 15 : 0), 0, 30);
+}
+
+/** Draft stock from your college career: rating, production, awards, fame, team success. */
+export function draftStock(state) {
+  const p = state.player;
+  const col = p.history.filter((h) => h.stage === 'college');
+  const perf = col.length ? col.reduce((a, h) => a + (h.perf ?? 50), 0) / col.length : 50;
+  const best = col.length ? Math.max(...col.map((h) => h.perf ?? 50)) : 50;
+  const awards = p.awards.filter((a) => a.stage === 'college');
+  const big = awards.filter((a) => /Ironstone|Champion/.test(a.name)).length;
+  const wins = col.reduce((a, h) => a + Number(h.record.split('-')[0]), 0) / Math.max(1, col.length);
+  return { value: p.ovr * 0.8 + (perf - 50) * 0.35 + (best - 50) * 0.15 + awards.length * 1.6 + big * 3 + p.fame * 0.08 + wins * 0.3 + 12, perf: Math.round(perf), awards: awards.length };
+}
+
 export function runDraft(state, early) {
   const p = state.player;
   const c = state.career;
@@ -478,27 +519,54 @@ export function runDraft(state, early) {
   if (!state.proHistory.length) state.proHistory = seedHistory(state, league);
   // Draft order: weakest teams pick first.
   const order = league.teams.slice().sort((a, b) => a.base + gauss(state, 0, 4) - (b.base + gauss(state, 0, 4))).map((t) => t.id);
-  const posPool = ['QB', 'RB', 'WR', 'WR', 'TE', 'OL', 'OL', 'DL', 'DL', 'LB', 'CB', 'CB', 'S'];
+  const posPool = ['QB', 'RB', 'WR', 'WR', 'TE', 'OL', 'OL', 'OL', 'DL', 'DL', 'LB', 'LB', 'CB', 'CB', 'S', 'K'];
   const prospects = [];
-  for (let i = 0; i < 64; i++) {
+  const collegeIds = COLLEGE_TEAMS.map((t) => t.id);
+  for (let i = 0; i < 240; i++) {
     const n = genName(state);
-    prospects.push({ name: `${n.first} ${n.last}`, pos: pick(state, posPool), stock: gauss(state, 70, 6.5), college: pick(state, ['NRS', 'BEL', 'LKT', 'MAR', 'PAC', 'SVS', 'HVU', 'CPU']) });
+    prospects.push({ name: `${n.first} ${n.last}`, pos: pick(state, posPool), stock: gauss(state, 62, 9), college: pick(state, collegeIds) });
   }
-  const collegeAwards = p.awards.filter((a) => a.stage === 'college').length;
-  const userStock = p.ovr * 1.0 + p.fame * 0.1 + collegeAwards * 2 + gauss(state, 0, 2.5) - (early ? 1 : 0);
-  const sorted = prospects.slice().sort((a, b) => b.stock - a.stock);
-  let pickNo = 1 + sorted.filter((x) => x.stock > userStock).length;
-  if (pickNo > 64) pickNo = Math.round(64 + (sorted[63].stock - userStock) * 14);
-  const undrafted = pickNo > 210;
-  const teamId = undrafted ? order[randInt(state, 0, 9)] : order[(pickNo - 1) % 30];
-  const salary = undrafted ? MIN_SALARY : rookieSalary(pickNo);
-  // Board for the draft-night screen.
+  const ds = draftStock(state);
+  const me = { name: `${p.first} ${p.last}`, pos: p.position, stock: ds.value - (early ? 1 : 0) + gauss(state, 0, 2), user: true, college: c.teamId };
+  prospects.push(me);
+  // Each pick: the team takes the best mix of talent and need, with a little unpredictability.
+  const need = {};
+  for (const t of order) need[t] = {};
   const board = [];
-  let si = 0;
-  for (let n = 1; n <= 32; n++) {
-    if (n === pickNo) board.push({ pick: n, name: `${p.first} ${p.last}`, pos: p.position, team: order[(n - 1) % 30], user: true });
-    else { const pr = sorted[si++]; board.push({ pick: n, name: pr.name, pos: pr.pos, team: order[(n - 1) % 30], college: pr.college }); }
+  let pickNo = 0;
+  let userPick = null;
+  let reason = null;
+  const available = prospects.slice();
+  for (let round = 1; round <= 7 && !userPick; round++) {
+    for (const teamId of order) {
+      pickNo++;
+      let best = null;
+      let bestScore = -Infinity;
+      for (const pr of available) {
+        const nd = need[teamId][pr.pos] ?? (need[teamId][pr.pos] = teamNeed(league, teamId, pr.pos));
+        const score = pr.stock + nd * 0.35 + gauss(state, 0, 1.5) - (pr.pos === 'K' ? 8 : 0);
+        if (score > bestScore) { bestScore = score; best = pr; }
+      }
+      available.splice(available.indexOf(best), 1);
+      need[teamId][best.pos] = Math.max(0, (need[teamId][best.pos] ?? 0) - 15); // need filled
+      if (pickNo <= 32 || best.user) board.push({ pick: pickNo, name: best.name, pos: best.pos, team: teamId, user: !!best.user, college: best.college });
+      if (best.user) {
+        userPick = { pick: pickNo, round, teamId };
+        const nd = teamNeed(league, teamId, p.position);
+        const starter = league.players.filter((x) => x.teamId === teamId && x.pos === p.position).sort((a, b) => b.ovr - a.ovr)[0];
+        reason = nd >= 12 && starter
+          ? `The ${getTeam(league, teamId).name} needed a ${p.position}: their starter ${starter.first} ${starter.last} is ${starter.age} with a ${starter.ovr} rating.`
+          : `The ${getTeam(league, teamId).name} took the best player on their board: you.`;
+        break;
+      }
+    }
   }
+  const undrafted = !userPick;
+  // Undrafted: the team with the biggest need at your position signs you.
+  const teamId = undrafted ? order.slice().sort((a, b) => teamNeed(league, b, p.position) - teamNeed(league, a, p.position))[0] : userPick.teamId;
+  const pickNum = undrafted ? 999 : userPick.pick;
+  const salary = undrafted ? MIN_SALARY : rookieSalary(pickNum);
+  if (undrafted) reason = `Nobody called your name, but the ${getTeam(league, teamId).name} needed a ${p.position} and offered a tryout deal.`;
   state.league = league;
   c.stage = 'pro';
   c.stageSeason = 1;
@@ -507,11 +575,12 @@ export function runDraft(state, early) {
   newCoach(state);
   p.rel.teammates = 45;
   if (p.housing === 'dorm' || p.housing === 'parents') p.housing = 'offcampus';
-  p.draft = { pick: pickNo, round: Math.ceil(pickNo / 30), teamId, undrafted, year: c.year };
-  state.draft = { pick: pickNo, round: Math.ceil(pickNo / 30), teamId, undrafted, salary, board, early };
+  p.draft = { pick: pickNum, round: undrafted ? 0 : userPick.round, teamId, undrafted, year: c.year };
+  state.draft = { pick: pickNum, round: undrafted ? 0 : userPick.round, teamId, undrafted, salary, board, early, reason, stock: ds };
   addNews(state, 'story', undrafted
     ? `${p.first} ${p.last} goes undrafted but signs with ${teamName(state)}.`
-    : `With pick #${pickNo}, the ${teamName(state)} select ${p.first} ${p.last}!`);
+    : `With pick #${pickNum}, the ${teamName(state)} select ${p.first} ${p.last}!`);
+  textFrom(state, 'family', undrafted ? 'We believe in you. Go prove them all wrong. ❤️' : `PICK #${pickNum}!!! We are crying. Our kid is a pro!!`);
   state.phase = 'draft';
 }
 

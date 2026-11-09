@@ -4,7 +4,7 @@
 // Stats: Speed = separation, Skill = catch window + cleaner breaks, Strength = contested catches, IQ = break timing.
 import * as THREE from 'three';
 import { makePlayer, animateRun, makeBall, makeRing, makeDisc, faceToward, knockDown, setPose, setHop, playAction, celebrate, setBackpedal, makeRouteLine, confetti } from '../actors.js';
-import { bindInput, maybeTip, rig, endPlay, finalize, dist2 } from './common.js';
+import { bindInput, maybeTip, rig, endPlay, finalize, dist2, weatherFx } from './common.js';
 import { sfx } from '../../audio/sfx.js';
 
 // Route tree per play call. dir = direction after the break, sit = settles after the break.
@@ -92,8 +92,9 @@ export function routePlay(ctx) {
   boundary.visible = mode === 'toetap';
   group.add(boundary);
 
-  const vR = 7.2 + (st.speed / 100) * 2.6;
-  const vCB = 7.9 + Math.random() * 0.6;
+  const wfx = weatherFx(m);
+  const vR = (7.2 + (st.speed / 100) * 2.6) * wfx.speed;
+  const vCB = (7.9 + Math.random() * 0.6) * wfx.speed;
   let zoneHalf = 1.0 * tol;
   let phase = 'wait';
   let t = 0;
@@ -318,7 +319,8 @@ export function routePlay(ctx) {
     if (err <= window * 2.2) {
       const perfect = err <= window;
       let caught = true;
-      if (contested) {
+      if (Math.random() < wfx.slip * (perfect ? 0.5 : 1)) caught = false;
+      else if (contested) {
         const p = (perfect ? 0.72 : 0.42) + st.strength / 400 - (mode === 'jump' && safety && dist2(safety.pos, pos) < 2 ? 0.15 : 0);
         caught = Math.random() < p;
       }

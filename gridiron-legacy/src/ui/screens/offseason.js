@@ -32,10 +32,10 @@ export function recruitingScreen(app) {
   const p = st.player;
   return h('div.screen',
     h('h1', 'Signing Day'),
-    h('p.muted', `${p.first}, these programs want you. Prestige means a stronger team and more spotlight. Pick your school.`),
+    h('p.muted', `${p.first}, ${st.offers.length} programs offered you a scholarship. Prestige means a stronger team and a bigger spotlight. Pick your school.`),
     st.offers.map((o) => h('div.card.offer', { style: { borderLeftColor: o.colors[0] } },
       h('div.row', teamBadge({ id: o.teamId, city: o.city, name: o.name, colors: o.colors }, 48),
-        h('div.grow', h('h3', `${o.city} ${o.name}`), h('div', stars(o.prestige)), h('p.small.muted', `"${o.pitch}"`))),
+        h('div.grow', h('h3', `${o.city} ${o.name}`), h('div.row', { style: { gap: '8px' } }, stars(o.prestige), o.conf ? h('span.tiny.muted', `${o.conf} Conf.`) : null), h('p.small.muted', `"${o.pitch}"`))),
       h('button.btn.primary.block', { style: { marginTop: '8px' }, onclick: () => { sfx.levelUp(); flow.chooseCollege(st, o.teamId); app.commit(); } }, `Commit to ${o.city}`))));
 }
 
@@ -64,7 +64,9 @@ export function draftScreen(app) {
       h('div.display', { style: { fontSize: '1.6rem', marginTop: '6px' } }, d.undrafted ? 'Undrafted' : `Round ${d.round} · Pick ${d.pick}`),
       h('h2', `${team.city} ${team.name}`),
       h('p', d.undrafted ? 'Nobody called your name. The phone rings at midnight: a tryout contract.' : `With the ${ordinal(d.pick)} pick, the ${team.name} select ${p.first} ${p.last}!`),
-      h('p.small.muted', `Rookie contract: ${fmtMoney(d.salary)}/yr for ${p.contract.years} years`)),
+      h('p.small.muted', `Rookie contract: ${fmtMoney(d.salary)}/yr for ${p.contract.years} years`),
+      d.reason ? h('p.small', { style: { marginTop: '8px' } }, d.reason) : null,
+      d.stock ? h('p.tiny.muted', `Your college résumé: season rating ${d.stock.perf} average, ${d.stock.awards} award${d.stock.awards === 1 ? '' : 's'}.`) : null),
     h('div.card.draft-board', h('h3', 'First Round'), h('div.list', d.board.map((x) => {
       const t = getTeam(st.league, x.team);
       return h(`div.li${x.user ? '.me' : ''}`, h('span.muted.small', { style: { width: '26px' } }, x.pick), teamBadge(t, 24), h('span.grow', x.name), h('span.chip', x.pos));

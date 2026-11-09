@@ -1,5 +1,12 @@
 // Shared minigame helpers: input binding, first-time tips, camera follow, ending a play.
 import { sfx } from '../../audio/sfx.js';
+import { WEATHER } from '../../data/config.js';
+
+/** Weather effects for a moment: { speed, slip, wind {x,z}, fog, id }. */
+export function weatherFx(m) {
+  const w = WEATHER[m.weather] ?? WEATHER.clear;
+  return { id: m.weather ?? 'clear', speed: w.speed ?? 1, slip: w.slip ?? 0, wind: m.wind ?? { x: 0, z: 0, mph: 0 }, fog: !!w.fog };
+}
 
 /** Pointer + keyboard input. handlers: { down(ev, pt), move(ev, pt), up(ev, pt), key(ev, isDown) } */
 export function bindInput(ctx, handlers) {

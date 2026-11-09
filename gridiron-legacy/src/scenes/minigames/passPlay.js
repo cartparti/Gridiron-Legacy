@@ -5,7 +5,7 @@
 // Stats: Skill = accuracy, IQ = coverage read + pocket time, Strength = ball speed, Speed = escape time.
 import * as THREE from 'three';
 import { makePlayer, animateRun, makeBall, makeRing, makeLabel, makeRouteLine, faceToward, knockDown, setPose, playAction, celebrate, setBackpedal, confetti } from '../actors.js';
-import { bindInput, maybeTip, rig, endPlay, finalize, dist2, hudMeter, gaussR } from './common.js';
+import { bindInput, maybeTip, rig, endPlay, finalize, dist2, hudMeter, gaussR, weatherFx } from './common.js';
 import { sfx } from '../../audio/sfx.js';
 
 // Route concepts: start x and waypoints relative to the start. sit = receiver stops at the end.
@@ -56,6 +56,7 @@ export function passPlay(ctx) {
   const m = opts.moment;
   const st = opts.stats;
   const tol = opts.tolerance;
+  const wfx = weatherFx(m);
   const hail = ctx.type === 'qb_hailmary';
   const off = opts.teamColors;
   const def = opts.oppColors;
@@ -112,8 +113,8 @@ export function passPlay(ctx) {
     faceToward(dmesh, dpos.x, 5);
     group.add(dmesh);
     return {
-      path, ext, mesh, ring, line, s: 0, speed: 8.2 + Math.random() * 1.1, pos: { ...path[0] }, vel: { x: 0, z: 0 }, hist: [],
-      d: { mesh: dmesh, pos: dpos, lag: lags[i], speed: 8.8 + Math.random() * 0.6, zone: { x: dpos.x, z: dpos.z - (i === 1 ? 6 : 3) } }, sep: 5,
+      path, ext, mesh, ring, line, s: 0, speed: (8.2 + Math.random() * 1.1) * wfx.speed, pos: { ...path[0] }, vel: { x: 0, z: 0 }, hist: [],
+      d: { mesh: dmesh, pos: dpos, lag: lags[i], speed: (8.8 + Math.random() * 0.6) * wfx.speed, zone: { x: dpos.x, z: dpos.z - (i === 1 ? 6 : 3) } }, sep: 5,
     };
   });
   const safeties = [];
@@ -151,7 +152,7 @@ export function passPlay(ctx) {
   // --- state
   let pocketTime = (2.2 + st.iq * 0.011 + st.speed * 0.004) * (0.75 + tol * 0.25) + (opts.call === 'risky' ? 0.45 : 0) + (hail ? 0.8 : 0);
   if (coverage.id === 'blitz') pocketTime *= 0.72;
-  const iqNoise = Math.max(0, (100 - st.iq) / 28);
+  const iqNoise = Math.max(0, (100 - st.iq) / 28) * (wfx.fog ? 2 : 1);
   const readsCoverage = st.iq >= 55 || Math.random() < st.iq / 120;
   let phase = 'wait';
   let t = 0;
@@ -189,11 +190,13 @@ export function passPlay(ctx) {
     const over = p > 1.1;
     const pocketFrac = t / pocketTime;
     const sd = ((1.7 - st.skill * 0.011) / tol) * (over ? 1.9 : 1) * (pocketFrac > 0.8 ? 1.4 : 1);
-    const land = clampField({ x: aim.point.x + gaussR() * sd * 0.8, z: aim.point.z + gaussR() * sd });
+    let land = clampField({ x: aim.point.x + gaussR() * sd * 0.8, z: aim.point.z + gaussR() * sd });
     const from = { x: qb.position.x + 0.4, z: qb.position.z - 0.3 };
     const dist = Math.hypot(land.x - from.x, land.z - from.z);
     const v = 14 + Math.min(1, p) * (7 + st.strength * 0.1);
     const T = Math.max(0.35, dist / v);
+    // Wind pushes the ball while it is in the air.
+    land = clampField({ x: land.x + wfx.wind.x * T * 0.45, z: land.z + wfx.wind.z * T * 0.45 });
     const H = Math.max(1.2, dist * 0.14 * (1.25 - Math.min(1, p) * 0.45));
     const r = aim.rec;
     const routeAt = pathPoint(r.path, r.s + r.speed * T, r.ext);
@@ -301,6 +304,7 @@ export function passPlay(ctx) {
       r.sep = Math.min(dist2(r.pos, D.pos), ...safeties.map((s) => dist2(r.pos, s.pos)), ...recs.filter((o) => o !== r).map((o) => dist2(r.pos, o.d.pos) + 1));
       const shown = r.sep + iqNoise * Math.sin(t * 3.1 + r.d.lag * 9);
       r.ring.material.color.set(ringColor(shown));
+      r.ring.visible = !wfx.fog || t > 1.0; // fog: reads come late
     }
     for (const s of safeties) {
       const deepest = recs.reduce((a, b) => (b.pos.z < a.pos.z ? b : a));
@@ -415,6 +419,10 @@ export function passPlay(ctx) {
       } else if (dD <= 1.6 && Math.random() > 0.5 + st.strength / 400) {
         caught = false;
         result = { complete: false, yards: 0, quality: 0.25, text: 'Contested… knocked away.' };
+      }
+      if (caught && Math.random() < wfx.slip) {
+        caught = false;
+        result = { complete: false, yards: 0, quality: 0.25, text: 'Slippery ball! It squirts through the hands.' };
       }
       if (caught) {
         sfx.catch();

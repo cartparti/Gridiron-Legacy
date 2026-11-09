@@ -102,3 +102,63 @@ test('energy budget includes item bonuses', () => {
   assert.equal(maxEnergy(st), e0 + 1);
   assert.ok(ITEM_BY_ID.cryo.energy === 1);
 });
+
+import { collegeOffers, draftStock, teamNeed } from '../src/sim/flow.js';
+import { CITIES, HS_TEAMS, COLLEGE_TEAMS } from '../src/data/teams.js';
+import { simulateCareer, STRATEGIES, botStep } from '../src/sim/bot.js';
+import { followers, makePost, textFrom, phoneState, feed } from '../src/sim/phone.js';
+import { createLeague } from '../src/sim/league.js';
+
+test('every city has 2-3 high schools and the crosstown school is the rival', () => {
+  for (const c of CITIES) assert.ok(c.schools.length >= 2 && c.schools.length <= 3, c.name);
+  assert.equal(new Set(HS_TEAMS.map((t) => t.id)).size, HS_TEAMS.length);
+  const st = flow.newCareer({ ...randomCareerOpts(3), hsTeamId: 'OHE', hometown: 'Oak Hollow' });
+  const rival = st.league.teams.find((t) => t.id === st.career.rivalTeamId);
+  assert.equal(rival.town, 'Oak Hollow');
+});
+
+test('college offers come from a varied mix of schools', () => {
+  const seen = new Set();
+  for (let s = 0; s < 12; s++) {
+    const st = fresh(100 + s);
+    st.player.history.push({ stage: 'hs', perf: 60, record: '5-3' });
+    for (const o of collegeOffers(st)) seen.add(o.teamId);
+    assert.ok(collegeOffers(st).length >= 3);
+  }
+  assert.ok(seen.size >= 15, `only ${seen.size} different schools offered`);
+  assert.equal(COLLEGE_TEAMS.length, 32);
+});
+
+test('draft: better college careers go earlier, and teams with weak starters need you more', () => {
+  const st = fresh(7);
+  st.player.history.push({ stage: 'college', perf: 80, record: '9-1' });
+  const hi = draftStock(st).value;
+  st.player.history = [{ stage: 'college', perf: 40, record: '3-7' }];
+  assert.ok(draftStock(st).value < hi);
+  const league = createLeague(st, 'pro');
+  const qbs = league.players.filter((p) => p.pos === 'QB');
+  qbs[0].ovr = 50;
+  assert.ok(teamNeed(league, qbs[0].teamId, 'QB') > 20);
+});
+
+test('careers still reach the draft with a reason and pick number', () => {
+  const st = flow.newCareer(randomCareerOpts(41));
+  let guard = 0;
+  while (st.phase !== 'draft' && guard++ < 6000) botStep(st, STRATEGIES.grinder, 0.6);
+  assert.equal(st.phase, 'draft');
+  assert.ok(st.draft.reason && st.draft.reason.length > 10);
+  assert.ok(st.draft.pick >= 1);
+});
+
+test('phone: texts arrive after games, posts gain likes, feed mixes sources', () => {
+  const st = fresh(9);
+  st.player.fame = 40;
+  const before = phoneState(st).unread;
+  textFrom(st, 'coach', 'Nice work');
+  assert.equal(phoneState(st).unread, before + 1);
+  const r = makePost(st, 'workout');
+  assert.ok(r.post.likes > 0);
+  assert.equal(makePost(st, 'workout'), null); // once per week
+  assert.ok(followers(st.player) > 1000);
+  assert.ok(feed(st).some((x) => x.mine));
+});

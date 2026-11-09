@@ -36,32 +36,78 @@ export const PRO_TEAMS = [
   { id: 'HPB', city: 'Highplains', name: 'Bison', colors: ['#432818', '#bb9457'], conf: 'Coastal', div: 'South', base: 68 },
 ];
 
+// 32 colleges in 4 conferences. prestige 1-5 drives recruiting interest and program strength.
+const C = (id, city, name, colors, conf, prestige) => ({ id, city, name, colors, conf, prestige, base: 52 + prestige * 5 + ((id.charCodeAt(0) + id.charCodeAt(2)) % 7) - 3 });
 export const COLLEGE_TEAMS = [
-  { id: 'NRS', city: 'Northridge State', name: 'Owls', colors: ['#283618', '#dda15e'], base: 72, prestige: 4 },
-  { id: 'BEL', city: 'Bellmont', name: 'Cardinals', colors: ['#9d0208', '#f8f9fa'], base: 78, prestige: 5 },
-  { id: 'LKT', city: 'Lakeland Tech', name: 'Engineers', colors: ['#003049', '#fcbf49'], base: 64, prestige: 2 },
-  { id: 'ASH', city: 'Ashford', name: 'Foxes', colors: ['#bc4b51', '#f4e285'], base: 60, prestige: 2 },
-  { id: 'CPU', city: 'Coastal Plains', name: 'Gulls', colors: ['#118ab2', '#ffffff'], base: 66, prestige: 3 },
-  { id: 'SVS', city: 'Sierra Vista State', name: 'Pumas', colors: ['#6b4226', '#e9d8a6'], base: 70, prestige: 3 },
-  { id: 'MAR', city: 'Marston', name: 'Knights', colors: ['#22223b', '#c9ada7'], base: 75, prestige: 4 },
-  { id: 'RAM', city: 'Redwood A&M', name: 'Lumberjacks', colors: ['#7f4f24', '#99d98c'], base: 62, prestige: 2 },
-  { id: 'HVU', city: 'Highland Valley', name: 'Hawks', colors: ['#3c096c', '#ff9e00'], base: 68, prestige: 3 },
-  { id: 'BFS', city: 'Brookfield State', name: 'Bulldogs', colors: ['#495057', '#e63946'], base: 58, prestige: 1 },
-  { id: 'PAC', city: 'Pacifica', name: 'Swells', colors: ['#0096c7', '#ffd166'], base: 74, prestige: 4 },
-  { id: 'IHB', city: 'Iron Hills', name: 'Bighorns', colors: ['#5f0f40', '#fb8b24'], base: 56, prestige: 1 },
+  // Heartland Conference
+  C('NRS', 'Northridge State', 'Owls', ['#283618', '#dda15e'], 'Heartland', 4),
+  C('BEL', 'Bellmont', 'Cardinals', ['#9d0208', '#f8f9fa'], 'Heartland', 5),
+  C('LKT', 'Lakeland Tech', 'Engineers', ['#003049', '#fcbf49'], 'Heartland', 2),
+  C('ASH', 'Ashford', 'Foxes', ['#bc4b51', '#f4e285'], 'Heartland', 2),
+  C('MAR', 'Marston', 'Knights', ['#22223b', '#c9ada7'], 'Heartland', 4),
+  C('RAM', 'Redwood A&M', 'Lumberjacks', ['#7f4f24', '#99d98c'], 'Heartland', 2),
+  C('BFS', 'Brookfield State', 'Bulldogs', ['#495057', '#e63946'], 'Heartland', 1),
+  C('IHB', 'Iron Hills', 'Bighorns', ['#5f0f40', '#fb8b24'], 'Heartland', 1),
+  // Pacific Rim Conference
+  C('PAC', 'Pacifica', 'Swells', ['#0096c7', '#ffd166'], 'Pacific Rim', 4),
+  C('SVS', 'Sierra Vista State', 'Pumas', ['#6b4226', '#e9d8a6'], 'Pacific Rim', 3),
+  C('CPU', 'Coastal Plains', 'Gulls', ['#118ab2', '#ffffff'], 'Pacific Rim', 3),
+  C('GLU', 'Golden Lake', 'Miners', ['#b5838d', '#ffcb69'], 'Pacific Rim', 5),
+  C('SBU', 'Summit Bay', 'Sea Lions', ['#023e8a', '#90e0ef'], 'Pacific Rim', 3),
+  C('DVC', 'Desert Valley', 'Roadrunners', ['#d00000', '#ffba08'], 'Pacific Rim', 2),
+  C('OKS', 'Oak Shore', 'Otters', ['#386641', '#a7c957'], 'Pacific Rim', 1),
+  C('CNU', 'Canyon', 'Condors', ['#9c6644', '#ede0d4'], 'Pacific Rim', 2),
+  // Atlantic Conference
+  C('HVU', 'Highland Valley', 'Hawks', ['#3c096c', '#ff9e00'], 'Atlantic', 3),
+  C('KNG', 'Kingsport', 'Royals', ['#240046', '#e0aaff'], 'Atlantic', 5),
+  C('BWU', 'Bay Water', 'Mariners', ['#14213d', '#fca311'], 'Atlantic', 4),
+  C('NEC', 'New Easton', 'Colonials', ['#1d3557', '#e63946'], 'Atlantic', 3),
+  C('HRS', 'Harbor State', 'Anchors', ['#0b525b', '#e0e1dd'], 'Atlantic', 2),
+  C('MTV', 'Mount Vernon Tech', 'Rockets', ['#6c757d', '#ff006e'], 'Atlantic', 2),
+  C('CHU', 'Chesterfield', 'Chargers', ['#03045e', '#00b4d8'], 'Atlantic', 1),
+  C('WSF', 'Westford', 'Wolves', ['#212529', '#adb5bd'], 'Atlantic', 3),
+  // Southern Plains Conference
+  C('TXU', 'Tall Grass', 'Stampede', ['#9a031e', '#fb8b24'], 'Southern Plains', 5),
+  C('RVS', 'River State', 'Gators', ['#2d6a4f', '#ffd60a'], 'Southern Plains', 4),
+  C('MDS', 'Meadow Springs', 'Mustangs', ['#7b2cbf', '#ffffff'], 'Southern Plains', 2),
+  C('PLU', 'Pine Lake', 'Panthers', ['#000000', '#ffd166'], 'Southern Plains', 3),
+  C('BYU', 'Bayou', 'Herons', ['#004b23', '#ccff33'], 'Southern Plains', 3),
+  C('CLS', 'Clay Springs', 'Hornets', ['#ffb703', '#023047'], 'Southern Plains', 1),
+  C('SLU', 'Sunland', 'Suns', ['#f77f00', '#003049'], 'Southern Plains', 4),
+  C('RGC', 'Red Gulch', 'Rattlers', ['#6a040f', '#e9d8a6'], 'Southern Plains', 2),
 ];
+export const COLLEGE_CONFS = ['Heartland', 'Pacific Rim', 'Atlantic', 'Southern Plains'];
 
-export const HS_TEAMS = [
-  { id: 'WFW', city: 'Westfield', name: 'Wildcats', colors: ['#1d3557', '#f1c40f'], base: 62 },
-  { id: 'OHE', city: 'Oak Hollow', name: 'Eagles', colors: ['#2b9348', '#ffffff'], base: 58 },
-  { id: 'LPP', city: 'Lincoln Park', name: 'Panthers', colors: ['#111111', '#ff595e'], base: 66 },
-  { id: 'CGH', city: 'Cedar Grove', name: 'Hornets', colors: ['#ffca3a', '#1b1b1b'], base: 55 },
-  { id: 'BSM', city: 'Bayside', name: 'Mustangs', colors: ['#3a86ff', '#ff006e'], base: 60 },
-  { id: 'PVP', city: 'Pine Valley', name: 'Pioneers', colors: ['#6a994e', '#f2e8cf'], base: 52 },
-  { id: 'EVS', city: 'Eastview', name: 'Spartans', colors: ['#7b2cbf', '#e0aaff'], base: 64 },
-  { id: 'MCB', city: 'Mill Creek', name: 'Bobcats', colors: ['#bc6c25', '#fefae0'], base: 50 },
-  { id: 'NPN', city: 'North Point', name: 'Navigators', colors: ['#003566', '#ffc300'], base: 57 },
-  { id: 'SLS', city: 'Southlake', name: 'Sharks', colors: ['#0a9396', '#e9d8a6'], base: 61 },
+// High schools grouped by city: 2-3 schools per town. Crosstown schools are natural rivals.
+export const CITIES = [
+  { name: 'Westfield', schools: [
+    { id: 'WFW', city: 'Westfield North', name: 'Wildcats', colors: ['#1d3557', '#f1c40f'], base: 62 },
+    { id: 'WFS', city: 'Westfield South', name: 'Stallions', colors: ['#6a040f', '#ffffff'], base: 57 },
+  ] },
+  { name: 'Oak Hollow', schools: [
+    { id: 'OHE', city: 'Oak Hollow', name: 'Eagles', colors: ['#2b9348', '#ffffff'], base: 58 },
+    { id: 'OHC', city: 'Oak Hollow Central', name: 'Comets', colors: ['#3a0ca3', '#f72585'], base: 55 },
+    { id: 'OHP', city: 'Oak Hollow Prep', name: 'Lions', colors: ['#8d6a3a', '#111111'], base: 63 },
+  ] },
+  { name: 'Lincoln Park', schools: [
+    { id: 'LPP', city: 'Lincoln Park', name: 'Panthers', colors: ['#111111', '#ff595e'], base: 66 },
+    { id: 'LPE', city: 'Lincoln Park East', name: 'Hurricanes', colors: ['#0077b6', '#caf0f8'], base: 54 },
+  ] },
+  { name: 'Bayside', schools: [
+    { id: 'BSM', city: 'Bayside', name: 'Mustangs', colors: ['#3a86ff', '#ff006e'], base: 60 },
+    { id: 'BSH', city: 'Bayside Harbor', name: 'Pirates', colors: ['#000000', '#e5e5e5'], base: 53 },
+    { id: 'BSC', city: 'Bayside Catholic', name: 'Crusaders', colors: ['#7f1d1d', '#fbbf24'], base: 61 },
+  ] },
+  { name: 'Mill Creek', schools: [
+    { id: 'MCB', city: 'Mill Creek', name: 'Bobcats', colors: ['#bc6c25', '#fefae0'], base: 50 },
+    { id: 'MCV', city: 'Mill Creek Valley', name: 'Vikings', colors: ['#2d3142', '#bfc0c0'], base: 56 },
+  ] },
+  { name: 'Southlake', schools: [
+    { id: 'SLS', city: 'Southlake', name: 'Sharks', colors: ['#0a9396', '#e9d8a6'], base: 61 },
+    { id: 'SLR', city: 'Southlake Ridge', name: 'Rams', colors: ['#5a189a', '#ffd60a'], base: 58 },
+  ] },
 ];
+export const HS_TEAMS = CITIES.flatMap((c) => c.schools.map((s) => ({ ...s, town: c.name })));
+export const HOMETOWN_NAMES = CITIES.map((c) => c.name);
 
 export const teamFullName = (t) => `${t.city} ${t.name}`;

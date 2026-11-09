@@ -51,6 +51,10 @@ for five play styles (Balanced, Grinder, Social, Gunslinger, Cautious), across a
    You have three named teammates on every team. Give gifts bought in the **Store**.
    **Store** (Life tab or downtown): gear that widens your timing windows on the field, plus style,
    home upgrades, pets, big-ticket toys and gifts.
+   **Phone** (top bar): Huddle social media (post once a week, followers grow with fame), texts from
+   coach, teammates, family, partner and agent, plus Bank, Calendar, News and Contacts apps.
+   **Weather**: each week has a forecast. Rain and storms make the ball slippery, snow slows
+   everyone, wind pushes passes (watch the arrow), fog hides coverage until late.
 3. **Random events** pop up most weeks: two or three choices with lasting consequences. 🎲
    choices are a gamble.
 4. **Game day**: the game is simulated drive by drive and pauses on 5 to 8 key moments, plus
@@ -67,8 +71,10 @@ for five play styles (Balanced, Grinder, Social, Gunslinger, Cautious), across a
    - **CB coverage**: drag to shadow the receiver, tap BREAK as the ball arrives for a pick or pass breakup.
      **Open-field tackle**: read the runner's lean, shuffle into the lane, time your TACKLE.
 5. **Seasons**: standings, playoffs and a title game. End-of-season awards, records, aging.
-6. **Career**: 2 high school seasons → college recruiting (pick from offers) → 3 college
-   seasons (or declare early) → the draft → pro seasons with contracts, free agency and a
+6. **Career**: pick a hometown and one of its 2-3 high schools (the crosstown school is your rival) →
+   2 high school seasons → offers from a random mix of 32 colleges in 4 conferences → 3 college
+   seasons (or declare early) → a pick-by-pick draft where teams weigh your college résumé against
+   their needs → pro seasons with contracts, free agency and a
    salary cap → retirement at 34, when your rating declines, or when you choose (30+).
 7. **Legacy**: Journeyman, Solid Starter, Star of Your Era, or Hall of Fame.
 

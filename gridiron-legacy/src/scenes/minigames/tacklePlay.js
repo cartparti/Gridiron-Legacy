@@ -3,7 +3,7 @@
 // Stats: IQ = reading his juke early (lean tell), Skill = tackle window, Strength = wrapping up, Speed = shuffle.
 import * as THREE from 'three';
 import { makePlayer, animateRun, makeBall, makeRing, faceToward, knockDown, setPose, setHop, playAction, celebrate } from '../actors.js';
-import { bindInput, maybeTip, rig, endPlay, finalize } from './common.js';
+import { bindInput, maybeTip, rig, endPlay, finalize, weatherFx } from './common.js';
 import { sfx } from '../../audio/sfx.js';
 
 const LANES = [-3, 0, 3];
@@ -44,7 +44,8 @@ export function tacklePlay(ctx) {
   btns.innerHTML = '<button class="hbtn" data-a="left" aria-label="Shuffle left">◀</button><button class="hbtn big" data-a="tackle">TACKLE</button><button class="hbtn" data-a="right" aria-label="Shuffle right">▶</button>';
   hud.bottom(btns);
 
-  const vC = 7.6 + Math.random() * 0.8;
+  const wfx = weatherFx(m);
+  const vC = (7.6 + Math.random() * 0.8) * wfx.speed;
   const jukeAt = 3.2 + Math.random() * 2.5; // distance at which he cuts
   const jukeDir = Math.random() < 0.5 ? -1 : 1;
   const doubleMove = call === 'risky' && Math.random() < 0.4;
@@ -120,7 +121,7 @@ export function tacklePlay(ctx) {
       const timed = tackleT !== null && (t - tackleT) < tWin * 0.35;
       const late = tackleT === null;
       if (sameLane && (timed || late)) {
-        const wrap = 0.55 + st.strength / 220 + (timed ? 0.2 : -0.15);
+        const wrap = 0.55 + st.strength / 220 + (timed ? 0.2 : -0.15) - wfx.slip * 2;
         if (Math.random() < wrap) {
           knockDown(carrier, 1);
           playAction(me, ['tackle', 'fall'], { fps: 6, then: 'getup' });

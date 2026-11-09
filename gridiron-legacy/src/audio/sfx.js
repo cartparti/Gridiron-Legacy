@@ -90,5 +90,6 @@ export const sfx = {
   cash: () => { tone(1320, 0.08, { type: 'square', vol: 0.06 }); tone(1760, 0.18, { type: 'square', vol: 0.06, delay: 0.07 }); },
   levelUp: () => [440, 554, 659, 880].forEach((f, i) => tone(f, 0.15, { type: 'triangle', vol: 0.12, delay: i * 0.07 })),
   error: () => tone(160, 0.2, { type: 'square', vol: 0.08, slide: -40 }),
+  thunder: () => { noise(2.2, { vol: 0.5, freq: 90, q: 0.6, type: 'lowpass', attack: 0.05 }); noise(1.4, { vol: 0.3, freq: 160, q: 0.8, type: 'lowpass', attack: 0.3, delay: 0.25 }); },
   tick: () => tone(1200, 0.02, { type: 'square', vol: 0.04 }),
 };

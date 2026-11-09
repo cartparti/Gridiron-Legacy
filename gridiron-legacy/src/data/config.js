@@ -56,17 +56,21 @@ export const DIFFICULTIES = {
 };
 
 /** Game-day weather. tol scales timing windows; pass extra-penalizes throws and catches. */
+// slip: extra drop/fumble chance; speed: player speed multiplier; wind: max wind (yards/sec of ball drift);
+// fog: visibility (lower = shorter view, coverage harder to read).
 export const WEATHER = {
-  clear: { label: 'Clear', icon: 'sun', tol: 1, pass: 1 },
-  night: { label: 'Night game', icon: 'moon', tol: 1, pass: 1 },
-  rain: { label: 'Rain', icon: 'rain', tol: 0.93, pass: 0.9 },
-  snow: { label: 'Snow', icon: 'snow', tol: 0.9, pass: 0.92 },
-  wind: { label: 'Windy', icon: 'wind', tol: 0.97, pass: 0.85 },
+  clear: { label: 'Clear', icon: 'sun', tol: 1, pass: 1, slip: 0, speed: 1, wind: 1 },
+  night: { label: 'Night game', icon: 'moon', tol: 1, pass: 1, slip: 0, speed: 1, wind: 1 },
+  rain: { label: 'Rain', icon: 'rain', tol: 0.93, pass: 0.9, slip: 0.07, speed: 0.97, wind: 2, desc: 'Slippery ball: more drops and fumbles, players slip on hard cuts.' },
+  storm: { label: 'Thunderstorm', icon: 'rain', tol: 0.88, pass: 0.84, slip: 0.1, speed: 0.95, wind: 5, desc: 'Heavy rain and wind. Lightning. Hold on to the ball.' },
+  snow: { label: 'Snow', icon: 'snow', tol: 0.9, pass: 0.92, slip: 0.04, speed: 0.88, wind: 2, desc: 'Everyone is slower. Footing is tricky.' },
+  wind: { label: 'Windy', icon: 'wind', tol: 0.97, pass: 0.85, slip: 0, speed: 1, wind: 7, desc: 'Passes drift with the wind. Watch the arrow.' },
+  fog: { label: 'Fog', icon: 'wind', tol: 0.92, pass: 0.9, slip: 0, speed: 1, wind: 1, fog: true, desc: 'Hard to see downfield. Coverage reads come late.' },
 };
 
 export const LEGACY_TIERS = [
   { min: 0, id: 'journeyman', label: 'Journeyman', blurb: 'You suited up, you competed, you belonged.' },
   { min: 170, id: 'starter', label: 'Solid Starter', blurb: 'Coaches trusted you. Teammates leaned on you.' },
   { min: 245, id: 'star', label: 'Star of Your Era', blurb: 'Kids wore your number. Defenses game-planned for you.' },
-  { min: 330, id: 'hof', label: 'Hall of Fame', blurb: 'Immortal. Your bust stands in Canton Ridge forever.' },
+  { min: 315, id: 'hof', label: 'Hall of Fame', blurb: 'Immortal. Your bust stands in Canton Ridge forever.' },
 ];

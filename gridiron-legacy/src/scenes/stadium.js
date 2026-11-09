@@ -200,9 +200,10 @@ export function buildStadium(scene) {
     hideLines() { los.visible = false; fd.visible = false; },
     /** Darken / cool the scene for night and bad weather. */
     setTint(weather) {
-      const t = { night: 0x8a93b8, rain: 0xb5bcc4, snow: 0xe8eef4, wind: 0xf2f2f2 }[weather] ?? 0xffffff;
+      const t = { night: 0x8a93b8, rain: 0x9aa4ae, storm: 0x7a8490, snow: 0xf2f6fa, wind: 0xf2efe6, fog: 0xc8ced4 }[weather] ?? 0xffffff;
       fieldMat.color.setHex(t);
-      apron.material.color.setHex(weather === 'snow' ? 0xdfe8ee : weather === 'night' ? 0x1f5a24 : 0x2f7f33);
+      apron.material.color.setHex(weather === 'snow' ? 0xe6edf2 : weather === 'night' ? 0x1f5a24 : weather === 'storm' ? 0x24582a : weather === 'rain' ? 0x2a6a2f : 0x2f7f33);
+      crowd.material.color.setHex(weather === 'storm' || weather === 'rain' ? 0x8f99a3 : weather === 'night' ? 0x9aa0b8 : 0xffffff);
     },
     /** Make the crowd bounce (excitement 0..1). */
     animateCrowd(t, excitement = 0.2) {

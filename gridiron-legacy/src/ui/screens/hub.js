@@ -1,6 +1,6 @@
 // Main career hub: top bar with meters, bottom tabs, and the five tab views.
 import { h, clear } from '../dom.js';
-import { STAGES, DAYS } from '../../data/config.js';
+import { STAGES, DAYS, WEATHER } from '../../data/config.js';
 import { POSITIONS } from '../../data/positions.js';
 import { HOUSING, CARS, PERKS, INVESTMENTS } from '../../data/lifestyle.js';
 import { RECORD_LABELS, seasonPerf } from '../../sim/awards.js';
@@ -15,6 +15,16 @@ import { tipCard } from './tips.js';
 import { icon, activityIcon } from '../icons.js';
 import { peopleView, storeView } from './people.js';
 import { placeCards, enterWorld } from './world.js';
+import { openPhone, phoneBadge } from './phone.js';
+
+function forecastRow(st) {
+  const f = st.week?.forecast;
+  if (!f) return null;
+  const w = WEATHER[f];
+  return h('div.row', { style: { marginTop: '10px', gap: '8px', alignItems: 'flex-start' } },
+    h('span.chip.info', icon(w.icon), `Forecast: ${w.label}`),
+    w.desc ? h('span.tiny.muted', { style: { flex: '1' } }, w.desc) : null);
+}
 
 const DONE_ICONS = { coach: 'clipboard', teammate: 'users', family: 'home', partner: 'heart', agent: 'briefcase', rival: 'flame', fan: 'star' };
 
@@ -39,6 +49,7 @@ export function topBar(app) {
         h('div.name', `${p.first} ${p.last}`),
         h('div.sub', `#${p.number} ${p.position} · Age ${p.age} · ${team ? team.name : ''}`),
         h('div.sub', `${stageLbl} · ${st.career.year} · ${wk}`)),
+      h('button.icon-btn.phone-btn', { 'aria-label': 'Phone', onclick: () => openPhone(app) }, icon('chat'), phoneBadge(st) ? h('span.app-badge', phoneBadge(st)) : null),
       h('button.icon-btn', { 'aria-label': 'Settings', onclick: () => { app.ui.back = 'career'; app.go('settings'); } }, icon('gear'))),
     h('div.meters',
       meter('Energy', maxEnergy(st), 12),
@@ -107,7 +118,8 @@ function weekView(app) {
         h('div.team-badge', teamBadge(opp, 44), h('span.nm', opp.name), h('span.rec', `${opp.w}-${opp.l}`))),
       h('div.row.between.small.muted', { style: { marginTop: '8px' } },
         h('span', `Your OFF ${Math.round(me.off)} · DEF ${Math.round(me.def)}`),
-        h('span', `Their OFF ${Math.round(opp.off)} · DEF ${Math.round(opp.def)}`))));
+        h('span', `Their OFF ${Math.round(opp.off)} · DEF ${Math.round(opp.def)}`)),
+      forecastRow(st)));
   }
 
   // Walkable places: doing things there fills your days.
@@ -193,7 +205,7 @@ function teamView(app) {
     .map(([id, l]) => h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { app.ui.teamSub = id; app.render(); } }, l)));
   const out = h('div.col', { style: { gap: '14px' } }, h('h2', STAGES[league.kind].leagueName), tabs);
   if (sub === 'standings') {
-    const confs = league.kind === 'pro' ? ['Summit', 'Coastal'] : [null];
+    const confs = league.kind === 'pro' ? ['Summit', 'Coastal'] : league.kind === 'college' ? [...new Set(league.teams.map((t) => t.conf))].sort((a, b) => (a === getTeam(league, st.career.teamId).conf ? -1 : b === getTeam(league, st.career.teamId).conf ? 1 : 0)) : [null];
     for (const c of confs) {
       const rows = standings(league, c);
       out.append(h('div.card', c ? h('h3', `${c} Conference`) : null, h('div.scroll-x', h('table.tbl',
@@ -201,7 +213,7 @@ function teamView(app) {
         rows.map((t, i) => h(`tr${t.id === st.career.teamId ? '.me' : ''}`,
           h('td', i + 1), h('td', h('span.swatch', { style: { background: t.colors[0] } }), `${t.city} ${t.name}`, t.id === st.career.rivalTeamId ? ' (rival)' : ''),
           h('td.num', t.w), h('td.num', t.l), h('td.num', t.pf), h('td.num', t.pa), h('td.num', t.streak > 0 ? `W${t.streak}` : t.streak < 0 ? `L${-t.streak}` : '-')))))),
-        h('p.tiny.muted', `Top ${league.kind === 'pro' ? 4 : STAGES[league.kind].playoffTeams} make the playoffs.`));
+        h('p.tiny.muted', league.kind === 'pro' ? 'Top 4 in each conference make the playoffs.' : league.kind === 'college' ? 'The top 4 records nationwide make the playoff.' : 'Top 4 make the playoffs.'));
     }
   } else if (sub === 'schedule') {
     out.append(h('div.card', h('div.list', league.schedule.map((wk, i) => {

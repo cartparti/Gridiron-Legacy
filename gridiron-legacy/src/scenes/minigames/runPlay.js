@@ -5,7 +5,7 @@
 // Stats: Speed = top speed, Skill = juke window + catch, Strength = breaking tackles, IQ = seeing the hole.
 import * as THREE from 'three';
 import { makePlayer, animateRun, makeBall, makeRing, knockDown, faceToward, setPose, playAction, celebrate, confetti } from '../actors.js';
-import { bindInput, maybeTip, rig, endPlay, finalize } from './common.js';
+import { bindInput, maybeTip, rig, endPlay, finalize, weatherFx } from './common.js';
 import { sfx } from '../../audio/sfx.js';
 
 const LANES = [-4.4, -2.2, 0, 2.2, 4.4];
@@ -16,6 +16,7 @@ export function runPlay(ctx) {
   const st = opts.stats;
   const tol = opts.tolerance;
   const call = opts.call;
+  const wfx = weatherFx(m);
   const kind = ctx.type === 'qb_scramble' ? 'scramble' : ctx.type === 'rb_screen' ? 'screen' : 'run';
   const off = opts.teamColors;
   const def = opts.oppColors;
@@ -44,7 +45,7 @@ export function runPlay(ctx) {
     d.position.set(x, 0, z);
     faceToward(d, x, 10);
     group.add(d);
-    defenders.push({ mesh: d, x, z, blocked: blockedFor, down: false, speed: cfg.defSpeed * (0.94 + Math.random() * 0.14) });
+    defenders.push({ mesh: d, x, z, blocked: blockedFor, down: false, speed: cfg.defSpeed * (0.94 + Math.random() * 0.14) * wfx.speed });
   };
   const blockers = [];
   for (let i = 0; i < 5; i++) {
@@ -90,7 +91,7 @@ export function runPlay(ctx) {
   hud.bottom(btns);
 
   const jukeWindow = (0.22 + (st.skill / 100) * 0.22) * tol;
-  const vmax = (6.2 + (st.speed / 100) * 3.6) * (kind === 'scramble' ? 0.9 : 1);
+  const vmax = (6.2 + (st.speed / 100) * 3.6) * (kind === 'scramble' ? 0.9 : 1) * wfx.speed;
   let lane = kind === 'screen' ? 0 : 2;
   let x = startX;
   let z = startZ;
@@ -114,6 +115,8 @@ export function runPlay(ctx) {
     if (phase !== 'live') return;
     lane = Math.max(0, Math.min(4, lane + dir));
     sfx.juke();
+    // Wet or icy footing: hard cuts can slip.
+    if (Math.random() < wfx.slip * 1.6) { slow = 0.6; hud.big('SLIPPED!', '#fbbf24', 600); }
   };
   const doJuke = () => {
     if (phase === 'catch') return tapCatch();
@@ -297,7 +300,7 @@ export function runPlay(ctx) {
         ctx.shake(0.35);
         knockDown(runner, 1);
         const yards = -z;
-        if (Math.random() < cfg.fumble * (yards > 0 ? 1 : 1.5)) {
+        if (Math.random() < cfg.fumble * (yards > 0 ? 1 : 1.5) * (1 + wfx.slip * 8)) {
           return finish({ turnover: true, complete: false, yards: Math.round(yards), quality: 0.05, text: 'FUMBLE! Defense recovers.' });
         }
         return finish({ complete: true, yards, quality: 0.25 + yards / 24 + broken * 0.06 });

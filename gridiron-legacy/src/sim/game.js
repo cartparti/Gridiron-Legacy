@@ -47,14 +47,25 @@ export function momentCount(state, { playoff, rivalry }) {
   return clamp(n, 5, 8);
 }
 
-function chooseWeather(state, league, playoff, rivalry) {
+/** Pick game-day weather (used for the weekly forecast). Late season brings snow. */
+export function chooseWeather(state, league, playoff = false, rivalry = false) {
   const frac = league.week / Math.max(1, league.schedule.length);
   const r = rand(state);
   if (frac > 0.6 && r < 0.18) return 'snow';
-  if (r < 0.32) return 'rain';
+  if (r < 0.27) return 'rain';
+  if (r < 0.33) return 'storm';
   if (r < 0.42) return 'wind';
+  if (r < 0.47) return 'fog';
   if (playoff || rivalry || r > 0.8) return 'night';
   return 'clear';
+}
+
+/** Wind as a direction + strength in yards/sec of ball drift. */
+export function makeWind(state, weather) {
+  const w = WEATHER[weather] ?? WEATHER.clear;
+  const strength = w.wind * (0.5 + rand(state) * 0.5);
+  const angle = rand(state) * Math.PI * 2;
+  return { x: Math.cos(angle) * strength, z: Math.sin(angle) * strength, mph: Math.round(strength * 3.2) };
 }
 
 export function createUserGame(state, league, sched, { playoff = false, round = 0, sitOut = false, playingHurt = false } = {}) {
@@ -89,7 +100,7 @@ export function createUserGame(state, league, sched, { playoff = false, round = 
 
   return {
     homeId: sched.home, awayId: sched.away, userSide, momentSide, oppId, playoff, round, rivalry, sitOut, playingHurt,
-    weather: chooseWeather(state, league, playoff, rivalry),
+    weather: state.week?.forecast ?? chooseWeather(state, league, playoff, rivalry),
     ratings: { home: hr, away: ar },
     score: { home: 0, away: 0 },
     toBonus: { home: 0, away: 0 },
@@ -98,6 +109,12 @@ export function createUserGame(state, league, sched, { playoff = false, round = 
     momentum: 0, tolMod: 1, extraPending: sitOut ? 0 : (state.week?.extraMoments ?? 0), skipNext: false, flagNext: false, userOut: false,
     eventsFired: [], pregameDone: false, halfDone: false, twoMinDone: false,
   };
+}
+
+/** Called after createUserGame: wind for this game. */
+export function initWeather(state, g) {
+  g.wind = makeWind(state, g.weather);
+  return g;
 }
 
 const otherSide = (s) => (s === 'home' ? 'away' : 'home');
@@ -208,6 +225,7 @@ function buildMoment(state, g, d, over = {}) {
     down, distance, yardLine, quarter: d.quarter, clock, clutch,
     twoMin: !!d.twoMin,
     weather: g.weather,
+    wind: g.wind,
     label: `${label}${ords[down]} and ${yardLine <= distance ? 'Goal' : distance} at ${yardText(yardLine)}`,
     trailing: userScore(g) < oppScore(g),
     situation: d.twoMin ? (isDefense(state) ? 'Final stand' : 'Two-minute drill') : clutch ? 'Clutch' : null,
@@ -254,7 +272,8 @@ export function outcomeFromQuality(state, m, q, call) {
     return res;
   }
   const deep = DEEP_TYPES.has(m.type);
-  const pTO = Math.max(0, (deep ? 0.4 : 0.3) - q) * 0.9 * pc.turnover;
+  const slip = WEATHER[m.weather]?.slip ?? 0;
+  const pTO = Math.max(0, (deep ? 0.4 : 0.3) - q) * 0.9 * pc.turnover + slip * 0.35;
   if (chance(state, pTO)) {
     res.turnover = true;
     res.text = m.type === 'rb_run' || m.type === 'qb_scramble' ? 'FUMBLE! Defense recovers.' : 'INTERCEPTED!';

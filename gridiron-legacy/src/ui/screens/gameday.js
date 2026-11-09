@@ -235,9 +235,10 @@ export function gamedayScreen(app) {
         h('span.vs', '@'),
         h('div.team-badge', teamBadge(home, 64), h('span.nm', home.city), h('span.rec', `${home.w}-${home.l}`))),
       h('div.weather-row',
-        h('span.chip', icon(w.icon), w.label),
+        h('span.chip', icon(w.icon), w.label, g.wind?.mph >= 4 ? ` · wind ${g.wind.mph} mph` : ''),
         g.rivalry ? h('span.chip.bad', icon('flame'), `Rivalry vs ${opp.name}`) : null,
         g.isTitle ? h('span.chip.gold', icon('trophy'), g.roundName) : g.playoff ? h('span.chip.info', g.roundName) : null),
+      w.desc ? h('p.center.tiny.muted', { style: { marginTop: '8px' } }, w.desc) : null,
       h('p.center.small.muted', { style: { marginTop: '10px' } }, g.sitOut ? 'You are sitting out this one.'
         : `${g.drives.filter((d) => d.moment).length}+ ${defense ? 'defensive snaps' : 'key moments'} expected · freshness ${Math.round((st.week.freshness ?? 0) * 100)}%`),
       h('button.btn.primary.block.big', { style: { marginTop: '12px' }, onclick: () => { sfx.whistle(); ui.started = true; clear(momentSlot); controls.append(simRestBtn()); advance(); } },

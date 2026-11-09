@@ -5,7 +5,7 @@
 // Stats: Speed = keeping up, IQ = route hint before his break, Skill = break window, Strength = tackling.
 import * as THREE from 'three';
 import { makePlayer, animateRun, makeBall, makeRing, faceToward, knockDown, setPose, setHop, playAction, celebrate, setBackpedal, confetti } from '../actors.js';
-import { bindInput, maybeTip, rig, endPlay, finalize, dist2, hudMeter } from './common.js';
+import { bindInput, maybeTip, rig, endPlay, finalize, dist2, hudMeter, weatherFx } from './common.js';
 import { sfx } from '../../audio/sfx.js';
 
 // Receiver routes he might run (depth, direction after the break).
@@ -77,8 +77,9 @@ export function coverPlay(ctx) {
   wrap.append(sepM.el, btns);
   hud.bottom(wrap);
 
-  const vCB = 7.0 + (st.speed / 100) * 2.6;
-  const vWR = 8.4 + Math.random() * 0.6;
+  const wfx = weatherFx(m);
+  const vCB = (7.0 + (st.speed / 100) * 2.6) * wfx.speed;
+  const vWR = (8.4 + Math.random() * 0.6) * wfx.speed;
   const reactLag = 0.32 - (st.iq / 100) * 0.18;
   const breakWindow = (0.16 + (st.skill / 100) * 0.12) * tol;
   let phase = 'wait';

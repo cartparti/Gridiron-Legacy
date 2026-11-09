@@ -70,7 +70,3 @@ export const BACKGROUNDS = [
   { id: 'technician', label: 'Technician', desc: 'Footwork, hands, mechanics. Flawless fundamentals.', stats: { speed: -1, skill: 8, iq: 1, strength: -2 } },
 ];
 
-export const HOMETOWNS = [
-  'Cedar Rapids Bend', 'Port Lowell', 'Ashwood', 'Millbrook', 'Dover Flats', 'Sable Creek', 'Oakmont',
-  'Fairhaven', 'Red Hollow', 'Marigold', 'Stonebridge', 'Willow Glen', 'Briar Point', 'Eastlake',
-];

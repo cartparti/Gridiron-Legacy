@@ -241,7 +241,7 @@ export function worldScreen(app) {
 
   const start = (id) => {
     world = runWorld(id, {
-      state: st, lookFor, nameFor, check,
+      state: st, lookFor, nameFor, check, weather: st.week.forecast,
       onFocus: (f) => { focus = f; drawPrompt(); },
     });
     if (!world) {
