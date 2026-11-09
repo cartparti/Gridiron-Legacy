@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0f1712" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="description" content="Gridiron Legacy: take one athlete from high school to the Hall of Fame." />
+    <title>Gridiron Legacy</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cellipse cx='32' cy='32' rx='28' ry='17' transform='rotate(-35 32 32)' fill='%23a0522d'/%3E%3Cpath d='M22 38 42 26M27 29l4 6M31 27l4 6M35 25l4 6' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="styles/main.css" />
+    <script type="importmap">
+      { "imports": { "three": "./vendor/three.module.min.js" } }
+    </script>
+  </head>
+  <body>
+    <div id="stage" aria-hidden="true"></div>
+    <div id="app"></div>
+    <div id="overlay"></div>
+    <div id="toasts" aria-live="polite"></div>
+    <noscript>Gridiron Legacy needs JavaScript to run.</noscript>
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>

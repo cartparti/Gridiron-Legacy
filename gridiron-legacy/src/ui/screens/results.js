@@ -1,0 +1,85 @@
+// Postgame report and end-of-season review.
+import { h } from '../dom.js';
+import { STAGES, PLAY_CALLS } from '../../data/config.js';
+import { STAT_KEYS, STAT_LABELS } from '../../data/positions.js';
+import { getTeam } from '../../sim/league.js';
+import * as flow from '../../sim/flow.js';
+import { fmtMoney, signed } from '../../core/util.js';
+import { teamBadge } from '../components.js';
+import { sfx } from '../../audio/sfx.js';
+
+const AWARD_ICONS = { 'Most Valuable Player': '👑', 'Legacy Bowl Champion': '🏆', 'Heritage Bowl Champion': '🏆', 'State Champion': '🏆', 'Ironstone Trophy': '🥇', 'Legacy Bowl MVP': '⭐' };
+
+export function statLine(pos, s) {
+  if (pos === 'QB') return [[`${s.passComp}/${s.passAtt}`, 'Comp/Att'], [s.passYds, 'Pass Yds'], [`${s.passTD}/${s.int}`, 'TD/INT']];
+  if (pos === 'RB') return [[s.rushAtt, 'Carries'], [s.rushYds, 'Rush Yds'], [s.rushTD, 'TD']];
+  return [[`${s.rec}/${s.targets}`, 'Rec/Tgt'], [s.recYds, 'Rec Yds'], [s.recTD, 'TD']];
+}
+
+export function postgameScreen(app) {
+  const st = app.state;
+  const g = st.lastGame;
+  const p = st.player;
+  const home = getTeam(st.league, g.homeId);
+  const away = getTeam(st.league, g.awayId);
+  const d = g.deltas;
+  return h('div.screen',
+    h('div.card',
+      h('div.row.between', h('span.chip', g.roundName), g.won ? h('span.chip.good', 'WIN') : h('span.chip.bad', 'LOSS')),
+      h('div.matchup', { style: { marginTop: '10px' } },
+        h('div.team-badge', teamBadge(away, 50), h('span.nm', away.city), h('span.display', { style: { fontSize: '2rem' } }, g.score.away)),
+        h('span.vs', 'FINAL'),
+        h('div.team-badge', teamBadge(home, 50), h('span.nm', home.city), h('span.display', { style: { fontSize: '2rem' } }, g.score.home)))),
+    h('div.card',
+      h('div.src.small.muted', `📰 ${g.outlet}`),
+      h('h2', { style: { textTransform: 'none' } }, g.headline)),
+    g.sitOut ? h('div.card', h('p', 'You watched this one from the sideline.')) : h('div.card',
+      h('div.row', h('div.grade', { style: { color: g.grade >= 70 ? 'var(--good)' : g.grade >= 50 ? 'var(--warn)' : 'var(--bad)' } }, g.letter),
+        h('div.grow', h('b', 'Your game'), h('div.small.muted', `Grade ${g.grade}/100`))),
+      h('div.bigstat', { style: { marginTop: '10px' } }, statLine(p.position, g.userStats).map(([v, l]) => h('div', h('b', v), h('span', l))))),
+    g.moments.length ? h('div.card', h('h3', 'Key Moments'), h('div.list', g.moments.map((m) =>
+      h('div.li', h('span.chip', PLAY_CALLS[m.call]?.label ?? m.call), h('div.grow', h('div.small', m.label), h('div.tiny.muted', `${m.text} → ${m.outcome === 'TD' ? 'Touchdown' : m.outcome === 'FG' ? 'Field goal' : m.outcome === 'TO' ? 'Turnover' : 'Punt'}`)),
+        h('b', { style: { color: m.quality > 0.7 ? 'var(--good)' : m.quality < 0.35 ? 'var(--bad)' : 'inherit' } }, `${Math.round(m.quality * 100)}%`))))) : null,
+    h('div.card', h('h3', 'Fallout'), h('div.changes',
+      h(`span.chip.${d.fame >= 0 ? 'good' : 'bad'}`, `Fame ${signed(d.fame, 1)}`),
+      h(`span.chip.${d.coach >= 0 ? 'good' : 'bad'}`, `Coach ${signed(d.coach, 1)}`),
+      h(`span.chip.${d.mood >= 0 ? 'good' : 'bad'}`, `Mood ${signed(d.mood, 1)}`)),
+      g.injury ? h('p.bad', h('b', `🩹 Injured: ${g.injury.label}, out ~${g.injury.weeks} week${g.injury.weeks > 1 ? 's' : ''}.`)) : null),
+    h('button.btn.primary.block', { onclick: () => { sfx.click(); flow.continueAfterGame(st); app.hubTab = 'week'; app.commit(); } }, 'Continue'));
+}
+
+export function reviewScreen(app) {
+  const st = app.state;
+  const r = st.review;
+  const p = st.player;
+  const champ = getTeam(st.league, r.championId);
+  const delta = r.ovrAfter - r.ovrBefore;
+  setTimeout(() => (r.awards.length ? sfx.levelUp() : null), 300);
+  return h('div.screen',
+    h('div', h('div.small.muted', `${STAGES[r.stage].label} · Season ${r.stageSeason}`), h('h1', `${r.year} Season Review`)),
+    h('div.card',
+      h('div.bigstat',
+        h('div', h('b', r.record), h('span', 'Record')),
+        h('div', h('b', r.champion ? '🏆' : r.seed >= 0 ? `#${(r.seed % 4) + 1}` : '—'), h('span', r.champion ? 'Champions' : r.seed >= 0 ? 'Playoff seed' : 'No playoffs')),
+        h('div', h('b', r.perf), h('span', 'Season rating'))),
+      h('p.small.muted', { style: { marginTop: '8px' } }, `${STAGES[r.stage].titleName}: ${champ.city} ${champ.name}`)),
+    r.awards.length ? h('div.col', r.awards.map((a, i) => h('div.award', { style: { animationDelay: `${i * 0.15}s` } }, h('span.ico', AWARD_ICONS[a] ?? '🏅'), h('div', h('div.nm', a), h('div.tiny.muted', `${r.year}`))))) : null,
+    r.records.length ? h('div.card', { style: { borderColor: 'var(--accent)' } }, h('h3', '📜 Records Broken'), r.records.map((x) => h('p', h('b', x)))) : null,
+    h('div.card', h('h3', 'Season Stats'), h('div.bigstat', statLine(p.position, r.seasonStats).map(([v, l]) => h('div', h('b', v), h('span', l)))),
+      h('p.tiny.muted', { style: { marginTop: '6px' } }, `${r.seasonStats.games} games played`)),
+    r.leaders ? h('div.card', h('h3', 'League Leaders'), leadersTable(r.leaders, p)) : null,
+    h('div.card', h('h3', 'Aging & Growth'),
+      h('p', `Overall ${Math.round(r.ovrBefore)} → `, h(`b.${delta >= 0 ? 'good' : 'bad'}`, `${Math.round(r.ovrAfter)} (${signed(delta, 1)})`), ` · now age ${p.age}`),
+      h('div.changes', STAT_KEYS.map((k) => h(`span.chip.${r.ageChanges[k] >= 0 ? 'good' : 'bad'}`, `${STAT_LABELS[k]} ${signed(r.ageChanges[k], 1)}`)))),
+    r.invest.length ? h('div.card', h('h3', 'Investments'), r.invest.map((x) => h('div.row.between.small', h('span', x.label), h(`b.${x.r >= 0 ? 'good' : 'bad'}`, `${fmtMoney(x.from)} → ${fmtMoney(x.to)} (${signed(x.r * 100, 0)}%)`)))) : null,
+    h('button.btn.primary.block', { onclick: () => { sfx.click(); flow.continueAfterReview(st); app.commit(); } }, 'Into the Offseason'));
+}
+
+function leadersTable(leaders, p) {
+  const keys = p.position === 'QB' ? ['passYds', 'passTD'] : p.position === 'RB' ? ['rushYds', 'rushTD'] : ['recYds', 'recTD'];
+  const labels = { passYds: 'Passing Yards', passTD: 'Passing TDs', rushYds: 'Rushing Yards', rushTD: 'Rushing TDs', recYds: 'Receiving Yards', recTD: 'Receiving TDs' };
+  return keys.map((k) => {
+    const list = [...leaders[k], { name: `${p.first[0]}. ${p.last}`, team: 'YOU', value: p.seasonStats[k], me: true }].sort((a, b) => b.value - a.value).slice(0, 4);
+    return h('div', { style: { marginBottom: '8px' } }, h('div.small.muted', labels[k]), h('table.tbl', list.map((x, i) => h(`tr${x.me ? '.me' : ''}`, h('td', i + 1), h('td', x.name), h('td', x.team), h('td.num', x.value.toLocaleString())))));
+  });
+}
