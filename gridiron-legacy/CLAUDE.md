@@ -6,7 +6,7 @@ Read this every session. Run instructions are in README.md.
 An American football career and life-sim browser game. One athlete, high school to the Hall of Fame.
 Like New Star Soccer in mechanics only: the player controls key moments (throw, cut, catch, later
 tackle/kick); everything else is simulated. Around it: weekly schedule, relationships, money, fame,
-health and branching events. Look: stylized low-poly 2.5D field with an angled camera. Clean and
+health and branching events. Look: retro voxel/pixel athletes on a 3D field with an angled camera (see v0.6). Clean and
 distinctive, not realistic. Do not copy any other game's look, art or assets.
 
 ## Tech rules
@@ -74,6 +74,18 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   tells (red ring + windup), AI QB reads, TD celebration cutscene. Smooth full-res rendering.
 - Remaining rounds: 2 customization + unique NPCs + jerseys; 3 graphics; 4 team-colored menus +
   awards/standings; 5 message responses, field minigames, story cutscenes, training minigames.
+
+## v0.6 (round 2 of 5) changes
+- Retro voxel art direction (owner's reference: chunky pixel/voxel athletes, CRT-style dark UI). Characters
+  are box rigs with big heads and 12x12 pixel-art face/hair textures (nearest filtering); scene renders at
+  ~560 pixel rows and scales up crisply; voxel crowd + ad boards; darker grass.
+- Looks (`src/data/looks.js`): skin, 12 hair styles + colors, eyes/brows/nose/mouth/beard, arm tattoos,
+  gear (cleats, gloves, wristbands, arm sleeves, visor, eye black), height/weight (small rating nudges),
+  TD celebration. Editor `src/ui/screens/look.js` (creation + Career tab "Edit look"). Every NPC and every
+  on-field player gets a unique random look; old saves upgrade via `normalizeLook`.
+- Kits (`src/data/kits.js`): home/away/third per team; pregame lineup + uniform picker (`g.kit`);
+  opponent picks a non-clashing kit.
+- Retro arcade theme in `styles/main.css` (dark by default, team-colored top bar/tabs, scanlines).
 
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.

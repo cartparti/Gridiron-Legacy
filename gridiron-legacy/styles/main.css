@@ -442,3 +442,84 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-family: var(
 .fc-play b { font-family: var(--pixel); font-size: 0.78rem; text-transform: uppercase; line-height: 1.15; }
 .fc-play small { font-size: 0.7rem; opacity: 0.75; line-height: 1.25; }
 .fc-play:active { transform: scale(0.97); border-color: var(--accent); }
+
+/* =====================================================================
+   v0.6 retro arcade theme: dark chunky panels, hard pixel shadows, pixel
+   type, CRT scanlines, team-colored accents. Overrides the rules above.
+   ===================================================================== */
+:root, :root[data-theme='dark'] {
+  --bg: #111318; --bg2: #16191f; --card: #1b1e25; --card2: #22262e; --card3: #2a2f39;
+  --line: #0a0b0e; --line2: #343a46; --radius: 6px; --play: #4fd06d; --play-ink: #0d2412;
+}
+body { background: radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--team) 22%, var(--bg)) 0%, var(--bg) 60%) fixed, var(--bg); }
+body::after {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 50;
+  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.13) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply;
+}
+:root[data-theme='light'] body::after { opacity: 0.35; }
+h1, h2, .display { text-shadow: 1.5px 0 rgba(255, 40, 90, 0.45), -1.5px 0 rgba(40, 200, 255, 0.45); }
+:root[data-theme='light'] h1, :root[data-theme='light'] h2, :root[data-theme='light'] .display { text-shadow: none; }
+
+.card { border: 2px solid var(--line); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.05), 0 3px 0 rgba(0, 0, 0, 0.45); border-radius: var(--radius); }
+.card.hero { border-color: color-mix(in srgb, var(--team) 60%, #000); }
+.btn { border-radius: 6px; border: 2px solid #07080a; box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.08), 0 4px 0 #07080a; }
+.btn:active { transform: translateY(3px); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.08), 0 1px 0 #07080a; }
+.btn.primary { background: var(--play); color: var(--play-ink); border-color: #07080a; box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.35), inset 0 -3px 0 rgba(0, 0, 0, 0.18), 0 4px 0 #07080a; }
+.btn.primary:active { box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.35), 0 1px 0 #07080a; }
+.btn.ghost { box-shadow: none; border-color: var(--line2); }
+.btn.team { background: var(--team); border-color: #07080a; }
+.chip { border-radius: 4px; border: 2px solid var(--line); }
+.subtab { border-radius: 5px; border: 2px solid var(--line); font-family: var(--pixel); font-size: 0.68rem; letter-spacing: 0.05em; text-transform: uppercase; box-shadow: 0 2px 0 #07080a; }
+.subtab.on { background: var(--accent); color: var(--accent-ink); }
+.topbar { border-bottom: 2px solid #07080a; box-shadow: inset 0 -4px 0 var(--team2), 0 3px 0 rgba(0, 0, 0, 0.4); }
+.topbar .name { font-size: 1.15rem; text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.45); }
+.tabs { background: #0d0f13; border-top: 2px solid #07080a; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.tab.on { color: #fff; background: linear-gradient(to bottom, color-mix(in srgb, var(--team) 55%, transparent), transparent); }
+.tab.on::before { left: 0; right: 0; height: 3px; border-radius: 0; background: var(--team2); }
+.ovr-badge { border-radius: 6px !important; border: 2px solid #07080a; box-shadow: 0 3px 0 #07080a; }
+.meter .bar, .statbar .track { border-radius: 2px !important; }
+input[type='text'], input[type='number'] { border-radius: 5px !important; border: 2px solid var(--line) !important; }
+
+/* ---------- look editor ---------- */
+.look-editor { display: flex; flex-direction: column; gap: 10px; }
+.look-preview { display: flex; flex-direction: column; gap: 8px; }
+.look-stage {
+  display: flex; justify-content: center; align-items: flex-end; height: 210px; border-radius: 6px; border: 2px solid var(--line);
+  background: linear-gradient(to bottom, #2b2219 0%, #3a2d20 62%, #5a4630 62%, #4b3a28 100%);
+  box-shadow: inset 0 -16px 24px rgba(0, 0, 0, 0.35);
+}
+.look-stage img { height: 200px !important; width: 160px !important; }
+.look-tabs { margin-top: 2px; }
+.look-panel { display: flex; flex-direction: column; gap: 12px; }
+.look-row { display: flex; flex-direction: column; gap: 8px; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.opt { appearance: none; cursor: pointer; border: 2px solid var(--line); background: var(--card2); color: var(--text); border-radius: 5px; padding: 8px 10px; min-height: 40px; font-family: var(--pixel); font-size: 0.66rem; letter-spacing: 0.04em; text-transform: uppercase; box-shadow: 0 2px 0 #07080a; }
+.opt.on { background: var(--accent); color: var(--accent-ink); }
+.swatch-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.sw { appearance: none; cursor: pointer; width: 40px; height: 40px; border-radius: 5px; border: 2px solid #07080a; box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.18), 0 2px 0 #07080a; }
+.sw.on { outline: 3px solid var(--accent); outline-offset: 1px; }
+.sw.none { background: var(--card2); color: var(--muted); font-weight: 700; }
+.slider { width: 100%; accent-color: var(--accent); height: 28px; }
+
+/* ---------- uniform picker / lineup ---------- */
+.kit-picker { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.lineup {
+  display: flex; align-items: flex-end; justify-content: space-around; border-radius: 6px; border: 2px solid var(--line); padding-top: 8px;
+  background: linear-gradient(to bottom, #1a2a40 0%, #22385a 48%, #2f7a36 48%, #3a8a3a 100%);
+}
+.lineup img { width: 110px !important; height: 138px !important; }
+.lineup-vs { font-size: 1.4rem; color: #fff; text-shadow: 2px 2px 0 #000; align-self: center; }
+.kit-row { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
+.kit-btn { appearance: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 8px; min-width: 64px; border-radius: 6px; border: 2px solid var(--line); background: var(--card2); box-shadow: 0 3px 0 #07080a; color: var(--text); }
+.kit-btn.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--card2)); }
+.kit-opp { margin-left: auto; display: flex; flex-direction: column; align-items: center; gap: 2px; opacity: 0.85; }
+.kit-ic { width: 44px; height: 40px; display: block; }
+/* The retro theme is dark unless the player explicitly picks light in Settings. */
+@media (prefers-color-scheme: light) {
+  html:root:not([data-theme='light']):not([data-theme='x']) {
+    --bg: #111318; --bg2: #16191f; --card: #1b1e25; --card2: #22262e; --card3: #2a2f39;
+    --line: #0a0b0e; --line2: #343a46; --text: #eef2f6; --muted: #8b98a8; --accent: #ffcc33; --accent-ink: #1a1400;
+    color-scheme: dark;
+  }
+}

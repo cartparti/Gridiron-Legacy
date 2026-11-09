@@ -6,13 +6,12 @@ import { clamp, fillTokens } from '../core/util.js';
 import { rand, randInt, pick } from '../core/rng.js';
 import { applyEffects } from './effects.js';
 import { maxEnergy, planCost } from './week.js';
+import { randomLook as genLook, normalizeLook, defaultLook } from '../data/looks.js';
 
-const SHIRTS = ['#e63946', '#457b9d', '#2a9d8f', '#e9c46a', '#f4a261', '#6d597a', '#3a86ff', '#ff006e', '#8ac926', '#ffffff', '#222222'];
-const PANTS = ['#264653', '#1d3557', '#3d405b', '#5c4033', '#2b2d42', '#6c757d'];
 const MATE_POS = ['OL', 'DL', 'LB', 'S', 'TE', 'WR', 'RB', 'QB', 'CB'];
 
-export function randomLook(h) {
-  return { shirt: pick(h, SHIRTS), pants: pick(h, PANTS), skin: randInt(h, 0, 4), hair: randInt(h, 0, 6), hairStyle: randInt(h, 0, 3) };
+export function randomLook(h, position) {
+  return genLook(() => rand(h), { position });
 }
 
 /** Three named teammates: your closest friends on the current team. */
@@ -25,7 +24,7 @@ export function genTeammates(state) {
     do name = `${pick(state, FIRST_NAMES)} ${pick(state, LAST_NAMES)}`; while (used.has(name));
     used.add(name);
     const pos = pick(state, MATE_POS.filter((x) => x !== p.position));
-    p.teammates.push({ id: `mate${i}`, name, pos, bond: randInt(state, 42, 58), look: randomLook(state) });
+    p.teammates.push({ id: `mate${i}`, name, pos, bond: randInt(state, 42, 58), look: randomLook(state, pos) });
   }
   p.teamLook = randomLook(state);
 }
@@ -38,7 +37,9 @@ function ensure(state) {
   p.coachLook ??= randomLook(state);
   p.agentLook ??= randomLook(state);
   p.rivalLook ??= randomLook(state);
-  p.look ??= randomLook(state);
+  p.look = p.look ? normalizeLook(p.look, p.first + p.last) : defaultLook(p.position);
+  for (const m of p.teammates) m.look = normalizeLook(m.look, m.name);
+  for (const k of ['familyLook', 'partnerLook', 'coachLook', 'agentLook', 'rivalLook']) p[k] = normalizeLook(p[k], k + p.last);
 }
 
 /** Everyone you can interact with right now. */

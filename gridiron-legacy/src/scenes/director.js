@@ -21,9 +21,9 @@ function ensure() {
   if (failed) return null;
   try {
     const el = document.getElementById('stage');
-    // Smooth, full-resolution rendering (capped for phone performance).
-    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    // Retro pixel look: render at a low internal resolution and scale it up with crisp pixels.
+    const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+    renderer.domElement.style.imageRendering = 'pixelated';
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     el.append(renderer.domElement);
     const scene = new THREE.Scene();
@@ -41,6 +41,8 @@ function ensure() {
     const resize = () => {
       const w = window.innerWidth;
       const h = window.innerHeight;
+      // ~560 pixel rows tall regardless of screen size, so pixels read as chunky but detailed.
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Math.max(0.35, 560 / h)));
       renderer.setSize(w, h, false);
       renderer.domElement.style.width = '100%';
       renderer.domElement.style.height = '100%';

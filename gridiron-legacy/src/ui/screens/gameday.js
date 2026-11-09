@@ -13,6 +13,37 @@ import { sfx } from '../../audio/sfx.js';
 import { runMinigame } from '../../scenes/director.js';
 import { tipCard } from './tips.js';
 import { icon } from '../icons.js';
+import { teamKits, oppKitFor, kitUniform, KIT_IDS } from '../../data/kits.js';
+import { randomLook } from '../../data/looks.js';
+import { portraitImg } from '../../scenes/portrait.js';
+
+/** Small pixel jersey icon for a kit. */
+export function kitIcon(kit, number = '') {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 22');
+  svg.setAttribute('shape-rendering', 'crispEdges');
+  svg.classList.add('kit-ic');
+  const rect = (x, y, w, hh, fill) => { const r = document.createElementNS(NS, 'rect'); Object.entries({ x, y, width: w, height: hh, fill }).forEach(([k, v]) => r.setAttribute(k, v)); svg.append(r); };
+  rect(2, 3, 20, 7, '#0b0d10'); rect(5, 2, 14, 19, '#0b0d10');
+  rect(3, 4, 18, 5, kit.jersey); rect(6, 3, 12, 17, kit.jersey);
+  rect(3, 7, 3, 1, kit.trim); rect(18, 7, 3, 1, kit.trim);
+  rect(10, 3, 4, 2, '#0b0d10');
+  const t = document.createElementNS(NS, 'text');
+  Object.entries({ x: 12, y: 16, 'text-anchor': 'middle', 'font-size': 8, 'font-family': 'Silkscreen, monospace', fill: kit.numbers }).forEach(([k, v]) => t.setAttribute(k, v));
+  t.textContent = number;
+  svg.append(t);
+  return svg;
+}
+
+/** The kits both teams wear in the current game. */
+export function gameKits(st, me, opp) {
+  const g = st.game;
+  const myId = g.kit ?? (g.userSide === 'home' ? 'home' : 'away');
+  const mine = teamKits(me)[myId] ?? teamKits(me).home;
+  const theirs = oppKitFor(mine, opp, g.userSide !== 'home');
+  return { myId, mine, theirs };
+}
 
 const CALL_DESC_DEF = {
   safe: 'Play soft. Fewer big plays, fewer picks.',
@@ -186,6 +217,10 @@ export function gamedayScreen(app) {
       position: st.player.position,
       teamColors: me.colors,
       oppColors: opp.colors,
+      teamUniform: kitUniform(gameKits(st, me, opp).mine),
+      oppUniform: kitUniform(gameKits(st, me, opp).theirs),
+      look: st.player.look,
+      number: st.player.number,
       homeColors: home.colors,
       showTips: app.settings.tutorials && !app.settings.seenTips?.[`mg_${m.type}`],
       markTip: () => { app.settings.seenTips = { ...(app.settings.seenTips ?? {}), [`mg_${m.type}`]: true }; app.saveSettings(); },
@@ -225,6 +260,31 @@ export function gamedayScreen(app) {
       h('button.btn.primary.block', { onclick: () => { sfx.click(); flow.finishGame(st); app.ui.game = null; app.commit(); } }, 'Postgame Report')));
   };
 
+  // ---- Uniform picker + lineup preview
+  function kitPicker() {
+    const me = getTeam(league, st.career.teamId);
+    const opp = getTeam(league, g.oppId);
+    const box = h('div.kit-picker');
+    const draw = () => {
+      clear(box);
+      const { myId, mine, theirs } = gameKits(st, me, opp);
+      const kits = teamKits(me);
+      const star = randomLook(`${opp.id}-star`, { position: st.player.position === 'CB' ? 'WR' : 'CB' });
+      box.append(
+        h('div.lineup',
+          h('div.lineup-side', portraitImg({ uniform: kitUniform(mine), look: st.player.look, number: st.player.number, helmet: false }, 120, { full: true, big: true, yaw: -0.5 })),
+          h('div.lineup-vs.pix', 'VS'),
+          h('div.lineup-side', portraitImg({ uniform: kitUniform(theirs), look: star, number: 1 + (opp.id.charCodeAt(0) % 40), helmet: false }, 120, { full: true, big: true, yaw: 0.5 }))),
+        h('div.section-label', 'Choose your uniform'),
+        h('div.kit-row',
+          KIT_IDS.map((id) => h(`button.kit-btn${myId === id ? '.on' : ''}`, { 'aria-label': kits[id].label, onclick: () => { sfx.click(); g.kit = id; app.save(); draw(); } },
+            kitIcon(kits[id], st.player.number), h('span.tiny', kits[id].label))),
+          h('div.kit-opp', kitIcon(theirs, ''), h('span.tiny.muted', `${opp.name}: ${theirs.label}`))));
+    };
+    draw();
+    return box;
+  }
+
   // ---- Initial state
   if (!ui.started) {
     const opp = getTeam(league, g.oppId);
@@ -241,6 +301,7 @@ export function gamedayScreen(app) {
       w.desc ? h('p.center.tiny.muted', { style: { marginTop: '8px' } }, w.desc) : null,
       h('p.center.small.muted', { style: { marginTop: '10px' } }, g.sitOut ? 'You are sitting out this one.'
         : `${g.drives.filter((d) => d.moment).length}+ ${defense ? 'defensive snaps' : 'key moments'} expected · freshness ${Math.round((st.week.freshness ?? 0) * 100)}%`),
+      g.sitOut ? null : kitPicker(),
       h('button.btn.primary.block.big', { style: { marginTop: '12px' }, onclick: () => { sfx.whistle(); ui.started = true; clear(momentSlot); controls.append(simRestBtn()); advance(); } },
         g.sitOut ? 'Watch from the sideline' : 'Kick Off')));
   } else if (g.finished) showEnd();

@@ -7,7 +7,7 @@ const FIELD_W = 53.3;
 const FIELD_L = 120;
 
 function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWAY') {
-  const ppy = 14; // pixels per yard: low on purpose for a chunky retro look
+  const ppy = 10; // pixels per yard: low on purpose for a chunky retro look
   const cw = Math.round(FIELD_W * ppy);
   const ch = FIELD_L * ppy;
   const c = document.createElement('canvas');
@@ -17,8 +17,15 @@ function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWA
   
   // Grass stripes every 5 yards.
   for (let y = 0; y < FIELD_L; y += 5) {
-    g.fillStyle = Math.floor(y / 5) % 2 ? '#3f9a3c' : '#4aab44';
+    g.fillStyle = Math.floor(y / 5) % 2 ? '#2f6f35' : '#377b3a';
     g.fillRect(0, y * ppy, cw, 5 * ppy);
+  }
+  // Pixel grass noise.
+  for (let i = 0; i < cw * ch * 0.05; i++) {
+    const x = Math.floor(Math.random() * cw);
+    const y = Math.floor(Math.random() * ch);
+    g.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.05)';
+    g.fillRect(x, y, 1, 1);
   }
   // End zones.
   const ez = (y0, col, txt) => {
@@ -70,7 +77,8 @@ function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWA
   g.stroke();
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
+  tex.magFilter = THREE.NearestFilter;
+  tex.anisotropy = 4;
   return tex;
 }
 
@@ -81,7 +89,7 @@ export function buildStadium(scene) {
   const lambert = (color, extra = {}) => new THREE.MeshBasicMaterial({ color, ...extra });
 
   // Surrounding turf / track.
-  const apron = new THREE.Mesh(new THREE.PlaneGeometry(FIELD_W + 24, FIELD_L + 24), lambert('#2f7f33'));
+  const apron = new THREE.Mesh(new THREE.PlaneGeometry(FIELD_W + 24, FIELD_L + 24), lambert('#2a6430'));
   apron.rotation.x = -Math.PI / 2;
   apron.position.y = -0.02;
   world.add(apron);
@@ -121,16 +129,61 @@ export function buildStadium(scene) {
   addStand(0, FIELD_L / 2 + 4, FIELD_W + 20, true, 1);
   addStand(0, -FIELD_L / 2 - 4, FIELD_W + 20, true, -1);
 
-  const crowdGeo = new THREE.BoxGeometry(0.7, 0.9, 0.5);
+  // Voxel fans: a body and a head per seat (two instanced meshes, colored per instance).
+  const crowdGeo = new THREE.BoxGeometry(0.72, 0.8, 0.5);
+  const headGeo = new THREE.BoxGeometry(0.42, 0.42, 0.42);
+  headGeo.translate(0, 0.62, 0);
   const crowd = new THREE.InstancedMesh(crowdGeo, new THREE.MeshBasicMaterial(), crowdPositions.length);
+  const heads = new THREE.InstancedMesh(headGeo, new THREE.MeshBasicMaterial(), crowdPositions.length);
   const dummy = new THREE.Object3D();
+  const skins = ['#f7dcc0', '#e0ab7f', '#cc9260', '#b07646', '#8f5a34', '#6e4126', '#4d2c1a'].map((c) => new THREE.Color(c));
   crowdPositions.forEach((p, i) => {
     dummy.position.copy(p);
     dummy.updateMatrix();
     crowd.setMatrixAt(i, dummy.matrix);
+    heads.setMatrixAt(i, dummy.matrix);
+    heads.setColorAt(i, skins[Math.floor(Math.random() * skins.length)]);
   });
   crowd.userData.base = crowdPositions;
-  world.add(crowd);
+  world.add(crowd, heads);
+
+  // Ad boards around the field.
+  const adTex = (() => {
+    const c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 16;
+    const g = c.getContext('2d');
+    const slogans = ['GRIDIRON LEAGUE', 'FIZZ COLA', 'IRONCLAD GYM', 'GRIDIRON LEAGUE', 'TURBO TIRES', 'BOLT ENERGY'];
+    const cols = [['#c62f2f', '#ffffff'], ['#ffffff', '#1f3a7a'], ['#1d1f24', '#f2c12e'], ['#c62f2f', '#ffffff'], ['#2c6fd6', '#ffffff'], ['#f2c12e', '#1d1f24']];
+    g.font = 'bold 9px monospace';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    for (let i = 0; i < 6; i++) {
+      const x = i * (256 / 6);
+      g.fillStyle = cols[i][0];
+      g.fillRect(x, 0, 256 / 6, 16);
+      g.fillStyle = cols[i][1];
+      g.fillText(slogans[i].split(' ')[0], x + 256 / 12, 8.5);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.magFilter = THREE.NearestFilter;
+    t.wrapS = THREE.RepeatWrapping;
+    return t;
+  })();
+  const board = (len, x, z, rotY) => {
+    const tex = adTex.clone();
+    tex.needsUpdate = true;
+    tex.repeat.set(len / 40, 1);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(len, 1.1, 0.2), [lambert('#222'), lambert('#222'), lambert('#333'), lambert('#222'), new THREE.MeshBasicMaterial({ map: tex }), new THREE.MeshBasicMaterial({ map: tex })]);
+    m.position.set(x, 0.55, z);
+    m.rotation.y = rotY;
+    world.add(m);
+  };
+  board(FIELD_L + 6, FIELD_W / 2 + 3.2, 0, Math.PI / 2);
+  board(FIELD_L + 6, -FIELD_W / 2 - 3.2, 0, -Math.PI / 2);
+  board(FIELD_W + 6, 0, FIELD_L / 2 + 3, 0);
+  board(FIELD_W + 6, 0, -FIELD_L / 2 - 3, 0);
 
   // Light towers.
   const poleMat = lambert('#9aa3ad');
@@ -200,8 +253,9 @@ export function buildStadium(scene) {
     setTint(weather) {
       const t = { night: 0x8a93b8, rain: 0x9aa4ae, storm: 0x7a8490, snow: 0xf2f6fa, wind: 0xf2efe6, fog: 0xc8ced4 }[weather] ?? 0xffffff;
       fieldMat.color.setHex(t);
-      apron.material.color.setHex(weather === 'snow' ? 0xe6edf2 : weather === 'night' ? 0x1f5a24 : weather === 'storm' ? 0x24582a : weather === 'rain' ? 0x2a6a2f : 0x2f7f33);
+      apron.material.color.setHex(weather === 'snow' ? 0xe6edf2 : weather === 'night' ? 0x1f5a24 : weather === 'storm' ? 0x24582a : weather === 'rain' ? 0x2a6a2f : 0x2a6430);
       crowd.material.color.setHex(weather === 'storm' || weather === 'rain' ? 0x8f99a3 : weather === 'night' ? 0x9aa0b8 : 0xffffff);
+      heads.material.color.copy(crowd.material.color);
     },
     /** Make the crowd bounce (excitement 0..1). */
     animateCrowd(t, excitement = 0.2) {
@@ -212,8 +266,10 @@ export function buildStadium(scene) {
         dummy.position.set(p.x, p.y + Math.max(0, Math.sin(t * 9 + i * 1.7)) * 0.35 * excitement, p.z);
         dummy.updateMatrix();
         crowd.setMatrixAt(i, dummy.matrix);
+        heads.setMatrixAt(i, dummy.matrix);
       }
       crowd.instanceMatrix.needsUpdate = true;
+      heads.instanceMatrix.needsUpdate = true;
     },
   };
   api.setTeams(['#1d3557', '#f1c40f'], ['#b5121b', '#f5d547'], 'Gridiron', 'Legacy');

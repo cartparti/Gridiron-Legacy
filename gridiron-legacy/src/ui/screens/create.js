@@ -7,20 +7,18 @@ import { newCareer } from '../../sim/flow.js';
 import { jersey, teamBadge, stars } from '../components.js';
 import { sfx } from '../../audio/sfx.js';
 import { DIFFICULTIES } from '../../data/config.js';
-import { portraitImg } from '../../scenes/portrait.js';
-
-/** Full-body 3D preview of the athlete in school colors. */
-function spritePreview(colors, number) {
-  return portraitImg({ colors, number, skin: 2 }, 120, { full: true });
-}
+import { defaultLook, POS_SIZE } from '../../data/looks.js';
+import { teamKits } from '../../data/kits.js';
+import { lookEditor } from './look.js';
 
 const rnd = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 export function createScreen(app) {
   const f = app.ui.form ?? (app.ui.form = {
     first: rnd(FIRST_NAMES), last: rnd(LAST_NAMES), position: 'QB', background: 'natural',
-    number: 7, hometown: 'Westfield', hsTeamId: 'WFW', difficulty: app.settings.difficulty ?? 'normal',
+    number: 7, hometown: 'Westfield', hsTeamId: 'WFW', difficulty: app.settings.difficulty ?? 'normal', look: defaultLook('QB'),
   });
+  f.look ??= defaultLook(f.position);
   const wrap = h('div.screen');
   const draw = () => {
     clear(wrap);
@@ -32,18 +30,27 @@ export function createScreen(app) {
     wrap.append(
       h('div.row.between', h('h1', 'New Athlete'), h('button.btn.small.ghost', { onclick: () => app.go('slots') }, 'Back')),
       h('div.card',
-        h('div.row', { style: { alignItems: 'flex-start' } },
-          h('div.col', { style: { alignItems: 'center', gap: '4px' } }, spritePreview(school.colors, f.number), h('span.tiny.muted', school.name)),
-          h('div.col.grow', { style: { gap: '8px' } },
+        h('div.col', { style: { gap: '8px' } },
+          h('div.col', { style: { gap: '8px' } },
             h('label.field', 'First name', h('input', { type: 'text', value: f.first, maxlength: 14, oninput: (e) => { f.first = e.target.value; } , onchange: draw })),
             h('label.field', 'Last name', h('input', { type: 'text', value: f.last, maxlength: 14, oninput: (e) => { f.last = e.target.value; }, onchange: draw })),
             h('div.row',
               h('label.field.grow', 'Number', h('input', { type: 'number', min: 0, max: 99, value: f.number, onchange: (e) => { f.number = Math.max(0, Math.min(99, Number(e.target.value) || 0)); draw(); } })),
               h('button.btn.small', { style: { marginTop: '18px' }, onclick: () => { sfx.click(); f.first = rnd(FIRST_NAMES); f.last = rnd(LAST_NAMES); f.number = Math.floor(Math.random() * 90) + 1; draw(); } }, '🎲 Random'))))),
       h('div.card',
+        h('h2', 'Look'),
+        h('p.small.muted', 'Make them yours: skin, hair, face, tattoos, gear, size and touchdown celebration. You can change everything except height and weight later.'),
+        lookEditor({ look: f.look, uniform: teamKits(school).home, number: f.number, position: f.position })),
+      h('div.card',
         h('h2', 'Position'),
         h('div.pos-cards', Object.entries(POSITIONS).map(([id, p]) =>
-          h(`button.pick-card${f.position === id ? '.on' : ''}`, { onclick: () => { sfx.click(); f.position = id; draw(); } },
+          h(`button.pick-card${f.position === id ? '.on' : ''}`, { onclick: () => {
+            sfx.click();
+            const [h0, w0] = POS_SIZE[f.position];
+            if (f.look.heightIn === h0 && f.look.weightLb === w0) [f.look.heightIn, f.look.weightLb] = POS_SIZE[id];
+            f.position = id;
+            draw();
+          } },
             h('span.big', id), h('span.lbl', p.label)))),
         h('p.small.muted', { style: { marginTop: '10px' } }, POSITIONS[f.position].blurb),
         h('div.small', { style: { marginTop: '6px' } },

@@ -1,20 +1,25 @@
-// Low-poly 3D athletes with a jointed rig and smooth procedural animation.
+// Chunky voxel athletes with pixel-art faces, a jointed rig and smooth procedural animation.
 //
-// Every character is a small hierarchy of meshes (hips, legs with knees, spine, chest, arms with
-// elbows, head/helmet). Poses are computed each frame from a locomotion state (idle / run / sprint /
-// backpedal) plus optional one-shot actions (throw, catch, juke, spin, stiff-arm, dive, tackle,
-// fall, get up, celebrate ...) and blended smoothly, so movement reads clearly.
+// Every character is a small hierarchy of boxes (hips, legs with knees, spine, chest, arms with
+// elbows, a big blocky head). Faces, hair, tattoos and jersey numbers are tiny canvas textures drawn
+// pixel by pixel and shown with nearest-neighbour filtering, so they stay crisp and retro.
+// Poses are computed each frame from a locomotion state (idle / run / sprint / backpedal) plus
+// optional one-shot actions (throw, catch, juke, spin, stiff-arm, dive, tackle, fall, get up,
+// celebrate ...) and blended smoothly.
 //
-// The public API (makePlayer, makePerson, animateRun, faceToward, setPose, playAction, celebrate,
-// knockDown, setHop, setBackpedal ...) is shared by the play engine, minigames and the walkable world.
+// Looks (skin, hair, face, tattoos, gear, height/weight) come from src/data/looks.js.
 import * as THREE from 'three';
+import {
+  SKIN_TONES, HAIR_COLORS, EYE_COLORS, bodyScale, randomLook, normalizeLook,
+} from '../data/looks.js';
+import { shade } from '../data/kits.js';
 
-// ------------------------------------------------------------------ materials & geometry
+// ------------------------------------------------------------------ materials & textures
 
 let gradient = null;
 function toonGradient() {
   if (gradient) return gradient;
-  const data = new Uint8Array([90, 90, 90, 255, 170, 170, 170, 255, 255, 255, 255, 255]);
+  const data = new Uint8Array([120, 120, 120, 255, 200, 200, 200, 255, 255, 255, 255, 255]);
   gradient = new THREE.DataTexture(data, 3, 1, THREE.RGBAFormat);
   gradient.minFilter = THREE.NearestFilter;
   gradient.magFilter = THREE.NearestFilter;
@@ -28,97 +33,284 @@ export function toon(color) {
   return matCache.get(key);
 }
 
-const G = {};
-function geo() {
-  if (G.limb) return G;
-  G.limb = new THREE.CylinderGeometry(0.075, 0.062, 1, 7); G.limb.translate(0, -0.5, 0); // pivot at top
-  G.thigh = new THREE.CylinderGeometry(0.095, 0.075, 1, 7); G.thigh.translate(0, -0.5, 0);
-  G.torso = new THREE.CylinderGeometry(0.2, 0.16, 1, 8); G.torso.translate(0, 0.5, 0);
-  G.pads = new THREE.BoxGeometry(0.62, 0.16, 0.34);
-  G.helmet = new THREE.SphereGeometry(0.17, 12, 9);
-  G.head = new THREE.SphereGeometry(0.13, 12, 9);
-  G.mask = new THREE.TorusGeometry(0.13, 0.014, 4, 10, Math.PI);
-  G.hand = new THREE.SphereGeometry(0.055, 6, 5);
-  G.shoe = new THREE.BoxGeometry(0.12, 0.08, 0.26);
-  G.hips = new THREE.BoxGeometry(0.36, 0.18, 0.22);
-  G.shadow = new THREE.CircleGeometry(0.5, 14);
-  G.plane = new THREE.PlaneGeometry(0.26, 0.26);
-  G.hairCap = new THREE.SphereGeometry(0.138, 10, 6, 0, Math.PI * 2, 0, Math.PI / 1.9);
-  G.afro = new THREE.SphereGeometry(0.19, 10, 8);
-  G.ponytail = new THREE.BoxGeometry(0.16, 0.28, 0.08);
-  G.ball = new THREE.SphereGeometry(0.11, 10, 8);
-  return G;
-}
-const shadowMat = new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.32, depthWrite: false });
-
-const numberCache = new Map();
-function numberTexture(num, fg, bg) {
-  const key = `${num}|${fg}|${bg}`;
-  if (numberCache.has(key)) return numberCache.get(key);
+const texCache = new Map();
+/** Pixel texture: draw(g, w, h) on a tiny canvas; cached by key. Returns a toon material. */
+function pixMat(key, w, h, draw, { transparent = false } = {}) {
+  if (texCache.has(key)) return texCache.get(key);
   const c = document.createElement('canvas');
-  c.width = 64;
-  c.height = 64;
+  c.width = w;
+  c.height = h;
   const g = c.getContext('2d');
-  g.fillStyle = bg;
-  g.fillRect(0, 0, 64, 64);
-  g.font = '900 44px "Arial Black", Arial, sans-serif';
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.lineWidth = 5;
-  g.strokeStyle = 'rgba(0,0,0,0.35)';
-  g.strokeText(String(num), 32, 35);
-  g.fillStyle = fg;
-  g.fillText(String(num), 32, 35);
+  g.imageSmoothingEnabled = false;
+  draw(g, w, h);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
-  const m = new THREE.MeshToonMaterial({ map: t, gradientMap: toonGradient() });
-  numberCache.set(key, m);
+  t.magFilter = THREE.NearestFilter;
+  t.minFilter = THREE.NearestFilter;
+  t.generateMipmaps = false;
+  const m = new THREE.MeshToonMaterial({ map: t, gradientMap: toonGradient(), transparent, alphaTest: transparent ? 0.5 : 0 });
+  texCache.set(key, m);
   return m;
 }
+const px = (g, x, y, c, w = 1, h = 1) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
 
-export const SKINS = ['#f3cfa6', '#e2b07a', '#c68a52', '#94603a', '#62402a'];
-export const HAIRS = ['#1c1410', '#3b2414', '#6b4423', '#a8743f', '#d9b36a', '#7a2e1c', '#2b2b2b'];
+const G = {};
+const box = (w, h, d, py = 0) => { const b = new THREE.BoxGeometry(w, h, d); if (py) b.translate(0, py, 0); return b; };
+function geo() {
+  if (G.thigh) return G;
+  G.thigh = box(0.17, 0.48, 0.18, -0.24);
+  G.shin = box(0.145, 0.44, 0.15, -0.22);
+  G.shoe = box(0.16, 0.1, 0.28);
+  G.hips = box(0.38, 0.2, 0.24);
+  G.torso = box(0.44, 0.52, 0.26, 0.26);
+  G.pads = box(0.64, 0.17, 0.34);
+  G.upper = box(0.14, 0.33, 0.14, -0.15);
+  G.fore = box(0.125, 0.3, 0.125, -0.15);
+  G.hand = box(0.12, 0.11, 0.12);
+  G.band = box(0.14, 0.06, 0.14);
+  G.head = box(0.36, 0.36, 0.34);
+  G.headScale = 1.14;
+  G.ball = new THREE.SphereGeometry(0.11, 8, 6);
+  G.shadow = new THREE.CircleGeometry(0.5, 14);
+  return G;
+}
+const shadowMat = new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.3, depthWrite: false });
+
+// ---- legacy palettes (kept for older callers)
+export const SKINS = SKIN_TONES;
+export const HAIRS = HAIR_COLORS;
+
+const INK = '#22324a';
+function drawTattoo(g, style, x0, y0, w, h) {
+  if (!style || style === 'none') return;
+  const P = (x, y) => px(g, x0 + x, y0 + y, INK);
+  if (style === 'band') { for (let x = 0; x < w; x++) { P(x, 2); P(x, 4); if (x % 2) P(x, 3); } }
+  else if (style === 'tribal') { for (let x = 0; x < w; x++) { P(x, 1 + (x % 3)); P(x, 4 + ((x + 1) % 3)); } }
+  else if (style === 'sleeve') { for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if ((x * 3 + y * 5) % 4 !== 0) P(x, y); }
+  else if (style === 'stars') { [[1, 1], [5, 3], [2, 6], [6, 8], [3, 10]].forEach(([x, y]) => { if (y < h) { P(x, y); P(x - 1, y); P(x + 1, y); P(x, y - 1); P(x, y + 1); } }); }
+  else if (style === 'script') { for (let y = 2; y < h - 1; y += 3) for (let x = 1; x < w - 1; x++) if ((x + y) % 3) P(x, y); }
+  else if (style === 'cross') { for (let y = 1; y < Math.min(h, 8); y++) P(Math.floor(w / 2), y); for (let x = Math.floor(w / 2) - 2; x <= Math.floor(w / 2) + 2; x++) P(x, 3); }
+}
+
+// ---- head textures (12x12 pixels per face)
+const HAIR_FRONT = { bald: 0, buzz: 1, short: 2, fade: 2, flattop: 2, curly: 3, afro: 3, mohawk: 0, dreads: 3, braids: 2, long: 3, bun: 2 };
+const HAIR_BACK = { bald: 0, buzz: 6, short: 7, fade: 5, flattop: 6, curly: 8, afro: 10, mohawk: 0, dreads: 12, braids: 12, long: 12, bun: 8 };
+
+function faceMat(L, hc, { eyeBlack = false } = {}) {
+  const key = `face|${L.skin}|${L.hairStyle}|${L.hairColor}|${L.eyeColor}|${L.eyes}|${L.brows}|${L.nose}|${L.mouth}|${L.beard}|${eyeBlack}`;
+  return pixMat(key, 12, 12, (g) => {
+    const sk = SKIN_TONES[L.skin % SKIN_TONES.length];
+    const dk = shade(sk, -0.18);
+    const dk2 = shade(sk, -0.38);
+    px(g, 0, 0, sk, 12, 12);
+    px(g, 0, 11, shade(sk, -0.08), 12, 1);
+    // hair fringe
+    const fr = HAIR_FRONT[L.hairStyle] ?? 2;
+    const hcol = L.hairStyle === 'buzz' ? shade(hc, 0.15) : hc;
+    if (fr) px(g, 0, 0, hcol, 12, fr);
+    if (L.hairStyle === 'fade' || L.hairStyle === 'short') { px(g, 0, 2, hcol, 1, 2); px(g, 11, 2, hcol, 1, 2); }
+    if (L.hairStyle === 'curly' || L.hairStyle === 'afro') { px(g, 1, 3, hcol); px(g, 4, 3, hcol); px(g, 7, 3, hcol); px(g, 10, 3, hcol); px(g, 0, 3, hcol, 1, 3); px(g, 11, 3, hcol, 1, 3); }
+    if (L.hairStyle === 'long' || L.hairStyle === 'dreads' || L.hairStyle === 'braids') { px(g, 0, 0, hcol, 2, 10); px(g, 10, 0, hcol, 2, 10); }
+    if (L.hairStyle === 'dreads') { px(g, 2, 3, hcol); px(g, 9, 3, hcol); px(g, 5, 3, hcol, 2, 1); }
+    if (L.hairStyle === 'mohawk') { px(g, 5, 0, hc, 2, 2); px(g, 0, 0, shade(sk, -0.1), 4, 1); px(g, 8, 0, shade(sk, -0.1), 4, 1); }
+    // brows (row 4, or 3 when raised)
+    const bc = (L.hairColor ?? 0) > 8 ? '#2a1a12' : shade(hc, -0.1);
+    const by = L.brows === 'raised' ? 3 : 4;
+    if (L.brows === 'thick') { px(g, 2, 3, bc, 3, 2); px(g, 7, 3, bc, 3, 2); }
+    else if (L.brows === 'thin') { px(g, 3, by, bc, 2, 1); px(g, 7, by, bc, 2, 1); }
+    else if (L.brows === 'angry') { px(g, 2, 3, bc); px(g, 3, 3, bc); px(g, 4, 4, bc); px(g, 9, 3, bc); px(g, 8, 3, bc); px(g, 7, 4, bc); }
+    else { px(g, 2, by, bc, 3, 1); px(g, 7, by, bc, 3, 1); }
+    // eyes (rows 5-6)
+    const ec = EYE_COLORS[L.eyeColor % EYE_COLORS.length];
+    const eye = (x, inner) => {
+      if (L.eyes === 'narrow') { px(g, x, 6, '#fafafa', 2, 1); px(g, inner, 6, ec); }
+      else if (L.eyes === 'sleepy') { px(g, x, 5, dk, 2, 1); px(g, x, 6, '#fafafa', 2, 1); px(g, inner, 6, ec); }
+      else if (L.eyes === 'wide') { px(g, x, 5, '#fafafa', 2, 2); px(g, inner, 5, ec, 1, 2); px(g, inner, 5, '#0d0d0d'); }
+      else { px(g, x, 5, '#fafafa', 2, 2); px(g, inner, 5, ec, 1, 2); }
+    };
+    eye(2, 3); eye(8, 8);
+    if (eyeBlack) { px(g, 2, 7, '#111111', 3, 1); px(g, 7, 7, '#111111', 3, 1); }
+    // nose
+    if (L.nose === 'wide') px(g, 4, 7, dk, 4, 1);
+    else if (L.nose === 'long') { px(g, 5, 6, dk, 2, 2); px(g, 5, 7, dk2, 2, 1); }
+    else px(g, 5, 7, dk, 2, 1);
+    // beard
+    const natural = (L.hairColor ?? 0) <= 8 ? hc : HAIR_COLORS[1];
+    const bh = shade(natural, -0.05);
+    if (L.beard === 'stubble') { for (let y = 8; y < 12; y++) for (let x = 1; x < 11; x++) if ((x + y) % 2 === 0) px(g, x, y, shade(sk, -0.22)); }
+    if (L.beard === 'full') { px(g, 0, 7, bh, 1, 5); px(g, 11, 7, bh, 1, 5); px(g, 1, 8, bh, 10, 4); }
+    if (L.beard === 'chinstrap') { px(g, 0, 6, bh, 1, 6); px(g, 11, 6, bh, 1, 6); px(g, 1, 10, bh, 10, 2); }
+    if (L.beard === 'goatee') px(g, 4, 10, bh, 4, 2);
+    if (L.beard === 'mustache' || L.beard === 'goatee' || L.beard === 'full') px(g, 3, 8, bh, 6, 1);
+    // mouth (row 9)
+    const lip = shade(sk, -0.45);
+    if (L.mouth === 'smile') { px(g, 4, 9, lip, 4, 1); px(g, 3, 8, lip); px(g, 8, 8, lip); }
+    else if (L.mouth === 'grin') { px(g, 4, 9, '#f6f6f6', 4, 1); px(g, 3, 9, lip); px(g, 8, 9, lip); px(g, 4, 10, lip, 4, 1); }
+    else if (L.mouth === 'smirk') { px(g, 5, 9, lip, 3, 1); px(g, 8, 8, lip); }
+    else if (L.mouth === 'serious') px(g, 4, 9, shade(sk, -0.3), 4, 1);
+    else px(g, 4, 9, lip, 4, 1);
+  });
+}
+
+function sideMat(L, hc, flip) {
+  const key = `side|${L.skin}|${L.hairStyle}|${L.hairColor}|${L.beard}|${flip}`;
+  return pixMat(key, 12, 12, (g) => {
+    const sk = SKIN_TONES[L.skin % SKIN_TONES.length];
+    px(g, 0, 0, sk, 12, 12);
+    const fx = (x, w = 1) => (flip ? 12 - x - w : x); // x measured from the back of the head
+    const top = HAIR_FRONT[L.hairStyle] ?? 2;
+    const back = HAIR_BACK[L.hairStyle] ?? 6;
+    if (top) px(g, 0, 0, hc, 12, Math.max(top, 2));
+    if (back) for (let x = 0; x < 6; x++) px(g, fx(x), 0, hc, 1, Math.max(0, back - x));
+    if (L.hairStyle === 'fade') px(g, fx(0, 7), 3, shade(hc, 0.25), 7, 2);
+    if (L.hairStyle === 'mohawk') px(g, 0, 0, shade(sk, -0.1), 12, 1);
+    px(g, fx(5, 2), 5, shade(sk, -0.2), 2, 3); // ear
+    if (L.beard === 'full' || L.beard === 'chinstrap') px(g, fx(6, 6), 9, shade((L.hairColor ?? 0) <= 8 ? hc : HAIR_COLORS[1], -0.05), 6, 3);
+  });
+}
+
+function backMat(L, hc) {
+  const key = `back|${L.skin}|${L.hairStyle}|${L.hairColor}`;
+  return pixMat(key, 12, 12, (g) => {
+    const sk = SKIN_TONES[L.skin % SKIN_TONES.length];
+    px(g, 0, 0, sk, 12, 12);
+    const back = HAIR_BACK[L.hairStyle] ?? 6;
+    if (back) px(g, 0, 0, hc, 12, back);
+    if (L.hairStyle === 'fade') px(g, 0, 4, shade(hc, 0.25), 12, 1);
+    if (L.hairStyle === 'braids') for (let x = 1; x < 12; x += 3) px(g, x, 0, shade(hc, -0.3), 1, 12);
+    if (L.hairStyle === 'dreads') for (let x = 0; x < 12; x += 2) px(g, x, 2, shade(hc, -0.25), 1, 10);
+    if (L.hairStyle === 'mohawk') px(g, 5, 0, hc, 2, 7);
+  });
+}
+
+function topMat(L, hc) {
+  const key = `top|${L.skin}|${L.hairStyle}|${L.hairColor}`;
+  return pixMat(key, 12, 12, (g) => {
+    const sk = SKIN_TONES[L.skin % SKIN_TONES.length];
+    if (L.hairStyle === 'bald') { px(g, 0, 0, sk, 12, 12); px(g, 4, 4, shade(sk, 0.15), 3, 2); return; }
+    if (L.hairStyle === 'mohawk') { px(g, 0, 0, shade(sk, -0.05), 12, 12); px(g, 5, 0, hc, 2, 12); return; }
+    px(g, 0, 0, hc, 12, 12);
+    const hi = shade(hc, 0.18);
+    for (let i = 0; i < 9; i++) px(g, (i * 5) % 12, (i * 7) % 12, hi);
+    if (L.hairStyle === 'braids') for (let x = 1; x < 12; x += 3) px(g, x, 0, shade(hc, -0.3), 1, 12);
+  });
+}
+
+/** Arm texture: 8x16. top rows = sleeve (jersey/shirt) unless bare, rest skin + tattoo or arm sleeve. */
+function armMat(skin, sleeveCol, trim, tattoo, part, armSleeve) {
+  const key = `arm|${skin}|${sleeveCol}|${trim}|${tattoo}|${part}|${armSleeve}`;
+  return pixMat(key, 8, 16, (g) => {
+    px(g, 0, 0, skin, 8, 16);
+    if (part === 'upper') {
+      drawTattoo(g, tattoo, 0, 7, 8, 9);
+      if (armSleeve) px(g, 0, 6, armSleeve, 8, 10);
+      px(g, 0, 0, sleeveCol, 8, 7);
+      if (trim) px(g, 0, 5, trim, 8, 1);
+    } else {
+      drawTattoo(g, tattoo, 0, 1, 8, 13);
+      if (armSleeve) px(g, 0, 0, armSleeve, 8, 15);
+    }
+  });
+}
+
+/** Jersey torso texture with stripes and a big blocky number. */
+function jerseyMat(un, number, side) {
+  const key = `jersey|${un.jersey}|${un.trim}|${un.numbers}|${number}|${side}`;
+  return pixMat(key, 22, 26, (g) => {
+    px(g, 0, 0, un.jersey, 22, 26);
+    px(g, 0, 22, shade(un.jersey, -0.15), 22, 4);
+    if (side === 'front') { px(g, 8, 0, shade(un.jersey, -0.25), 6, 2); px(g, 9, 2, shade(un.jersey, -0.25), 4, 1); }
+    if (number === undefined || side === 'side') { px(g, 0, 3, un.trim, 22, 1); return; }
+    const s = String(number);
+    g.font = side === 'front' ? 'bold 13px monospace' : 'bold 17px monospace';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    const y = side === 'front' ? 10 : 12;
+    // pixel outline
+    g.fillStyle = un.trim === un.numbers ? shade(un.jersey, -0.4) : un.trim;
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) g.fillText(s, 11 + dx, y + dy);
+    g.fillStyle = un.numbers;
+    g.fillText(s, 11, y);
+    // harden anti-aliasing into pixels
+    const img = g.getImageData(0, 0, 22, 26);
+    const d = img.data;
+    for (let i = 3; i < d.length; i += 4) d[i] = 255;
+    g.putImageData(img, 0, 0);
+  });
+}
+
+function padsMat(un) {
+  const key = `pads|${un.jersey}|${un.trim}`;
+  return pixMat(key, 16, 8, (g) => {
+    px(g, 0, 0, un.jersey, 16, 8);
+    px(g, 0, 2, un.trim, 16, 2);
+    px(g, 0, 7, shade(un.jersey, -0.2), 16, 1);
+  });
+}
+
+function shirtMat(color, side) {
+  const key = `shirt|${color}|${side}`;
+  return pixMat(key, 12, 14, (g) => {
+    px(g, 0, 0, color, 12, 14);
+    px(g, 0, 12, shade(color, -0.15), 12, 2);
+    if (side === 'front') { px(g, 4, 0, shade(color, -0.3), 4, 1); px(g, 5, 1, shade(color, -0.3), 2, 1); }
+  });
+}
+
+function helmetMat(un, side) {
+  const key = `helm|${un.helmet}|${un.stripe}|${side}`;
+  return pixMat(key, 12, 12, (g) => {
+    px(g, 0, 0, un.helmet, 12, 12);
+    px(g, 0, 10, shade(un.helmet, -0.2), 12, 2);
+    if (side === 'top') { px(g, 5, 0, un.stripe, 2, 12); px(g, 3, 3, shade(un.helmet, 0.35), 2, 2); }
+    if (side === 'side') { px(g, 3, 3, un.stripe, 6, 4); px(g, 4, 4, shade(un.stripe, -0.2), 4, 2); }
+    if (side === 'back') px(g, 5, 0, un.stripe, 2, 10);
+  });
+}
+
+const sixFaces = (right, left, top, bottom, back, front) => [right, left, top, bottom, back, front];
 
 // ------------------------------------------------------------------ rig
 
 /**
- * Build a character. o = { jersey, trim, pants, helmet, skin, number, football, shirt, hair, hairStyle,
- * build (0.85-1.2 width), height (0.92-1.08), highlight }
+ * Build a character. o = { football, uniform, look, number, helmet (bool), highlight, shirt, pants, shoe }
  */
 function buildRig(o) {
   const g = geo();
+  const L = o.look;
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
-  const h = o.height ?? 1;
-  const w = o.build ?? 1;
-  body.scale.set(w, h, w);
-  const skin = toon(o.skin);
-  const shirt = toon(o.jersey);
-  const pants = toon(o.pants);
-  const sock = toon(o.football ? o.jersey : o.pants);
-  const shoe = toon(o.shoe ?? '#16181c');
+  const sc = bodyScale(L);
+  body.scale.set(sc.build, sc.height, Math.min(1.15, 0.5 + sc.build * 0.5));
+  const skinC = SKIN_TONES[L.skin % SKIN_TONES.length];
+  const hairC = HAIR_COLORS[(L.hairColor ?? 0) % HAIR_COLORS.length];
+  const skin = toon(skinC);
+  const un = o.uniform;
+  const football = !!o.football;
+  const shirtC = football ? un.jersey : o.shirt;
+  const pantsC = football ? un.pants : o.pants;
+  const pants = toon(pantsC);
+  const sock = toon(football ? un.socks ?? un.jersey : skinC);
+  const shoe = toon(football ? L.cleats ?? '#16181c' : o.shoe ?? '#f1f1f1');
 
   const hips = new THREE.Group();
   hips.position.y = 0.95;
   body.add(hips);
-  const hipBox = new THREE.Mesh(g.hips, pants);
-  hips.add(hipBox);
+  hips.add(new THREE.Mesh(g.hips, pants));
 
   const mkLeg = (side) => {
     const hip = new THREE.Group();
-    hip.position.set(side * 0.11, -0.04, 0);
-    const thigh = new THREE.Mesh(g.thigh, pants);
-    thigh.scale.set(1, 0.46, 1);
-    hip.add(thigh);
+    hip.position.set(side * 0.1, -0.04, 0);
+    hip.add(new THREE.Mesh(g.thigh, pants));
     const knee = new THREE.Group();
-    knee.position.y = -0.46;
+    knee.position.y = -0.48;
     hip.add(knee);
-    const shin = new THREE.Mesh(g.limb, sock);
-    shin.scale.set(1.05, 0.44, 1.05);
+    const shin = new THREE.Mesh(g.shin, football ? sock : pants);
     knee.add(shin);
+    if (football) { const sk = new THREE.Mesh(box(0.15, 0.05, 0.155), toon(un.trim)); sk.position.y = -0.1; knee.add(sk); }
     const foot = new THREE.Mesh(g.shoe, shoe);
-    foot.position.set(0, -0.46, -0.05);
+    foot.position.set(0, -0.44, -0.05);
     knee.add(foot);
     hips.add(hip);
     return { hip, knee };
@@ -128,80 +320,59 @@ function buildRig(o) {
 
   const spine = new THREE.Group();
   hips.add(spine);
-  const torso = new THREE.Mesh(g.torso, shirt);
-  torso.scale.set(1, 0.52, 0.8);
+  const tm = football
+    ? sixFaces(jerseyMat(un, undefined, 'side'), jerseyMat(un, undefined, 'side'), toon(un.jersey), toon(un.jersey), jerseyMat(un, o.number, 'back'), jerseyMat(un, o.number, 'front'))
+    : sixFaces(toon(shirtC), toon(shirtC), toon(shirtC), toon(shirtC), shirtMat(shirtC, 'back'), shirtMat(shirtC, 'front'));
+  const torso = new THREE.Mesh(g.torso, tm);
+  torso.position.y = -0.02;
   spine.add(torso);
   const chest = new THREE.Group();
   chest.position.y = 0.5;
   spine.add(chest);
-  if (o.football) {
-    const pads = new THREE.Mesh(g.pads, shirt);
-    pads.position.y = -0.02;
+  if (football) {
+    const pads = new THREE.Mesh(g.pads, padsMat(un));
+    pads.position.y = -0.04;
     chest.add(pads);
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.035, 0.345), toon(o.trim));
-    stripe.position.y = 0.02;
-    chest.add(stripe);
-    if (o.number !== undefined) {
-      const back = new THREE.Mesh(g.plane, numberTexture(o.number, o.trim, o.jersey));
-      back.position.set(0, -0.2, 0.152);
-      chest.add(back);
-      const front = new THREE.Mesh(g.plane, numberTexture(o.number, o.trim, o.jersey));
-      front.position.set(0, -0.2, -0.152);
-      front.rotation.y = Math.PI;
-      chest.add(front);
-    }
   }
 
   const neck = new THREE.Group();
-  neck.position.y = 0.1;
+  neck.position.y = 0.07;
   chest.add(neck);
-  if (o.football) {
-    const helmet = new THREE.Mesh(g.helmet, toon(o.helmet));
-    helmet.scale.set(1, 1.05, 1.12);
-    helmet.position.y = 0.14;
-    neck.add(helmet);
-    const hs = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.03, 0.36), toon(o.trim));
-    hs.position.y = 0.315;
-    neck.add(hs);
-    const face = new THREE.Mesh(g.head, skin);
-    face.scale.set(0.8, 0.75, 0.6);
-    face.position.set(0, 0.11, -0.1);
-    neck.add(face);
-    const mask = new THREE.Mesh(g.mask, toon('#aab4be'));
-    mask.rotation.set(Math.PI / 2, 0, 0);
-    mask.position.set(0, 0.06, -0.12);
-    neck.add(mask);
-  } else {
-    const head = new THREE.Mesh(g.head, skin);
-    head.position.y = 0.14;
-    neck.add(head);
-    const hair = toon(o.hair ?? '#1c1410');
-    const style = o.hairStyle ?? 0;
-    if (style === 3) { const a = new THREE.Mesh(g.afro, hair); a.position.set(0, 0.2, 0.02); neck.add(a); }
-    else if (style !== 1) {
-      const cap = new THREE.Mesh(g.hairCap, hair);
-      cap.position.y = 0.155;
-      neck.add(cap);
-      if (style === 2) { const pt = new THREE.Mesh(g.ponytail, hair); pt.position.set(0, 0.06, 0.13); neck.add(pt); }
-    } else { const buzz = new THREE.Mesh(g.hairCap, hair); buzz.scale.setScalar(0.96); buzz.position.y = 0.15; neck.add(buzz); }
-    const eyeM = toon('#1a1a1a');
-    for (const s of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.018, 4, 3), eyeM); e.position.set(s * 0.045, 0.16, -0.12); neck.add(e); }
-  }
+  // counter the body's width scale so heads stay square
+  neck.scale.set(1 / sc.build, 1 / sc.height * 0.96 + 0.04, 1 / body.scale.z);
+  const neckBox = new THREE.Mesh(box(0.14, 0.08, 0.14), skin);
+  neckBox.position.y = 0.02;
+  neck.add(neckBox);
+  const helmetOn = football && o.helmet !== false;
+  const head = new THREE.Mesh(g.head, sixFaces(
+    sideMat(L, hairC, false), sideMat(L, hairC, true), topMat(L, hairC), skin, backMat(L, hairC),
+    faceMat(L, hairC, { eyeBlack: helmetOn && L.eyeBlack }),
+  ));
+  head.position.y = 0.23;
+  // Big chunky heads: everything above the neck lives in a scaled group.
+  const headGroup = new THREE.Group();
+  headGroup.scale.setScalar(g.headScale);
+  headGroup.position.y = -0.02;
+  neck.add(headGroup);
+  headGroup.add(head);
+  if (helmetOn) addHelmet(headGroup, un, L, hairC);
+  else addHairVolume(headGroup, L, hairC);
 
   const mkArm = (side) => {
     const sh = new THREE.Group();
-    sh.position.set(side * (o.football ? 0.3 : 0.24), -0.05, 0);
-    const upper = new THREE.Mesh(g.limb, shirt);
-    upper.scale.set(1, 0.32, 1);
-    sh.add(upper);
+    sh.position.set(side * (football ? 0.3 : 0.27), -0.06, 0);
+    const tat = side < 0 ? L.tatL : L.tatR;
+    const sleeveOn = football && (L.sleeve === 'both' || L.sleeve === (side < 0 ? 'left' : 'right'));
+    const armSleeve = sleeveOn ? L.sleeveColor : null;
+    sh.add(new THREE.Mesh(g.upper, armMat(skinC, shirtC, football ? un.trim : null, tat, 'upper', armSleeve)));
     const el = new THREE.Group();
-    el.position.y = -0.32;
+    el.position.y = -0.31;
     sh.add(el);
-    const fore = new THREE.Mesh(g.limb, o.football ? shirt : skin);
-    fore.scale.set(0.9, 0.29, 0.9);
-    el.add(fore);
-    const hand = new THREE.Mesh(g.hand, o.football ? toon(o.glove ?? o.trim) : skin);
-    hand.position.y = -0.31;
+    el.add(new THREE.Mesh(g.fore, armMat(skinC, shirtC, null, tat, 'fore', armSleeve)));
+    const wrist = football && (L.wristband === 'both' || L.wristband === (side < 0 ? 'left' : 'right'));
+    if (wrist) { const b = new THREE.Mesh(g.band, toon(L.wristColor ?? '#f2f2f2')); b.position.y = -0.25; el.add(b); }
+    const hand = new THREE.Mesh(g.hand, football && L.gloves ? toon(L.gloves) : skin);
+    hand.position.y = -0.34;
     el.add(hand);
     chest.add(sh);
     return { sh, el };
@@ -222,33 +393,82 @@ function buildRig(o) {
     ...root.userData,
     rig: { body, hips, spine, chest, neck, legL, legR, armL, armR },
     u: { speed: 0, phase: Math.random() * 6, back: false, hold: null, action: null, down: false, downT: 0, hop: 0, yaw: 0, targetYaw: 0, celebrate: null },
+    look: L,
     ticked: 0,
   };
   return root;
 }
 
-const COLORS_DEFAULT_SKIN = () => SKINS[Math.floor(Math.random() * SKINS.length)];
+function addHelmet(neck, un, L, hairC) {
+  const H = new THREE.Group();
+  H.position.y = 0.25;
+  neck.add(H);
+  const side = helmetMat(un, 'side');
+  const add = (geom, mat, x, y, z) => { const m = new THREE.Mesh(geom, mat); m.position.set(x, y, z); H.add(m); return m; };
+  add(box(0.44, 0.1, 0.44), sixFaces(toon(un.helmet), toon(un.helmet), helmetMat(un, 'top'), toon(un.helmet), toon(un.helmet), toon(un.helmet)), 0, 0.19, 0.01);
+  add(box(0.44, 0.34, 0.08), sixFaces(toon(un.helmet), toon(un.helmet), toon(un.helmet), toon(un.helmet), helmetMat(un, 'back'), toon(un.helmet)), 0, 0.0, 0.19);
+  add(box(0.05, 0.34, 0.4), side, -0.2, 0.0, 0.0);
+  add(box(0.05, 0.34, 0.4), side, 0.2, 0.0, 0.0);
+  add(box(0.42, 0.05, 0.05), toon(un.helmet), 0, 0.14, -0.2); // brim
+  const mask = toon('#c3cad3');
+  add(box(0.4, 0.03, 0.03), mask, 0, -0.04, -0.235);
+  add(box(0.36, 0.03, 0.03), mask, 0, -0.12, -0.225);
+  add(box(0.03, 0.12, 0.03), mask, 0, -0.08, -0.235);
+  add(box(0.03, 0.1, 0.06), mask, -0.19, -0.07, -0.205);
+  add(box(0.03, 0.1, 0.06), mask, 0.19, -0.07, -0.205);
+  if (L.visor && L.visor !== 'none') {
+    const col = { clear: '#cfe8ff', dark: '#111418', gold: '#e8b730' }[L.visor];
+    const v = new THREE.Mesh(box(0.36, 0.09, 0.01), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: L.visor === 'clear' ? 0.35 : 0.85 }));
+    v.position.set(0, 0.05, -0.2);
+    H.add(v);
+  }
+  // long hair and locs hang out the back of the helmet
+  if (['long', 'dreads', 'braids'].includes(L.hairStyle)) {
+    const hm = toon(hairC);
+    if (L.hairStyle === 'long') add(box(0.3, 0.22, 0.06), hm, 0, -0.27, 0.19);
+    else for (const x of [-0.12, -0.04, 0.04, 0.12]) add(box(0.05, 0.26, 0.05), hm, x, -0.28, 0.2);
+  }
+}
 
-/** Football player in team colors. colors = [primary, secondary] or a uniform object. */
-export function makePlayer(colors, { highlight = false, skin, number, build, height, uniform } = {}) {
-  const un = uniform ?? { jersey: colors[0], trim: colors[1], helmet: colors[0], pants: lightOrDark(colors[1]) };
+function addHairVolume(neck, L, hairC) {
+  const hm = toon(hairC);
+  const add = (w, h, d, x, y, z, m = hm) => { const mesh = new THREE.Mesh(box(w, h, d), m); mesh.position.set(x, y, z); neck.add(mesh); return mesh; };
+  const top = 0.23 + 0.18;
+  switch (L.hairStyle) {
+    case 'afro': add(0.46, 0.22, 0.44, 0, top + 0.06, 0.02); add(0.44, 0.16, 0.2, 0, top - 0.08, 0.13); break;
+    case 'curly': add(0.39, 0.08, 0.37, 0, top + 0.02, 0.01); add(0.1, 0.06, 0.1, -0.1, top + 0.08, -0.05); add(0.1, 0.06, 0.1, 0.08, top + 0.08, 0.06); break;
+    case 'flattop': add(0.36, 0.12, 0.32, 0, top + 0.06, 0.01); break;
+    case 'mohawk': add(0.07, 0.1, 0.36, 0, top + 0.05, 0.01); break;
+    case 'short': add(0.37, 0.04, 0.35, 0, top + 0.01, 0.005); break;
+    case 'bun': add(0.37, 0.03, 0.35, 0, top, 0); add(0.14, 0.12, 0.12, 0, top + 0.04, 0.16); break;
+    case 'long': add(0.38, 0.04, 0.36, 0, top + 0.01, 0); add(0.38, 0.42, 0.06, 0, 0.12, 0.19); break;
+    case 'dreads': add(0.38, 0.05, 0.36, 0, top + 0.02, 0); for (let i = 0; i < 6; i++) add(0.05, 0.32, 0.05, -0.15 + i * 0.06, 0.1, 0.18); add(0.05, 0.26, 0.05, -0.19, 0.13, 0.06); add(0.05, 0.26, 0.05, 0.19, 0.13, 0.06); break;
+    case 'braids': add(0.37, 0.03, 0.35, 0, top, 0); add(0.06, 0.36, 0.06, -0.08, 0.1, 0.19); add(0.06, 0.36, 0.06, 0.08, 0.1, 0.19); break;
+    default: break;
+  }
+}
+
+function uniformFrom(colors) {
+  const [p, s] = colors;
+  const light = (c) => parseInt(c.slice(1), 16) > 0xdddddd;
+  return { jersey: p, trim: s, numbers: light(p) ? s : light(s) ? s : '#ffffff', pants: light(s) ? '#eceef1' : s, helmet: p, stripe: s, socks: p };
+}
+
+/**
+ * Football player. colors = [primary, secondary]; or pass a full `uniform` (see data/kits.js).
+ * look: a full look (data/looks.js); random if omitted. helmet: false shows the head and hair.
+ */
+export function makePlayer(colors, { highlight = false, number, uniform, look, helmet = true, position } = {}) {
   return buildRig({
-    football: true, ...un, skin: typeof skin === 'number' ? SKINS[skin % 5] : skin ?? COLORS_DEFAULT_SKIN(),
-    number: number ?? Math.floor(Math.random() * 89) + 1, build: build ?? 0.92 + Math.random() * 0.22, height: height ?? 0.95 + Math.random() * 0.1, highlight,
+    football: true, uniform: uniform ?? uniformFrom(colors), look: look ? normalizeLook(look) : randomLook(Math.random, { position }),
+    number: number ?? Math.floor(Math.random() * 89) + 1, helmet, highlight,
   });
 }
 
-function lightOrDark(c) {
-  return parseInt(c.slice(1), 16) > 0xdddddd ? '#e6e9ee' : c;
-}
-
-/** Person in casual clothes. look = { shirt, pants, skin (index), hair (index), hairStyle, build, height } */
+/** Person in casual clothes. look = full look (shirt, pants, shoe + face/hair/body fields). */
 export function makePerson(look, { highlight = false } = {}) {
-  return buildRig({
-    football: false, jersey: look.shirt, pants: look.pants ?? '#34495e', skin: SKINS[(look.skin ?? 0) % 5],
-    hair: HAIRS[(look.hair ?? 0) % HAIRS.length], hairStyle: look.hairStyle ?? 0, build: look.build ?? 1, height: look.height ?? 1, highlight,
-    shoe: look.shoe ?? '#f1f1f1',
-  });
+  const L = normalizeLook(look, JSON.stringify(look ?? {}).length);
+  return buildRig({ football: false, look: L, shirt: L.shirt ?? '#3a86ff', pants: L.pants ?? '#34495e', shoe: L.shoe ?? '#f1f1f1', highlight });
 }
 
 // ------------------------------------------------------------------ animation
@@ -410,7 +630,7 @@ export function celebrate(p, style) {
   u.down = false;
   u.hold = null;
   u.celebT = 0;
-  u.celebrate = style ?? CELEBRATIONS[Math.floor(Math.random() * CELEBRATIONS.length)];
+  u.celebrate = style ?? p.userData.look?.celebration ?? CELEBRATIONS[Math.floor(Math.random() * CELEBRATIONS.length)];
 }
 export function stopCelebrate(p) { p.userData.u.celebrate = null; }
 
@@ -430,7 +650,7 @@ export function setHop(p, h) { p.userData.u.hop = Math.max(p.userData.u.hop, h);
 
 export function makeBall() {
   const g = new THREE.Group();
-  const b = new THREE.Mesh(geo().ball, toon('#8b4513'));
+  const b = new THREE.Mesh(geo().ball, Object.assign(toon('#8b4513').clone(), { flatShading: true }));
   b.scale.set(1, 1, 1.75);
   g.add(b);
   const lace = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.02, 0.14), toon('#ffffff'));

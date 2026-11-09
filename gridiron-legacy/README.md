@@ -6,7 +6,7 @@ to the Hall of Fame. You play only the key moments (a throw, a cut, a catch) in 
 relationships, money, fame, injuries and 125 branching story events.
 
 Mobile-first (portrait, touch), and it also works with a mouse and keyboard. The look is
-low-poly 3D players with a smooth toon look on an angled field, with a clean modern UI around it.
+chunky voxel players with pixel-art faces on a retro-rendered 3D field, with a clean modern UI around it.
 
 ## Run it
 
@@ -73,12 +73,15 @@ for five play styles (Balanced, Grinder, Social, Gunslinger, Cautious), across a
    - **Goal-line dive**: tap fast to drive the pile, then time your leap.
    - Touchdowns trigger a celebration cutscene.
 5. **Seasons**: standings, playoffs and a title game. End-of-season awards, records, aging.
-6. **Career**: pick a hometown and one of its 2-3 high schools (the crosstown school is your rival) →
+6. **Your look**: build your athlete in the creator (skin, hair, face, tattoos, gear, height and
+   weight, touchdown celebration) and change it any time from **Career → Edit look** (size is fixed).
+   Before each game, pick your **Home, Away or Alternate** uniform; the opponent avoids a clash.
+7. **Career**: pick a hometown and one of its 2-3 high schools (the crosstown school is your rival) →
    2 high school seasons → offers from a random mix of 32 colleges in 4 conferences → 3 college
    seasons (or declare early) → a pick-by-pick draft where teams weigh your college résumé against
    their needs → pro seasons with contracts, free agency and a
    salary cap → retirement at 34, when your rating declines, or when you choose (30+).
-7. **Legacy**: Journeyman, Solid Starter, Star of Your Era, or Hall of Fame.
+8. **Legacy**: Journeyman, Solid Starter, Star of Your Era, or Hall of Fame.
 
 Everything autosaves to one of three save slots. Slots can be exported/imported as files.
 Settings: light/dark/auto theme, sound, reduced motion, tutorial tips.

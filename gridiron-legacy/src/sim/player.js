@@ -4,6 +4,7 @@ import { PERKS } from '../data/lifestyle.js';
 import { itemTrainBonus } from './shop.js';
 import { clamp } from '../core/util.js';
 import { gauss, randRange } from '../core/rng.js';
+import { sizeStatMods } from '../data/looks.js';
 
 /** Weighted average of the four stats using the position's weights. */
 export function calcOverall(stats, pos) {
@@ -21,12 +22,14 @@ export function refreshOverall(p) {
 export function createAthlete(state, opts) {
   const bg = BACKGROUNDS.find((b) => b.id === opts.background) ?? BACKGROUNDS[0];
   const stats = {};
-  for (const k of STAT_KEYS) stats[k] = clamp(43 + bg.stats[k] + gauss(state, 0, 2), 30, 60);
+  const mods = opts.look ? sizeStatMods(opts.look, opts.position) : {};
+  for (const k of STAT_KEYS) stats[k] = clamp(43 + bg.stats[k] + (mods[k] ?? 0) + gauss(state, 0, 2), 30, 60);
   const p = {
     first: opts.first,
     last: opts.last,
     position: opts.position,
     number: opts.number,
+    look: opts.look ?? null,
     hometown: opts.hometown,
     background: bg.id,
     age: 16,

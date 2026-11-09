@@ -9,16 +9,16 @@ const cache = new Map();
 function ensure() {
   if (R) return R;
   try {
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, preserveDrawingBuffer: true });
     renderer.setPixelRatio(1);
-    renderer.setSize(160, 200, false);
+    renderer.setSize(80, 100, false);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     const scene = new THREE.Scene();
     scene.add(new THREE.HemisphereLight('#ffffff', '#555555', 1.8));
     const sun = new THREE.DirectionalLight('#fff3dc', 1.8);
     sun.position.set(-2, 4, -5);
     scene.add(sun);
-    const camera = new THREE.PerspectiveCamera(30, 160 / 200, 0.1, 50);
+    const camera = new THREE.PerspectiveCamera(30, 80 / 100, 0.1, 50);
     R = { renderer, scene, camera };
   } catch {
     R = false;
@@ -26,19 +26,28 @@ function ensure() {
   return R;
 }
 
-/** Returns a data URL of a head-and-shoulders portrait. kind 'person' (look) or 'player' ({ colors, number, skin }). */
-export function portraitURL(spec, { full = false } = {}) {
-  const key = JSON.stringify(spec) + (full ? 'F' : '');
+/**
+ * Returns a data URL of a pixel portrait. spec is a person look, or a player
+ * { colors, uniform, look, number, helmet } (helmet defaults to off so the face shows).
+ * opts: { full: full body, yaw: turn, big: render at 2x resolution }
+ */
+export function portraitURL(spec, { full = false, yaw = 0.35, big = false } = {}) {
+  const key = JSON.stringify(spec) + (full ? 'F' : '') + yaw + big;
   if (cache.has(key)) return cache.get(key);
   const r = ensure();
   if (!r) return null;
-  const model = spec.colors ? makePlayer(spec.colors, { number: spec.number ?? 1, skin: spec.skin ?? 1, build: spec.build ?? 1, height: spec.height ?? 1 }) : makePerson(spec);
-  model.rotation.y = Math.PI + 0.35; // face the camera, slight turn
+  const isPlayer = spec.colors || spec.uniform;
+  const model = isPlayer
+    ? makePlayer(spec.colors ?? [spec.uniform.jersey, spec.uniform.trim], { number: spec.number ?? 1, uniform: spec.uniform, look: spec.look ?? { skin: spec.skin ?? 2 }, helmet: spec.helmet ?? false })
+    : makePerson(spec);
+  r.renderer.setSize(big ? 160 : 80, big ? 200 : 100, false);
+  model.rotation.y = Math.PI + yaw; // face the camera, slight turn
   model.userData.u.targetYaw = model.rotation.y;
   for (let i = 0; i < 4; i++) animateRun(model, 0.1, 0);
   r.scene.add(model);
-  if (full) { r.camera.position.set(0, 1.15, 5.2); r.camera.lookAt(0, 1.0, 0); }
-  else { r.camera.position.set(0, 1.75, 2.4); r.camera.lookAt(0, 1.6, 0); }
+  const hs = model.userData.rig.body.scale.y;
+  if (full) { r.camera.position.set(0, 1.12 * hs, 4.0); r.camera.lookAt(0, 1.02 * hs, 0); }
+  else { r.camera.position.set(0, 1.74 * hs, 2.3); r.camera.lookAt(0, 1.64 * hs, 0); }
   r.renderer.setClearColor(0x000000, 0);
   r.renderer.render(r.scene, r.camera);
   const url = r.renderer.domElement.toDataURL('image/png');
@@ -51,7 +60,7 @@ export function portraitURL(spec, { full = false } = {}) {
 export function portraitImg(spec, size = 48, opts = {}) {
   const url = portraitURL(spec, opts);
   const img = document.createElement(url ? 'img' : 'div');
-  img.style.cssText = `width:${size * 0.8}px;height:${size}px;flex:none;object-fit:contain;${url ? '' : `border-radius:50%;background:${spec.shirt ?? spec.colors?.[0] ?? '#888'}`}`;
+  img.style.cssText = `width:${size * 0.8}px;height:${size}px;flex:none;object-fit:contain;image-rendering:pixelated;${url ? '' : `border-radius:50%;background:${spec.shirt ?? spec.colors?.[0] ?? '#888'}`}`;
   if (url) { img.src = url; img.alt = ''; }
   return img;
 }

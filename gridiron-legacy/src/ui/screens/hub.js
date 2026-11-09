@@ -16,6 +16,10 @@ import { icon, activityIcon } from '../icons.js';
 import { peopleView, storeView } from './people.js';
 import { placeCards, enterWorld } from './world.js';
 import { openPhone, phoneBadge } from './phone.js';
+import { openLookModal } from './look.js';
+import { teamKits } from '../../data/kits.js';
+import { portraitImg } from '../../scenes/portrait.js';
+import { people } from '../../sim/social.js';
 
 function forecastRow(st) {
   const f = st.week?.forecast;
@@ -338,7 +342,10 @@ function careerView(app) {
   const awardCounts = {};
   for (const a of p.awards) awardCounts[a.name] = (awardCounts[a.name] ?? 0) + 1;
   return h('div.col', { style: { gap: '14px' } },
-    h('div.card', h('div.row', jersey(p, team.colors, 120),
+    h('div.card', h('div.row',
+      h('div.col', { style: { alignItems: 'center', gap: '6px' } },
+        (people(st), portraitImg({ uniform: teamKits(team).home, look: p.look, number: p.number, helmet: false }, 130, { full: true, big: true })),
+        h('button.btn.small', { onclick: () => { sfx.click(); openLookModal(app, { uniform: teamKits(team).home }); } }, icon('star'), 'Edit look')),
       h('div.col.grow', { style: { gap: '4px' } },
         h('h2', `${p.first} ${p.last}`),
         h('span.small.muted', `${POSITIONS[p.position].label} · ${p.hometown}`),

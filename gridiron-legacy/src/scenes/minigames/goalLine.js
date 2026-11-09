@@ -14,19 +14,19 @@ export function goalLine(ctx) {
   const off = opts.teamColors;
   const def = opts.oppColors;
 
-  const runner = makePlayer(off, { highlight: true });
+  const runner = makePlayer(off, { highlight: true, look: opts.look, number: opts.number, uniform: opts.teamUniform });
   runner.position.set(0, 0, 4);
   group.add(runner);
   const ol = [];
   const dl = [];
   for (let i = 0; i < 7; i++) {
     const x = -6 + i * 2;
-    const o = makePlayer(off);
+    const o = makePlayer(off, { uniform: opts.teamUniform });
     o.position.set(x, 0, 0.9);
     setPose(o, 'tackle');
     group.add(o);
     ol.push(o);
-    const d = makePlayer(def);
+    const d = makePlayer(def, { uniform: opts.oppUniform });
     d.position.set(x, 0, -0.9);
     faceToward(d, x, 5);
     setPose(d, 'tackle');

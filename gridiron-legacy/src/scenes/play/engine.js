@@ -30,6 +30,8 @@ export function freePlay(ctx) {
   const wfx = weatherFx(m);
   const offColors = m.defense ? opts.oppColors : opts.teamColors;
   const defColors = m.defense ? opts.teamColors : opts.oppColors;
+  const offUniform = m.defense ? opts.oppUniform : opts.teamUniform;
+  const defUniform = m.defense ? opts.teamUniform : opts.oppUniform;
   const goalZ = -m.yardLine;
   const backLine = goalZ - 9.5;
   const clampPos = (p) => { p.x = Math.max(-FIELD_X - 1, Math.min(FIELD_X + 1, p.x)); p.z = Math.max(backLine, Math.min(25, p.z)); return p; };
@@ -42,7 +44,10 @@ export function freePlay(ctx) {
     const [n0, n1] = NUMBERS[role];
     const isUser = !!extra.user;
     const colors = team === 'off' ? offColors : defColors;
-    const mesh = makePlayer(colors, { highlight: isUser, number: extra.number ?? Math.floor(rnd(n0, n1 + 1)) });
+    const mesh = makePlayer(colors, {
+      highlight: isUser, number: isUser && opts.number !== undefined ? opts.number : extra.number ?? Math.floor(rnd(n0, n1 + 1)),
+      uniform: team === 'off' ? offUniform : defUniform, look: isUser ? opts.look : undefined, position: role,
+    });
     mesh.position.set(x, 0, z);
     faceToward(mesh, x, team === 'off' ? z - 5 : z + 5);
     mesh.userData.u.targetYaw = team === 'off' ? 0 : Math.PI;
