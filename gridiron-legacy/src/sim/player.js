@@ -70,6 +70,7 @@ export function emptyStats() {
     passAtt: 0, passComp: 0, passYds: 0, passTD: 0, int: 0, sacks: 0,
     rushAtt: 0, rushYds: 0, rushTD: 0, fumbles: 0,
     targets: 0, rec: 0, recYds: 0, recTD: 0, drops: 0,
+    tackles: 0, defInt: 0, pd: 0, defTD: 0, tgtAgainst: 0, recAllowed: 0, ydsAllowed: 0, tdAllowed: 0,
     grades: 0, // sum of game grades (average = grades / games)
     clutch: 0,
   };

@@ -42,14 +42,31 @@ export const ROOKIE_CONTRACT_YEARS = 3;
 
 /** How each play call changes a key moment. */
 export const PLAY_CALLS = {
-  safe: { label: 'Safe', difficulty: 0.8, reward: 0.75, turnover: 0.35, desc: 'Short and sure. Smaller gains, few mistakes.' },
+  safe: { label: 'Safe', difficulty: 0.92, reward: 0.62, turnover: 0.45, desc: 'Short and sure. Smaller gains, few mistakes.' },
   balanced: { label: 'Balanced', difficulty: 1.0, reward: 1.0, turnover: 1.0, desc: 'The honest play.' },
-  risky: { label: 'Risky', difficulty: 1.3, reward: 1.4, turnover: 2.2, desc: 'Go for the big one. Turnovers happen.' },
+  risky: { label: 'Risky', difficulty: 1.2, reward: 1.5, turnover: 1.9, desc: 'Go for the big one. Turnovers happen.' },
+};
+
+/** Difficulty: scales minigame timing windows. Harder settings also earn more legacy. */
+export const DIFFICULTIES = {
+  easy: { label: 'Easy', tol: 1.25, legacy: 0.9, desc: 'Generous timing. Learn the ropes.' },
+  normal: { label: 'Normal', tol: 1.0, legacy: 1.0, desc: 'A real challenge.' },
+  hard: { label: 'Hard', tol: 0.82, legacy: 1.1, desc: 'Tight windows, smart defenses.' },
+  legend: { label: 'Legend', tol: 0.68, legacy: 1.2, desc: 'Only the greats. Every mistake hurts.' },
+};
+
+/** Game-day weather. tol scales timing windows; pass extra-penalizes throws and catches. */
+export const WEATHER = {
+  clear: { label: 'Clear', icon: 'sun', tol: 1, pass: 1 },
+  night: { label: 'Night game', icon: 'moon', tol: 1, pass: 1 },
+  rain: { label: 'Rain', icon: 'rain', tol: 0.93, pass: 0.9 },
+  snow: { label: 'Snow', icon: 'snow', tol: 0.9, pass: 0.92 },
+  wind: { label: 'Windy', icon: 'wind', tol: 0.97, pass: 0.85 },
 };
 
 export const LEGACY_TIERS = [
   { min: 0, id: 'journeyman', label: 'Journeyman', blurb: 'You suited up, you competed, you belonged.' },
-  { min: 140, id: 'starter', label: 'Solid Starter', blurb: 'Coaches trusted you. Teammates leaned on you.' },
-  { min: 215, id: 'star', label: 'Star of Your Era', blurb: 'Kids wore your number. Defenses game-planned for you.' },
-  { min: 300, id: 'hof', label: 'Hall of Fame', blurb: 'Immortal. Your bust stands in Canton Ridge forever.' },
+  { min: 170, id: 'starter', label: 'Solid Starter', blurb: 'Coaches trusted you. Teammates leaned on you.' },
+  { min: 245, id: 'star', label: 'Star of Your Era', blurb: 'Kids wore your number. Defenses game-planned for you.' },
+  { min: 330, id: 'hof', label: 'Hall of Fame', blurb: 'Immortal. Your bust stands in Canton Ridge forever.' },
 ];

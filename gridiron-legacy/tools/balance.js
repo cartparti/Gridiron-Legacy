@@ -25,13 +25,13 @@ for (const [key, strat] of Object.entries(STRATEGIES)) {
   const legacy = [];
   const reasons = {};
   const awards = {};
-  const perfByPos = { QB: [], RB: [], WR: [] };
+  const perfByPos = { QB: [], RB: [], WR: [], CB: [] };
   let seasons = 0;
   let titles = 0;
   let undrafted = 0;
   const draftPicks = [];
-  const perGame = { QB: [], RB: [], WR: [] };
-  const perGameTD = { QB: [], RB: [], WR: [] };
+  const perGame = { QB: [], RB: [], WR: [], CB: [] };
+  const perGameTD = { QB: [], RB: [], WR: [], CB: [] };
   for (let i = 0; i < N; i++) {
     const seed = 1000 + i * 7919 + key.length * 104729;
     const st = simulateCareer(randomCareerOpts(seed), strat, SKILL);
@@ -55,8 +55,8 @@ for (const [key, strat] of Object.entries(STRATEGIES)) {
     else if (p.draft) draftPicks.push(p.draft.pick);
     const g = Math.max(1, p.proCareerStats.games);
     const s = p.proCareerStats;
-    perGame[p.position].push(p.position === 'QB' ? s.passYds / g : p.position === 'RB' ? s.rushYds / g : s.recYds / g);
-    perGameTD[p.position].push((s.passTD + s.rushTD + s.recTD) / g);
+    perGame[p.position].push(p.position === 'QB' ? s.passYds / g : p.position === 'RB' ? s.rushYds / g : p.position === 'CB' ? s.pd / g : s.recYds / g);
+    perGameTD[p.position].push(p.position === 'CB' ? s.defInt / g : (s.passTD + s.rushTD + s.recTD) / g);
   }
   rows.push({ perGame, perGameTD, key, tiers, peak, proSeasons, winPct, money, legacy, reasons, awards, seasons, titles, perfByPos, undrafted, draftPicks });
 }
@@ -68,7 +68,7 @@ for (const r of rows) {
   console.log(`  Team win% ${(mean(r.winPct) * 100).toFixed(1)}, titles per career ${(r.titles / N).toFixed(2)}, final bank ${fmtM(mean(r.money))}`);
   console.log(`  Draft: avg pick ${mean(r.draftPicks).toFixed(0)}, undrafted ${pct(r.undrafted, N)}`);
   console.log(`  Pro season perf: ${Object.entries(r.perfByPos).map(([k, v]) => `${k} ${mean(v).toFixed(1)}`).join(', ')}`);
-  console.log(`  Pro yards/game: ${Object.entries(r.perGame).map(([k, v]) => `${k} ${mean(v).toFixed(0)}`).join(', ')}; TD/game: ${Object.entries(r.perGameTD).map(([k, v]) => `${k} ${mean(v).toFixed(2)}`).join(', ')}`);
+  console.log(`  Pro yards/game (CB: PD/game): ${Object.entries(r.perGame).map(([k, v]) => `${k} ${mean(v).toFixed(0)}`).join(', ')}; TD/game (CB: INT/game): ${Object.entries(r.perGameTD).map(([k, v]) => `${k} ${mean(v).toFixed(2)}`).join(', ')}`);
   console.log(`  Retirement: ${Object.entries(r.reasons).map(([k, v]) => `${k} ${pct(v, N)}`).join(', ')}`);
   const top = Object.entries(r.awards).sort((a, b) => b[1] - a[1]).slice(0, 10);
   console.log(`  Awards per career: ${top.map(([k, v]) => `${k} ${(v / N).toFixed(2)}`).join(', ')}\n`);

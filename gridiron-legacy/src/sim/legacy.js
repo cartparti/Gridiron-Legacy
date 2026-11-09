@@ -1,9 +1,10 @@
 // Legacy score: turns a career into Journeyman / Solid Starter / Star / Hall of Fame.
-import { LEGACY_TIERS } from '../data/config.js';
+import { LEGACY_TIERS, DIFFICULTIES } from '../data/config.js';
 
 const AWARD_POINTS = {
   'Most Valuable Player': 32,
   'Offensive Player of the Year': 16,
+  'Defensive Player of the Year': 16,
   'All-League': 9,
   'Rookie of the Year': 7,
   'Comeback Player of the Year': 5,
@@ -30,12 +31,19 @@ export function computeLegacy(state) {
   add(`${p.records.length} record${p.records.length === 1 ? '' : 's'} broken`, p.records.length * 8);
   const s = p.proCareerStats;
   const yards = s.passYds / 3 + s.rushYds + s.recYds;
-  const tds = s.passTD * 0.6 + s.rushTD + s.recTD;
-  add('Career production', yards / 500 + tds * 0.4);
+  const tds = s.passTD * 0.6 + s.rushTD + s.recTD + (s.defInt ?? 0) * 0.9 + (s.defTD ?? 0) * 2;
+  const defYards = ((s.pd ?? 0) * 40 + (s.tackles ?? 0) * 12);
+  add('Career production', (yards + defYards) / 500 + tds * 0.4);
   const peak = Math.max(0, ...p.history.map((h) => h.ovr));
   add(`Peak overall ${Math.round(peak)}`, Math.max(0, peak - 75) * 2);
   add('Fame', p.fame / 4);
-  const score = lines.reduce((a, l) => a + l.pts, 0);
+  let score = lines.reduce((a, l) => a + l.pts, 0);
+  const diff = DIFFICULTIES[state.difficulty ?? 'normal'];
+  if (diff.legacy !== 1) {
+    const bonus = Math.round(score * (diff.legacy - 1));
+    lines.push({ label: `${diff.label} difficulty`, pts: bonus });
+    score += bonus;
+  }
   let tier = LEGACY_TIERS[0];
   for (const t of LEGACY_TIERS) if (score >= t.min) tier = t;
   // The Hall needs longevity, not just a hot streak.

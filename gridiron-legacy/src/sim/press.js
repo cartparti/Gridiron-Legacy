@@ -22,7 +22,7 @@ export function postGamePress(state, g, oppName, teamName) {
   const tokens = {
     name: `${p.first} ${p.last}`, last: p.last, team: teamName, opp: oppName,
     score: `${Math.max(g.score.home, g.score.away)}-${Math.min(g.score.home, g.score.away)}`,
-    yards, tds, title: STAGES[state.career.stage].titleName,
+    yards, tds, title: STAGES[state.career.stage].titleName, line: statPhrase(p.position, s),
   };
   let key;
   if (g.sitOut) key = 'sat_out';
@@ -41,4 +41,12 @@ export function postGamePress(state, g, oppName, teamName) {
     for (let i = 0; i < n; i++) addNews(state, 'fan', fillTokens(pick(state, FAN_POSTS[mood]), tokens), { handle: pick(state, FAN_HANDLES) });
   }
   return { headline, outlet };
+}
+
+/** Short stat phrase for headlines, e.g. "312 yards, 3 TD" or "2 INT, 7 tackles". */
+export function statPhrase(pos, s) {
+  if (pos === 'CB') return `${s.defInt} INT, ${s.pd} PD, ${s.tackles} Tackles`;
+  if (pos === 'QB') return `${s.passYds} Yards, ${s.passTD} TD`;
+  if (pos === 'RB') return `${s.rushYds} Yards, ${s.rushTD} TD`;
+  return `${s.recYds} Yards, ${s.recTD} TD`;
 }

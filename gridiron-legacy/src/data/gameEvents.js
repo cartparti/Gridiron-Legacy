@@ -1,0 +1,242 @@
+// Mid-game events: short decisions that pop up DURING a game.
+//
+// trigger: when it can fire
+//   pregame      before kickoff
+//   halftime     at the half
+//   afterTD      right after you score / make a big defensive play
+//   afterBad     right after a turnover or a bad moment of yours
+//   bigHit       after a moment where you took contact
+//   clutch       4th quarter, close game, before your next moment
+//   random       between drives, any time
+// cond: { rivalry, playoff, trailing, leading, positions, weather, minFame }
+// choices[].effects: normal effects (mood, fame, rel, health, injury ...)
+// choices[].game:    effects on THIS game:
+//   tol        timing window bonus for the rest of the game (e.g. 0.06 = 6% wider)
+//   momentum   swing momentum (-1..1)
+//   extra      add one extra key moment for you later this game
+//   skip       you sit out your next key moment
+//   flag       15-yard penalty on your team's next key moment
+//   oppBoost   the opponent's next drive is more dangerous
+//   points     points for your team right now (e.g. a 2-point conversion)
+
+export const GAME_EVENTS = [
+  // ---------------- pregame
+  {
+    id: 'g_rival_tunnel', trigger: 'pregame', cond: { rivalry: true }, title: 'Tunnel Talk',
+    text: '{rival} bumps your shoulder in the tunnel. "Hope you brought a helmet for your ego."',
+    choices: [
+      { label: 'Get in his face', effects: { fame: 1, rel: { rival: 8 } }, game: { momentum: 0.15, tol: -0.03 }, result: 'Both benches spill out. You are fired up, maybe too fired up.' },
+      { label: 'Smile and walk away', effects: { rel: { coach: 2 } }, game: { tol: 0.04 }, result: 'Ice in your veins. He looks rattled.' },
+    ],
+  },
+  {
+    id: 'g_crowd_loud', trigger: 'pregame', cond: { playoff: true }, title: 'Hostile Crowd',
+    text: 'The stadium is shaking. You can barely hear the play call in the huddle.',
+    choices: [
+      { label: 'Wave your arms: get louder!', effects: { fame: 1 }, game: { momentum: 0.2, tol: -0.02 }, result: 'Half the stadium boos you. The other half loves it.' },
+      { label: 'Use hand signals all game', effects: { rel: { coach: 2 } }, game: { tol: 0.03 }, result: 'Silent, efficient, focused.' },
+    ],
+  },
+  {
+    id: 'g_weather_gear', trigger: 'pregame', cond: { weather: ['rain', 'snow'] }, title: 'Slick Conditions',
+    text: 'The field is a mess. The equipment manager offers sticky gloves and longer cleats.',
+    choices: [
+      { label: 'Take the gear', effects: {}, game: { tol: 0.05 }, result: 'Your hands feel like Velcro.' },
+      { label: 'Stick with what you know', effects: { mood: 2 }, game: {}, result: 'No surprises. Hopefully.' },
+    ],
+  },
+  {
+    id: 'g_pregame_speech', trigger: 'pregame', cond: { minFame: 20 }, title: 'Pregame Huddle',
+    text: 'The team looks at you. Somebody needs to say something.',
+    choices: [
+      { label: 'Fiery speech', effects: { rel: { teammates: 4 } }, game: { momentum: 0.25 }, result: 'Helmets slam. The sideline is bouncing.' },
+      { label: 'Calm, short and focused', effects: { rel: { coach: 3 } }, game: { tol: 0.03 }, result: '"Do your job." Nods all around.' },
+      { label: 'Let the captains talk', effects: {}, game: {}, result: 'You stay in your zone.' },
+    ],
+  },
+  {
+    id: 'g_family_stands', trigger: 'pregame', title: 'Family in the Stands',
+    text: 'You spot your family in the stands holding a giant sign with your face on it.',
+    choices: [
+      { label: 'Point at them', effects: { mood: 5, rel: { family: 4 } }, game: { momentum: 0.05 }, result: 'Your mom screams loud enough to hear from the field.' },
+      { label: 'Stay locked in', effects: {}, game: { tol: 0.02 }, result: 'Game face on.' },
+    ],
+  },
+  // ---------------- after a TD / big play
+  {
+    id: 'g_celebrate', trigger: 'afterTD', title: 'Celebration Time',
+    text: 'You just made the play of the game. The cameras are on you.',
+    choices: [
+      { label: 'Choreographed dance', effects: { fame: 2 }, game: { momentum: 0.15 }, chance: { p: 0.65, failGame: { flag: true }, failText: 'Flag! Excessive celebration. 15 yards.' }, result: 'The crowd goes wild. Instant meme.' },
+      { label: 'Hand the ball to the ref', effects: { rel: { coach: 3 } }, game: { tol: 0.02 }, result: '"Act like you\'ve been there before."' },
+      { label: 'Give the ball to a kid in the stands', effects: { fame: 1.5, mood: 3 }, game: { momentum: 0.1 }, result: 'That kid will remember this forever.' },
+    ],
+  },
+  {
+    id: 'g_two_point', trigger: 'afterTD', cond: { trailing: true }, title: 'Go for Two?',
+    text: 'Coach is thinking about a two-point conversion. He looks at you. "Your call."',
+    choices: [
+      { label: 'Go for two', effects: {}, game: {}, chance: { p: 0.48, stat: 'skill', successGame: { points: 1, momentum: 0.2 }, successText: 'Converted! Two points, not one.', failGame: { points: -1, momentum: -0.1 }, failText: 'Stopped short. No points.' }, result: '' },
+      { label: 'Kick the extra point', effects: {}, game: {}, result: 'Safe and sure.' },
+    ],
+  },
+  {
+    id: 'g_taunt', trigger: 'afterTD', cond: { rivalry: true }, title: 'Taunt Opportunity',
+    text: '{rival} is standing right there on their sideline, sulking.',
+    choices: [
+      { label: 'Spike it at his feet', effects: { fame: 2, rel: { rival: 10 } }, game: { flag: true, momentum: 0.1 }, result: 'Flag, worth it?' },
+      { label: 'Ignore him', effects: { rel: { coach: 2 } }, game: {}, result: 'Classy. He hates that even more.' },
+    ],
+  },
+  // ---------------- after a bad play
+  {
+    id: 'g_coach_yell', trigger: 'afterBad', title: 'Coach Is Furious',
+    text: 'Coach {coach} grabs your face mask on the sideline. "WHAT WAS THAT?"',
+    choices: [
+      { label: '"My fault. Won\'t happen again."', effects: { rel: { coach: 3 } }, game: { tol: 0.02 }, result: 'He lets go. "Show me."' },
+      { label: 'Yell back', effects: { rel: { coach: -8 } }, game: { skip: true, momentum: -0.05 }, result: 'He sits you for a series.' },
+      { label: 'Walk away, reset', effects: {}, game: { tol: 0.01 }, result: 'Deep breaths on the bench.' },
+    ],
+  },
+  {
+    id: 'g_shake_it_off', trigger: 'afterBad', title: 'Shake It Off',
+    text: 'A veteran teammate sits next to you on the bench after that mistake.',
+    choices: [
+      { label: 'Listen to his advice', effects: { rel: { teammates: 3 } }, game: { tol: 0.04 }, result: '"Next play mentality." It works.' },
+      { label: 'Stew on it', effects: { mood: -3 }, game: { tol: -0.03 }, result: 'You replay it in your head for a quarter.' },
+    ],
+  },
+  {
+    id: 'g_boo_birds', trigger: 'afterBad', cond: { minFame: 25 }, title: 'Boos Rain Down',
+    text: 'The home crowd is booing. A few are chanting the backup\'s name.',
+    choices: [
+      { label: 'Cup your ear at them', effects: { fame: -1 }, game: { momentum: 0.05 }, result: 'Bold. Now you HAVE to deliver.' },
+      { label: 'Tune it out', effects: {}, game: { tol: 0.02 }, result: 'Noise is just noise.' },
+    ],
+  },
+  // ---------------- big hits
+  {
+    id: 'g_big_hit', trigger: 'bigHit', title: 'Big Hit',
+    text: 'You got absolutely leveled on that play. Your ears are ringing.',
+    choices: [
+      { label: 'Pop right up, stay in', effects: { rel: { teammates: 3 } }, game: { tol: -0.04 }, chance: { p: 0.82, failText: 'Something isn\'t right. You leave the game hurt.', failEffects: { injury: true } }, result: 'You pop up and the sideline erupts.' },
+      { label: 'Get checked by trainers (miss a series)', effects: { health: 6 }, game: { skip: true }, result: 'Cleared. Back next series.' },
+    ],
+  },
+  {
+    id: 'g_hit_retaliate', trigger: 'bigHit', title: 'Late Hit',
+    text: 'That hit came after the whistle. The defender is standing over you, talking trash.',
+    choices: [
+      { label: 'Shove him', effects: { fame: 1 }, game: { flag: true, momentum: 0.05 }, result: 'Offsetting penalties... no, just yours.' },
+      { label: 'Let the refs handle it', effects: { rel: { coach: 3 } }, game: { momentum: 0.1 }, result: 'Flag on THEM. 15 free yards.' },
+    ],
+  },
+  // ---------------- halftime
+  {
+    id: 'g_halftime_down', trigger: 'halftime', cond: { trailing: true }, title: 'Halftime: Down',
+    text: 'The locker room is silent. You are down at the half. Coach looks around for a leader.',
+    choices: [
+      { label: 'Stand up and speak', effects: { rel: { teammates: 5 } }, game: { momentum: 0.3 }, result: 'By the end, guys are punching lockers. Good energy.' },
+      { label: 'Ask Coach for more touches', effects: { rel: { coach: -2 } }, game: { extra: true }, result: '"You want the ball? You got it."' },
+      { label: 'Ice and focus', effects: { health: 5 }, game: { tol: 0.03 }, result: 'Quiet prep for the second half.' },
+    ],
+  },
+  {
+    id: 'g_halftime_up', trigger: 'halftime', cond: { leading: true }, title: 'Halftime: Up',
+    text: 'You are winning at the half. Coach warns everyone not to get comfortable.',
+    choices: [
+      { label: 'Keep the pedal down', effects: {}, game: { momentum: 0.1 }, result: 'Nobody relaxes.' },
+      { label: 'Rest your legs', effects: { health: 6 }, game: { tol: 0.02 }, result: 'Fresh legs for the second half.' },
+    ],
+  },
+  {
+    id: 'g_halftime_adjust', trigger: 'halftime', title: 'Halftime Adjustments',
+    text: 'The coordinator spots a weakness on the whiteboard. "Watch their #24. He bites on everything."',
+    choices: [
+      { label: 'Study the tape on the tablet', effects: { train: { iq: 0.3 } }, game: { tol: 0.05 }, result: 'You see it now. It is going to be a good half.' },
+      { label: 'Trust your instincts', effects: {}, game: { momentum: 0.05 }, result: 'You already knew.' },
+    ],
+  },
+  // ---------------- clutch
+  {
+    id: 'g_clutch_ball', trigger: 'clutch', cond: { positions: ['QB', 'RB', 'WR'] }, title: 'Put It in My Hands',
+    text: 'Fourth quarter, close game. The huddle is tense. Do you ask for the ball?',
+    choices: [
+      { label: '"Give me the ball."', effects: { fame: 1 }, game: { extra: true, tol: -0.02 }, result: 'All eyes on you now.' },
+      { label: '"Trust the play call."', effects: { rel: { coach: 2 } }, game: { tol: 0.02 }, result: 'Calm and collected.' },
+    ],
+  },
+  {
+    id: 'g_clutch_defense', trigger: 'clutch', cond: { positions: ['CB'] }, title: 'Shadow Their Best',
+    text: 'Fourth quarter. Their star receiver is killing the other corner. Coach asks if you want the assignment.',
+    choices: [
+      { label: '"Put me on him."', effects: { fame: 1 }, game: { extra: true, tol: -0.02 }, result: 'You walk across the field. The crowd notices.' },
+      { label: '"I\'ll play my side."', effects: {}, game: { tol: 0.02 }, result: 'Stay disciplined.' },
+    ],
+  },
+  {
+    id: 'g_clutch_timeout', trigger: 'clutch', title: 'Timeout',
+    text: 'The opponent calls timeout to ice you. The jumbotron is showing your face.',
+    choices: [
+      { label: 'Wave to the camera', effects: { fame: 1 }, game: { momentum: 0.05 }, result: 'Cool as can be.' },
+      { label: 'Visualize the play', effects: {}, game: { tol: 0.04 }, result: 'You have already run it in your head five times.' },
+    ],
+  },
+  // ---------------- random
+  {
+    id: 'g_injured_teammate', trigger: 'random', title: 'Teammate Down',
+    text: 'A teammate is carted off. The sideline is shaken.',
+    choices: [
+      { label: 'Rally the troops', effects: { rel: { teammates: 4 } }, game: { momentum: 0.15 }, result: '"Let\'s win this one for him."' },
+      { label: 'Stay focused on your job', effects: {}, game: { tol: 0.02 }, result: 'Head down. Next play.' },
+    ],
+  },
+  {
+    id: 'g_trick_play', trigger: 'random', cond: { positions: ['RB', 'WR'] }, title: 'Trick Play?',
+    text: 'The coordinator wants to run a trick play where you throw the ball. "You in?"',
+    choices: [
+      { label: 'Let\'s do it!', effects: {}, game: {}, chance: { p: 0.45, stat: 'skill', successGame: { points: 7, momentum: 0.35 }, successText: 'TOUCHDOWN on the trick play! The stadium loses its mind.', successEffects: { fame: 4 }, failGame: { momentum: -0.2 }, failText: 'You throw a duck. Intercepted.' }, result: '' },
+      { label: '"Let\'s keep it simple."', effects: {}, game: {}, result: 'Normal play.' },
+    ],
+  },
+  {
+    id: 'g_ref_bad_call', trigger: 'random', title: 'Terrible Call',
+    text: 'The refs just made an awful call against your team. Your teammates are losing it.',
+    choices: [
+      { label: 'Argue with the ref', effects: {}, game: { flag: true }, result: 'Unsportsmanlike conduct. Now it\'s worse.' },
+      { label: 'Calm everyone down', effects: { rel: { teammates: 3, coach: 3 } }, game: { tol: 0.02 }, result: 'Leadership. The team refocuses.' },
+    ],
+  },
+  {
+    id: 'g_fan_sign', trigger: 'random', cond: { minFame: 15 }, title: 'Viral Sign',
+    text: 'A fan\'s sign with your face on a superhero body is on the jumbotron.',
+    choices: [
+      { label: 'Do the superhero pose', effects: { fame: 1.5, mood: 3 }, game: { momentum: 0.05 }, result: 'Instant highlight.' },
+      { label: 'Ignore it', effects: {}, game: {}, result: 'Focus.' },
+    ],
+  },
+  {
+    id: 'g_cramp', trigger: 'random', title: 'Cramping Up',
+    text: 'Your calf is locking up. The trainers have pickle juice and a bench.',
+    choices: [
+      { label: 'Gulp it and stay in', effects: { health: -3 }, game: { tol: -0.03 }, result: 'Gross. Effective-ish.' },
+      { label: 'Sit a series and stretch', effects: { health: 3 }, game: { skip: true, tol: 0.02 }, result: 'Loose and ready.' },
+    ],
+  },
+  {
+    id: 'g_qb_audible', trigger: 'random', cond: { positions: ['QB'] }, title: 'Audible?',
+    text: 'You see a blitz coming. You could audible out of the called play.',
+    choices: [
+      { label: 'Audible', effects: { rel: { coach: -1 } }, game: {}, chance: { p: 0.55, stat: 'iq', successGame: { momentum: 0.2, tol: 0.03 }, successText: 'Perfect read. Big gain.', failGame: { oppBoost: true, momentum: -0.15 }, failText: 'Miscommunication. Turnover.' }, result: '' },
+      { label: 'Run the play as called', effects: { rel: { coach: 2 } }, game: {}, result: 'Short gain.' },
+    ],
+  },
+  {
+    id: 'g_cb_bait', trigger: 'random', cond: { positions: ['CB'] }, title: 'Bait the QB?',
+    text: 'You notice the QB stares down his first read. You could play off and bait him.',
+    choices: [
+      { label: 'Bait him', effects: {}, game: {}, chance: { p: 0.5, stat: 'iq', successGame: { momentum: 0.3, points: 0, extra: true }, successText: 'He takes the bait... you nearly had it. Next time.', failGame: { oppBoost: true }, failText: 'He sees through it. Big completion behind you.' }, result: '' },
+      { label: 'Play it straight', effects: {}, game: { tol: 0.02 }, result: 'Disciplined coverage.' },
+    ],
+  },
+];

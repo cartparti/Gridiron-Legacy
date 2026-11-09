@@ -7,7 +7,7 @@ import { createLeague, makeSchedule, quickSim, recordResult, standings, seedPlay
 import { SALARY_CAP, STAGES } from '../src/data/config.js';
 import * as flow from '../src/sim/flow.js';
 import { simulateCareer, randomCareerOpts, STRATEGIES, botStep, botPlan } from '../src/sim/bot.js';
-import { stepGame, resolveMoment, autoMoment, tolerance } from '../src/sim/game.js';
+import { stepGame, resolveMoment, autoMoment, tolerance, resolveDecision, resolveGameEvent, outcomeFromQuality } from '../src/sim/game.js';
 import { maxEnergy, planCost } from '../src/sim/week.js';
 import { computeLegacy } from '../src/sim/legacy.js';
 
@@ -109,25 +109,51 @@ test('pro teams stay under the salary cap', () => {
   for (const t of league.teams) assert.ok(capSpace(league, t.id) > 0, `${t.id} over cap by ${-capSpace(league, t.id)}`);
 });
 
-test('a user game pauses for 3 to 6 key moments and finishes', () => {
-  const state = flow.newCareer(randomCareerOpts(321, 'QB'));
-  while (state.phase === 'event') flow.resolveEvent(state, 0);
-  assert.equal(state.phase, 'plan');
-  flow.submitPlan(state, [null, null, null, null, null]);
-  assert.equal(state.phase, 'game');
-  let moments = 0;
-  for (;;) {
-    const r = stepGame(state);
-    if (r.type === 'end') break;
-    moments++;
-    const res = autoMoment(state, 'balanced');
-    assert.ok(res.quality >= 0 && res.quality <= 1);
-    resolveMoment(state, res);
+test('a user game pauses for key moments, decisions and events, then finishes', () => {
+  for (const pos of ['QB', 'RB', 'WR', 'CB']) {
+    const state = flow.newCareer(randomCareerOpts(321, pos));
+    while (state.phase === 'event') flow.resolveEvent(state, 0);
+    assert.equal(state.phase, 'plan');
+    flow.submitPlan(state, [null, null, null, null, null]);
+    assert.equal(state.phase, 'game');
+    let moments = 0;
+    for (let guard = 0; guard < 200; guard++) {
+      const r = stepGame(state);
+      if (r.type === 'end') break;
+      if (r.type === 'decision') { resolveDecision(state, true); continue; }
+      if (r.type === 'gameEvent') { resolveGameEvent(state, 0); continue; }
+      moments++;
+      assert.equal(r.moment.defense, pos === 'CB');
+      const res = autoMoment(state, 'balanced');
+      assert.ok(res.quality >= 0 && res.quality <= 1);
+      resolveMoment(state, res);
+    }
+    assert.ok(moments >= 5 && moments <= 16, `${pos} moments: ${moments}`);
+    flow.finishGame(state);
+    assert.equal(state.phase, 'postgame');
+    assert.notEqual(state.lastGame.score.home, state.lastGame.score.away);
   }
-  assert.ok(moments >= 3 && moments <= 6, `moments: ${moments}`);
-  flow.finishGame(state);
-  assert.equal(state.phase, 'postgame');
-  assert.notEqual(state.lastGame.score.home, state.lastGame.score.away);
+});
+
+test('every moment type produces a valid simulated outcome', () => {
+  const state = flow.newCareer(randomCareerOpts(9, 'QB'));
+  const types = ['qb_throw', 'qb_scramble', 'qb_hailmary', 'rb_run', 'rb_screen', 'rb_goalline', 'wr_route', 'wr_jumpball', 'wr_toetap', 'cb_cover', 'cb_tackle'];
+  for (const type of types) {
+    for (const q of [0, 0.3, 0.6, 0.95]) {
+      const m = { type, defense: type.startsWith('cb'), yardLine: type === 'rb_goalline' ? 2 : 40, distance: 8, down: 3 };
+      const r = outcomeFromQuality(state, m, q, 'balanced');
+      assert.ok(typeof r.text === 'string' && r.text.length, `${type} q${q} text`);
+      if (!m.defense) assert.ok(r.yards <= m.yardLine, `${type} yards past goal`);
+    }
+  }
+});
+
+test('difficulty scales the timing window', () => {
+  const state = flow.newCareer(randomCareerOpts(10));
+  state.difficulty = 'easy';
+  const easy = tolerance(state, 'balanced');
+  state.difficulty = 'legend';
+  assert.ok(tolerance(state, 'balanced') < easy * 0.6);
 });
 
 test('weekly plans from the bot never exceed the energy budget', () => {
@@ -160,7 +186,7 @@ test('full careers reach retirement with a legacy, deterministically', () => {
 
 test('careers survive every strategy and position without errors', () => {
   for (const [key, strat] of Object.entries(STRATEGIES)) {
-    for (const pos of ['QB', 'RB', 'WR']) {
+    for (const pos of ['QB', 'RB', 'WR', 'CB']) {
       const st = simulateCareer(randomCareerOpts(key.length * 100 + pos.charCodeAt(0), pos), strat);
       assert.equal(st.phase, 'retired');
       assert.ok(Number.isFinite(st.player.money));

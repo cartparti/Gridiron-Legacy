@@ -48,6 +48,18 @@ export const POSITIONS = {
       strength: 'Contested catches',
     },
   },
+  CB: {
+    label: 'Cornerback',
+    short: 'CB',
+    weights: { speed: 0.34, skill: 0.26, iq: 0.26, strength: 0.14 },
+    blurb: 'Shadow the league\'s best receivers, jump routes for interceptions, and make the open-field tackle.',
+    statNotes: {
+      speed: 'Staying on top of routes',
+      skill: 'Breaking on the ball, ball skills',
+      iq: 'Reading the QB and routes',
+      strength: 'Tackling',
+    },
+  },
 };
 
 /** Background picked at character creation: shapes starting stats. */

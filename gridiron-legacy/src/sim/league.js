@@ -138,7 +138,11 @@ export function gameRatings(state, league, teamId, { userPlaying = true } = {}) 
   if (teamId === state.career.teamId) {
     const p = state.player;
     const chem = (p.rel.teammates - 50) / 20;
-    if (userPlaying) off = off * 0.9 + p.ovr * 0.1 + chem;
+    if (p.position === 'CB') {
+      // A cornerback lifts the defense instead of the offense.
+      if (userPlaying) def = def * 0.92 + p.ovr * 0.08 + chem;
+      else def = def * 0.96 + chem - 2;
+    } else if (userPlaying) off = off * 0.92 + p.ovr * 0.08 + chem;
     else off = off * 0.96 + chem - 2;
   }
   return { off, def };

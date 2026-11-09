@@ -3,7 +3,7 @@
 import { STAT_KEYS, POSITIONS } from '../data/positions.js';
 import { pick, rand, chance } from '../core/rng.js';
 import { availableActivities, maxEnergy, planCost } from './week.js';
-import { stepGame, resolveMoment, autoMoment } from './game.js';
+import { stepGame, resolveMoment, autoMoment, resolveDecision, autoDecision, resolveGameEvent, autoGameEvent } from './game.js';
 import * as flow from './flow.js';
 
 export const STRATEGIES = {
@@ -48,6 +48,8 @@ export function botPlayGame(state, strat, skill) {
   for (;;) {
     const r = stepGame(state);
     if (r.type === 'end') break;
+    if (r.type === 'decision') { resolveDecision(state, autoDecision(state)); continue; }
+    if (r.type === 'gameEvent') { resolveGameEvent(state, autoGameEvent(state)); continue; }
     const call = weightedKey(state, strat.call);
     resolveMoment(state, autoMoment(state, call, skill));
   }
@@ -114,7 +116,7 @@ export function randomCareerOpts(seed, position) {
     seed,
     first: 'Test',
     last: `Player${seed}`,
-    position: position ?? ['QB', 'RB', 'WR'][seed % 3],
+    position: position ?? ['QB', 'RB', 'WR', 'CB'][seed % 4],
     number: 7,
     hometown: 'Ashwood',
     background: ['natural', 'gymrat', 'student', 'technician'][seed % 4],

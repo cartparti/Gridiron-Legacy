@@ -49,6 +49,7 @@ export function newCareer(opts) {
     records: null,
     proHistory: [],
     tutorial: { done: {} },
+    difficulty: opts.difficulty ?? 'normal',
   };
   const rival = genName(state);
   state.player = createAthlete(state, { ...opts, rivalName: `${rival.first} ${rival.last}`, coachName: genPersonName(state) });
@@ -225,6 +226,7 @@ export function finishGame(state) {
     deltas: { fame: p.fame - before.fame, coach: p.rel.coach - before.coach, mood: p.mood - before.mood },
     injury: newInj,
     log: g.log,
+    weather: g.weather,
   };
   state.game = null;
   state.phase = 'postgame';
