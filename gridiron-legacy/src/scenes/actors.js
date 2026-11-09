@@ -10,7 +10,7 @@
 // Looks (skin, hair, face, tattoos, gear, height/weight) come from src/data/looks.js.
 import * as THREE from 'three';
 import {
-  SKIN_TONES, HAIR_COLORS, EYE_COLORS, bodyScale, randomLook, normalizeLook,
+  SKIN_TONES, HAIR_COLORS, EYE_COLORS, VISOR_TINTS, bodyScale, randomLook, normalizeLook,
 } from '../data/looks.js';
 import { shade } from '../data/kits.js';
 
@@ -268,6 +268,29 @@ function helmetMat(un, side) {
   });
 }
 
+function cleatTex(base, accent) {
+  return pixMat(`cleat|${base}|${accent}`, 8, 8, (g) => {
+    px(g, 0, 0, base, 8, 8);
+    px(g, 0, 3, accent, 8, 2);
+    px(g, 0, 7, shade(base, -0.35), 8, 1);
+  });
+}
+function braceTex(c) {
+  return pixMat(`brace|${c}`, 8, 8, (g) => {
+    px(g, 0, 0, c, 8, 8);
+    px(g, 0, 1, '#9aa3ad', 8, 1);
+    px(g, 0, 6, '#9aa3ad', 8, 1);
+    px(g, 3, 2, shade(c, 0.25), 2, 4);
+  });
+}
+function towelTex(c) {
+  return pixMat(`towel|${c}`, 4, 10, (g) => {
+    px(g, 0, 0, c, 4, 10);
+    px(g, 0, 7, shade(c, -0.15), 4, 1);
+    px(g, 0, 9, shade(c, -0.2), 4, 1);
+  });
+}
+
 const sixFaces = (right, left, top, bottom, back, front) => [right, left, top, bottom, back, front];
 
 // ------------------------------------------------------------------ rig
@@ -298,7 +321,20 @@ function buildRig(o) {
   hips.position.y = 0.95;
   body.add(hips);
   hips.add(new THREE.Mesh(g.hips, pants));
+  if (football && L.towel && L.towel !== 'none') {
+    const tw = new THREE.Mesh(box(0.12, 0.3, 0.02), towelTex(L.towel === 'white' ? '#f4f4f4' : L.towel === 'black' ? '#16181c' : un.trim));
+    tw.position.set(0.09, -0.2, -0.13);
+    hips.add(tw);
+  }
+  if (football && L.handWarmer) {
+    const hw = new THREE.Mesh(box(0.28, 0.11, 0.09), toon(un.trim === un.jersey ? '#16181c' : un.trim));
+    hw.position.set(0, 0.08, -0.16);
+    hips.add(hw);
+  }
 
+  const onSide = (v, side) => v === 'both' || v === (side < 0 ? 'left' : 'right');
+  const teamOr = (v, white = '#f4f4f4', black = '#16181c') => (v === 'white' ? white : v === 'black' ? black : football ? un.trim : '#c0392b');
+  const cleatMat = football ? cleatTex(L.cleats ?? '#16181c', L.cleatAccent ?? '#f2f2f2') : shoe;
   const mkLeg = (side) => {
     const hip = new THREE.Group();
     hip.position.set(side * 0.1, -0.04, 0);
@@ -306,12 +342,23 @@ function buildRig(o) {
     const knee = new THREE.Group();
     knee.position.y = -0.48;
     hip.add(knee);
-    const shin = new THREE.Mesh(g.shin, football ? sock : pants);
+    const legSleeve = football && onSide(L.legSleeve, side);
+    const shin = new THREE.Mesh(g.shin, legSleeve ? toon(L.legSleeveColor ?? '#16181c') : football ? sock : pants);
     knee.add(shin);
-    if (football) { const sk = new THREE.Mesh(box(0.15, 0.05, 0.155), toon(un.trim)); sk.position.y = -0.1; knee.add(sk); }
-    const foot = new THREE.Mesh(g.shoe, shoe);
+    if (football && !legSleeve) { const sk = new THREE.Mesh(box(0.15, 0.05, 0.155), toon(un.trim)); sk.position.y = -0.1; knee.add(sk); }
+    if (football && onSide(L.kneeBrace, side)) {
+      const kb = new THREE.Mesh(box(0.19, 0.16, 0.2), braceTex(L.kneeColor ?? '#16181c'));
+      kb.position.y = -0.01;
+      knee.add(kb);
+    }
+    const foot = new THREE.Mesh(g.shoe, cleatMat);
     foot.position.set(0, -0.44, -0.05);
     knee.add(foot);
+    if (football && L.spats && L.spats !== 'none') {
+      const sp = new THREE.Mesh(box(0.175, 0.13, 0.22), toon(teamOr(L.spats)));
+      sp.position.set(0, -0.4, -0.03);
+      knee.add(sp);
+    }
     hips.add(hip);
     return { hip, knee };
   };
@@ -335,6 +382,15 @@ function buildRig(o) {
     chest.add(pads);
   }
 
+  if (L.chain && L.chain !== 'none') {
+    const cm = toon({ gold: '#e6b422', silver: '#d6dbe2', ice: '#eaf6ff' }[L.chain]);
+    const z = -0.142;
+    const y0 = football ? -0.13 : -0.02;
+    for (const sd of [-1, 1]) { const link = new THREE.Mesh(box(0.11, 0.025, 0.02), cm); link.position.set(sd * 0.05, y0 - 0.03, z); link.rotation.z = -sd * 0.6; chest.add(link); }
+    const pend = new THREE.Mesh(box(0.06, 0.07, 0.025), toon(L.chain === 'ice' ? '#9fe7ff' : L.chain === 'gold' ? '#ffd84a' : '#ffffff'));
+    pend.position.set(0, y0 - 0.085, z - 0.005);
+    chest.add(pend);
+  }
   const neck = new THREE.Group();
   neck.position.y = 0.07;
   chest.add(neck);
@@ -369,6 +425,7 @@ function buildRig(o) {
     el.position.y = -0.31;
     sh.add(el);
     el.add(new THREE.Mesh(g.fore, armMat(skinC, shirtC, null, tat, 'fore', armSleeve)));
+    if (football && onSide(L.elbowPad, side)) { const ep = new THREE.Mesh(box(0.145, 0.09, 0.145), toon(L.elbowColor ?? '#16181c')); ep.position.y = -0.02; el.add(ep); }
     const wrist = football && (L.wristband === 'both' || L.wristband === (side < 0 ? 'left' : 'right'));
     if (wrist) { const b = new THREE.Mesh(g.band, toon(L.wristColor ?? '#f2f2f2')); b.position.y = -0.25; el.add(b); }
     const hand = new THREE.Mesh(g.hand, football && L.gloves ? toon(L.gloves) : skin);
@@ -417,8 +474,8 @@ function addHelmet(neck, un, L, hairC) {
   add(box(0.03, 0.1, 0.06), mask, -0.19, -0.07, -0.205);
   add(box(0.03, 0.1, 0.06), mask, 0.19, -0.07, -0.205);
   if (L.visor && L.visor !== 'none') {
-    const col = { clear: '#cfe8ff', dark: '#111418', gold: '#e8b730' }[L.visor];
-    const v = new THREE.Mesh(box(0.36, 0.09, 0.01), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: L.visor === 'clear' ? 0.35 : 0.85 }));
+    const [col, op] = VISOR_TINTS[L.visor] ?? VISOR_TINTS.dark;
+    const v = new THREE.Mesh(box(0.36, 0.09, 0.01), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op }));
     v.position.set(0, 0.05, -0.2);
     H.add(v);
   }

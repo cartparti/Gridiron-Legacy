@@ -104,8 +104,26 @@ export function buildStadium(scene) {
   world.add(field);
 
   // Stands: stepped tiers on all four sides.
-  const standMat = lambert('#3b4252');
-  const standMat2 = lambert('#2e3440');
+  const pixTex = (w, h, draw, repeat = [1, 1]) => {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    draw(c.getContext('2d'));
+    const t = new THREE.CanvasTexture(c);
+    t.magFilter = THREE.NearestFilter;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(...repeat);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  };
+  // Concrete tiers with a painted railing stripe and seat backs.
+  const tierTex = (base) => pixTex(16, 16, (g) => {
+    g.fillStyle = base; g.fillRect(0, 0, 16, 16);
+    g.fillStyle = '#5a6272'; g.fillRect(0, 0, 16, 2);
+    g.fillStyle = '#1f2430'; for (let x = 1; x < 16; x += 4) g.fillRect(x, 4, 2, 4);
+    g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, 14, 16, 2);
+  }, [40, 1]);
+  const standMat = new THREE.MeshBasicMaterial({ map: tierTex('#3b4252') });
+  const standMat2 = new THREE.MeshBasicMaterial({ map: tierTex('#323847') });
   const crowdPositions = [];
   const addStand = (cx, cz, len, alongX, facing) => {
     for (let tier = 0; tier < 7; tier++) {
@@ -185,6 +203,112 @@ export function buildStadium(scene) {
   board(FIELD_W + 6, 0, FIELD_L / 2 + 3, 0);
   board(FIELD_W + 6, 0, -FIELD_L / 2 - 3, 0);
 
+
+  // Roof canopies over the sideline stands, with a strip of lights underneath.
+  for (const sd of [-1, 1]) {
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(14, 1.2, FIELD_L + 10), lambert('#1c2029'));
+    roof.position.set(sd * (FIELD_W / 2 + 22), 15.5, 0);
+    world.add(roof);
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(1, 0.3, FIELD_L + 6), new THREE.MeshBasicMaterial({ color: '#fff6d8' }));
+    strip.position.set(sd * (FIELD_W / 2 + 16), 14.8, 0);
+    world.add(strip);
+    for (let z = -FIELD_L / 2; z <= FIELD_L / 2; z += 15) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.6, 15, 0.6), lambert('#2a2f3a'));
+      post.position.set(sd * (FIELD_W / 2 + 28), 7.5, z);
+      world.add(post);
+    }
+  }
+
+  // Big screen behind the far end zone.
+  const jumboCanvas = document.createElement('canvas');
+  jumboCanvas.width = 128;
+  jumboCanvas.height = 48;
+  const jumboTex = new THREE.CanvasTexture(jumboCanvas);
+  jumboTex.magFilter = THREE.NearestFilter;
+  jumboTex.colorSpace = THREE.SRGBColorSpace;
+  const jumbo = new THREE.Group();
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(34, 14, 1.2), lambert('#15181e'));
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(32, 12), new THREE.MeshBasicMaterial({ map: jumboTex }));
+  screen.position.z = 0.62;
+  const legL = new THREE.Mesh(new THREE.BoxGeometry(1.2, 22, 1.2), lambert('#2a2f3a'));
+  legL.position.set(-12, -16, 0);
+  const legR = legL.clone();
+  legR.position.x = 12;
+  jumbo.add(frame, screen, legL, legR);
+  jumbo.position.set(0, 30, -FIELD_L / 2 - 30);
+  world.add(jumbo);
+  const drawJumbo = (info = {}) => {
+    const g = jumboCanvas.getContext('2d');
+    g.fillStyle = '#05070a'; g.fillRect(0, 0, 128, 48);
+    // LED dot texture
+    g.fillStyle = 'rgba(255,255,255,0.03)';
+    for (let y = 0; y < 48; y += 2) g.fillRect(0, y, 128, 1);
+    const half = (x, col, name, pts) => {
+      g.fillStyle = col[0]; g.fillRect(x, 4, 56, 12);
+      g.fillStyle = col[1]; g.font = 'bold 9px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(String(name).slice(0, 9).toUpperCase(), x + 28, 10.5);
+      g.fillStyle = '#ffd43b'; g.font = 'bold 20px monospace'; g.fillText(String(pts ?? 0), x + 28, 30);
+    };
+    half(4, info.awayColors ?? ['#b5121b', '#ffffff'], info.away ?? 'AWAY', info.awayPts);
+    half(68, info.homeColors ?? ['#1d3557', '#ffffff'], info.home ?? 'HOME', info.homePts);
+    g.fillStyle = '#ffffff'; g.font = 'bold 7px monospace'; g.textAlign = 'center';
+    g.fillText(info.clock ?? 'GRIDIRON LEAGUE', 64, 44);
+    jumboTex.needsUpdate = true;
+  };
+  drawJumbo();
+
+  // Sidelines: benches and a row of teammates in uniform on each side (instanced, cheap).
+  const sideGroups = {};
+  for (const sd of [-1, 1]) {
+    const bench = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 26), lambert('#2a2f3a'));
+    bench.position.set(sd * (FIELD_W / 2 + 6.2), 0.3, 0);
+    world.add(bench);
+    const area = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 40), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.12 }));
+    area.rotation.x = -Math.PI / 2;
+    area.position.set(sd * (FIELD_W / 2 + 4), 0.01, 0);
+    world.add(area);
+    const n = 22;
+    const bodyG = new THREE.BoxGeometry(0.62, 0.9, 0.4); bodyG.translate(0, 1.15, 0);
+    const legG = new THREE.BoxGeometry(0.5, 0.75, 0.32); legG.translate(0, 0.38, 0);
+    const headG = new THREE.BoxGeometry(0.46, 0.46, 0.44); headG.translate(0, 1.85, 0);
+    const parts = [bodyG, legG, headG].map((geo) => new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: '#ffffff' }), n));
+    const base = [];
+    for (let i = 0; i < n; i++) {
+      const p = new THREE.Vector3(sd * (FIELD_W / 2 + 3 + Math.random() * 2.2), 0, -18 + (i / n) * 36 + Math.random() * 0.8);
+      base.push(p);
+      dummy.position.copy(p);
+      dummy.rotation.y = sd > 0 ? Math.PI / 2 : -Math.PI / 2;
+      dummy.updateMatrix();
+      parts.forEach((m) => m.setMatrixAt(i, dummy.matrix));
+    }
+    dummy.rotation.set(0, 0, 0);
+    parts.forEach((m) => world.add(m));
+    sideGroups[sd] = { parts, base, rot: sd > 0 ? Math.PI / 2 : -Math.PI / 2 };
+  }
+
+  // Pylons at the corners of each end zone.
+  const pylonMat = lambert('#ff7a1a');
+  for (const z of [-50, -60, 50, 60]) for (const x of [-FIELD_W / 2, FIELD_W / 2]) {
+    const py = new THREE.Mesh(new THREE.BoxGeometry(0.35, 1.1, 0.35), pylonMat);
+    py.position.set(x, 0.55, z);
+    world.add(py);
+  }
+
+  // Down markers (sideline sticks for line of scrimmage / first down).
+  const stick = (col) => {
+    const g = new THREE.Group();
+    const pole = new THREE.Mesh(new THREE.BoxGeometry(0.15, 2.6, 0.15), lambert('#222'));
+    pole.position.y = 1.3;
+    const flag = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.7, 0.7), lambert(col));
+    flag.position.y = 2.6;
+    g.add(pole, flag);
+    g.position.x = -FIELD_W / 2 - 1.4;
+    scene.add(g);
+    return g;
+  };
+  const losStick = stick('#ff7a1a');
+  const fdStick = stick('#ffd43b');
+
   // Light towers.
   const poleMat = lambert('#9aa3ad');
   const lampMat = new THREE.MeshBasicMaterial({ color: '#fffbe6' });
@@ -237,6 +361,14 @@ export function buildStadium(scene) {
       const palette = [crowdColors[0], crowdColors[1], crowdColors[0], farColors[0], '#d9d9d9', '#6c757d', crowdColors[0]].map((c) => new THREE.Color(c));
       for (let i = 0; i < crowd.count; i++) crowd.setColorAt(i, palette[Math.floor(Math.random() * palette.length)]);
       crowd.instanceColor.needsUpdate = true;
+      // sideline teams: near team on the right side (+x), far team on the left
+      const paint = (sd, cols) => {
+        const [body, legs, head] = sideGroups[sd].parts;
+        for (let i = 0; i < body.count; i++) { body.setColorAt(i, new THREE.Color(cols[0])); legs.setColorAt(i, new THREE.Color(cols[1])); head.setColorAt(i, new THREE.Color(i % 3 ? cols[0] : '#c68a56')); }
+        [body, legs, head].forEach((m) => { m.instanceColor.needsUpdate = true; });
+      };
+      paint(1, nearColors);
+      paint(-1, farColors);
     },
     /** Place the world so the opponent goal line is `yardLine` yards ahead of z = 0. */
     setYardLine(yardLine, distance) {
@@ -245,10 +377,14 @@ export function buildStadium(scene) {
       fd.position.z = -Math.min(distance, yardLine);
       fd.visible = distance < yardLine;
       los.visible = true;
+      losStick.position.z = 0; losStick.visible = true;
+      fdStick.position.z = fd.position.z; fdStick.visible = fd.visible;
       // Fade the goalposts when the play is close enough for them to block the view.
       postMat.opacity = yardLine < 35 ? 0.3 : 1;
     },
-    hideLines() { los.visible = false; fd.visible = false; },
+    hideLines() { los.visible = false; fd.visible = false; losStick.visible = false; fdStick.visible = false; },
+    /** Update the big screen: { home, away, homePts, awayPts, homeColors, awayColors, clock } */
+    setScoreboard(info) { drawJumbo(info); },
     /** Darken / cool the scene for night and bad weather. */
     setTint(weather) {
       const t = { night: 0x8a93b8, rain: 0x9aa4ae, storm: 0x7a8490, snow: 0xf2f6fa, wind: 0xf2efe6, fog: 0xc8ced4 }[weather] ?? 0xffffff;
@@ -270,6 +406,17 @@ export function buildStadium(scene) {
       }
       crowd.instanceMatrix.needsUpdate = true;
       heads.instanceMatrix.needsUpdate = true;
+      for (const sd of [-1, 1]) {
+        const sg = sideGroups[sd];
+        sg.base.forEach((p, i) => {
+          dummy.position.set(p.x, Math.max(0, Math.sin(t * 7 + i * 2.3)) * 0.25 * excitement, p.z);
+          dummy.rotation.y = sg.rot;
+          dummy.updateMatrix();
+          sg.parts.forEach((m) => m.setMatrixAt(i, dummy.matrix));
+        });
+        dummy.rotation.set(0, 0, 0);
+        sg.parts.forEach((m) => { m.instanceMatrix.needsUpdate = true; });
+      }
     },
   };
   api.setTeams(['#1d3557', '#f1c40f'], ['#b5121b', '#f5d547'], 'Gridiron', 'Legacy');

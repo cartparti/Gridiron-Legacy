@@ -87,6 +87,16 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   opponent picks a non-clashing kit.
 - Retro arcade theme in `styles/main.css` (dark by default, team-colored top bar/tabs, scanlines).
 
+## v0.7 (round 3 of 5) changes
+- Swag (looks.js + Swag tab in the editor): knee braces, leg sleeves, elbow pads, two-tone cleats, tape spats,
+  towel, hand warmer, chains, 8 visor tints, more gear colors. Older looks get swag defaults in `normalizeLook`.
+- Stadium detail: textured tiers, roof canopies with light strips, big screen with the live score
+  (`stadium.setScoreboard`), instanced sideline teams + benches, pylons, down-marker sticks, real team names
+  in the end zones.
+- Play-by-play commentary banner (`src/data/commentary.js`, `hud.say`), retro HUD styling.
+- Walkable places: 16px pixel floor textures (planks, grass, stone, asphalt, water), brick/painted walls with
+  caps, voxel trees/plants, instanced grass tufts and flowers, closer camera.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

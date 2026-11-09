@@ -211,6 +211,7 @@ export function makeHud() {
       <div class="hud-pill sit"></div>
       <div class="hud-right"><div class="hud-pill hud-call"></div><div class="hud-pill hud-wx"></div></div>
     </div>
+    <div class="hud-comm"></div>
     <div class="hud-instr"></div>
     <div class="hud-mid"></div>
     <div class="hud-bottom"></div>`;
@@ -235,6 +236,14 @@ export function makeHud() {
       q('.hud-mid').replaceChildren(b);
       clearTimeout(bigTimer);
       bigTimer = setTimeout(() => b.remove(), ms);
+    },
+    /** Commentary banner (play-by-play). */
+    say: (text, ms = 2200) => {
+      const c = q('.hud-comm');
+      c.textContent = text;
+      c.classList.remove('show'); void c.offsetWidth; c.classList.add('show');
+      clearTimeout(c._t);
+      c._t = setTimeout(() => c.classList.remove('show'), ms);
     },
     bottom: (node) => { const b = q('.hud-bottom'); b.replaceChildren(); if (node) b.append(node); },
     remove: () => el.remove(),
@@ -277,8 +286,11 @@ export function runMinigame(type, opts) {
       return;
     }
     // On defense, the opponent attacks toward the far end zone (ours).
-    if (m.defense) r.stadium.setTeams(opts.teamColors, opts.oppColors, 'HOME', 'OPP', opts.homeColors);
-    else r.stadium.setTeams(opts.oppColors, opts.teamColors, 'OPP', 'HOME', opts.homeColors);
+    const myName = opts.teamName ?? 'HOME';
+    const oppName = opts.oppName ?? 'OPP';
+    if (m.defense) r.stadium.setTeams(opts.teamColors, opts.oppColors, myName, oppName, opts.homeColors);
+    else r.stadium.setTeams(opts.oppColors, opts.teamColors, oppName, myName, opts.homeColors);
+    if (opts.scoreInfo) r.stadium.setScoreboard(opts.scoreInfo);
     r.stadium.setYardLine(m.yardLine, m.distance);
     applyAtmosphere(r, m.weather ?? 'clear');
     const group = new THREE.Group();

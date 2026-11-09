@@ -523,3 +523,15 @@ input[type='text'], input[type='number'] { border-radius: 5px !important; border
     color-scheme: dark;
   }
 }
+
+/* ---------- retro HUD (v0.7) ---------- */
+.hud-pill, .hud-instr { background: rgba(14, 16, 21, 0.88); backdrop-filter: none; -webkit-backdrop-filter: none; border: 2px solid #07080a; border-radius: 6px; box-shadow: inset 0 2px 0 rgba(255,255,255,0.06), 0 3px 0 rgba(0,0,0,0.5); }
+.hud-comm {
+  align-self: stretch; margin: 2px 4px 0; text-align: center; padding: 10px 14px; border-radius: 8px;
+  background: rgba(14, 16, 21, 0.86); border: 2px solid #07080a; box-shadow: inset 0 0 0 2px rgba(255,255,255,0.06), 0 4px 0 rgba(0,0,0,0.5);
+  font-family: var(--pixel); font-weight: 700; font-size: 1.05rem; line-height: 1.2; letter-spacing: 0.03em; text-transform: uppercase; color: #fff;
+  text-shadow: 2px 2px 0 #000; opacity: 0; transform: translateY(-6px); transition: opacity 0.18s, transform 0.18s;
+}
+.hud-comm.show { opacity: 1; transform: none; }
+.hud-big { font-size: 2.6rem; text-shadow: 4px 4px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 0 0 18px rgba(0,0,0,0.5); }
+.fc-btn { border-radius: 50% !important; border: 3px solid #07080a !important; box-shadow: inset 0 3px 0 rgba(255,255,255,0.18), 0 4px 0 #07080a !important; }

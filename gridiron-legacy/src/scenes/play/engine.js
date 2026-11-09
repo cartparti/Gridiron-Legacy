@@ -12,6 +12,7 @@ import { rig, endPlay, finalize, weatherFx, gaussR } from '../minigames/common.j
 import { makeControls } from './controls.js';
 import { PLAYS, OFF_FORMATION, OL_X, playMode } from '../../data/playbook.js';
 import { sfx } from '../../audio/sfx.js';
+import { line } from '../../data/commentary.js';
 
 const FIELD_X = 26.4;
 const BASE_SPEED = { QB: 7.0, RB: 8.1, WR: 8.5, TE: 7.3, OL: 5.6, DL: 6.6, LB: 7.3, CB: 8.4, S: 8.1 };
@@ -293,6 +294,7 @@ export function freePlay(ctx) {
 
   // ---------------- throwing
   const throwTo = (r) => {
+    say('throw');
     if (!r || thrown || holder !== qb) return;
     thrown = true;
     const qbP = qb.pos;
@@ -649,12 +651,25 @@ export function freePlay(ctx) {
     carrier = r;
     sfx.catch();
     playAction(r.mesh, 'catch');
+    say('catch');
     if (r === user) setButtonsFor();
   };
 
   // ---------------- whistle & results
+  const say = (kind) => hud.say?.(line(kind, opts.lastName ?? 'he'));
+  const commentate = (why) => {
+    const r = result;
+    if (!r) return;
+    if (r.td || r.defTD) return; // celebration handles it
+    if (m.defense) {
+      if (r.int) say('pick'); else if (r.pd) say('pd'); else if (r.forcedFumble) say('turnover');
+      else if (why === 'incomplete') say('incomplete'); else if (r.tackle) say('stop'); else say((r.yardsAllowed ?? 0) > 8 ? 'allowed' : 'short');
+    } else if (r.turnover) say('turnover'); else if (r.sack) say('sack'); else if (r.complete === false) say('incomplete');
+    else say(r.yards >= 15 ? 'big' : r.yards >= 5 ? 'gain' : 'short');
+  };
   const whistle = (why, by = null, text = null) => {
     if (phase !== 'live') return;
+    setTimeout(() => commentate(why), 0);
     if (globalThis.__playDebug) console.log('whistle', why, 'by', by?.role, by?.slot, by?.engagedBy ? 'blocked' : '', carrier?.role, carrier?.slot, carrier?.pos.z?.toFixed(1), 'holder', holder?.role, 'thrown', thrown, 't', t.toFixed(2));
     phase = 'dead';
     t = 0;
@@ -694,6 +709,7 @@ export function freePlay(ctx) {
     const who = scorer;
     celebrate(who.mesh);
     hud.big('TOUCHDOWN!', '#4ade80', 2600);
+    say(scorer.team === 'def' ? 'pick' : 'td');
     sfx.touchdown();
     fx = confetti(scene, new THREE.Vector3(who.pos.x, 0, who.pos.z), [offColors[0], offColors[1], '#ffffff']);
     // teammates run over to join
@@ -736,6 +752,7 @@ export function freePlay(ctx) {
       if (t > 1.1) {
         phase = 'live'; t = 0;
         sfx.whistle();
+        say(m.defense ? 'snapDef' : 'snap');
         hud.instr('');
         for (const e of ents) setPose(e.mesh, null);
         if (mode === 'run' || mode === 'runD') {

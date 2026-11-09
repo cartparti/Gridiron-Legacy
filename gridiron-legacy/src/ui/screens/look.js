@@ -3,13 +3,13 @@ import { h, clear } from '../dom.js';
 import { openModal, toast } from '../components.js';
 import {
   SKIN_TONES, HAIR_COLORS, EYE_COLORS, GEAR_COLORS, HAIR_STYLES, BROWS, EYES, NOSES, MOUTHS, BEARDS, TATTOOS,
-  SIDES, VISORS, CELEBRATIONS, HEIGHT_RANGE, WEIGHT_RANGE, fmtHeight, randomLook, sizeStatMods,
+  SIDES, VISORS, CELEBRATIONS, SPATS, TOWELS, CHAINS, normalizeLook, HEIGHT_RANGE, WEIGHT_RANGE, fmtHeight, randomLook, sizeStatMods,
 } from '../../data/looks.js';
 import { portraitImg } from '../../scenes/portrait.js';
 import { sfx } from '../../audio/sfx.js';
 import { STAT_LABELS } from '../../data/positions.js';
 
-const TABS = [['body', 'Body'], ['hair', 'Hair'], ['face', 'Face'], ['ink', 'Ink'], ['gear', 'Gear'], ['celeb', 'Celebrate']];
+const TABS = [['body', 'Body'], ['hair', 'Hair'], ['face', 'Face'], ['ink', 'Ink'], ['gear', 'Gear'], ['swag', 'Swag'], ['celeb', 'Celebrate']];
 
 /**
  * Build the editor. opts: { look (mutated), uniform, number, position, lockBody, onChange }
@@ -71,13 +71,25 @@ export function lookEditor(opts) {
     ink: () => [chips('Left arm', TATTOOS, 'tatL'), chips('Right arm', TATTOOS, 'tatR')],
     gear: () => [
       swatches('Cleats', GEAR_COLORS, 'cleats'),
+      swatches('Cleat stripe', GEAR_COLORS, 'cleatAccent'),
+      chips('Spats / tape', SPATS, 'spats'),
       swatches('Gloves', GEAR_COLORS, 'gloves', { none: true }),
-      chips('Wristbands', SIDES, 'wristband'), L.wristband !== 'none' ? swatches('Wristband color', GEAR_COLORS, 'wristColor') : null,
-      chips('Arm sleeve', SIDES, 'sleeve'), L.sleeve !== 'none' ? swatches('Sleeve color', GEAR_COLORS, 'sleeveColor') : null,
-      chips('Visor', VISORS, 'visor'),
+      chips('Visor tint', VISORS, 'visor'),
       h('div.look-row', h('div.section-label', 'Eye black'), h('div.chip-row',
         h(`button.opt${L.eyeBlack ? '.on' : ''}`, { onclick: () => set('eyeBlack', true) }, 'On'),
         h(`button.opt${!L.eyeBlack ? '.on' : ''}`, { onclick: () => set('eyeBlack', false) }, 'Off'))),
+    ],
+    swag: () => [
+      chips('Arm sleeves', SIDES, 'sleeve'), L.sleeve !== 'none' ? swatches('Arm sleeve color', GEAR_COLORS, 'sleeveColor') : null,
+      chips('Wristbands', SIDES, 'wristband'), L.wristband !== 'none' ? swatches('Wristband color', GEAR_COLORS, 'wristColor') : null,
+      chips('Elbow pads', SIDES, 'elbowPad'), L.elbowPad !== 'none' ? swatches('Elbow pad color', GEAR_COLORS, 'elbowColor') : null,
+      chips('Knee braces', SIDES, 'kneeBrace'), L.kneeBrace !== 'none' ? swatches('Brace color', GEAR_COLORS, 'kneeColor') : null,
+      chips('Leg sleeves', SIDES, 'legSleeve'), L.legSleeve !== 'none' ? swatches('Leg sleeve color', GEAR_COLORS, 'legSleeveColor') : null,
+      chips('Towel', TOWELS, 'towel'),
+      h('div.look-row', h('div.section-label', 'Hand warmer'), h('div.chip-row',
+        h(`button.opt${L.handWarmer ? '.on' : ''}`, { onclick: () => set('handWarmer', true) }, 'On'),
+        h(`button.opt${!L.handWarmer ? '.on' : ''}`, { onclick: () => set('handWarmer', false) }, 'Off'))),
+      chips('Chain', CHAINS, 'chain'),
     ],
     celeb: () => [chips('Touchdown celebration', CELEBRATIONS, 'celebration'), h('p.tiny.muted', 'Shown in the end zone after you score.')],
   };
@@ -87,7 +99,7 @@ export function lookEditor(opts) {
     wrap.append(
       preview(),
       h('div.subtabs.look-tabs', TABS.map(([id, l]) =>
-        h(`button.subtab${st.tab === id ? '.on' : ''}`, { onclick: () => { sfx.click(); st.tab = id; st.helmet = id === 'gear'; draw(); } }, l))),
+        h(`button.subtab${st.tab === id ? '.on' : ''}`, { onclick: () => { sfx.click(); st.tab = id; st.helmet = id === 'gear' || id === 'swag'; draw(); } }, l))),
       h('div.look-panel', views[st.tab]()));
   };
   draw();
@@ -97,7 +109,7 @@ export function lookEditor(opts) {
 /** Modal editor for an existing athlete (body size is locked after creation). */
 export function openLookModal(app, { uniform, onDone } = {}) {
   const p = app.state.player;
-  const look = { ...p.look };
+  const look = normalizeLook({ ...p.look }, p.first + p.last);
   const content = h('div');
   const m = openModal(content, { dismissable: true });
   content.append(

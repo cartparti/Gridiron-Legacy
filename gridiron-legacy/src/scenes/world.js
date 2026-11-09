@@ -52,7 +52,12 @@ export function makeProp(type, opts = {}) {
     case 'rack': add(box(1.8, 0.1, 0.5, '#343a40', 0, 1.0), box(0.1, 1.1, 0.5, '#495057', -0.85), box(0.1, 1.1, 0.5, '#495057', 0.85), cyl(0.3, 0.1, '#212529', -0.6, 1.05, 0), cyl(0.3, 0.1, '#212529', 0.6, 1.05, 0), box(1.0, 0.25, 0.6, '#c1121f', 0, 0, 0.6)); g.children[3].rotation.z = Math.PI / 2; g.children[4].rotation.z = Math.PI / 2; break;
     case 'treadmill': add(box(0.9, 0.2, 1.8, '#343a40'), box(0.8, 0.04, 1.6, '#111', 0, 0.2), box(0.1, 1.2, 0.1, '#495057', -0.4, 0, -0.8), box(0.1, 1.2, 0.1, '#495057', 0.4, 0, -0.8), box(0.9, 0.3, 0.2, '#4da3ff', 0, 1.1, -0.8)); break;
     case 'locker': add(box(1.9, 2.0, 0.6, '#3a506b'), box(0.04, 1.8, 0.02, '#1c2541', -0.32, 0.1, 0.31), box(0.04, 1.8, 0.02, '#1c2541', 0.32, 0.1, 0.31), box(1.9, 0.08, 0.62, '#5bc0be', 0, 1.6)); break;
-    case 'tree': add(cyl(0.22, 1.2, '#6b4423', 0, 0, 0, 6)); { const t = new THREE.Mesh(new THREE.IcosahedronGeometry(1.1, 0), mat(opts.color ?? '#2d6a4f')); t.position.y = 2.1; add(t); const t2 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 0), mat(hexShade(opts.color ?? '#2d6a4f', 0.06))); t2.position.set(0.3, 2.7, 0.2); add(t2); } break;
+    case 'tree': {
+      const leaf = opts.color ?? '#2d6a4f';
+      add(box(0.36, 1.5, 0.36, '#6b4423'), box(1.9, 1.0, 1.9, leaf, 0, 1.4), box(1.4, 0.8, 1.4, hexShade(leaf, 0.05), 0.1, 2.35, -0.1),
+        box(0.8, 0.5, 0.8, hexShade(leaf, 0.1), -0.1, 3.1, 0.1), box(0.5, 0.4, 0.5, hexShade(leaf, -0.06), 0.85, 1.1, 0.6));
+      break;
+    }
     case 'bench': add(box(1.8, 0.1, 0.5, '#a0714f', 0, 0.45), box(1.8, 0.4, 0.1, '#a0714f', 0, 0.55, -0.22), box(0.1, 0.45, 0.4, '#343a40', -0.75), box(0.1, 0.45, 0.4, '#343a40', 0.75)); break;
     case 'hoop': add(cyl(0.08, 2.6, '#adb5bd'), box(1.1, 0.7, 0.06, '#ffffff', 0, 2.5, 0.25)); { const r = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.03, 4, 10), mat('#e85d04')); r.rotation.x = Math.PI / 2; r.position.set(0, 2.55, 0.55); add(r); } break;
     case 'fountain': add(cyl(1.6, 0.5, '#adb5bd', 0, 0, 0, 10), cyl(1.35, 0.06, '#4cc9f0', 0, 0.45, 0, 10), cyl(0.2, 1.2, '#ced4da', 0, 0.4), cyl(0.5, 0.12, '#adb5bd', 0, 1.5, 0, 8)); break;
@@ -66,7 +71,7 @@ export function makeProp(type, opts = {}) {
       break;
     }
     case 'sign': add(cyl(0.06, 1.2, '#6b4423'), box(0.9, 0.5, 0.06, '#ffd166', 0, 1.1)); break;
-    case 'plant': add(cyl(0.3, 0.4, '#bc6c25'), new THREE.Mesh(new THREE.IcosahedronGeometry(0.45, 0), mat('#40916c'))); g.children[1].position.y = 0.75; break;
+    case 'plant': add(box(0.55, 0.45, 0.55, '#bc6c25'), box(0.7, 0.45, 0.7, '#40916c', 0, 0.45), box(0.4, 0.35, 0.4, '#52b788', 0.05, 0.9, 0)); break;
     case 'door': add(box(1.4, 0.04, 0.8, '#6b4423')); break;
     case 'cone': add(new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.6, 6), mat('#fb8500'))); g.children[0].position.y = 0.3; break;
     case 'mic': add(cyl(0.05, 1.3, '#adb5bd'), new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 4), mat('#212529')), box(1.8, 0.8, 0.6, '#1d3557', 0, 0, -0.7)); g.children[1].position.y = 1.35; break;
@@ -126,7 +131,7 @@ export function buildWorld(placeId, ctx) {
   const charAt = (r, c) => (rows[r]?.[c] ?? '#');
 
   // Floor texture: one pixel-art canvas for the whole map.
-  const PX = 8;
+  const PX = 16;
   const cv = document.createElement('canvas');
   cv.width = W * PX;
   cv.height = H * PX;
@@ -142,7 +147,11 @@ export function buildWorld(placeId, ctx) {
     if (ch === 'E') return 'door';
     return place.ground ?? (place.outdoor ? 'grass' : 'floor');
   };
+  // deterministic per-pixel noise
+  const nz = (x, y) => { const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return v - Math.floor(v); };
+  const dot = (x, y, col) => { g2.fillStyle = col; g2.fillRect(x, y, 1, 1); };
   let startTile = null;
+  const tufts = [];
   for (let r = 0; r < H; r++) {
     solid.push([]);
     for (let c = 0; c < W; c++) {
@@ -151,14 +160,31 @@ export function buildWorld(placeId, ctx) {
       const isWall = ch === '#';
       const kind = isWall ? 'floor' : kindFor(ch, entry);
       const [a, b] = floorColors(place.outdoor && kind === 'floor' ? 'path' : kind);
-      g2.fillStyle = (r + c) % 2 ? a : b;
-      g2.fillRect(c * PX, r * PX, PX, PX);
-      // texture details
-      if (kind === 'grass') { g2.fillStyle = hexShade(a, -0.06); for (let i = 0; i < 3; i++) g2.fillRect(c * PX + ((i * 5 + r * 3) % 7), r * PX + ((i * 3 + c * 5) % 7), 1, 2); }
-      if (kind === 'floor' && !place.outdoor) { g2.fillStyle = hexShade(a, -0.05); g2.fillRect(c * PX, r * PX + PX - 1, PX, 1); }
-      if (kind === 'road' && r % 2 === 0 && c % 3 === 0) { g2.fillStyle = '#ffd166'; g2.fillRect(c * PX + 1, r * PX + PX - 1, 5, 1); }
-      if (kind === 'turf' && c % 3 === 0) { g2.fillStyle = '#ffffff'; g2.fillRect(c * PX, r * PX, 1, PX); }
-      if (kind === 'court') { g2.fillStyle = '#ffffff'; if (r % 3 === 0) g2.fillRect(c * PX, r * PX, PX, 1); }
+      const X0 = c * PX;
+      const Y0 = r * PX;
+      g2.fillStyle = kind === 'grass' || kind === 'road' || kind === 'water' || kind === 'path' ? a : (r + c) % 2 ? a : b;
+      g2.fillRect(X0, Y0, PX, PX);
+      // pixel texture details per surface
+      for (let y = 0; y < PX; y++) {
+        for (let x = 0; x < PX; x++) {
+          const n = nz(X0 + x, Y0 + y);
+          if (kind === 'grass') { if (n < 0.1) dot(X0 + x, Y0 + y, hexShade(a, -0.07)); else if (n > 0.93) dot(X0 + x, Y0 + y, hexShade(a, 0.06)); }
+          else if (kind === 'path') { if (n < 0.08) dot(X0 + x, Y0 + y, hexShade(a, -0.09)); else if (n > 0.95) dot(X0 + x, Y0 + y, hexShade(a, 0.07)); }
+          else if (kind === 'road') { if (n < 0.12) dot(X0 + x, Y0 + y, hexShade(a, 0.04)); else if (n > 0.96) dot(X0 + x, Y0 + y, hexShade(a, -0.05)); }
+          else if (kind === 'water') { if ((y + Math.floor(x / 4) + r) % 6 === 0 && n > 0.4) dot(X0 + x, Y0 + y, hexShade(a, 0.12)); }
+          else if (kind === 'floor' && !place.outdoor) {
+            // wood planks: 4 planks per tile, staggered seams, a little grain
+            if (y % 4 === 3) dot(X0 + x, Y0 + y, hexShade(a, -0.08));
+            else if ((x + (Math.floor((Y0 + y) / 4) % 2) * 8 + c * 5) % 16 === 0) dot(X0 + x, Y0 + y, hexShade(a, -0.07));
+            else if (n < 0.06) dot(X0 + x, Y0 + y, hexShade(a, -0.03));
+          }
+        }
+      }
+      if (kind === 'road' && r % 2 === 0 && c % 3 === 0) { g2.fillStyle = '#ffd166'; g2.fillRect(X0 + 2, Y0 + PX - 2, 10, 2); }
+      if (kind === 'turf') { g2.fillStyle = 'rgba(255,255,255,0.9)'; if (c % 3 === 0) g2.fillRect(X0, Y0, 2, PX); }
+      if (kind === 'court') { g2.fillStyle = '#ffffff'; if (r % 3 === 0) g2.fillRect(X0, Y0, PX, 2); }
+      if (kind === 'door') { g2.fillStyle = hexShade(a, -0.12); g2.fillRect(X0, Y0 + 7, PX, 2); }
+      if (kind === 'grass' && !entry && nz(r * 3.1, c * 7.7) > 0.72) tufts.push({ x: toX(c) + (nz(c, r) - 0.5) * 1.4, z: toZ(r) + (nz(r, c) - 0.5) * 1.4, flower: nz(c * 2, r * 5) > 0.7 });
       solid[r][c] = isWall || ch === '~' || !!entry?.solid;
       if (ch === place.start && !startTile) startTile = { r, c };
     }
@@ -183,7 +209,25 @@ export function buildWorld(placeId, ctx) {
   for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (charAt(r, c) === '#') wallCells.push({ r, c });
   // Interior walls stay low (cutaway view) so you can see into every room; the back wall is tall.
   const wallH = place.outdoor ? 1.2 : 1.1;
-  const walls = new THREE.InstancedMesh(new THREE.BoxGeometry(S, 1, S), new THREE.MeshLambertMaterial({ color: place.wall ?? '#7f8c8d' }), Math.max(1, wallCells.length));
+  const wallCol = place.wall ?? '#7f8c8d';
+  const wallSide = (() => {
+    const c = document.createElement('canvas');
+    c.width = 16; c.height = 16;
+    const g = c.getContext('2d');
+    g.fillStyle = wallCol; g.fillRect(0, 0, 16, 16);
+    if (place.outdoor) { // brick
+      g.fillStyle = hexShade(wallCol, -0.08);
+      for (let y = 0; y < 16; y += 4) { g.fillRect(0, y + 3, 16, 1); for (let x = (y / 4) % 2 ? 0 : 4; x < 16; x += 8) g.fillRect(x, y, 1, 3); }
+    } else { // painted wall with a baseboard and trim
+      g.fillStyle = hexShade(wallCol, 0.06); g.fillRect(0, 0, 16, 2);
+      g.fillStyle = hexShade(wallCol, -0.18); g.fillRect(0, 13, 16, 3);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.MeshLambertMaterial({ map: t });
+  })();
+  const wallTop = new THREE.MeshLambertMaterial({ color: hexShade(wallCol, 0.14) });
+  const walls = new THREE.InstancedMesh(new THREE.BoxGeometry(S, 1, S), [wallSide, wallSide, wallTop, wallTop, wallSide, wallSide], Math.max(1, wallCells.length));
   const dummy = new THREE.Object3D();
   const placeWalls = (playerRow) => {
     wallCells.forEach((w, i) => {
@@ -198,6 +242,28 @@ export function buildWorld(placeId, ctx) {
   };
   walls.count = wallCells.length;
   root.add(walls);
+
+  // Grass tufts and little flowers (instanced voxels).
+  if (tufts.length) {
+    const tg = new THREE.BoxGeometry(0.12, 0.22, 0.12);
+    tg.translate(0, 0.11, 0);
+    const tm = new THREE.InstancedMesh(tg, new THREE.MeshLambertMaterial({ color: '#ffffff' }), tufts.length * 3);
+    const flowerCols = ['#ffd166', '#ef476f', '#ffffff', '#9b5de5'].map((x) => new THREE.Color(x));
+    const grassCol = new THREE.Color(hexShade(FLOOR_COLORS.grass[0], -0.1));
+    let k = 0;
+    for (const t of tufts) {
+      for (let j = 0; j < 3; j++) {
+        dummy.position.set(t.x + (j - 1) * 0.14, 0, t.z + ((j * 7) % 3 - 1) * 0.1);
+        dummy.scale.set(1, j === 1 ? 1.4 : 1, 1);
+        dummy.updateMatrix();
+        tm.setMatrixAt(k, dummy.matrix);
+        tm.setColorAt(k, t.flower && j === 1 ? flowerCols[k % 4] : grassCol);
+        k++;
+      }
+    }
+    dummy.scale.set(1, 1, 1);
+    root.add(tm);
+  }
 
   // Props, NPCs and interactables.
   for (let r = 0; r < H; r++) {
@@ -278,7 +344,7 @@ export function buildWorld(placeId, ctx) {
   let input = { x: 0, z: 0 };
   let focus = null;
   let lastRow = -1;
-  const zoom = place.outdoor ? 1.55 : 1.35;
+  const zoom = place.outdoor ? 1.15 : 1.0;
   ctx.camera.position.set(pos.x, 15 * zoom, pos.z + 12 * zoom);
   ctx.camera.lookAt(pos.x, 0, pos.z - 1);
 

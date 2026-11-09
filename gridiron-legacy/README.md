@@ -74,7 +74,8 @@ for five play styles (Balanced, Grinder, Social, Gunslinger, Cautious), across a
    - Touchdowns trigger a celebration cutscene.
 5. **Seasons**: standings, playoffs and a title game. End-of-season awards, records, aging.
 6. **Your look**: build your athlete in the creator (skin, hair, face, tattoos, gear, height and
-   weight, touchdown celebration) and change it any time from **Career → Edit look** (size is fixed).
+   weight, touchdown celebration, plus swag: arm/leg sleeves, knee braces, elbow pads, two-tone cleats,
+   tape, towels, hand warmers, chains and tinted visors) and change it any time from **Career → Edit look** (size is fixed).
    Before each game, pick your **Home, Away or Alternate** uniform; the opponent avoids a clash.
 7. **Career**: pick a hometown and one of its 2-3 high schools (the crosstown school is your rival) →
    2 high school seasons → offers from a random mix of 32 colleges in 4 conferences → 3 college
