@@ -4,7 +4,7 @@
 // tap BREAK (or Space) right before it arrives to jump the route.
 // Stats: Speed = keeping up, IQ = route hint before his break, Skill = break window, Strength = tackling.
 import * as THREE from 'three';
-import { makePlayer, animateRun, makeBall, makeRing, faceToward, knockDown, setPose, setHop, confetti } from '../actors.js';
+import { makePlayer, animateRun, makeBall, makeRing, faceToward, knockDown, setPose, setHop, playAction, celebrate, setBackpedal, confetti } from '../actors.js';
 import { bindInput, maybeTip, rig, endPlay, finalize, dist2, hudMeter } from './common.js';
 import { sfx } from '../../audio/sfx.js';
 
@@ -50,7 +50,7 @@ export function coverPlay(ctx) {
     group.add(d);
   }
   const cb = makePlayer(mine, { highlight: true });
-  const cp = { x: startX + 0.4, z: -cushion };
+  const cp = { x: startX + 0.4, z: Math.max(-cushion, -m.yardLine - 8) };
   cb.position.set(cp.x, 0, cp.z);
   faceToward(cb, cp.x, 5);
   group.add(cb);
@@ -183,7 +183,11 @@ export function coverPlay(ctx) {
       const sp = Math.min(vCB * (reacting ? 0.4 : 1) * (breakTap !== null ? 1.15 : 1), d / Math.max(dt, 1e-3));
       if (d > 0.05) { cp.x += (dx / d) * sp * dt; cp.z += (dz / d) * sp * dt; }
       cb.position.set(cp.x, 0, cp.z);
-      if (sp > 0.3) faceToward(cb, cp.x + dx, cp.z + dz);
+      // Backpedal while bailing (moving away from the line), face the play.
+      const pedal = dz < -0.1 && breakTap === null && !after;
+      setBackpedal(cb, pedal);
+      if (pedal) faceToward(cb, cp.x, cp.z + 5);
+      else if (sp > 0.3) faceToward(cb, cp.x + dx, cp.z + dz);
       animateRun(cb, dt, sp);
     }
     const sep = dist2(cp, wp);
@@ -198,7 +202,7 @@ export function coverPlay(ctx) {
       ball.visible = true;
       landRing.visible = true;
       landRing.position.set(lead.x, 0.05, lead.z);
-      setPose(qb, 'throw');
+      playAction(qb, ['throwWind', 'throwRelease', 'throwRelease'], { fps: 8 });
       faceToward(qb, lead.x, lead.z);
       sfx.throw();
       hud.instr('BREAK on the ball!');
@@ -256,7 +260,9 @@ export function coverPlay(ctx) {
       const intChance = (0.55 + (st.skill / 100) * 0.25) * (call === 'risky' ? 1.15 : call === 'safe' ? 0.8 : 1);
       if (Math.random() < intChance) {
         sfx.catch();
-        setPose(cb, 'catch');
+        setPose(cb, null);
+        playAction(cb, ['jumpCatch', 'catchReach'], { fps: 5, then: null });
+        setTimeout(() => celebrate(cb), 500);
         ball.visible = false;
         const pickSix = Math.random() < 0.1 + (st.speed / 100) * 0.1 + (call === 'risky' ? 0.08 : 0);
         if (pickSix) fx = confetti(ctx.scene, new THREE.Vector3(cp.x, 0, cp.z), [opts.teamColors[0], opts.teamColors[1], '#fff']);

@@ -1,12 +1,11 @@
 // Pixel-art players, ball, rings, labels and effects (three.js sprites).
 import * as THREE from 'three';
-import { playerSheet, ballCanvas, FW, FH, COLS, ROWS } from './pixelart.js';
+import { playerSheet, casualSheet, ballCanvas, FW, FH, COLS, ROWS, poseCol } from './pixelart.js';
 
 const texCache = new Map();
-function sheetTexture(colors, skin) {
-  const key = `${colors[0]}|${colors[1]}|${skin}`;
+function sheetTexture(key, make) {
   if (!texCache.has(key)) {
-    const t = new THREE.CanvasTexture(playerSheet(colors, skin));
+    const t = new THREE.CanvasTexture(make());
     t.magFilter = THREE.NearestFilter;
     t.minFilter = THREE.NearestFilter;
     t.generateMipmaps = false;
@@ -16,22 +15,35 @@ function sheetTexture(colors, skin) {
   return texCache.get(key);
 }
 
-const shadowGeo = new THREE.CircleGeometry(0.75, 10);
+const shadowGeo = new THREE.CircleGeometry(0.75, 12);
 const shadowMat = new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.35, depthWrite: false });
 
-const SPRITE_W = 1.6;
+const SPRITE_W = 1.75;
 const SPRITE_H = SPRITE_W * (FH / FW);
+let FRAME = 0;
+/** Called once per rendered frame by the director. */
+export function nextFrame() { FRAME++; }
+/** Keep every character animating (idle breathing, celebrations) even if a minigame stopped updating it. */
+export function tickIdle(root, dt) {
+  root.traverse((o) => { if (o.userData?.sprite && o.userData.tex && o.userData.ticked !== FRAME) animateRun(o, dt, 0); });
+}
 
-/** A pixel-art player. Position the returned group in yards; it faces -z (away) by default. */
-export function makePlayer(colors, { highlight = false, skin } = {}) {
-  const root = new THREE.Group();
-  const skinIdx = skin ?? Math.floor(Math.random() * 5);
-  const tex = sheetTexture(colors, skinIdx).clone();
+const RUN = ['run0', 'run1', 'run2', 'run3', 'run4', 'run5'];
+const BACK = ['back0', 'idle0', 'back1', 'idle0'];
+const IDLE = ['idle0', 'idle1'];
+
+function makeSprite(baseTex) {
+  const tex = baseTex.clone();
   tex.repeat.set(1 / COLS, 1 / ROWS);
   tex.needsUpdate = true;
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.5 }));
-  sprite.center.set(0.5, 0);
+  sprite.center.set(0.5, 0.06);
   sprite.scale.set(SPRITE_W, SPRITE_H, 1);
+  return { sprite, tex };
+}
+
+function wrap(sprite, tex, { highlight = false } = {}) {
+  const root = new THREE.Group();
   root.add(sprite);
   const shadow = new THREE.Mesh(shadowGeo, shadowMat);
   shadow.rotation.x = -Math.PI / 2;
@@ -43,34 +55,64 @@ export function makePlayer(colors, { highlight = false, skin } = {}) {
     root.add(ring);
     root.userData.ring = ring;
   }
-  root.userData = { ...root.userData, sprite, tex, view: 0, flip: false, frame: 0, t: Math.random(), pose: null, down: false, hop: 0 };
+  root.userData = { ...root.userData, sprite, tex, view: 0, flip: false, pose: 'idle0', t: Math.random() * 3, hold: null, action: null, down: false, hop: 0, back: false };
   setFrame(root);
   return root;
 }
 
+/** A pixel-art football player in team colors. Faces -z (away from camera) by default. */
+export function makePlayer(colors, { highlight = false, skin } = {}) {
+  const skinIdx = skin ?? Math.floor(Math.random() * 5);
+  const base = sheetTexture(`fb|${colors[0]}|${colors[1]}|${skinIdx}`, () => playerSheet(colors, skinIdx));
+  const { sprite, tex } = makeSprite(base);
+  return wrap(sprite, tex, { highlight });
+}
+
+/** A person in casual clothes for the walkable world. look = { shirt, pants, skin, hair, hairStyle } */
+export function makePerson(look, { highlight = false } = {}) {
+  const base = sheetTexture(`cas|${look.shirt}|${look.pants}|${look.skin}|${look.hair}|${look.hairStyle}`, () => casualSheet(look));
+  const { sprite, tex } = makeSprite(base);
+  return wrap(sprite, tex, { highlight });
+}
+
 function setFrame(p) {
   const u = p.userData;
-  const col = u.down ? 8 : u.pose === 'throw' ? 5 : u.pose === 'catch' ? 6 : u.pose === 'dive' ? 7 : u.frame;
-  const row = u.down ? 1 : u.view;
-  // Texture rows go bottom-up in UV space.
-  const flip = u.view === 2 && u.flip;
+  const name = u.down ? 'down' : u.action ? u.action.seq[Math.min(u.action.seq.length - 1, Math.floor(u.action.t * u.action.fps))] : u.hold ?? u.pose;
+  const col = poseCol(name);
+  const row = name === 'down' ? 2 : u.view;
+  const flip = (row === 2) && (u.view === 2 ? u.flip : false);
   u.tex.repeat.x = (flip ? -1 : 1) / COLS;
   u.tex.offset.x = (col + (flip ? 1 : 0)) / COLS;
   u.tex.offset.y = (ROWS - 1 - row) / ROWS;
 }
 
-/** Advance the run cycle. speed in yards/sec. */
+/** Advance locomotion animation (run / backpedal / idle) and any one-shot action. speed in yards/sec. */
 export function animateRun(p, dt, speed) {
   const u = p.userData;
-  if (speed > 0.6) {
-    u.t += dt * (3 + speed * 0.9);
-    u.frame = 1 + (Math.floor(u.t * 2) % 4);
-  } else u.frame = 0;
+  u.ticked = FRAME;
+  u.t += dt;
+  if (u.action) {
+    u.action.t += dt;
+    if (u.action.t * u.action.fps >= u.action.seq.length) {
+      if (u.action.loop) u.action.t = 0;
+      else {
+        const done = u.action.then;
+        u.action = null;
+        if (done === 'down') u.down = true;
+        else if (typeof done === 'string') u.hold = done;
+      }
+    }
+  } else if (!u.hold && !u.down) {
+    if (speed > 0.6) {
+      const seq = u.back ? BACK : RUN;
+      u.pose = seq[Math.floor(u.t * (5 + speed * 1.15)) % seq.length];
+    } else u.pose = IDLE[Math.floor(u.t * 1.6) % 2];
+  }
   u.sprite.position.y = u.hop;
   setFrame(p);
 }
 
-/** Choose the back / front / side frames based on direction of travel or facing. */
+/** Choose back / front / side frames from the direction of travel or facing. */
 export function faceToward(p, x, z) {
   const dx = x - p.position.x;
   const dz = z - p.position.z;
@@ -81,15 +123,33 @@ export function faceToward(p, x, z) {
   setFrame(p);
 }
 
+/** Backpedal mode: run cycle plays as a backpedal (for defensive backs). */
+export function setBackpedal(p, on) { p.userData.back = on; }
+
+const POSE_ALIAS = { throw: 'throwWind', catch: 'catchReach', dive: 'dive', jump: 'jumpCatch', stance: 'stance', sit: 'sit', wave: 'wave' };
+
+/** Hold a pose until cleared (setPose(p, null)). */
 export function setPose(p, pose) {
-  p.userData.pose = pose;
+  p.userData.hold = pose ? POSE_ALIAS[pose] ?? pose : null;
   setFrame(p);
 }
 
-/** Tackled / fallen. */
-export function knockDown(p, t = 1) {
-  p.userData.down = t > 0;
+/** Play a one-shot sequence of poses, then optionally hold a final pose ('down' lies down). */
+export function playAction(p, seq, { fps = 8, loop = false, then = null } = {}) {
+  p.userData.action = { seq, fps, t: 0, loop, then };
+  p.userData.hold = null;
   setFrame(p);
+}
+
+export function celebrate(p) {
+  p.userData.down = false;
+  playAction(p, ['celebrate0', 'celebrate1'], { fps: 4, loop: true });
+}
+
+/** Tackled: impact, fall, then lie on the ground. */
+export function knockDown(p, t = 1) {
+  if (t <= 0) { p.userData.down = false; setFrame(p); return; }
+  playAction(p, ['tackle', 'fall', 'fall'], { fps: 9, then: 'down' });
 }
 
 /** Small vertical hop (jumps, dives). */
@@ -105,7 +165,7 @@ export function makeBall() {
   t.minFilter = THREE.NearestFilter;
   t.colorSpace = THREE.SRGBColorSpace;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, alphaTest: 0.5 }));
-  s.scale.set(0.8, 0.6, 1);
+  s.scale.set(0.75, 0.52, 1);
   g.add(s);
   const shadow = new THREE.Mesh(shadowGeo, shadowMat);
   shadow.rotation.x = -Math.PI / 2;

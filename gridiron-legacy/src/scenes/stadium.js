@@ -7,7 +7,7 @@ const FIELD_W = 53.3;
 const FIELD_L = 120;
 
 function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWAY') {
-  const ppy = 5; // pixels per yard: low on purpose for a chunky retro look
+  const ppy = 8; // pixels per yard: low on purpose for a chunky retro look
   const cw = Math.round(FIELD_W * ppy);
   const ch = FIELD_L * ppy;
   const c = document.createElement('canvas');
@@ -148,7 +148,7 @@ export function buildStadium(scene) {
   }
 
   // Goalposts at the back of each end zone.
-  const postMat = lambert('#ffd43b');
+  const postMat = lambert('#ffd43b', { transparent: true });
   for (const z of [-60, 60]) {
     const g = new THREE.Group();
     const base = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 3.3, 6), postMat);
@@ -194,6 +194,8 @@ export function buildStadium(scene) {
       fd.position.z = -Math.min(distance, yardLine);
       fd.visible = distance < yardLine;
       los.visible = true;
+      // Fade the goalposts when the play is close enough for them to block the view.
+      postMat.opacity = yardLine < 35 ? 0.3 : 1;
     },
     hideLines() { los.visible = false; fd.visible = false; },
     /** Darken / cool the scene for night and bad weather. */

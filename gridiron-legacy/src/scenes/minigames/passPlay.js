@@ -4,7 +4,7 @@
 // hold for power, release to throw. Keyboard: 1/2/3 pick, arrows aim, hold Space.
 // Stats: Skill = accuracy, IQ = coverage read + pocket time, Strength = ball speed, Speed = escape time.
 import * as THREE from 'three';
-import { makePlayer, animateRun, makeBall, makeRing, makeLabel, makeRouteLine, faceToward, knockDown, setPose, confetti } from '../actors.js';
+import { makePlayer, animateRun, makeBall, makeRing, makeLabel, makeRouteLine, faceToward, knockDown, setPose, playAction, celebrate, setBackpedal, confetti } from '../actors.js';
 import { bindInput, maybeTip, rig, endPlay, finalize, dist2, hudMeter, gaussR } from './common.js';
 import { sfx } from '../../audio/sfx.js';
 
@@ -71,10 +71,13 @@ export function passPlay(ctx) {
   const qb = makePlayer(off, { highlight: true });
   qb.position.set(0, 0, 5);
   group.add(qb);
+  const linemen = [];
   for (let i = 0; i < 5; i++) {
     const ol = makePlayer(off);
     ol.position.set(-4 + i * 2, 0, 1);
+    setPose(ol, 'stance');
     group.add(ol);
+    linemen.push(ol);
   }
   const rushers = [];
   const nRush = coverage.id === 'blitz' ? 6 : 4;
@@ -83,6 +86,7 @@ export function passPlay(ctx) {
     const x = -(nRush - 1) + i * 2;
     dl.position.set(x, 0, -1.2);
     faceToward(dl, x, 5);
+    setPose(dl, 'stance');
     group.add(dl);
     rushers.push({ mesh: dl, x0: x });
   }
@@ -92,6 +96,7 @@ export function passPlay(ctx) {
     const ext = !r.sit && r.ext !== false;
     const mesh = makePlayer(off);
     mesh.position.set(path[0].x, 0, 0);
+    setPose(mesh, 'stance');
     group.add(mesh);
     const label = makeLabel(String(i + 1));
     label.position.set(0, 3.4, 0);
@@ -102,7 +107,7 @@ export function passPlay(ctx) {
     const line = makeRouteLine(path.concat(lineEnd), '#ffffff', 0.6);
     group.add(line);
     const dmesh = makePlayer(def);
-    const dpos = hail ? { x: r.x * 0.8, z: -m.yardLine + 2 + Math.random() * 3 } : { x: r.x + (r.x < 0 ? 1 : -1), z: -(coverage.id === 'zone' ? 7 : 5.5) - Math.random() * 2 };
+    const dpos = hail ? { x: r.x * 0.8, z: -m.yardLine + 2 + Math.random() * 3 } : { x: r.x + (r.x < 0 ? 1 : -1), z: Math.max(backLine + 2, -(coverage.id === 'zone' ? 7 : 5.5) - Math.random() * 2) };
     dmesh.position.set(dpos.x, 0, dpos.z);
     faceToward(dmesh, dpos.x, 5);
     group.add(dmesh);
@@ -115,7 +120,7 @@ export function passPlay(ctx) {
   if (opts.call !== 'safe' || hail) {
     const ns = hail ? 3 : coverage.id === 'blitz' ? 0 : 1 + (coverage.id === 'zone' ? 1 : 0);
     for (let i = 0; i < ns; i++) {
-      const s = { mesh: makePlayer(def), pos: { x: (i - (ns - 1) / 2) * 12, z: hail ? -m.yardLine - 2 : -20 - Math.random() * 4 }, speed: 7.6 };
+      const s = { mesh: makePlayer(def), pos: clampField({ x: (i - (ns - 1) / 2) * 12, z: hail ? -m.yardLine - 2 : Math.max(-20 - Math.random() * 4, backLine + 3) }), speed: 7.6 };
       s.mesh.position.set(s.pos.x, 0, s.pos.z);
       faceToward(s.mesh, s.pos.x, 5);
       group.add(s.mesh);
@@ -195,6 +200,7 @@ export function passPlay(ctx) {
     const reach = 3 * Math.sqrt(tol);
     const adjusts = dist2(routeAt, land) <= reach || dist2(r.pos, land) <= r.speed * T * 1.05;
     flight = { from, land, T, H, t0: t, rec: r, adjusts, over, p };
+    playAction(qb, ['throwRelease', 'throwRelease', 'throwRelease'], { fps: 6 });
     ball.visible = true;
     reticle.visible = false;
     arc.visible = false;
@@ -235,7 +241,13 @@ export function passPlay(ctx) {
     if (phase === 'wait') return;
     t += dt;
     if (phase === 'pre') {
-      if (t > 1.1) { phase = 'live'; t = 0; sfx.whistle(); hud.instr('Pick a receiver and throw!'); recs.forEach((r) => (r.line.material.opacity = 0.25)); }
+      if (t > 1.1) {
+        phase = 'live'; t = 0; sfx.whistle(); hud.instr('Pick a receiver and throw!');
+        recs.forEach((r) => { r.line.material.opacity = 0.25; setPose(r.mesh, null); });
+        // Linemen engage: both lines lock up in a blocking pose.
+        linemen.forEach((o) => setPose(o, 'tackle'));
+        rushers.forEach((d) => setPose(d.mesh, 'tackle'));
+      }
       return;
     }
     if (fx && !fx(dt)) fx = null;
@@ -280,7 +292,11 @@ export function passPlay(ctx) {
       const dsp = Math.min(D.speed, dd / Math.max(dt, 1e-3));
       if (dd > 0.05) { D.pos.x += (dx / dd) * dsp * dt; D.pos.z += (dz / dd) * dsp * dt; }
       D.mesh.position.set(D.pos.x, 0, D.pos.z);
-      if (dsp > 0.5) faceToward(D.mesh, D.pos.x + dx, D.pos.z + dz);
+      // Defensive backs backpedal (face the QB) while bailing deep, then turn and run.
+      const bailing = !flight && dz < -0.1 && t < 2.2;
+      setBackpedal(D.mesh, bailing);
+      if (bailing) faceToward(D.mesh, D.pos.x, D.pos.z + 5);
+      else if (dsp > 0.5) faceToward(D.mesh, D.pos.x + dx, D.pos.z + dz);
       animateRun(D.mesh, dt, dsp);
       r.sep = Math.min(dist2(r.pos, D.pos), ...safeties.map((s) => dist2(r.pos, s.pos)), ...recs.filter((o) => o !== r).map((o) => dist2(r.pos, o.d.pos) + 1));
       const shown = r.sep + iqNoise * Math.sin(t * 3.1 + r.d.lag * 9);
@@ -367,6 +383,7 @@ export function passPlay(ctx) {
       } else if (!after.done) {
         after.done = true;
         if (!after.td) { sfx.hit(); ctx.shake(0.2); knockDown(r.mesh, 1); }
+        else celebrate(r.mesh);
         endPlay(ctx, after.result);
       }
     }

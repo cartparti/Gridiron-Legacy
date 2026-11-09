@@ -4,7 +4,7 @@
 // Screen: tap when the rings meet to catch the pass first.
 // Stats: Speed = top speed, Skill = juke window + catch, Strength = breaking tackles, IQ = seeing the hole.
 import * as THREE from 'three';
-import { makePlayer, animateRun, makeBall, makeRing, knockDown, faceToward, setPose, confetti } from '../actors.js';
+import { makePlayer, animateRun, makeBall, makeRing, knockDown, faceToward, setPose, playAction, celebrate, confetti } from '../actors.js';
 import { bindInput, maybeTip, rig, endPlay, finalize } from './common.js';
 import { sfx } from '../../audio/sfx.js';
 
@@ -50,6 +50,7 @@ export function runPlay(ctx) {
   for (let i = 0; i < 5; i++) {
     const ol = makePlayer(off);
     ol.position.set(LANES[i], 0, 0.8);
+    setPose(ol, 'tackle');
     group.add(ol);
     blockers.push(ol);
   }
@@ -121,8 +122,7 @@ export function runPlay(ctx) {
     jukeStart = t;
     jukeCd = jukeWindow + 0.6;
     sfx.juke();
-    setPose(runner, 'dive');
-    setTimeout(() => setPose(runner, null), 220);
+    playAction(runner, ['juke', 'juke', 'run2'], { fps: 10 });
     const b = btns.querySelector('[data-a="juke"]');
     b.classList.add('on');
     setTimeout(() => b?.classList.remove('on'), 200);
@@ -209,7 +209,7 @@ export function runPlay(ctx) {
       animateRun(runner, dt, 4);
       faceToward(qb, x, z);
       if (t >= pass.t0) {
-        setPose(qb, 'throw');
+        if (!pass.thrown) { pass.thrown = true; playAction(qb, ['throwWind', 'throwRelease', 'throwRelease'], { fps: 8 }); setPose(runner, 'catch'); }
         ball.visible = true;
         target.visible = closing.visible = true;
         const f = Math.min(1, (t - pass.t0) / pass.T);
@@ -227,6 +227,7 @@ export function runPlay(ctx) {
             return finish({ complete: false, yards: 0, quality: 0.15, text: pass.tap === null ? 'Never looked it in.' : 'Dropped the screen pass.' });
           }
           sfx.catch();
+          setPose(runner, null);
           hud.big(err <= win ? 'CLEAN CATCH' : 'BOBBLED… GOT IT', '#fff', 600);
           if (err > win) slow = 0.5;
           phase = 'live';
@@ -305,7 +306,7 @@ export function runPlay(ctx) {
     rig(camera, x, z, dt, { zoom: 0.8, ahead: 9, k: 5 });
     if (z <= -m.yardLine) {
       fx = confetti(ctx.scene, new THREE.Vector3(x, 0, z - 2), [opts.teamColors[0], opts.teamColors[1], '#fff']);
-      setPose(runner, 'catch');
+      celebrate(runner);
       return finish({ complete: true, yards: m.yardLine, quality: 0.95 });
     }
     if (t > 11) {

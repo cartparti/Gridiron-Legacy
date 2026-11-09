@@ -3,7 +3,7 @@
 // Controls: tap / Space. Before the snap pick a route with the buttons or 1/2/3.
 // Stats: Speed = separation, Skill = catch window + cleaner breaks, Strength = contested catches, IQ = break timing.
 import * as THREE from 'three';
-import { makePlayer, animateRun, makeBall, makeRing, makeDisc, faceToward, knockDown, setPose, setHop, makeRouteLine, confetti } from '../actors.js';
+import { makePlayer, animateRun, makeBall, makeRing, makeDisc, faceToward, knockDown, setPose, setHop, playAction, celebrate, setBackpedal, makeRouteLine, confetti } from '../actors.js';
 import { bindInput, maybeTip, rig, endPlay, finalize, dist2 } from './common.js';
 import { sfx } from '../../audio/sfx.js';
 
@@ -46,19 +46,20 @@ export function routePlay(ctx) {
   const wr = makePlayer(off, { highlight: true });
   const pos = { x: startX, z: 0 };
   wr.position.set(pos.x, 0, 0);
+  setPose(wr, 'stance');
   group.add(wr);
   const qb = makePlayer(off);
   qb.position.set(0, 0, 5);
   group.add(qb);
   const press = call === 'risky' || mode === 'jump';
-  const cbPos = { x: startX + 0.6, z: press ? -1.6 : -6 };
+  const cbPos = { x: startX + 0.6, z: Math.max(press ? -1.6 : -6, -m.yardLine - 8) };
   const cb = makePlayer(def);
   cb.position.set(cbPos.x, 0, cbPos.z);
   faceToward(cb, cbPos.x, 5);
   group.add(cb);
   let safety = null;
   if (call === 'risky' || mode === 'jump') {
-    safety = { pos: { x: startX - 6, z: -22 }, mesh: makePlayer(def) };
+    safety = { pos: { x: startX - 6, z: Math.max(-22, -m.yardLine - 6) }, mesh: makePlayer(def) };
     safety.mesh.position.set(safety.pos.x, 0, safety.pos.z);
     group.add(safety.mesh);
   }
@@ -158,6 +159,7 @@ export function routePlay(ctx) {
     sep = base + (st.speed / 100) * 0.6 + (st.skill / 100) * 0.4;
     hud.big(perfect ? 'PERFECT BREAK!' : good ? 'GOOD BREAK' : 'SLOPPY BREAK', perfect ? '#4ade80' : good ? '#fff' : '#fbbf24', 700);
     sfx.juke();
+    playAction(wr, ['juke', 'juke'], { fps: 10 });
     const L = Math.hypot(route.dir.x, route.dir.z);
     dir = { x: route.dir.x / L, z: route.dir.z / L };
     zone.visible = false;
@@ -201,7 +203,7 @@ export function routePlay(ctx) {
       return;
     }
     if (phase === 'pre') {
-      if (t > 0.45) { phase = 'route'; t = 0; sfx.whistle(); if (mode === 'jump') doCut(zoneHalf * 0.7); }
+      if (t > 0.45) { phase = 'route'; t = 0; sfx.whistle(); setPose(wr, null); if (mode === 'jump') doCut(zoneHalf * 0.7); }
       return;
     }
     if (phase === 'over') return;
@@ -233,7 +235,9 @@ export function routePlay(ctx) {
     const csp = Math.min(vCB * (phase === 'route' && !press ? 0.85 : 1), dd / Math.max(dt, 1e-3));
     if (dd > 0.02) { cbPos.x += (dx / dd) * csp * dt; cbPos.z += (dz / dd) * csp * dt; }
     cb.position.set(cbPos.x, 0, cbPos.z);
-    faceToward(cb, pos.x, pos.z);
+    const pedal = phase === 'route' && dz < -0.1;
+    setBackpedal(cb, pedal);
+    faceToward(cb, pedal ? cbPos.x : cbPos.x + dx, pedal ? cbPos.z + 5 : cbPos.z + dz);
     animateRun(cb, dt, csp);
     if (safety) {
       const sx = (flight ? flight.land.x : pos.x) - safety.pos.x;
@@ -255,7 +259,7 @@ export function routePlay(ctx) {
       phase = 'flight';
       ball.visible = true;
       target.visible = closing.visible = true;
-      setPose(qb, 'throw');
+      playAction(qb, ['throwWind', 'throwRelease', 'throwRelease'], { fps: 8 });
       faceToward(qb, lead.x, lead.z);
       sfx.throw();
     }
@@ -297,6 +301,7 @@ export function routePlay(ctx) {
         rig(camera, pos.x * 0.75, pos.z, dt, { zoom: 1, k: 3 });
       } else {
         if (!after.result.td) { sfx.hit(); ctx.shake(0.2); knockDown(wr, 1); }
+        else celebrate(wr);
         finish(after.result);
       }
     }

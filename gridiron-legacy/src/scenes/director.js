@@ -3,6 +3,7 @@
 // If WebGL is unavailable, a simple 2D timing meter is used instead.
 import * as THREE from 'three';
 import { buildStadium } from './stadium.js';
+import { nextFrame, tickIdle } from './actors.js';
 import { passPlay } from './minigames/passPlay.js';
 import { runPlay } from './minigames/runPlay.js';
 import { routePlay } from './minigames/routePlay.js';
@@ -20,7 +21,7 @@ let shake = 0;
 
 /** Internal render width in pixels: low on purpose for the retro look. */
 function pixelWidth(w) {
-  return Math.round(Math.max(240, Math.min(440, w / 2)));
+  return Math.round(Math.max(320, Math.min(640, w / 1.25)));
 }
 
 function ensure() {
@@ -274,7 +275,9 @@ export function runMinigame(type, opts) {
     };
     const update = GAMES[type](ctx);
     start((dt, t) => {
+      nextFrame();
       update(dt, t);
+      tickIdle(group, dt);
       r.stadium.animateCrowd(t, 0.35);
     });
   });

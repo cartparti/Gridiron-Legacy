@@ -1,7 +1,7 @@
 // Goal-line dive: tap fast to drive the pile forward, then time your leap.
 // Stats: Strength = push per tap, Skill = leap timing window.
 import * as THREE from 'three';
-import { makePlayer, animateRun, faceToward, knockDown, setPose, setHop, confetti } from '../actors.js';
+import { makePlayer, animateRun, faceToward, knockDown, setPose, setHop, celebrate, confetti } from '../actors.js';
 import { bindInput, maybeTip, rig, endPlay, finalize, hudMeter } from './common.js';
 import { sfx } from '../../audio/sfx.js';
 
@@ -23,11 +23,13 @@ export function goalLine(ctx) {
     const x = -6 + i * 2;
     const o = makePlayer(off);
     o.position.set(x, 0, 0.9);
+    setPose(o, 'tackle');
     group.add(o);
     ol.push(o);
     const d = makePlayer(def);
     d.position.set(x, 0, -0.9);
     faceToward(d, x, 5);
+    setPose(d, 'tackle');
     group.add(d);
     dl.push(d);
   }
@@ -120,6 +122,8 @@ export function goalLine(ctx) {
       if (lt > 1) {
         setHop(runner, 0);
         if (success) {
+          setPose(runner, null);
+          celebrate(runner);
           fx = confetti(ctx.scene, new THREE.Vector3(0, 0, -m.yardLine - 1), [opts.teamColors[0], opts.teamColors[1], '#fff']);
           return finish({ complete: true, yards: m.yardLine, quality: 0.6 + q * 0.4, text: 'Over the top! TOUCHDOWN!' });
         }
