@@ -991,3 +991,32 @@ export function bloodBurst(scene, origin, dir = { x: 0, z: -1 }) {
     return true;
   };
 }
+
+/** A puff of turf and dust where bodies hit the ground. Returns an updater (false when done). */
+export function dustPuff(scene, origin, n = 12) {
+  const geoD = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+  const mesh = new THREE.InstancedMesh(geoD, new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.9 }), n);
+  const cols = ['#5a8f3c', '#3f7a33', '#b8a37a', '#d8cfb8'].map((c) => new THREE.Color(c));
+  const P = [];
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 1 + Math.random() * 2.5;
+    P.push({ x: origin.x, y: 0.1, z: origin.z, vx: Math.cos(a) * sp, vy: 1.5 + Math.random() * 2.5, vz: Math.sin(a) * sp });
+    mesh.setColorAt(i, cols[i % cols.length]);
+  }
+  scene.add(mesh);
+  const d = new THREE.Object3D();
+  let life = 0;
+  return (dt) => {
+    life += dt;
+    P.forEach((p, i) => {
+      p.vy -= 9 * dt; p.x += p.vx * dt; p.y = Math.max(0.05, p.y + p.vy * dt); p.z += p.vz * dt;
+      p.vx *= 0.96; p.vz *= 0.96;
+      d.position.set(p.x, p.y, p.z); d.scale.setScalar(Math.max(0.01, 1 - life * 0.9)); d.updateMatrix();
+      mesh.setMatrixAt(i, d.matrix);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (life > 1.1) { scene.remove(mesh); geoD.dispose(); return false; }
+    return true;
+  };
+}

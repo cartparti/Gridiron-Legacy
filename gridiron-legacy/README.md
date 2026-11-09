@@ -69,6 +69,8 @@ for five play styles (Balanced, Grinder, Social, Gunslinger, Cautious), across a
    - **QB**: drop back, then tap a receiver on the field or press `1`-`5` to throw. Pressure and
      wind affect accuracy. Run if the pocket collapses.
    - **WR**: run your route (or freelance), `C` to call for the ball, `Space` to catch as it arrives.
+   - **DT**: you start locked up with a blocker. Push the stick toward the QB to build leverage, then RIP
+     `J`, SWIM `K` or BULL RUSH `L` to break free. SACK `F`, BAT IT `Space`.
    - **CB**: shadow your man, `Space` to swat / pick the pass, `F` to tackle. Pick-sixes are live.
    - **Goal-line dive**: tap fast to drive the pile, then time your leap.
    - Touchdowns trigger a celebration cutscene. Big hits send players flying (ragdolls), sometimes in a

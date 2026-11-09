@@ -4,7 +4,8 @@ import { clamp, fillTokens } from '../core/util.js';
 import { rand, randInt, pick, chance } from '../core/rng.js';
 import { applyEffects } from './effects.js';
 import { people } from './social.js';
-import { TEXTS, AFTER_GAME, WEEKLY, TROLL_COMMENTS, COMMENT_REPLIES, CLAPBACKS } from '../data/texts.js';
+import { TEXTS, AFTER_GAME, WEEKLY, TROLL_COMMENTS, COMMENT_REPLIES, CLAPBACKS, ALT, ALT_BACK, TAGS } from '../data/texts.js';
+import { FIRST_NAMES } from '../data/names.js';
 import { addNews } from './press.js';
 
 const MAX_MSGS = 40;
@@ -27,10 +28,10 @@ export function fmtCount(n) {
 }
 
 /** Someone texts you. key = person key (coach, mate0, family, partner, agent, rival). */
-export function textFrom(state, key, text, tid = null) {
+export function textFrom(state, key, text, tid = null, opts = null) {
   const ph = phone(state);
   const t = (ph.threads[key] = ph.threads[key] ?? []);
-  t.push({ from: 'them', text, tid, year: state.career.year, week: (state.league?.week ?? 0) + 1, read: false });
+  t.push({ from: 'them', text, tid, opts, year: state.career.year, week: (state.league?.week ?? 0) + 1, read: false });
   if (t.length > MAX_MSGS) t.shift();
   ph.unread = Object.values(ph.threads).reduce((a, th) => a + th.filter((m) => !m.read && m.from === 'them').length, 0);
 }
@@ -58,8 +59,18 @@ export function pendingMessage(state, key) {
 export function replyOptions(state, key) {
   const m = state ? pendingMessage(state, key) : null;
   if (!m) return [];
+  if (m.opts) return m.opts.map((o) => o.label);
   const tpl = m.tid ? TEXTS[m.tid] : null;
   return (tpl?.replies ?? REPLIES).map((r) => r.label);
+}
+
+/** Resolve the reply choices for a template right now (random wordings from ALT / ALT_BACK). */
+function resolveOptions(state, tid, replies) {
+  return replies.map((r, i) => {
+    const labels = Array.isArray(r.label) ? r.label : [r.label, ...(ALT[tid]?.[i]?.slice(1) ?? [])];
+    const backs = Array.isArray(r.back) ? r.back : r.back === undefined ? [null] : [r.back, ...(ALT_BACK[tid]?.[i]?.slice(1) ?? [])];
+    return { label: pick(state, ALT[tid]?.[i] && !Array.isArray(r.label) ? ALT[tid][i] : labels), back: pick(state, backs) ?? (r.back === null ? null : r.back ?? null), i };
+  });
 }
 
 const bump = (state, key, d) => {
@@ -78,9 +89,11 @@ export function reply(state, key, idx) {
   const ph = phone(state);
   const m = pendingMessage(state, key);
   if (!m) return null;
-  const tpl = m.tid ? TEXTS[m.tid] : null;
-  const r = (tpl?.replies ?? REPLIES)[idx];
-  if (!r) return null;
+  const tpl = m.tid === 'tag' ? { replies: TAGS[m.tagIdx]?.replies ?? REPLIES } : m.tid ? TEXTS[m.tid] : null;
+  const base = (tpl?.replies ?? REPLIES)[idx];
+  if (!base) return null;
+  const chosen = m.opts?.[idx];
+  const r = { ...base, label: chosen?.label ?? (Array.isArray(base.label) ? base.label[0] : base.label), back: chosen ? chosen.back : base.back };
   m.answered = true;
   const wk = (state.league?.week ?? 0) + 1;
   const t = (ph.threads[key] = ph.threads[key] ?? []);
@@ -89,6 +102,11 @@ export function reply(state, key, idx) {
   const b = bump(state, key, r.bond);
   if (b) changes.push(b);
   if (r.effects) changes.push(...applyEffects(state, r.effects));
+  if (r.risk && chance(state, r.risk)) {
+    changes.push(...applyEffects(state, { mood: -3, rel: { coach: -2 }, fame: -0.5 }));
+    addNews(state, 'scandal', `${state.player.first} ${state.player.last} gets into it online. Not a great look.`);
+    r.back = 'That reply is going viral... for the wrong reasons. 😬';
+  }
   if (r.back) t.push({ from: 'them', text: r.back, year: state.career.year, week: wk, read: true, answered: true });
   if (t.length > MAX_MSGS) t.splice(0, t.length - MAX_MSGS);
   return { changes, back: r.back };
@@ -103,7 +121,23 @@ function sendTemplate(state, tid) {
   if (tpl.who === 'agent' && !p.agentName) return;
   const key = tpl.who === 'mate' ? (p.teammates?.length ? pick(state, p.teammates).id : null) : tpl.who;
   if (!key) return;
-  textFrom(state, key, pick(state, tpl.text), tid);
+  textFrom(state, key, pick(state, tpl.text), tid, resolveOptions(state, tid, tpl.replies));
+}
+
+/** Someone tags you on Huddle. when: great / bad / any. Lands in the "Huddle Mentions" thread. */
+export function sendTag(state, when = 'any') {
+  const p = state.player;
+  const pool = TAGS.map((tg, i) => ({ tg, i })).filter(({ tg }) => tg.when === 'any' || tg.when === when);
+  if (!pool.length) return;
+  const { tg, i } = pick(state, pool);
+  const handle = pick(state, FAN_HANDLES).replace('@', '');
+  const mate = p.teammates?.length ? pick(state, p.teammates).name.split(' ')[0] : pick(state, FIRST_NAMES);
+  const me = `${p.first.toLowerCase()}${p.last.toLowerCase()}${p.number}`;
+  const text = fillTokens(pick(state, tg.text), { handle, first: p.first, me, mate, rival: p.rivalName });
+  const opts = tg.replies.map((r, k) => ({ label: pick(state, Array.isArray(r.label) ? r.label : [r.label]), back: null, i: k }));
+  textFrom(state, 'tags', text, 'tag', opts);
+  const t = phone(state).threads.tags;
+  t[t.length - 1].tagIdx = i;
 }
 
 /** Reply to a comment on one of your posts. kind 'fan' or 'troll'. */
@@ -168,6 +202,8 @@ export function postGameTexts(state, lg) {
   if (lg.won && p.teammates?.length && chance(state, 0.6)) sendTemplate(state, AFTER_GAME.mate[tier === 'great' ? 'great' : 'win']);
   if (p.agentName && tier === 'great' && chance(state, 0.5)) sendTemplate(state, AFTER_GAME.agent.great);
   if (lg.rivalry) sendTemplate(state, AFTER_GAME.rival[lg.won ? 'beat' : 'lost']);
+  if (chance(state, tier === 'bad' ? 0.6 : 0.7)) sendTag(state, tier === 'great' ? 'great' : tier === 'bad' ? 'bad' : 'any');
+  if (tier === 'great' && chance(state, 0.4)) sendTag(state, 'great');
 }
 
 /** Occasional texts at the start of a week. */
@@ -176,6 +212,7 @@ export function weeklyTexts(state) {
   if (!chance(state, 0.6)) return;
   const options = WEEKLY.filter((tid) => (TEXTS[tid].who !== 'partner' || p.partnerName) && (TEXTS[tid].who !== 'agent' || p.agentName));
   sendTemplate(state, pick(state, options));
+  if (chance(state, 0.35)) sendTag(state, 'any');
 }
 
 // ------------------------------------------------------------------ social media
@@ -252,6 +289,7 @@ export function feed(state) {
 }
 
 export function contactName(state, key) {
+  if (key === 'tags') return 'Huddle Mentions';
   return people(state).find((x) => x.key === key)?.name ?? key;
 }
 

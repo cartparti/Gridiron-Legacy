@@ -16,6 +16,7 @@ const AWARD_ICONS = { 'Most Valuable Player': 'crown', 'Legacy Bowl Champion': '
 export function statLine(pos, s) {
   if (pos === 'QB') return [[`${s.passComp}/${s.passAtt}`, 'Comp/Att'], [s.passYds, 'Pass Yds'], [`${s.passTD}/${s.int}`, 'TD/INT']];
   if (pos === 'RB') return [[s.rushAtt, 'Carries'], [s.rushYds, 'Rush Yds'], [s.rushTD, 'TD']];
+  if (pos === 'DT') return [[s.defSacks ?? 0, 'Sacks'], [s.tfl ?? 0, 'TFL'], [s.tackles ?? 0, 'Tackles']];
   if (pos === 'CB') return [[s.defInt ?? 0, 'INT'], [s.pd ?? 0, 'Pass Def'], [s.tackles ?? 0, 'Tackles']];
   return [[`${s.rec}/${s.targets}`, 'Rec/Tgt'], [s.recYds, 'Rec Yds'], [s.recTD, 'TD']];
 }

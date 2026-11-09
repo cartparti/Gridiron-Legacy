@@ -431,6 +431,7 @@ function profileView(app) {
   const team = getTeam(st.league, st.career.teamId);
   const s = p.seasonStats;
   const posLine = (x) => (p.position === 'QB' ? `${x.passComp}/${x.passAtt}, ${x.passYds} yds, ${x.passTD} TD, ${x.int} INT`
+    : p.position === 'DT' ? `${x.defSacks ?? 0} sacks, ${x.tfl ?? 0} TFL, ${x.tackles ?? 0} tkl`
     : p.position === 'CB' ? `${x.defInt ?? 0} INT, ${x.pd ?? 0} PD, ${x.tackles ?? 0} tkl, ${x.defTD ?? 0} TD · ${x.ydsAllowed ?? 0} yds allowed`
     : p.position === 'RB' ? `${x.rushAtt} car, ${x.rushYds} yds, ${x.rushTD} TD · ${x.rec} rec ${x.recYds} yds`
       : `${x.rec} rec, ${x.recYds} yds, ${x.recTD} TD · ${x.drops} drops`);

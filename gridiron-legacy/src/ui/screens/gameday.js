@@ -59,7 +59,7 @@ export function gamedayScreen(app) {
   const league = st.league;
   const home = getTeam(league, g.homeId);
   const away = getTeam(league, g.awayId);
-  const defense = st.player.position === 'CB';
+  const defense = st.player.position === 'CB' || st.player.position === 'DT';
   const root = h('div');
   const gid = `${g.homeId}-${g.awayId}-${g.week}`;
   const ui = app.ui.game && app.ui.game.id === gid ? app.ui.game
@@ -231,6 +231,7 @@ export function gamedayScreen(app) {
       look: st.player.look,
       number: st.player.number,
       lastName: st.player.last,
+      userHome: g.userSide === 'home',
       teamName: me.name,
       oppName: opp.name,
       scoreInfo: { home: home.name, away: away.name, homePts: g.score.home, awayPts: g.score.away, homeColors: home.colors, awayColors: away.colors, clock: `Q${m.quarter} ${m.clock}` },

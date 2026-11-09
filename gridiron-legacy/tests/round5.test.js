@@ -47,3 +47,18 @@ test('drills scale training gains', () => {
 test('presnap events exist for every position', () => {
   for (const pos of ['QB', 'RB', 'WR', 'CB']) assert.ok(GAME_EVENTS.some((e) => e.trigger === 'presnap' && (!e.cond?.positions || e.cond.positions.includes(pos))), pos);
 });
+
+test('tags land in Huddle Mentions with varied, answerable replies', async () => {
+  const { sendTag } = await import('../src/sim/phone.js');
+  const st = career();
+  sendTag(st, 'great');
+  const opts = replyOptions(st, 'tags');
+  assert.ok(opts.length >= 2);
+  const r = reply(st, 'tags', 0);
+  assert.ok(r && r.changes.length >= 1);
+  // weekly template texts carry pre-picked wordings
+  textFrom(st, 'family', 'hi');
+  const labels = new Set();
+  for (let i = 0; i < 12; i++) { const s2 = career(); s2.rngState = 1000 + i * 77; const ph = await import('../src/sim/phone.js'); ph.postGameTexts(s2, { grade: 80, won: true }); const o = ph.replyOptions(s2, 'coach'); if (o[0]) labels.add(o[0]); }
+  assert.ok(labels.size >= 2, 'reply wording varies');
+});

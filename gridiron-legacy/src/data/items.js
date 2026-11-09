@@ -14,7 +14,7 @@
 //   flag:    sets a story flag when bought (some events check these)
 
 const CATCH = ['wr_route', 'wr_jumpball', 'wr_toetap', 'rb_screen', 'cb_cover', 'qb_hailmary'];
-const RUN = ['rb_run', 'rb_screen', 'qb_scramble', 'rb_goalline', 'cb_tackle'];
+const RUN = ['rb_run', 'rb_screen', 'qb_scramble', 'rb_goalline', 'cb_tackle', 'dt_rush', 'dt_run'];
 const THROW = ['qb_throw', 'qb_hailmary'];
 
 export const ITEM_CATS = [

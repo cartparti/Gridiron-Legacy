@@ -3,6 +3,7 @@ import { clear } from './dom.js';
 import { closeAllModals, toast } from './components.js';
 import * as storage from '../core/storage.js';
 import { setSoundEnabled } from '../audio/sfx.js';
+import { setMusicEnabled } from '../audio/stadium.js';
 import { getTeam } from '../sim/league.js';
 import { titleScreen } from './screens/title.js';
 import { slotsScreen } from './screens/slots.js';
@@ -36,6 +37,7 @@ export const app = {
     else root.setAttribute('data-theme', s.theme);
     document.body.classList.toggle('reduce-motion', !!s.reducedMotion);
     setSoundEnabled(!!s.sound);
+    setMusicEnabled(s.music !== false);
   },
 
   saveSettings() {

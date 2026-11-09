@@ -60,6 +60,18 @@ export const POSITIONS = {
       strength: 'Tackling',
     },
   },
+  DT: {
+    label: 'Defensive Tackle',
+    short: 'DT',
+    weights: { speed: 0.18, skill: 0.24, iq: 0.14, strength: 0.44 },
+    blurb: 'Fight through blockers with rip, swim and bull-rush moves. Sack the quarterback, stuff the run.',
+    statNotes: {
+      speed: 'First step, chasing the QB',
+      skill: 'Rip and swim moves',
+      iq: 'Reading run or pass',
+      strength: 'Bull rush, taking on double teams',
+    },
+  },
 };
 
 /** Background picked at character creation: shapes starting stats. */

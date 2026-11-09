@@ -26,7 +26,7 @@ export const CHAINS = [{ id: 'none', label: 'None' }, { id: 'gold', label: 'Gold
 export const CELEBRATIONS = [{ id: 'pump', label: 'Fist pump' }, { id: 'dance', label: 'Dance' }, { id: 'flex', label: 'Flex' }, { id: 'flip', label: 'Backflip' }, { id: 'salute', label: 'Salute' }, { id: 'point', label: 'Point up' }];
 
 /** Typical size by position (inches, pounds). */
-export const POS_SIZE = { QB: [75, 220], RB: [70, 212], WR: [73, 196], CB: [72, 190], TE: [77, 250], OL: [77, 312], DL: [76, 290], LB: [74, 238], S: [72, 205] };
+export const POS_SIZE = { DT: [76, 300], QB: [75, 220], RB: [70, 212], WR: [73, 196], CB: [72, 190], TE: [77, 250], OL: [77, 312], DL: [76, 290], LB: [74, 238], S: [72, 205] };
 export const HEIGHT_RANGE = [66, 80];
 export const WEIGHT_RANGE = [160, 340];
 

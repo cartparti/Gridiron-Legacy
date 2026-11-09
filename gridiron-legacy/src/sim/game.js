@@ -24,19 +24,22 @@ const MOMENT_POOL = {
   RB: [['rb_run', 7], ['rb_screen', 2.5]],
   WR: [['wr_route', 6], ['wr_jumpball', 2], ['wr_toetap', 2]],
   CB: [['cb_cover', 6], ['cb_tackle', 3]],
+  DT: [['dt_rush', 6], ['dt_run', 3]],
 };
 export const MOMENT_NAMES = {
   qb_throw: 'Pass Play', qb_scramble: 'Scramble', qb_hailmary: 'Hail Mary',
   rb_run: 'Run Play', rb_screen: 'Screen Pass', rb_goalline: 'Goal-Line Dive',
   wr_route: 'Route & Catch', wr_jumpball: 'Jump Ball', wr_toetap: 'Sideline Toe-Tap',
   cb_cover: 'Coverage', cb_tackle: 'Open-Field Tackle',
+  dt_rush: 'Pass Rush', dt_run: 'Run Stop',
 };
-const PASS_TYPES = new Set(['qb_throw', 'qb_hailmary', 'wr_route', 'wr_jumpball', 'wr_toetap', 'rb_screen', 'cb_cover']);
+const PASS_TYPES = new Set(['qb_throw', 'qb_hailmary', 'wr_route', 'wr_jumpball', 'wr_toetap', 'rb_screen', 'cb_cover', 'dt_rush']);
 const DEEP_TYPES = new Set(['qb_hailmary', 'wr_jumpball']);
-const CONTACT_TYPES = new Set(['rb_run', 'rb_screen', 'rb_goalline', 'qb_scramble', 'wr_route', 'wr_jumpball', 'cb_tackle']);
+const CONTACT_TYPES = new Set(['rb_run', 'rb_screen', 'rb_goalline', 'qb_scramble', 'wr_route', 'wr_jumpball', 'cb_tackle', 'dt_rush', 'dt_run']);
 const MAX_EVENTS = 3;
 
-export const isDefense = (state) => state.player.position === 'CB';
+export const DEF_POSITIONS = new Set(['CB', 'DT']);
+export const isDefense = (state) => DEF_POSITIONS.has(state.player.position);
 
 export function momentCount(state, { playoff, rivalry }) {
   const c = state.player.rel.coach;
@@ -307,7 +310,15 @@ export function outcomeFromQuality(state, m, q, call) {
 function defenseOutcome(state, m, q, call, res) {
   const pc = PLAY_CALLS[call];
   res.defense = true;
-  if (m.type === 'cb_tackle') {
+  if (m.type === 'dt_rush') {
+    if (q > 0.74) { res.sack = true; res.tackle = true; res.tfl = true; res.yardsAllowed = -Math.round(5 + q * 5); res.text = 'SACK! You got home!'; if (q > 0.9 && chance(state, 0.2)) { res.forcedFumble = true; res.turnover = true; res.text = 'STRIP SACK! Fumble recovered!'; } }
+    else if (q > 0.5) { res.pd = chance(state, 0.3); res.pressure = true; res.yardsAllowed = 0; res.text = res.pd ? 'Batted at the line!' : 'Pressure! The pass falls incomplete.'; }
+    else { res.caught = true; res.yardsAllowed = Math.max(2, Math.round(6 + (0.5 - q) * 30 + gauss(state, 0, 3))); res.text = `They had time. ${res.yardsAllowed}-yard completion.`; }
+  } else if (m.type === 'dt_run') {
+    if (q > 0.7) { res.tackle = true; res.tfl = true; res.yardsAllowed = -Math.round(1 + q * 3); res.text = 'Tackle for loss!'; }
+    else if (q > 0.45) { res.tackle = true; res.yardsAllowed = Math.round(1 + (0.7 - q) * 8); res.text = 'Stuffed at the line.'; }
+    else { res.yardsAllowed = Math.round(5 + (0.45 - q) * 30 * pc.reward); res.text = 'They ran right past you.'; }
+  } else if (m.type === 'cb_tackle') {
     if (q > 0.45) { res.tackle = true; res.yardsAllowed = Math.max(0, Math.round(8 - q * 10 + gauss(state, 0, 1.5))); res.text = 'Wrapped up! Big stop.'; }
     else { res.yardsAllowed = Math.round(10 + (0.45 - q) * 60 * pc.reward); res.text = 'Missed tackle!'; }
     if (q > 0.85 && chance(state, 0.15 * pc.reward)) { res.forcedFumble = true; res.turnover = true; res.text = 'Forced FUMBLE! Your ball!'; }
@@ -350,13 +361,15 @@ export function resolveMoment(state, result) {
     if (result.pd) s.pd++;
     if (result.defTD) s.defTD++;
     if (result.tackle) s.tackles++;
+    if (result.sack && result.tackle) s.defSacks = (s.defSacks ?? 0) + 1;
+    if (result.tfl && result.tackle) s.tfl = (s.tfl ?? 0) + 1;
     if (result.forcedFumble) s.tackles++;
     if (result.caught || m.type === 'cb_tackle') {
       if (result.caught) s.recAllowed++;
       s.ydsAllowed += result.yardsAllowed ?? 0;
     }
     if (result.tdAllowed) s.tdAllowed++;
-    if (m.clutch && (result.int || result.pd || (result.tackle && (result.yardsAllowed ?? 0) < m.distance))) s.clutch++;
+    if (m.clutch && (result.int || result.pd || result.sack || (result.tackle && (result.yardsAllowed ?? 0) < m.distance))) s.clutch++;
     if (result.turnover) out = 'TO';
     else if (result.tdAllowed) out = 'TD';
     else {
@@ -556,6 +569,7 @@ export function gameGrade(state, g) {
   if (pos === 'QB') prod = s.passYds / 3.2 * 0.45 + s.passTD * 14 + (s.passAtt ? (s.passComp / s.passAtt - 0.5) * 60 : 0) - s.int * 12 - s.sacks * 2 + s.rushYds * 0.3;
   else if (pos === 'RB') prod = s.rushYds / 1.2 * 0.55 + s.rushTD * 15 + s.recYds * 0.3 - s.fumbles * 14;
   else if (pos === 'CB') prod = 40 + s.tackles * 3 + s.defInt * 22 + s.pd * 8 + s.defTD * 18 - s.tdAllowed * 12 - s.ydsAllowed * 0.35;
+  else if (pos === 'DT') prod = 32 + s.tackles * 4 + (s.defSacks ?? 0) * 20 + (s.tfl ?? 0) * 7 + s.pd * 6;
   else prod = s.recYds / 1.1 * 0.55 + s.recTD * 16 + s.rec * 2 - s.drops * 4;
   prod = clamp(prod, 0, 100);
   const mq = g.moments.length ? g.moments.reduce((a, m) => a + m.quality, 0) / g.moments.length : 0.5;

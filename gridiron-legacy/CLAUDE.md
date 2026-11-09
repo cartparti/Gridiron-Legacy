@@ -123,6 +123,22 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Cutscenes (`src/scenes/cutscenes.js`, `runCutscene` in director): tunnel run-out (first game at each level),
   draft night, trophy lift (champions), Hall of Fame induction. Skippable; off with Reduced motion.
 
+## v0.10 changes
+- QB balance: tighter man coverage in pass mode, contested-catch breakups, defenders burst on the catch,
+  AI ball carriers juke/break tackles less and run slightly slower after the catch.
+- Playbook pool (`MORE` + `dealPlays` in playbook.js): 6-10 plays per mode/call, 3 random each snap.
+- Brawling: `battle()` in engine (blocks sway, trade shoves, pancakes either way), CB/WR hand-fighting,
+  pile-ons after tackles, post-whistle scuffles, `dustPuff` turf on contact and sprints.
+- New position DT (Defensive Tackle): moments `dt_rush` (mode 'rush') and `dt_run` (mode 'runStop'). You
+  start locked with a blocker; build LEVERAGE by driving into him, RIP/SWIM/BULL RUSH to shed, SACK the QB,
+  BAT passes. Stats defSacks/tfl; awards/records/press/grades handle DT; `DEF_POSITIONS` in game.js.
+- Stadium audio (`src/audio/stadium.js`): crowd bed, reactions aware of home/away (`react(kind, homeGood)`),
+  chants, air horn, chiptune music loops (Settings → Stadium music).
+- Visuals: cheering fans with raised arms, signs, camera flashes, crowd hype (`ctx.hype`), TD flame jets +
+  fireworks (`src/scenes/fx.js`), crowd cam at the end of TD celebrations, ball trail, end zone stripes,
+  midfield team letters, team-colored border; broadcast score bug + player name tag in the HUD.
+- Texts: random wordings per reply (`ALT`, `ALT_BACK`), Huddle Mentions thread (`TAGS`, `sendTag`).
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

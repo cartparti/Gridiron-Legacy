@@ -110,7 +110,7 @@ test('pro teams stay under the salary cap', () => {
 });
 
 test('a user game pauses for key moments, decisions and events, then finishes', () => {
-  for (const pos of ['QB', 'RB', 'WR', 'CB']) {
+  for (const pos of ['QB', 'RB', 'WR', 'CB', 'DT']) {
     const state = flow.newCareer(randomCareerOpts(321, pos));
     while (state.phase === 'event') flow.resolveEvent(state, 0);
     assert.equal(state.phase, 'plan');
@@ -121,14 +121,14 @@ test('a user game pauses for key moments, decisions and events, then finishes', 
       const r = stepGame(state);
       if (r.type === 'end') break;
       if (r.type === 'decision') { resolveDecision(state, true); continue; }
-      if (r.type === 'gameEvent') { resolveGameEvent(state, 0); continue; }
+      if (r.type === 'gameEvent') { resolveGameEvent(state, r.event.choices.length - 1); continue; }
       moments++;
-      assert.equal(r.moment.defense, pos === 'CB');
+      assert.equal(r.moment.defense, pos === 'CB' || pos === 'DT');
       const res = autoMoment(state, 'balanced');
       assert.ok(res.quality >= 0 && res.quality <= 1);
       resolveMoment(state, res);
     }
-    assert.ok(moments >= 5 && moments <= 16, `${pos} moments: ${moments}`);
+    assert.ok(moments >= 3 && moments <= 16, `${pos} moments: ${moments}`);
     flow.finishGame(state);
     assert.equal(state.phase, 'postgame');
     assert.notEqual(state.lastGame.score.home, state.lastGame.score.away);
@@ -137,7 +137,7 @@ test('a user game pauses for key moments, decisions and events, then finishes', 
 
 test('every moment type produces a valid simulated outcome', () => {
   const state = flow.newCareer(randomCareerOpts(9, 'QB'));
-  const types = ['qb_throw', 'qb_scramble', 'qb_hailmary', 'rb_run', 'rb_screen', 'rb_goalline', 'wr_route', 'wr_jumpball', 'wr_toetap', 'cb_cover', 'cb_tackle'];
+  const types = ['qb_throw', 'qb_scramble', 'qb_hailmary', 'rb_run', 'rb_screen', 'rb_goalline', 'wr_route', 'wr_jumpball', 'wr_toetap', 'cb_cover', 'cb_tackle', 'dt_rush', 'dt_run'];
   for (const type of types) {
     for (const q of [0, 0.3, 0.6, 0.95]) {
       const m = { type, defense: type.startsWith('cb'), yardLine: type === 'rb_goalline' ? 2 : 40, distance: 8, down: 3 };

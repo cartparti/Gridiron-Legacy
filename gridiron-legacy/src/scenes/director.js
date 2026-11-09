@@ -3,6 +3,7 @@
 // If WebGL is unavailable, a simple 2D timing meter is used instead.
 import * as THREE from 'three';
 import { buildStadium } from './stadium.js';
+import { startCrowd, stopCrowd, playMusic, stopMusic } from '../audio/stadium.js';
 import { nextFrame, tickIdle } from './actors.js';
 import { buildWorld } from './world.js';
 import { goalLine } from './minigames/goalLine.js';
@@ -228,6 +229,8 @@ export function makeHud() {
   const el = document.createElement('div');
   el.className = 'hud';
   el.innerHTML = `
+    <div class="hud-score"></div>
+    <div class="hud-tag"></div>
     <div class="hud-top">
       <div class="hud-pill sit"></div>
       <div class="hud-right"><div class="hud-pill hud-call"></div><div class="hud-pill hud-wx"></div></div>
@@ -248,6 +251,15 @@ export function makeHud() {
       const deg = wind ? (Math.atan2(wind.z, wind.x) * 180) / Math.PI : 0;
       el.innerHTML = `${label}${wind && wind.mph >= 4 ? ` <span class="wind-arrow" style="transform:rotate(${deg}deg)">➜</span> ${wind.mph} mph` : ''}`;
     },
+    /** Broadcast score bug: { away, home, awayPts, homePts, awayColors, homeColors, clock } */
+    score: (i) => {
+      const el2 = q('.hud-score');
+      if (!i) { el2.style.display = 'none'; return; }
+      const side = (name, pts, cols, right) => `<div class="sb-team${right ? ' r' : ''}" style="--c1:${cols[0]};--c2:${cols[1]}"><b>${String(name).slice(0, 3).toUpperCase()}</b><span>${pts}</span></div>`;
+      el2.innerHTML = `${side(i.away, i.awayPts, i.awayColors, false)}<div class="sb-mid">${i.clock ?? ''}</div>${side(i.home, i.homePts, i.homeColors, true)}`;
+    },
+    /** Name tag for your player. */
+    tag: (num, name) => { const t2 = q('.hud-tag'); t2.innerHTML = `<b>${num}</b><span>${String(name).toUpperCase()}</span>`; },
     instr: (text) => { const i = q('.hud-instr'); i.textContent = text; i.classList.toggle('show', !!text); },
     big: (text, color = '#fff', ms = 1100) => {
       const b = document.createElement('div');
@@ -277,7 +289,7 @@ const GAMES = {
   qb_throw: freePlay, qb_hailmary: freePlay, qb_scramble: freePlay,
   rb_run: freePlay, rb_screen: freePlay, rb_goalline: goalLine,
   wr_route: freePlay, wr_jumpball: freePlay, wr_toetap: freePlay,
-  cb_cover: freePlay, cb_tackle: freePlay,
+  cb_cover: freePlay, cb_tackle: freePlay, dt_rush: freePlay, dt_run: freePlay,
 };
 
 /**
@@ -291,7 +303,10 @@ export function runMinigame(type, opts) {
   app.style.visibility = 'hidden';
   return new Promise((resolve) => {
     const cleanups = [];
+    startCrowd(0.3);
     const finish = (result) => {
+      stopCrowd();
+      stopMusic();
       if (R) { R.cine = null; document.body.classList.remove('cine'); }
       for (const c of cleanups.reverse()) { try { c(); } catch { /* ignore */ } }
       stop();
@@ -312,7 +327,8 @@ export function runMinigame(type, opts) {
     const oppName = opts.oppName ?? 'OPP';
     if (m.defense) r.stadium.setTeams(opts.teamColors, opts.oppColors, myName, oppName, opts.homeColors);
     else r.stadium.setTeams(opts.oppColors, opts.teamColors, oppName, myName, opts.homeColors);
-    if (opts.scoreInfo) r.stadium.setScoreboard(opts.scoreInfo);
+    if (opts.scoreInfo) { r.stadium.setScoreboard(opts.scoreInfo); hud.score(opts.scoreInfo); }
+    if (opts.lastName) hud.tag(opts.number ?? '', opts.lastName);
     r.stadium.setYardLine(m.yardLine, m.distance);
     applyAtmosphere(r, m.weather ?? 'clear');
     const group = new THREE.Group();
@@ -328,6 +344,8 @@ export function runMinigame(type, opts) {
       shake: cameraShake,
       slowMo,
       cinematic,
+      /** Crowd hype: level 0..1 for some seconds (bouncing fans, camera flashes). */
+      hype(level, seconds = 2) { r.hype = { level, until: performance.now() + seconds * 1000 }; },
       groundPoint(ev) {
         const rect = r.renderer.domElement.getBoundingClientRect();
         const ndc = new THREE.Vector2(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
@@ -342,7 +360,9 @@ export function runMinigame(type, opts) {
       nextFrame();
       update(dt, t);
       tickIdle(group, dt);
-      r.stadium.animateCrowd(t, 0.35);
+      const ex = r.hype && performance.now() < r.hype.until ? r.hype.level : 0.35;
+      r.stadium.setExcitement(ex);
+      r.stadium.animateCrowd(t, ex);
     });
   });
 }
@@ -372,9 +392,13 @@ export function runCutscene(build, { setup } = {}) {
     applyAtmosphere(r, 'clear');
     setup?.(r);
     let done = false;
+    startCrowd(0.6);
+    playMusic('anthem', { vol: 0.9 });
     const finish = () => {
       if (done) return;
       done = true;
+      stopCrowd();
+      stopMusic();
       stop();
       r.scene.remove(group);
       ui.remove();

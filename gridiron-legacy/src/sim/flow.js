@@ -494,6 +494,7 @@ function rookieSalary(pick) {
 
 /** How badly a pro team needs a position: weak or aging starters create need. 0..~30 */
 export function teamNeed(league, teamId, pos) {
+  if (pos === 'DT') pos = 'DL';
   const roster = league.players.filter((x) => x.teamId === teamId && x.pos === pos).sort((a, b) => b.ovr - a.ovr);
   const take = { QB: 1, RB: 1, WR: 3, TE: 1, OL: 5, DL: 4, LB: 3, CB: 3, S: 2, K: 1 }[pos] ?? 1;
   const starters = roster.slice(0, take);

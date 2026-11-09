@@ -168,7 +168,7 @@ export const GAME_EVENTS = [
     ],
   },
   {
-    id: 'g_clutch_defense', trigger: 'clutch', cond: { positions: ['CB'] }, title: 'Shadow Their Best',
+    id: 'g_clutch_defense', trigger: 'clutch', cond: { positions: ['CB', 'DT'] }, title: 'Shadow Their Best',
     text: 'Fourth quarter. Their star receiver is killing the other corner. Coach asks if you want the assignment.',
     choices: [
       { label: '"Put me on their WR1."', effects: { fame: 1 }, game: { extra: true, tol: -0.02 }, result: 'You walk across the field. The crowd notices.' },
@@ -313,6 +313,30 @@ export const GAME_EVENTS = [
     choices: [
       { label: 'Burn a timeout', effects: { rel: { coach: -1 } }, game: { tol: 0.05 }, result: 'Everyone is on the same page now.' },
       { label: 'Wing it', effects: {}, game: {}, chance: { p: 0.6, successText: 'Everyone figures it out. Phew.', failGame: { tol: -0.06 }, failText: 'Two guys run the same route. Ugly.' }, result: '' },
+    ],
+  },
+  {
+    id: 'p_dt_snapcount', trigger: 'presnap', cond: { positions: ['DT'] }, title: 'Time the Snap',
+    text: 'You have been watching the center\'s hands all game. He always dips before the snap.',
+    choices: [
+      { label: 'Jump the snap count', effects: {}, game: {}, chance: { p: 0.45, stat: 'iq', successGame: { tol: 0.12, momentum: 0.15 }, successText: 'You are off the ball before anyone moves. Free run at the QB!', failGame: { flag: true }, failText: 'Offside! Five yards.' }, result: '' },
+      { label: 'Stay patient', effects: {}, game: { tol: 0.03 }, result: 'React, don\'t guess.' },
+    ],
+  },
+  {
+    id: 'p_dt_double', trigger: 'presnap', cond: { positions: ['DT'] }, title: 'Double Team',
+    text: 'The guard and center are both eyeing you. They are going to double you.',
+    choices: [
+      { label: 'Split the double team', effects: {}, game: {}, chance: { p: 0.4, stat: 'strength', successGame: { tol: 0.1, momentum: 0.2 }, successText: 'You split them both. The crowd roars!', failGame: { tol: -0.06 }, failText: 'Two big men bury you.' }, result: '' },
+      { label: 'Eat the double, free a teammate', effects: { rel: { teammates: 3 } }, game: { tol: 0.02, momentum: 0.05 }, result: 'Your linebacker runs free behind you.' },
+    ],
+  },
+  {
+    id: 'g_dt_clutch', trigger: 'clutch', cond: { positions: ['DT'] }, title: 'Pin Your Ears Back',
+    text: 'They need a big play. Coach asks if you want to rush from the edge this series.',
+    choices: [
+      { label: 'Line me up on the edge', effects: { fame: 0.5 }, game: { tol: 0.04, momentum: 0.1 }, result: 'Speed against a slow tackle. Advantage you.' },
+      { label: 'Stay inside, collapse the pocket', effects: { rel: { coach: 2 } }, game: { tol: 0.03 }, result: 'Push the middle so he can\'t step up.' },
     ],
   },
   // ---------------- more random / on-field happenings

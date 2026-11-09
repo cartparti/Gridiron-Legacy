@@ -7,12 +7,14 @@
 //
 // Returns the same result objects as the old minigames, so the game simulation is unchanged.
 import * as THREE from 'three';
-import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, confetti, ragdoll, bloodBurst } from '../actors.js';
+import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, confetti, ragdoll, bloodBurst, dustPuff } from '../actors.js';
 import { rig, endPlay, finalize, weatherFx, gaussR } from '../minigames/common.js';
 import { makeControls } from './controls.js';
-import { PLAYS, OFF_FORMATION, OL_X, playMode } from '../../data/playbook.js';
+import { PLAYS, OFF_FORMATION, OL_X, playMode, dealPlays } from '../../data/playbook.js';
 import { sfx } from '../../audio/sfx.js';
 import { line } from '../../data/commentary.js';
+import { react, playMusic, stopMusic } from '../../audio/stadium.js';
+import { flameJet, firework, makeTrail } from '../fx.js';
 
 const FIELD_X = 26.4;
 const BASE_SPEED = { QB: 7.0, RB: 8.1, WR: 8.5, TE: 7.3, OL: 5.6, DL: 6.6, LB: 7.3, CB: 8.4, S: 8.1 };
@@ -64,8 +66,11 @@ export function freePlay(ctx) {
   };
 
   // ---------------- choose user + formation
-  const userRole = { pass: 'QB', run: type === 'qb_scramble' ? 'QB' : 'RB', route: 'WR', cover: 'CB', runD: 'CB' }[mode];
-  let plays = PLAYS[mode][call].slice();
+  const userRole = { pass: 'QB', run: type === 'qb_scramble' ? 'QB' : 'RB', route: 'WR', cover: 'CB', runD: 'CB', rush: 'DL', runStop: 'DL' }[mode];
+  const runO = mode === 'run' || mode === 'runD' || mode === 'runStop'; // the offense runs the ball
+  const passD = mode === 'cover' || mode === 'rush'; // you defend a pass play
+  const dtMode = mode === 'rush' || mode === 'runStop';
+  let plays = dealPlays(mode, call);
   if (type === 'qb_hailmary') plays = [{ name: 'Hail Mary', desc: 'Everyone to the end zone. Throw it up!', form: 'shotgun', hail: true, routes: { X: [[0, goalZ - 3]], Z: [[0, goalZ - 3]], S: [[2, goalZ - 4]], TE: [[-2, goalZ - 2]], RB: [[3, -2]] } }];
   if (type === 'rb_screen') plays = [
     { name: 'Screen Left', desc: 'Leak out left, catch it, follow the linemen.', form: 'shotgun', screen: -1 },
@@ -123,10 +128,10 @@ export function freePlay(ctx) {
     const press = play.press || (mode !== 'cover' && call === 'risky');
     const cushion = press ? 1.4 : call === 'safe' ? 7 : 5;
     const dz = (z) => Math.max(backLine + 1, z);
-    const dl = [-2.6, -0.9, 0.9, 2.6].map((x) => add('def', 'DL', 'DL', x, -1.1));
+    const dl = [-2.6, -0.9, 0.9, 2.6].map((x, i) => add('def', 'DL', 'DL', x, -1.1, { user: dtMode && i === 2 }));
     const lbs = [-3.2, 3.2].map((x) => add('def', 'LB', 'LB', x, dz(-5.5)));
     const cbX = add('def', 'CB', 'CBX', X.pos.x + 0.8, dz(-cushion));
-    const cbZ = add('def', 'CB', 'CBZ', Z.pos.x - 0.8, dz(-cushion), { user: m.defense });
+    const cbZ = add('def', 'CB', 'CBZ', Z.pos.x - 0.8, dz(-cushion), { user: m.defense && !dtMode });
     const nb = add('def', 'CB', 'NB', S.pos.x + 0.6, dz(-4.5));
     const ss = add('def', 'S', 'SS', -7, dz(-13));
     const fs = add('def', 'S', 'FS', 7, dz(-15));
@@ -161,8 +166,12 @@ export function freePlay(ctx) {
   };
 
   // ---------------- HUD: playbook picker
+  // crowd: the home crowd is the loud one. homeGood(userGood) -> was this good for the home team?
+  const userHome = opts.userHome !== false;
+  const crowd = (kind, userGood) => react(kind, userGood === userHome);
   const showPicker = () => {
     phase = 'pick';
+    playMusic(['hype', 'charge', 'groove'][Math.floor(Math.random() * 3)], { vol: 0.75 });
     hud.instr(m.defense ? 'Pick a defensive call' : 'Pick a play');
     const box = document.createElement('div');
     box.className = 'fc-plays';
@@ -182,6 +191,8 @@ export function freePlay(ctx) {
     play = plays[Math.max(0, Math.min(plays.length - 1, i))];
     // Run defense: the offense runs a toss toward your side of the field.
     if (mode === 'runD') play = { ...play, form: 'pistol', pitch: true, hole: [8, 10], press: call === 'risky' };
+    // Run stop: the offense runs between the tackles.
+    if (mode === 'runStop') { const hx = (Math.random() - 0.5) * 4.8; play = { ...play, form: 'pistol', pitch: false, hole: [hx, hx] }; }
     ctx.pickerEl?.remove();
     sfx.select();
     buildFormation();
@@ -189,6 +200,7 @@ export function freePlay(ctx) {
     phase = 'pre';
     t = 0;
     hud.instr(`${play.name} · get set…`);
+    if (m.defense && userHome) react('defense');
     setButtonsFor();
   };
 
@@ -200,7 +212,7 @@ export function freePlay(ctx) {
     if (mode === 'cover' && user.man && play.user === 'man') { assignLine = makeRouteLine([user.pos, user.man.pos], '#60a5fa', 0.8); group.add(assignLine); }
     if ((mode === 'run' && play.hole) || mode === 'runD') {
       const hx = mode === 'runD' ? 8 : (play.hole[0] + play.hole[1]) / 2;
-      holeArrow = new THREE.Mesh(new THREE.ConeGeometry(0.8, 2, 3), new THREE.MeshBasicMaterial({ color: mode === 'runD' ? '#f87171' : '#4ade80', transparent: true, opacity: 0.85 }));
+      holeArrow = new THREE.Mesh(new THREE.ConeGeometry(0.8, 2, 3), new THREE.MeshBasicMaterial({ color: mode === 'runD' || mode === 'runStop' ? '#f87171' : '#4ade80', transparent: true, opacity: 0.85 }));
       holeArrow.rotation.x = -Math.PI / 2;
       holeArrow.position.set(hx, 0.1, -1.6);
       group.add(holeArrow);
@@ -230,6 +242,23 @@ export function freePlay(ctx) {
     swat: { id: 'swat', label: 'SWAT / PICK', key: 'Space', big: true, tint: 'gold' },
     tackle: { id: 'tackle', label: 'TACKLE', key: 'F', big: true, tint: 'red' },
     pass: { id: 'passhint', label: 'TAP A RECEIVER', key: '1-5' },
+    rip: { id: 'rip', label: 'RIP', key: 'J', tint: 'gold' },
+    swim: { id: 'swim', label: 'SWIM', key: 'K', tint: 'gold' },
+    bull: { id: 'bull', label: 'BULL RUSH', key: 'L', big: true, tint: 'red' },
+    sack: { id: 'tackle', label: 'SACK / TACKLE', key: 'F', big: true, tint: 'red' },
+    bat: { id: 'swat', label: 'BAT IT', key: 'Space' },
+  };
+  // pass-rush battle state: leverage builds while you drive into the blocker
+  const rush = { lev: 0, cd: 0, stun: 0, burst: 0 };
+  let levBar = null;
+  const showLev = (on) => {
+    if (on && !levBar) {
+      levBar = document.createElement('div');
+      levBar.className = 'lev-meter';
+      levBar.innerHTML = '<span>LEVERAGE</span><div class="watch-bar"><i></i></div>';
+      hud.el.append(levBar);
+    }
+    if (levBar) levBar.style.display = on ? '' : 'none';
   };
   let btnMode = '';
   const setButtonsFor = () => {
@@ -238,6 +267,7 @@ export function freePlay(ctx) {
     else if (user === carrier) mode2 = 'runner';
     else if (user.role === 'QB' && holder === user && !user.runner) mode2 = 'qb';
     else if (user.team === 'off') mode2 = flight && flight.target === user ? 'catch' : 'route';
+    else if (user.role === 'DL') mode2 = user.engagedBy ? 'dlBlocked' : 'dlFree';
     else mode2 = 'def';
     if (mode2 === btnMode) return;
     btnMode = mode2;
@@ -248,7 +278,10 @@ export function freePlay(ctx) {
       route: [btn.sprint, btn.call, btn.catch],
       catch: [btn.sprint, btn.catch],
       def: [btn.sprint, btn.swat, btn.tackle],
+      dlBlocked: [btn.rip, btn.swim, btn.bull],
+      dlFree: [btn.sprint, btn.bat, btn.sack],
     };
+    showLev(mode2 === 'dlBlocked');
     controls.setButtons(sets[mode2]);
   };
 
@@ -267,7 +300,32 @@ export function freePlay(ctx) {
       if (id === 'spin' && user === carrier && moves.spinCd <= 0) { moves.spin = 0.42 * Math.sqrt(tol); moves.spinCd = 1.3; playAction(user.mesh, 'spin'); sfx.juke(); }
       if (id === 'stiff' && user === carrier && moves.stiffCd <= 0) { moves.stiff = 0.6; moves.stiffCd = 1.1; playAction(user.mesh, 'stiff'); }
       if (id === 'dive' && user === carrier && !moves.dive) { moves.dive = 0.01; playAction(user.mesh, 'dive'); }
+      // pass-rush moves: win the battle with the blocker
+      if ((id === 'rip' || id === 'swim' || id === 'bull') && user.engagedBy && rush.cd <= 0 && rush.stun <= 0) {
+        const o = user.engagedBy;
+        const stat = id === 'bull' ? (st.strength ?? 60) : id === 'swim' ? (st.skill ?? 60) : ((st.skill ?? 60) + (st.speed ?? 60)) / 2;
+        const pWin = (0.18 + rush.lev * 0.55 + (stat - 50) / 220) * (0.75 + tol * 0.25) * (call === 'risky' ? 0.9 : 1);
+        rush.cd = 0.7;
+        playAction(user.mesh, id === 'bull' ? 'stiff' : id === 'swim' ? 'throw' : 'juke', { dir: Math.random() < 0.5 ? 1 : -1 });
+        sfx.hit();
+        if (Math.random() < pWin) {
+          o.engaged = null; user.engagedBy = null; setPose(o.mesh, null); setPose(user.mesh, null);
+          o.out = id === 'bull' ? 1.4 : 0.6;
+          if (id === 'bull') { flatten(o, user, 0.8); hud.big('PANCAKE!', '#ff6b6b', 800); ctx.shake(0.35); } else { knockDown(o.mesh, 1); hud.big(id === 'rip' ? 'RIP!' : 'SWIM!', '#4ade80', 700); }
+          rush.burst = 0.7; rush.lev = 0;
+          sfx.cheer();
+        } else {
+          rush.lev *= 0.4; rush.stun = 0.35;
+          hud.big('STONEWALLED', '#94a3b8', 500);
+        }
+        setButtonsFor();
+        return;
+      }
       if (id === 'call' && user.team === 'off') { callForBall = true; hud.big('OPEN!', '#60a5fa', 500); }
+      if (id === 'swat' && user.role === 'DL' && flight && !flight.pitch && t - flight.t0 < 0.3 && dist(user.pos, qb.pos) < 3.2) {
+        playAction(user.mesh, 'jump');
+        if (Math.random() < 0.55 + (st.skill ?? 60) / 300) { flight = null; ball.visible = false; hud.big('BATTED DOWN!', '#4ade80', 900); sfx.hit(); whistle('pd'); return; }
+      }
       if ((id === 'catch' || id === 'swat') && flight && catchPress === null && swatPress === null) {
         if (user.team === 'off') catchPress = t; else swatPress = t;
         playAction(user.mesh, flight && flight.H > 4 ? 'jump' : 'catch');
@@ -357,6 +415,7 @@ export function freePlay(ctx) {
   };
 
   const aiOffense = (e, dt) => {
+    if (e.out > 0) { e.out -= dt; if (e.out <= 0 && isDown(e.mesh)) knockDown(e.mesh, 0); return; }
     if (e.role === 'OL') {
       if (e.blockTarget && !e.engaged) {
         const d = e.blockTarget;
@@ -367,7 +426,7 @@ export function freePlay(ctx) {
       }
       // Pick the nearest free rusher, step between it and the ball, lock up on contact.
       if (!e.engaged) {
-        const passPro = mode === 'pass' || mode === 'route' || mode === 'cover' || (play.draw && t < 0.9) || play.screen !== undefined;
+        const passPro = mode === 'pass' || mode === 'route' || passD || (play.draw && t < 0.9) || play.screen !== undefined;
         const threats = defenders.filter((d) => (d.role === 'DL' || d.blitz) && !d.engagedBy && d.out <= 0);
         const tgt = nearest(e, threats);
         if (tgt && dist(e.pos, tgt.pos) < 1.3) { e.engaged = tgt; tgt.engagedBy = e; tgt.shed = 0; setPose(e.mesh, 'block'); setPose(tgt.mesh, 'block'); }
@@ -377,12 +436,13 @@ export function freePlay(ctx) {
         } else moveToward(e, e.pos.x, passPro ? 1.8 : -2, e.maxSpeed * 0.6, dt);
       } else {
         const d = e.engaged;
-        const runPush = mode === 'run' || mode === 'runD';
+        const runPush = runO;
         // drive the defender away from the play
         const hx = play.hole ? (play.hole[0] + play.hole[1]) / 2 : 0;
         const away = runPush ? Math.sign(d.pos.x - hx || 1) * 0.6 : 0;
         moveToward(e, d.pos.x + away, d.pos.z + (runPush ? -0.3 : 0.9), 1.6, dt);
         d.pos.x += e.vel.x * dt; d.pos.z += e.vel.z * dt;
+        battle(e, d, dt);
       }
       return;
     }
@@ -390,15 +450,15 @@ export function freePlay(ctx) {
       if (play.qbRun) { if (t > 0.35 && holder === qb && !carrier) { carrier = qb; qb.runner = true; } }
       else if (holder === qb) {
         // drop back, then throw (AI QB) or let the user decide
-        const dropZ = mode === 'run' || mode === 'runD' ? qb.start.z : qb.start.z + 2.2;
+        const dropZ = runO ? qb.start.z : qb.start.z + 2.2;
         moveToward(e, e.start.x, dropZ, 4, dt);
-        if ((mode === 'run' || mode === 'runD') && t > 0.45 && !play.pitch && play.screen === undefined && !play.qbRun) { holder = rb; carrier = rb; sfx.catch(); }
-        if ((mode === 'run' || mode === 'runD') && play.pitch && t > 0.35 && !flight && !carrier) {
+        if (runO && t > 0.45 && !play.pitch && play.screen === undefined && !play.qbRun) { holder = rb; carrier = rb; sfx.catch(); }
+        if (runO && play.pitch && t > 0.35 && !flight && !carrier) {
           flight = { from: { ...qb.pos }, to: { x: rb.pos.x + rb.vel.x * 0.4, z: rb.pos.z + rb.vel.z * 0.4 }, T: 0.4, t0: t, H: 0.6, target: rb, pitch: true };
           holder = null; playAction(qb.mesh, 'release');
         }
         if (play.screen !== undefined && t > 1.0 && !flight) throwTo(rb);
-        if (!thrown && (mode === 'route' || mode === 'cover')) aiQbRead();
+        if (!thrown && (mode === 'route' || passD)) aiQbRead();
       } else moveToward(e, e.pos.x, e.pos.z, 3, dt);
       return;
     }
@@ -417,7 +477,7 @@ export function freePlay(ctx) {
       if (d && dist(d.pos, carrier.pos) < 10) { moveToward(e, (d.pos.x + carrier.pos.x) / 2, (d.pos.z + carrier.pos.z) / 2, e.maxSpeed * 0.9, dt); if (dist(e.pos, d.pos) < 1.0 && !d.engagedBy && Math.random() < 0.02) { d.engagedBy = e; e.engaged = d; d.shed = 0; setPose(e.mesh, 'block'); } }
       return;
     }
-    if (e === rb && (mode === 'run' || mode === 'runD') && !carrier) {
+    if (e === rb && runO && !carrier) {
       // move to the mesh point / hole
       const hx = play.hole ? play.hole[0] : 0;
       if (play.pitch) moveToward(e, hx * 0.6, rb.start.z - 0.5, e.maxSpeed * 0.8, dt);
@@ -443,7 +503,7 @@ export function freePlay(ctx) {
     }
     if (e.engaged) { const d = e.engaged; moveToward(e, d.pos.x, d.pos.z - 0.3, 1.4, dt); d.pos.x += e.vel.x * dt; d.pos.z += e.vel.z * dt; return; }
     // run plays: receivers block downfield
-    if (mode === 'run' || mode === 'runD') {
+    if (runO) {
       const d = nearest(e, defenders.filter((x) => x.role === 'CB' || x.role === 'S'));
       if (d) moveToward(e, d.pos.x, d.pos.z + 0.8, e.maxSpeed * 0.7, dt);
     }
@@ -460,7 +520,7 @@ export function freePlay(ctx) {
     if ((mode === 'route' && (callForBall && t > 1.3 || keySep > 2.2 && t > 1.5)) || t > readTime + 1.4 || (sacked && t > 1.2)) {
       // In coverage moments the QB mostly tests YOUR man; sometimes he goes elsewhere.
       let target = key;
-      if (mode === 'cover' && Math.random() < 0.25) target = receivers.filter((r) => r !== key && r.route).sort((a, b) => sepOf(b) - sepOf(a))[0] ?? key;
+      if (passD && Math.random() < 0.25) target = receivers.filter((r) => r !== key && r.route).sort((a, b) => sepOf(b) - sepOf(a))[0] ?? key;
       throwTo(target);
     } else if (t > readTime && keySep > 1.6) throwTo(key);
   };
@@ -477,14 +537,37 @@ export function freePlay(ctx) {
     if (mode === 'runD' && e.role === 'RB' && e.pos.z > -2) tx = 9; // sweep to the edge first
     if (play.hole && e === rb && e.pos.z > -1 && mode === 'run') tx = play.hole[1];
     tx = Math.max(-FIELD_X + 1.5, Math.min(FIELD_X - 1.5, tx));
-    moveToward(e, tx, e.pos.z - 6, e.maxSpeed * (moves.slow > 0 && e.user ? 0.55 : 1), dt);
+    moveToward(e, tx, e.pos.z - 6, e.maxSpeed * (moves.slow > 0 && e.user ? 0.55 : !e.user && mode === 'pass' ? 0.88 : 1), dt);
     if (!e.user && e.jukeCd <= 0) {
       const lunger = defenders.find((d) => (d.tell > 0 || d.lunge > 0) && dist(d.pos, e.pos) < 2.6);
-      if (lunger && Math.random() < 0.35 * (call === 'risky' ? 1.2 : 1)) { e.juking = 0.3; e.jukeCd = 1.2; playAction(e.mesh, 'juke', { dir: Math.sign(e.pos.x - lunger.pos.x || 1) }); e.vel.x += Math.sign(e.pos.x - lunger.pos.x || 1) * 5; }
+      if (lunger && Math.random() < (mode === 'pass' ? 0.1 : 0.25) * (call === 'risky' ? 1.2 : 1)) { e.juking = 0.3; e.jukeCd = 1.2; playAction(e.mesh, 'juke', { dir: Math.sign(e.pos.x - lunger.pos.x || 1) }); e.vel.x += Math.sign(e.pos.x - lunger.pos.x || 1) * 5; }
+    }
+  };
+
+  /** Two players locked up: sway, trade shoves, and sometimes one gets put on his back. */
+  const battle = (a, b, dt) => {
+    const sway = Math.sin(t * 6.5 + a.start.x * 3) * 1.1;
+    a.pos.x += sway * dt * 0.7; b.pos.x += sway * dt * 0.7;
+    a.pos.z += Math.cos(t * 5 + a.start.x) * dt * 0.5; b.pos.z += Math.cos(t * 5 + a.start.x) * dt * 0.5;
+    a.shoveT = (a.shoveT ?? Math.random() * 0.6) - dt;
+    if (a.shoveT > 0) return;
+    a.shoveT = 0.45 + Math.random() * 0.7;
+    const who = Math.random() < 0.5 ? a : b;
+    if (!who.user) playAction(who.mesh, 'stiff', { then: 'block', dur: 0.32 });
+    if (b.user || a.user) return;
+    const r = Math.random();
+    if (r < 0.07) { // pancake: the blocker plants the defender
+      a.engaged = null; b.engagedBy = null; setPose(a.mesh, null); setPose(b.mesh, null);
+      b.out = 1.8; flatten(b, a, 0.75); fxList.push(dustPuff(group, b.pos));
+      if (Math.random() < 0.35) say('pancake');
+    } else if (r < 0.1) { // the rusher throws the blocker aside
+      a.engaged = null; b.engagedBy = null; setPose(a.mesh, null); setPose(b.mesh, null);
+      a.out = 1.4; flatten(a, b, 0.6); fxList.push(dustPuff(group, a.pos)); b.out = 0.15;
     }
   };
 
   const aiDefense = (e, dt) => {
+    if (e.burst > 0) e.burst -= dt;
     if (e.out > 0) { e.out -= dt; if (e.out <= 0 && isDown(e.mesh)) knockDown(e.mesh, 0); return; }
     if (e.engagedBy) {
       // Blocked: try to shed the block over time.
@@ -499,10 +582,10 @@ export function freePlay(ctx) {
     if (carrier && carrier.team === 'def') { moveToward(e, carrier.pos.x, carrier.pos.z, e.maxSpeed * 0.6, dt); return; }
     if (flight) { moveToward(e, flight.to.x, flight.to.z, e.maxSpeed * 0.6, dt); return; } // no late hits
     // Before the ball is out
-    if (mode === 'run' || mode === 'runD') {
+    if (runO) {
       // Linebackers read the play first, then fly to the ball; in run defense your teammates are a step slower.
       const readT = e.role === 'LB' ? 0.9 : e.role === 'DL' ? 0 : 1.0;
-      if (t > readT && holder) { pursueAndTackle(e, holder, dt, mode === 'runD' ? 0.62 : 0.85); return; }
+      if (t > readT && holder) { pursueAndTackle(e, holder, dt, mode === 'runD' || mode === 'runStop' ? 0.62 : 0.85); return; }
     }
     if ((e.role === 'DL' || e.blitz) && holder) { pursueAndTackle(e, holder, dt, 0.85); return; }
     if (e.role === 'S') {
@@ -516,7 +599,15 @@ export function freePlay(ctx) {
       // Man coverage: trail the receiver with a reaction lag; jam at the line when pressing.
       const r = e.man;
       if ((play.press || call === 'risky') && t < 0.6 && dist(e.pos, r.pos) < 1.6) r.jam = 0.4;
-      const lag = 0.28 + Math.random() * 0.05;
+      // hand-fighting at the line and on the route
+      if (t < 1.6 && dist(e.pos, r.pos) < 1.4 && !(e.handT > 0)) {
+        e.handT = 0.5 + Math.random() * 0.4;
+        playAction(e.mesh, 'stiff', { dur: 0.3 });
+        if (!r.user) playAction(r.mesh, 'stiff', { dur: 0.3 });
+        r.vel.x += (Math.random() - 0.5) * 4;
+      }
+      if (e.handT > 0) e.handT -= dt;
+      const lag = (mode === 'pass' ? 0.2 : 0.28) + Math.random() * 0.05;
       moveToward(e, r.pos.x - r.vel.x * lag + (r.pos.x < 0 ? 0.5 : -0.5), r.pos.z - r.vel.z * lag - 0.6, e.maxSpeed, dt, 18);
       backpedalFace(e, e.vel.z < -0.3 && t < 1.8, r);
       return;
@@ -551,7 +642,7 @@ export function freePlay(ctx) {
       showTell(e);
       return;
     }
-    pursue(e, target, dt, factor);
+    pursue(e, target, dt, factor * (e.burst > 0 ? 1.22 : 1));
   };
 
   const showTell = (e) => {
@@ -564,6 +655,9 @@ export function freePlay(ctx) {
   // ---------------- contact resolution
   const fxList = [];
   let cineUsed = 0;
+  let scuffle = null;
+  let trail = null;
+  let dustT = 0;
   const pushDir = (from, to) => {
     const dx = to.pos.x - from.pos.x;
     const dz = to.pos.z - from.pos.z;
@@ -579,9 +673,12 @@ export function freePlay(ctx) {
     const rel = Math.hypot(tackler.vel.x - target.vel.x, tackler.vel.z - target.vel.z);
     const big = globalThis.__forceBigHit || rel > 10 || Math.random() < 0.14;
     flatten(target, tackler, big ? 1.5 + Math.random() * 0.5 : 0.55 + Math.random() * 0.3);
+    fxList.push(dustPuff(group, target.pos, big ? 16 : 9));
     if (!big) return;
     const involved = target.user || tackler.user;
     hud.big(tackler.user ? 'BOOM!' : 'BIG HIT!', '#ff6b6b', 900);
+    ctx.hype?.(0.8, 2);
+    crowd('hit', tackler.team === (m.defense ? 'def' : 'off'));
     ctx.shake(0.6);
     if (involved && cineUsed < 1 && !opts.reducedMotion && (globalThis.__forceBigHit || Math.random() < 0.6)) {
       cineUsed++;
@@ -619,7 +716,7 @@ export function freePlay(ctx) {
       }
     }
     const str = target.user ? (st.strength ?? 60) : 60;
-    const pBreak = (str / 100) * 0.3 * (target.user ? (0.6 + tol * 0.4) : 0.7) * Math.pow(0.5, target.broken ?? 0) + (tackler.user ? -0.1 : 0);
+    const pBreak = (str / 100) * 0.3 * (target.user ? (0.6 + tol * 0.4) : mode === 'pass' ? 0.35 : 0.6) * Math.pow(0.5, target.broken ?? 0) + (tackler.user ? -0.1 : 0);
     if (Math.random() < pBreak) {
       target.broken = (target.broken ?? 0) + 1;
       tackler.out = 1.0; flatten(tackler, target, 0.6);
@@ -670,7 +767,9 @@ export function freePlay(ctx) {
       if (catchOk && Math.random() < wfx.slip) { catchOk = false; hud.big('SLIPPERY!', '#fbbf24', 600); }
     } else {
       const catchR = (f.H > 4 ? 1.7 : 1.15) + 0.2 * tol;
-      catchOk = dR <= catchR && Math.random() < (crowd ? 0.5 : 0.9) - wfx.slip;
+      catchOk = dR <= catchR && Math.random() < (crowd ? 0.42 : dD < 1.6 ? 0.72 : 0.9) - wfx.slip;
+      // tight coverage: the defender gets a hand in
+      if (catchOk && dD < 1.25 && Math.random() < 0.3 / tol) { whistle('incomplete', null, 'Broken up at the catch point!'); return; }
       if (play.hail) catchOk = dR < 2.4 && Math.random() < 0.35 - crowd * 0.05;
     }
     const intRisk = dD < 0.9 && dD < dR ? 0.45 : dD < 1.3 && !catchOk ? 0.2 : 0;
@@ -688,6 +787,8 @@ export function freePlay(ctx) {
     sfx.catch();
     playAction(r.mesh, 'catch');
     say('catch');
+    // defenders nearby close fast on the catch
+    for (const d of defenders) if (dist(d.pos, r.pos) < 10) d.burst = 1.1;
     if (r === user) setButtonsFor();
   };
 
@@ -696,9 +797,17 @@ export function freePlay(ctx) {
   const commentate = (why) => {
     const r = result;
     if (!r) return;
+    // crowd reaction (from the user's point of view)
+    if (!(r.td || r.defTD)) {
+      if (m.defense) {
+        if (r.turnover) crowd('turnover', true); else if (r.sack) crowd('sack', true); else if (r.pd || why === 'incomplete') crowd('incomplete', true);
+        else if ((r.yardsAllowed ?? 0) >= 15) crowd('big', false); else crowd((r.yardsAllowed ?? 0) <= 2 ? 'good' : 'bad', (r.yardsAllowed ?? 0) <= 2);
+      } else if (r.turnover) crowd('turnover', false); else if (r.sack) crowd('sack', false); else if (r.complete === false) crowd('incomplete', false);
+      else if (r.yards >= 15) crowd('big', true); else crowd(r.yards >= 4 ? 'good' : 'bad', r.yards >= 4);
+    }
     if (r.td || r.defTD) return; // celebration handles it
     if (m.defense) {
-      if (r.int) say('pick'); else if (r.pd) say('pd'); else if (r.forcedFumble) say('turnover');
+      if (r.sack) say(r.tackle ? 'sackBy' : 'sack'); else if (r.int) say('pick'); else if (r.pd) say('pd'); else if (r.forcedFumble) say('turnover');
       else if (why === 'incomplete') say('incomplete'); else if (r.tackle) say('stop'); else say((r.yardsAllowed ?? 0) > 8 ? 'allowed' : 'short');
     } else if (r.turnover) say('turnover'); else if (r.sack) say('sack'); else if (r.complete === false) say('incomplete');
     else say(r.yards >= 15 ? 'big' : r.yards >= 5 ? 'gain' : 'short');
@@ -710,6 +819,17 @@ export function freePlay(ctx) {
     phase = 'dead';
     t = 0;
     sfx.whistle();
+    // pile on the ball carrier, and maybe a little scuffle after the whistle
+    const spot = (carrier ?? holder ?? qb)?.pos;
+    if (spot && (why === 'tackle' || why === 'sack' || why === 'fumble')) {
+      const near = ents.filter((x) => !x.user && !x.down && !(x.out > 0) && x !== carrier && dist(x.pos, spot) < 7).sort((a2, b2) => dist(a2.pos, spot) - dist(b2.pos, spot)).slice(0, 3);
+      near.forEach((x, i) => { x.pile = { at: 0.15 + i * 0.18 + Math.random() * 0.2, x: spot.x + (Math.random() - 0.5), z: spot.z + (Math.random() - 0.5) }; });
+    }
+    if (Math.random() < 0.22) {
+      const o = ents.find((x) => x.team === 'off' && !x.user && !x.down && !(x.out > 0) && !x.pile);
+      const d2 = o && ents.filter((x) => x.team === 'def' && !x.user && !x.down && !(x.out > 0) && !x.pile).sort((a2, b2) => dist(a2.pos, o.pos) - dist(b2.pos, o.pos))[0];
+      if (o && d2 && dist(o.pos, d2.pos) < 4) { scuffle = { a: o, b: d2, t: 0 }; setTimeout(() => hud.say?.(line('scuffle')), 700); }
+    }
     const yardsFrom = (e) => Math.round(-(e?.pos.z ?? 0));
     const def = m.defense;
     if (why === 'td') {
@@ -722,10 +842,12 @@ export function freePlay(ctx) {
     if (def) {
       if (why === 'int' || user.int) result = { defense: true, int: true, turnover: true, quality: 0.92, text: 'INTERCEPTED!' };
       else if (why === 'pd' || why === 'incomplete') result = { defense: true, pd: why === 'pd', yardsAllowed: 0, quality: why === 'pd' ? 0.72 : 0.55, text: why === 'pd' ? 'Pass broken up!' : 'Incomplete.' };
+      else if (why === 'sack') { const loss = Math.max(1, Math.round(qb.pos.z - 0)); result = { defense: true, sack: true, tackle: by === user, tfl: true, yardsAllowed: -loss, quality: by === user ? 0.96 : 0.72, text: by === user ? `SACK! You drop him for a loss of ${loss}.` : `Sacked by a teammate for a loss of ${loss}.` }; }
       else if (why === 'fumble' && by?.team === 'def') result = { defense: true, forcedFumble: true, turnover: true, tackle: true, yardsAllowed: Math.max(0, yardsFrom(carrier)), quality: 0.95, text: 'FUMBLE! Defense recovers!' };
       else {
         const ya = Math.max(0, yardsFrom(carrier));
-        result = { defense: true, caught: mode === 'cover', tackle: by === user, yardsAllowed: ya, quality: Math.max(0.05, (by === user ? 0.62 : 0.4) - ya / 40), text: by === user ? `You make the stop after ${ya} yards.` : `${ya} yards allowed.` };
+        const yr = yardsFrom(carrier);
+        result = { defense: true, caught: mode === 'cover', tackle: by === user, tfl: by === user && yr < 0, yardsAllowed: ya, quality: Math.max(0.05, (by === user ? (yr < 0 ? 0.88 : 0.62) : 0.4) - ya / 40), text: by === user ? (yr < 0 ? `Tackle for a loss of ${-yr}!` : `You make the stop after ${ya} yards.`) : `${ya} yards allowed.` };
       }
     } else {
       if (why === 'int') result = { turnover: true, complete: false, yards: 0, quality: 0.03, text: 'INTERCEPTED!' };
@@ -763,6 +885,15 @@ export function freePlay(ctx) {
     celebrate(who.mesh);
     hud.big('TOUCHDOWN!', '#4ade80', 2600);
     say(scorer.team === 'def' ? 'pick' : 'td');
+    const userScored = scorer.team === (m.defense ? 'def' : 'off');
+    crowd('td', userScored);
+    ctx.hype?.(1, 5);
+    // pyro: flame jets at the end zone corners and fireworks overhead
+    const ezZ = scorer.team === 'off' ? goalZ - 5 : (100 - m.yardLine) + 5;
+    for (const sx of [-1, 1]) fxList.push(flameJet(group, { x: sx * (FIELD_X + 2), z: ezZ }));
+    const fwCols = [offColors[0], offColors[1], '#ffffff', '#ffd43b'];
+    for (let i = 0; i < 5; i++) fxList.push(firework(group, { x: (Math.random() - 0.5) * 40, y: 22 + Math.random() * 12, z: ezZ - 10 - Math.random() * 10 }, fwCols[i % 4], 0.3 + i * 0.35));
+    if (userScored) setTimeout(() => playMusic('groove', { bars: 4 }), 1500);
     sfx.touchdown();
     fx = confetti(scene, new THREE.Vector3(who.pos.x, 0, who.pos.z), [offColors[0], offColors[1], '#ffffff']);
     // teammates run over to join
@@ -776,13 +907,15 @@ export function freePlay(ctx) {
     route: ['Pick your route. Run it yourself with the joystick, or let go and you will run it automatically.', 'Get open, tap CALL FOR IT, then press CATCH as the ball arrives.', 'After the catch, juke, spin and stiff-arm your way upfield.'],
     cover: ['Pick a coverage. Stay close to your receiver (blue line) with the joystick.', 'When the ball is in the air, press SWAT / PICK as it arrives.', 'Press TACKLE near the ball carrier to bring them down.'],
     runD: ['They are running at you. Come up and make the tackle.', 'Move with the joystick, press TACKLE when close. Watch for jukes!'],
+    rush: ['A lineman locks onto you at the snap. Push the stick toward the QB to build LEVERAGE.', 'Then hit RIP, SWIM or BULL RUSH to break free. More leverage = better odds.', 'Free? Chase the QB and press SACK. Near the line when he throws? BAT IT down.'],
+    runStop: ['They run right at you. Win your block with RIP, SWIM or BULL RUSH.', 'Find the ball carrier and press TACKLE. Behind the line = tackle for loss!'],
   };
   ctx.pickerEl = null;
   const startTipThenPick = () => {
     if (opts.showTips) {
       const box = document.createElement('div');
       box.className = 'tipbox';
-      box.innerHTML = `<div class="tip-k">How to play</div><div class="tip-t">${{ pass: 'Quarterback', run: 'Ball Carrier', route: 'Receiver', cover: 'Cornerback', runD: 'Run Defense' }[mode]}</div>${tips[mode].map((l) => `<p>${l}</p>`).join('')}<div class="tip-go">Tap to start</div>`;
+      box.innerHTML = `<div class="tip-k">How to play</div><div class="tip-t">${{ pass: 'Quarterback', run: 'Ball Carrier', route: 'Receiver', cover: 'Cornerback', runD: 'Run Defense', rush: 'Pass Rush', runStop: 'Run Stop' }[mode]}</div>${tips[mode].map((l) => `<p>${l}</p>`).join('')}<div class="tip-go">Tap to start</div>`;
       hud.el.append(box);
       const go = (ev) => { ev?.preventDefault?.(); ev?.stopPropagation?.(); box.remove(); opts.markTip?.(); showPicker(); window.removeEventListener('keydown', key); };
       const key = (ev) => { if (ev.key === ' ' || ev.key === 'Enter') go(ev); };
@@ -807,9 +940,16 @@ export function freePlay(ctx) {
         phase = 'live'; t = 0;
         sfx.whistle();
         say(m.defense ? 'snapDef' : 'snap');
+        stopMusic();
+        react('snap', m.defense ? userHome : !userHome);
         hud.instr('');
         for (const e of ents) setPose(e.mesh, null);
-        if (mode === 'run' || mode === 'runD') {
+        if (mode === 'rush') {
+          // Pass rush: the nearest lineman locks onto you right away. Win the battle!
+          const o = nearest(user, blockers);
+          if (o) { o.engaged = user; user.engagedBy = o; setPose(o.mesh, 'block'); setPose(user.mesh, 'block'); }
+        }
+        if (runO) {
           // Run blocking: every lineman fires out and locks onto the nearest defender at the snap.
           // Down linemen first (closest lineman takes each), the spare lineman climbs to a linebacker.
           const lock = (o, d) => { o.engaged = d; d.engagedBy = o; d.shed = -0.4; setPose(o.mesh, 'block'); setPose(d.mesh, 'block'); };
@@ -854,9 +994,26 @@ export function freePlay(ctx) {
         user.lunge -= dt;
         user.vel.x = user.lungeDir.x * 9.5; user.vel.z = user.lungeDir.z * 9.5;
         if (carrier && carrier !== user && dist(user.pos, carrier.pos) < 1.15) tryTackle(user, carrier);
+        else if (!carrier && holder === qb && !flight && passD && dist(user.pos, qb.pos) < 1.2) { qb.down = true; user.lunge = 0; hardHit(user, qb); hud.big('SACK!', '#4ade80', 1100); sfx.cheer(); whistle('sack', user); }
         if (user.lunge <= 0 && phase === 'live') { user.out = 0.7; knockDown(user.mesh, 1); }
+      } else if (user.engagedBy) {
+        // locked up with a blocker: drive into him to build leverage, use moves to break free
+        rush.cd = Math.max(0, rush.cd - dt);
+        rush.stun = Math.max(0, rush.stun - dt);
+        const o = user.engagedBy;
+        const toward = c.active ? Math.max(0, -(c.z) * 0.8 + 0.2) : 0.15;
+        rush.lev = Math.min(1, rush.lev + dt * toward * (0.5 + (st.strength ?? 60) / 200));
+        if (levBar) levBar.querySelector('i').style.width = `${rush.lev * 100}%`;
+        const push = c.active ? 1.6 : 0.6;
+        moveToward(user, o.pos.x + c.x * 1.2, o.pos.z + 0.2, push, dt, 10);
+        faceToward(user.mesh, o.pos.x, o.pos.z);
+        if (t > 4.2) { o.engaged = null; user.engagedBy = null; setPose(user.mesh, null); setPose(o.mesh, null); }
       } else if (c.active) {
-        moveToward(user, user.pos.x + c.x * 5, user.pos.z + c.z * 5, userSpeed * Math.min(1, Math.hypot(c.x, c.z) + 0.15), dt, 26);
+        if (rush.burst > 0) rush.burst -= dt;
+        // turf kicks up behind you when you sprint
+        dustT -= dt;
+        if (c.sprint && dustT <= 0 && Math.hypot(user.vel.x, user.vel.z) > 6) { dustT = 0.22; fxList.push(dustPuff(group, user.pos, 3)); }
+        moveToward(user, user.pos.x + c.x * 5, user.pos.z + c.z * 5, userSpeed * (rush.burst > 0 ? 1.25 : 1) * Math.min(1, Math.hypot(c.x, c.z) + 0.15), dt, 26);
         if (moves.juke > 0.15) { user.vel.x += moves.jukeDir * 7 * dt * 10; }
       } else {
         // assists when you let go of the stick
@@ -868,6 +1025,7 @@ export function freePlay(ctx) {
         else if (user.team === 'def' && carrier) pursue(user, carrier, dt, 0.8);
         else { user.vel.x *= 0.85; user.vel.z *= 0.85; }
       }
+      if (dtMode) setButtonsFor();
       // ---- AI
       for (const e of ents) {
         if (e.user || e.down) continue;
@@ -927,11 +1085,13 @@ export function freePlay(ctx) {
         const x = flight.from.x + (flight.to.x - flight.from.x) * f;
         const z = flight.from.z + (flight.to.z - flight.from.z) * f;
         ball.position.set(x, 1.6 + (1.3 - 1.6) * f + 4 * flight.H * f * (1 - f), z);
+        if (!flight.pitch) { trail ??= makeTrail(group); trail.push(ball.position); }
         ball.lookAt(flight.to.x, 1.3, flight.to.z);
         ball.userData.shadow.position.set(x, 0.03, z);
         if (f >= 1) resolveFlight();
       } else if (holder) {
         ball.position.set(holder.pos.x + 0.25, 1.15, holder.pos.z - 0.1);
+        trail?.fade();
         ball.userData.shadow.position.set(holder.pos.x, 0.03, holder.pos.z);
       }
       // ---- end conditions
@@ -967,17 +1127,60 @@ export function freePlay(ctx) {
       } else { e.vel.x *= 0.9; e.vel.z *= 0.9; animateRun(e.mesh, dt, 0); }
     }
     if (phase === 'celebrate') {
-      // orbit camera around the scorer
-      const a = t * 0.9;
-      camera.position.set(scorer.pos.x + Math.sin(a) * 9, 4.5, scorer.pos.z + Math.cos(a) * 9);
-      camera.lookAt(scorer.pos.x, 1.2, scorer.pos.z);
-      if (t > 3.0) { phase = 'over'; endPlay(ctx, finalize(result, m), { delay: 300 }); }
+      if (t < 2.6) {
+        // orbit camera around the scorer
+        const a = t * 0.9;
+        camera.position.set(scorer.pos.x + Math.sin(a) * 9, 4.5, scorer.pos.z + Math.cos(a) * 9);
+        camera.lookAt(scorer.pos.x, 1.2, scorer.pos.z);
+      } else {
+        // crowd cam: the fans going wild
+        const side = scorer.pos.x >= 0 ? 1 : -1;
+        const k = t - 2.6;
+        camera.position.set(side * (22 + k * 2), 3 + k, scorer.pos.z + 4 - k * 3);
+        camera.lookAt(side * 44, 9, scorer.pos.z - 4 - k * 3);
+      }
+      if (t > 4.2) { phase = 'over'; endPlay(ctx, finalize(result, m), { delay: 300 }); }
       return;
     }
     if (phase === 'dead') {
       const focus = carrier?.pos ?? user.pos;
       rig(camera, focus.x * 0.85, focus.z, dt, { zoom: 0.9, k: 3 });
-      if (t > 0.9) { phase = 'over'; endPlay(ctx, finalize(result, m), { delay: 1200 }); }
+      // players piling on
+      for (const e of ents) {
+        if (!e.pile || e.pile.done) continue;
+        if (t < e.pile.at) continue;
+        const dd = Math.hypot(e.pile.x - e.pos.x, e.pile.z - e.pos.z);
+        if (dd > 1.3) {
+          const sp = 7 * dt / dd;
+          e.pos.x += (e.pile.x - e.pos.x) * sp; e.pos.z += (e.pile.z - e.pos.z) * sp;
+          e.mesh.position.set(e.pos.x, 0, e.pos.z);
+          faceToward(e.mesh, e.pile.x, e.pile.z);
+          animateRun(e.mesh, dt, 7);
+        } else {
+          e.pile.done = true;
+          ragdoll(e.mesh, norm(e.pile.x - e.pos.x, e.pile.z - e.pos.z), 0.45);
+          fxList.push(dustPuff(group, e.pile, 8));
+          sfx.hit();
+        }
+      }
+      // after-the-whistle shoving match
+      if (scuffle) {
+        scuffle.t += dt;
+        const { a, b } = scuffle;
+        faceToward(a.mesh, b.pos.x, b.pos.z); faceToward(b.mesh, a.pos.x, a.pos.z);
+        const dd = dist(a.pos, b.pos);
+        if (dd > 1.0) { a.pos.x += (b.pos.x - a.pos.x) * dt * 1.5; a.pos.z += (b.pos.z - a.pos.z) * dt * 1.5; a.mesh.position.set(a.pos.x, 0, a.pos.z); animateRun(a.mesh, dt, 3); }
+        else if (Math.floor(scuffle.t * 3) !== scuffle.k) {
+          scuffle.k = Math.floor(scuffle.t * 3);
+          const s1 = scuffle.k % 2 ? a : b;
+          const s2 = s1 === a ? b : a;
+          playAction(s1.mesh, 'stiff', { dur: 0.3 });
+          const n2 = norm(s2.pos.x - s1.pos.x, s2.pos.z - s1.pos.z);
+          s2.pos.x += n2.x * 0.5; s2.pos.z += n2.z * 0.5; s2.mesh.position.set(s2.pos.x, 0, s2.pos.z);
+          ctx.shake(0.08);
+        }
+      }
+      if (t > 1.6) { phase = 'over'; endPlay(ctx, finalize(result, m), { delay: 900 }); }
     }
   };
 

@@ -98,5 +98,128 @@ export function playMode(type) {
   if (type.startsWith('wr_')) return 'route';
   if (type === 'cb_cover') return 'cover';
   if (type === 'cb_tackle') return 'runD';
+  if (type === 'dt_rush') return 'rush';
+  if (type === 'dt_run') return 'runStop';
   return null;
+}
+
+// ---------------- extra plays: each snap shows 3 random plays from the pool for your call.
+const MORE = {
+  pass: {
+    safe: [
+      { name: 'Stick', desc: 'TE sits at 6, slot runs to the flat.', form: 'shotgun', routes: { X: [[0, -3], [5, -8]], Z: [[0, -12]], S: [[0, -1], [-6, -2]], TE: [[0, -6], [0, -5]], RB: [[4, -1]] } },
+      { name: 'Spacing', desc: 'Everyone hitches at 5. Pick the soft spot.', form: 'shotgun', routes: { X: [[0, -6], [0, -5]], Z: [[0, -6], [0, -5]], S: [[0, -6], [0, -5]], TE: [[0, -5], [0, -4]], RB: [[3, -2]] } },
+      { name: 'Bubble Screen', desc: 'Throw it to the slot behind the line.', form: 'shotgun', routes: { X: [[0, -6]], Z: [[0, -8], [-3, -8]], S: [[-3, 1], [-6, 0.5]], TE: [[0, -4]], RB: [[3, -1]] } },
+      { name: 'Levels', desc: 'In-breakers at 5 and 10 yards.', form: 'shotgun', routes: { X: [[0, -5], [8, -5]], Z: [[0, -10], [-9, -10]], S: [[0, -10], [7, -10]], TE: [[0, -4], [-4, -4]], RB: [[-3, -1]] } },
+      { name: 'Drive', desc: 'Shallow cross with a dig behind it.', form: 'shotgun', routes: { X: [[0, -2], [18, -3]], Z: [[0, -11], [-10, -12]], S: [[0, -6], [0, -5]], TE: [[0, -6], [4, -7]], RB: [[4, -1]] } },
+      { name: 'Y-Option', desc: 'Tight end wins inside or out.', form: 'shotgun', routes: { X: [[0, -14]], Z: [[0, -14]], S: [[0, -3], [-4, -3]], TE: [[0, -6], [-2, -6]], RB: [[-3, -1]] } },
+    ],
+    balanced: [
+      { name: 'Flood', desc: 'Three levels to one sideline.', form: 'shotgun', routes: { X: [[0, -20]], Z: [[0, -18], [4, -24]], S: [[0, -9], [9, -11]], TE: [[0, -2], [8, -3]], RB: [[4, -1]] } },
+      { name: 'Shallow Cross', desc: 'Drag under, dig over.', form: 'shotgun', routes: { X: [[0, -2], [20, -3]], Z: [[0, -12], [-10, -13]], S: [[0, -16]], TE: [[0, -7], [-3, -7]], RB: [[3, -2]] } },
+      { name: 'Snag', desc: 'Triangle read: corner, snag, flat.', form: 'shotgun', routes: { X: [[0, -10], [-6, -18]], Z: [[0, -5], [-2, -5]], S: [[0, -1], [-6, -2]], TE: [[0, -10], [5, -16]], RB: [[3, -1]] } },
+      { name: 'Sail', desc: 'Go, out, and flat stacked on one side.', form: 'shotgun', routes: { X: [[0, -30]], Z: [[0, -12], [6, -12]], S: [[0, -1], [-6, -1]], TE: [[0, -12], [7, -13]], RB: [[-4, -1]] } },
+      { name: 'Spot', desc: 'Curl, corner and flat all at once.', form: 'shotgun', routes: { X: [[0, -7], [1, -6]], Z: [[0, -10], [6, -18]], S: [[0, -9], [-2, -8]], TE: [[0, -1], [6, -2]], RB: [[3, -1]] } },
+    ],
+    risky: [
+      { name: 'Sluggo', desc: 'Fake the slant, then go long.', form: 'shotgun', routes: { X: [[0, -4], [3, -6], [3, -36]], Z: [[0, -4], [-3, -6], [-3, -36]], S: [[0, -10], [-4, -12]], TE: [[0, -6]], RB: [[3, -1]] } },
+      { name: 'Mills', desc: 'Post over a dig. Safeties must choose.', form: 'shotgun', routes: { X: [[0, -12], [12, -13]], Z: [[0, -12], [-7, -30]], S: [[0, -14], [8, -28]], TE: [[0, -6]], RB: [[-3, -1]] } },
+      { name: 'Wheel', desc: 'Running back wheels up the sideline.', form: 'shotgun', routes: { X: [[0, -12], [10, -14]], Z: [[0, -10], [-6, -10]], S: [[0, -18]], TE: [[0, -8]], RB: [[-8, -1], [-10, -30]] } },
+      { name: 'Yankee', desc: 'Play-action deep cross with a post.', form: 'shotgun', routes: { X: [[0, -14], [-3, -32]], Z: [[0, -10], [-22, -24]], S: [[0, -8]], TE: [[0, -6], [4, -6]], RB: [[3, -1]] } },
+      { name: 'Seam Bender', desc: 'Slot splits the safeties.', form: 'shotgun', routes: { X: [[0, -22]], Z: [[0, -22]], S: [[0, -16], [3, -34]], TE: [[0, -16], [-3, -34]], RB: [[3, -2]] } },
+    ],
+  },
+  run: {
+    safe: [
+      { name: 'Iso', desc: 'Fullback leads straight ahead.', form: 'pistol', hole: [-0.6, -0.6] },
+      { name: 'Zone Read', desc: 'Find the cutback lane.', form: 'pistol', hole: [-0.8, 0.8] },
+      { name: 'Wham', desc: 'The TE kicks out the tackle. Hit it inside.', form: 'pistol', hole: [1.4, 1.4] },
+    ],
+    balanced: [
+      { name: 'Outside Zone', desc: 'Stretch to the C gap, then cut.', form: 'pistol', hole: [3.6, 4.4] },
+      { name: 'Split Zone', desc: 'Backside cut behind a crossing TE.', form: 'pistol', hole: [-1.8, -1.8] },
+      { name: 'Duo', desc: 'Double teams up front. Read the linebacker.', form: 'pistol', hole: [1.6, 0.6] },
+    ],
+    risky: [
+      { name: 'Jet Sweep', desc: 'Fly around the edge at full speed.', form: 'pistol', hole: [9, 11], pitch: true },
+      { name: 'Pin Pull', desc: 'Linemen pull and lead you outside.', form: 'pistol', hole: [5.5, 7] },
+      { name: 'Reverse', desc: 'Everyone flows right... you go left.', form: 'pistol', hole: [-8, -10], pitch: true },
+    ],
+  },
+  route: {
+    safe: [
+      { name: 'Drag', desc: 'Shallow across the field under the linebackers.', route: [[0, -2], [-14, -3]] },
+      { name: 'Whip', desc: 'Fake in, whip back out.', route: [[0, -4], [-3, -5], [3, -5]] },
+      { name: 'Flat', desc: 'Quick release to the flat.', route: [[0, -1], [6, -2]] },
+      { name: 'Stick', desc: 'Six yards and sit in the window.', route: [[0, -6], [-1, -6]], sit: true },
+    ],
+    balanced: [
+      { name: 'Deep Out', desc: 'Twelve yards and snap to the sideline.', route: [[0, -12], [7, -12]] },
+      { name: 'Square In', desc: 'Eight yards and cut flat inside.', route: [[0, -8], [-10, -9]] },
+      { name: 'Option', desc: 'Read your man: break in or out at 7.', route: [[0, -7], [-4, -7]], sit: true },
+      { name: 'Skinny Post', desc: 'Sharp slant at depth.', route: [[0, -9], [-4, -20]] },
+    ],
+    risky: [
+      { name: 'Fade', desc: 'Outside release, ball over the shoulder.', route: [[2, -35]] },
+      { name: 'Double Move', desc: 'Hitch fake... then GO.', route: [[0, -6], [0, -5], [1, -34]] },
+      { name: 'Seam', desc: 'Slide inside and race up the seam.', route: [[-4, -2], [-4, -36]] },
+      { name: 'Post Corner', desc: 'Sell the post, break to the corner.', route: [[0, -12], [-4, -17], [6, -28]] },
+    ],
+  },
+  cover: {
+    safe: [
+      { name: 'Tampa 2', desc: 'Sit in the flat, LB carries the middle.', coverage: 'zone', user: 'flat' },
+      { name: 'Cover 6', desc: 'Quarter on your side. Stay deep.', coverage: 'zone', user: 'deep' },
+      { name: 'Soft Squat', desc: 'Give the short stuff, make the tackle.', coverage: 'zone', user: 'flat' },
+    ],
+    balanced: [
+      { name: 'Bracket', desc: 'Man coverage with help over the top.', coverage: 'man', user: 'man', twoDeep: true },
+      { name: 'Banjo', desc: 'Switch on crossers. Talk to the safety.', coverage: 'man', user: 'man' },
+      { name: 'Cover 3 Match', desc: 'Match routes in zone. Play it like man.', coverage: 'man', user: 'man' },
+    ],
+    risky: [
+      { name: 'Zero Press', desc: 'Press with no safety. All or nothing.', coverage: 'man', user: 'man', press: true, blitz: true },
+      { name: 'Nickel Fire', desc: 'Slot blitz, you lock your man.', coverage: 'man', user: 'man', blitz: true },
+      { name: 'Corner Fire', desc: 'Off the edge after the QB!', coverage: 'man', user: 'blitz', blitz: true },
+    ],
+  },
+  runD: {
+    safe: [{ name: 'Spill', desc: 'Push the runner sideways to help.' }, { name: 'Rally', desc: 'Stay home, then swarm.' }],
+    balanced: [{ name: 'Squeeze', desc: 'Close the cutback lane.' }, { name: 'Force', desc: 'Set the edge hard.' }],
+    risky: [{ name: 'Sting Blitz', desc: 'Off the edge before the snap count.' }, { name: 'Edge Crash', desc: 'Crash the backfield. Boom or bust.' }],
+  },
+};
+// ---------------- DT: pass rush and run stopping
+PLAYS.rush = {
+  safe: [
+    { name: 'Two-Gap', desc: 'Stack the blocker, keep the QB in the pocket.' },
+    { name: 'Contain Rush', desc: 'Rush under control. Don\'t let him escape.' },
+    { name: 'Read & React', desc: 'Feel the play, then go get him.' },
+    { name: 'Bull & Hold', desc: 'Push the pocket straight back.' },
+  ],
+  balanced: [
+    { name: 'Speed Rush', desc: 'Win off the snap with quickness.' },
+    { name: 'Long Arm', desc: 'Lock out the blocker, then shed.' },
+    { name: 'Stunt', desc: 'Loop around your teammate on the snap.' },
+    { name: 'Swim Set', desc: 'Set up the swim move early.' },
+  ],
+  risky: [
+    { name: 'Overload Blitz', desc: 'Linebackers come too. Get home fast!', blitz: true },
+    { name: 'Twist', desc: 'Cross with the end. Confuse the line.', blitz: true },
+    { name: 'All-Out Rush', desc: 'Everyone pins their ears back.', blitz: true },
+  ],
+};
+PLAYS.runStop = {
+  safe: [{ name: 'Anchor', desc: 'Hold your gap. Don\'t get moved.' }, { name: 'Two-Gap Hold', desc: 'Control the blocker, find the ball.' }, { name: 'Squeeze', desc: 'Close the hole from the inside.' }],
+  balanced: [{ name: 'Slant', desc: 'Angle into the next gap at the snap.' }, { name: 'Pinch', desc: 'Crash inside and plug the middle.' }, { name: 'Spill', desc: 'Force the runner to bounce outside.' }],
+  risky: [{ name: 'Penetrate', desc: 'Shoot the gap. Tackle for loss or nothing.' }, { name: 'Run Blitz', desc: 'Linebackers fill behind you.', blitz: true }, { name: 'Stem & Shoot', desc: 'Shift late and knife through.' }],
+};
+
+for (const [mode, calls] of Object.entries(MORE)) for (const [call, list] of Object.entries(calls)) PLAYS[mode][call].push(...list);
+
+/** Three random plays for this snap (from the pool for your play call). */
+export function dealPlays(mode, call) {
+  const pool = PLAYS[mode][call].slice();
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  return pool.slice(0, 3);
 }

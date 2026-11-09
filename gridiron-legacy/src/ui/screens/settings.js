@@ -14,6 +14,7 @@ export function settingsScreen(app) {
     h('div.card', h('div.list',
       opt('Theme (menus)', 'theme', [['auto', 'Auto'], ['dark', 'Dark'], ['light', 'Light']]),
       opt('Sound effects', 'sound', [[true, 'On'], [false, 'Off']]),
+      opt('Stadium music', 'music', [[true, 'On'], [false, 'Off']]),
       opt('Reduced motion', 'reducedMotion', [[false, 'Off'], [true, 'On']]),
       opt('Blood effects', 'blood', [[true, 'On'], [false, 'Off']]),
       opt('Tutorial tips', 'tutorials', [[true, 'On'], [false, 'Off']]))),

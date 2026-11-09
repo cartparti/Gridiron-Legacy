@@ -192,3 +192,40 @@ export const COMMENT_REPLIES = {
   ],
 };
 export const CLAPBACKS = ['Check the scoreboard 😴', 'Stay mad. 🏈', 'Couldn\'t be me typing this from my couch', 'Highlights speak for themselves.'];
+
+// ---------------- variety: alternative wordings, picked at random each time a text arrives
+// ALT[tid][i] = alternative labels for reply i; ALT_BACK[tid][i] = alternative answers.
+export const ALT = {
+  coach_great: [['Thanks coach. Just doing my job.', 'Appreciate it, Coach.', 'Team effort, coach. Line was great.'], ['I want more. What should I work on?', 'Not satisfied yet. What\'s next?', 'Can we look at what I missed?'], ['😎', 'Told you I was ready 😤', '🔥']],
+  coach_bad: [['My fault. It won\'t happen again.', 'That\'s on me, Coach.', 'I\'ll be better. Promise.'], ['The line didn\'t block for me.', 'Refs were awful though.', 'Play calls weren\'t working.'], ['Can we watch film together?', 'Show me what I did wrong.', 'I\'ll be in early tomorrow.']],
+  family_win: [['❤️ love you guys', 'Love you!! Thanks for coming', '🥹❤️'], ['Tell grandpa I said thanks!', 'Tell everyone I said hi!', 'Was dad wearing the jersey?'], ['Busy, talk later', 'k', 'Can\'t talk rn']],
+  family_loss: [['Thanks mom ❤️ I\'ll call', 'Needed that. Calling tonight', 'Love you. Talk later?'], ['I don\'t want to talk about it', 'Not now please', '...']],
+  mate_great: [['Couldn\'t do it without you', 'You made that block happen bro', 'We did that together'], ['Wings on YOU then 😂', 'You\'re buying 😂', 'Bet. I\'m ordering everything'], ['I\'m HIM. 😤', 'Different breed 😤', 'Light work.']],
+  rival_beat: [['Scoreboard. 😘', 'Check the scoreboard 😴', 'See you next year... loser'], ['Good game, honestly.', 'Respect. You played hard.', 'GG. You made me work.'], ['(leave on read)', '(react 😂 and move on)', '(screenshot it)']],
+  rival_lost: [['Enjoy it. Next time is mine.', 'Rematch can\'t come soon enough.', 'Circle the date.'], ['Refs helped you lol', 'You got lucky and you know it', 'Weather game. Doesn\'t count.'], ['GG.', 'Earned it. GG.', 'Good game man.']],
+  mate_wings: [['I\'m in 🍗', 'Say less 🍗', 'Already hungry'], ['Can\'t, film study', 'Pass, gotta study', 'Next week, I\'m slammed']],
+  partner_movie: [['Friday. I\'ll bring snacks', 'Yes! Your pick this time', 'Tonight?? 👀'], ['Season\'s busy, sorry', 'Can we do it after the season?', 'I\'m wiped this week']],
+};
+export const ALT_BACK = {
+  coach_great: [['That humility will take you far.', 'Keep that attitude.', 'That\'s a leader talking.'], ['Come in early tomorrow. We\'ll break down your footwork.', 'Your eyes. We\'ll fix your eyes.', 'Film room, 7am.'], ['Don\'t let it go to your head.', 'Stay humble.', '...See you at practice.']],
+  coach_bad: [['That\'s what I want to hear.', 'Good. Own it.', 'Prove it Saturday.'], ['We win and lose as a TEAM. Remember that.', 'Excuses don\'t win games.', 'Not what I want to hear.'], ['Door\'s open. Bring a notebook.', 'Good. 6am.', 'That\'s the right answer.']],
+  rival_beat: [['...', 'Whatever.', 'Enjoy it.'], ['...respect. Still coming for you.', 'Respect. See you next year.', 'Didn\'t expect that. Respect.'], [null, null, null]],
+};
+
+// ---------------- tags / mentions on Huddle (the social app)
+export const TAGS = [
+  { who: 'fan', when: 'great', text: ['@{handle}: Y\'all see what {first} did today?? 🔥 @{me}', '@{handle}: {first} is the best player in this league and it\'s not close @{me}', '@{handle}: Framing this photo of @{me} 😭'],
+    replies: [{ label: ['🙏❤️', 'Appreciate you!', 'Love the support 🫡'], effects: { fame: 0.3 } }, { label: ['Repost it', 'Share to your story'], effects: { fame: 0.6 } }] },
+  { who: 'fan', when: 'bad', text: ['@{handle}: @{me} what WAS that today 😭', '@{handle}: Bench @{me}. I said what I said.', '@{handle}: @{me} cost us the game. Again.'],
+    replies: [{ label: ['We\'ll bounce back 💪', 'Fair. Better next week.', 'Hear you. Working on it.'], effects: { fame: 0.4, mood: 1 } }, { label: ['Clap back', 'Quote tweet them'], effects: { fame: 0.8 }, risk: 0.4 }, { label: ['Mute', 'Log off for the night'], effects: { mood: 2 } }] },
+  { who: 'mate', when: 'any', text: ['{mate} tagged you: "Me and @{me} after practice 😂"', '{mate} tagged you: "Locker room DJ @{me} needs to be fired 🎵"', '{mate} tagged you: "Best teammate in the building @{me}"'],
+    replies: [{ label: ['😂😂😂', 'Delete this', 'I\'m keeping the aux 🎵'], effects: { rel: { teammates: 2 } } }, { label: ['Tag them back with a worse pic', 'Expose them in the comments'], effects: { rel: { teammates: 3 }, fame: 0.3 } }] },
+  { who: 'reporter', when: 'any', text: ['@SportsDesk: Is @{me} the most underrated player in the conference? Vote below 👇', '@GridironDaily: Film breakdown: how @{me} keeps beating opponents', '@TheHuddleShow: Hot take: @{me} is overrated. Thoughts?'],
+    replies: [{ label: ['Just keep working 🤷', 'Let the tape talk', 'Appreciate the love'], effects: { fame: 0.4, rel: { coach: 1 } } }, { label: ['Talk your talk 😤', 'Overrated?? Watch Saturday.'], effects: { fame: 1 }, risk: 0.25 }] },
+  { who: 'brand', when: 'great', text: ['@VoltadeDrinks: Big game from @{me}! Want to work together? DM us ⚡', '@StrideCleats: That cut by @{me} though 👟 Let\'s talk.'],
+    replies: [{ label: ['DM sent 💼', 'Let\'s talk!', 'Have my agent reach out'], effects: { money: 600, fame: 0.4 } }, { label: ['Not right now', 'Focused on the season'], effects: { rel: { coach: 1 } } }] },
+  { who: 'rival', when: 'any', text: ['{rival} posted: "Some people peak in high school 🥱" and tagged @{me}', '{rival} posted: "Ask @{me} how that last game went 😂"'],
+    replies: [{ label: ['Scoreboard 📊', 'See you on the field', 'Keep my name out your mouth'], effects: { fame: 0.8, rel: { rival: 6 } } }, { label: ['Ignore it', 'Don\'t feed the trolls'], effects: { mood: 1, rel: { coach: 1 } } }] },
+  { who: 'fan', when: 'any', text: ['@{handle}: My son wants to be just like @{me} when he grows up ❤️', '@{handle}: Met @{me} at the mall and they were SO nice!!', '@{handle}: Drew this fan art of @{me} 🎨'],
+    replies: [{ label: ['This made my day ❤️', 'Tell him to keep working!', 'Send me a pic, I\'ll sign it'], effects: { fame: 0.5, mood: 2 } }, { label: ['❤️', '🙏'], effects: { fame: 0.2 } }] },
+];

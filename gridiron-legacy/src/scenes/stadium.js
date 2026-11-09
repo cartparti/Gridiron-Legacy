@@ -43,6 +43,17 @@ function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWA
   };
   ez(0, homeColors, homeName);
   ez(110, awayColors, awayName);
+  // diagonal pinstripes in the end zones
+  g.save();
+  g.globalAlpha = 0.14;
+  g.fillStyle = '#ffffff';
+  for (const y0 of [0, 110]) {
+    g.save();
+    g.beginPath(); g.rect(0, y0 * ppy, cw, 10 * ppy); g.clip();
+    for (let x = -ch; x < cw + ch; x += 18) { g.beginPath(); g.moveTo(x, y0 * ppy); g.lineTo(x + 8, y0 * ppy); g.lineTo(x + 8 - 10 * ppy, (y0 + 10) * ppy); g.lineTo(x - 10 * ppy, (y0 + 10) * ppy); g.fill(); }
+    g.restore();
+  }
+  g.restore();
   // Lines.
   g.fillStyle = '#ffffff';
   g.fillRect(0, 0, cw, 2); g.fillRect(0, ch - 2, cw, 2); g.fillRect(0, 0, 2, ch); g.fillRect(cw - 2, 0, 2, ch);
@@ -75,6 +86,11 @@ function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWA
   g.lineWidth = 4;
   g.strokeStyle = homeColors[1];
   g.stroke();
+  g.fillStyle = homeColors[1];
+  g.font = `bold ${Math.round(3.2 * ppy)}px "Silkscreen", "Courier New", monospace`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(String(homeName).slice(0, 3).toUpperCase(), cw / 2, 60 * ppy + 2);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.magFilter = THREE.NearestFilter;
@@ -98,6 +114,10 @@ export function buildStadium(scene) {
   track.position.y = -0.05;
   world.add(track);
 
+  const border = new THREE.Mesh(new THREE.PlaneGeometry(FIELD_W + 6, FIELD_L + 6), new THREE.MeshBasicMaterial({ color: '#1d3557' }));
+  border.rotation.x = -Math.PI / 2;
+  border.position.y = -0.01;
+  world.add(border);
   const fieldMat = new THREE.MeshBasicMaterial({ map: fieldTexture(['#1d3557', '#f1c40f'], ['#b5121b', '#f5d547']) });
   const field = new THREE.Mesh(new THREE.PlaneGeometry(FIELD_W, FIELD_L), fieldMat);
   field.rotation.x = -Math.PI / 2; // canvas top ends up at -z (the end zone the offense attacks)
@@ -164,6 +184,58 @@ export function buildStadium(scene) {
   });
   crowd.userData.base = crowdPositions;
   world.add(crowd, heads);
+
+  // About a third of the fans have their arms up (one instanced mesh of V-shaped arms).
+  const armGeo = (() => {
+    const a = new THREE.BoxGeometry(0.16, 0.62, 0.16); a.translate(0, 0.31, 0);
+    const l = a.clone(); l.rotateZ(0.45); l.translate(-0.34, 0.25, 0);
+    const r = a.clone(); r.rotateZ(-0.45); r.translate(0.34, 0.25, 0);
+    const pos = [...l.attributes.position.array, ...r.attributes.position.array];
+    const nor = [...l.attributes.normal.array, ...r.attributes.normal.array];
+    const idx = [...l.index.array, ...r.index.array.map((i) => i + l.attributes.position.count)];
+    const gg = new THREE.BufferGeometry();
+    gg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    gg.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    gg.setIndex(idx);
+    return gg;
+  })();
+  const cheerIdx = crowdPositions.map((_, i) => i).filter(() => Math.random() < 0.34);
+  const arms = new THREE.InstancedMesh(armGeo, new THREE.MeshBasicMaterial({ color: '#ffffff' }), cheerIdx.length);
+  world.add(arms);
+  // Signs and foam fingers held above some heads.
+  const signTex = (() => {
+    const c2 = document.createElement('canvas'); c2.width = 64; c2.height = 16;
+    const g2 = c2.getContext('2d');
+    const designs = [['#ffffff', '#c62f2f', 'GO!'], ['#f2c12e', '#1d1f24', '#1'], ['#ffffff', '#1f3a7a', 'D!'], ['#e63946', '#ffffff', 'TD!']];
+    designs.forEach(([bg, fg, txt], i) => { g2.fillStyle = bg; g2.fillRect(i * 16, 0, 16, 16); g2.fillStyle = fg; g2.font = 'bold 8px monospace'; g2.textAlign = 'center'; g2.textBaseline = 'middle'; g2.fillText(txt, i * 16 + 8, 8.5); });
+    const t = new THREE.CanvasTexture(c2); t.magFilter = THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  })();
+  const signIdx = crowdPositions.map((_, i) => i).filter(() => Math.random() < 0.07);
+  const signGeo = new THREE.PlaneGeometry(1.2, 0.8);
+  const uv = signGeo.attributes.uv;
+  const signMeshes = [0, 1, 2, 3].map((k) => {
+    const gq = signGeo.clone();
+    const u = gq.attributes.uv;
+    for (let i = 0; i < u.count; i++) u.setX(i, (k + uv.getX(i)) / 4);
+    const list = signIdx.filter((_, j) => j % 4 === k);
+    const mm = new THREE.InstancedMesh(gq, new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide }), Math.max(1, list.length));
+    mm.count = list.length;
+    mm.userData.list = list;
+    world.add(mm);
+    return mm;
+  });
+  // Camera flashes popping in the stands.
+  const flashN = 260;
+  const flashGeo = new THREE.BufferGeometry();
+  const fpos = new Float32Array(flashN * 3);
+  const fcol = new Float32Array(flashN * 3);
+  for (let i = 0; i < flashN; i++) { const p = crowdPositions[Math.floor(Math.random() * crowdPositions.length)]; fpos.set([p.x, p.y + 0.9, p.z], i * 3); }
+  flashGeo.setAttribute('position', new THREE.BufferAttribute(fpos, 3));
+  flashGeo.setAttribute('color', new THREE.BufferAttribute(fcol, 3));
+  const flashes = new THREE.Points(flashGeo, new THREE.PointsMaterial({ size: 3, sizeAttenuation: false, vertexColors: true, transparent: true, depthWrite: false }));
+  world.add(flashes);
+  let flashRate = 0.004;
 
   // Ad boards around the field.
   const adTex = (() => {
@@ -357,10 +429,14 @@ export function buildStadium(scene) {
     setTeams(farColors, nearColors, farName, nearName, crowdColors = nearColors) {
       fieldMat.map.dispose();
       fieldMat.map = fieldTexture(farColors, nearColors, farName, nearName);
+      border.material.color.set(crowdColors[0]).multiplyScalar(0.55);
       fieldMat.needsUpdate = true;
       const palette = [crowdColors[0], crowdColors[1], crowdColors[0], farColors[0], '#d9d9d9', '#6c757d', crowdColors[0]].map((c) => new THREE.Color(c));
       for (let i = 0; i < crowd.count; i++) crowd.setColorAt(i, palette[Math.floor(Math.random() * palette.length)]);
       crowd.instanceColor.needsUpdate = true;
+      const skinsA = ['#f7dcc0', '#e0ab7f', '#cc9260', '#b07646', '#8f5a34', '#6e4126'].map((cc) => new THREE.Color(cc));
+      for (let i = 0; i < arms.count; i++) arms.setColorAt(i, Math.random() < 0.5 ? skinsA[i % skinsA.length] : palette[i % palette.length]);
+      arms.instanceColor.needsUpdate = true;
       // sideline teams: near team on the right side (+x), far team on the left
       const paint = (sd, cols) => {
         const [body, legs, head] = sideGroups[sd].parts;
@@ -394,8 +470,35 @@ export function buildStadium(scene) {
       heads.material.color.copy(crowd.material.color);
     },
     /** Make the crowd bounce (excitement 0..1). */
+    /** How hyped the crowd is (more bouncing and camera flashes). */
+    setExcitement(e) { flashRate = 0.003 + e * 0.02; },
     animateCrowd(t, excitement = 0.2) {
       const base = crowd.userData.base;
+      // camera flashes
+      for (let i = 0; i < flashN; i++) { const on = Math.random() < flashRate ? 1 : fcol[i * 3] * 0.6; fcol[i * 3] = fcol[i * 3 + 1] = fcol[i * 3 + 2] = on > 0.05 ? on : 0; }
+      flashGeo.attributes.color.needsUpdate = true;
+      // cheering arms and signs bounce with their fans
+      cheerIdx.forEach((ci, k) => {
+        const p = base[ci];
+        const bob = Math.max(0, Math.sin(t * 9 + ci * 1.7)) * 0.35 * excitement;
+        dummy.position.set(p.x, p.y + 0.3 + bob, p.z);
+        dummy.rotation.set(0, 0, Math.sin(t * 6 + ci) * 0.25 * excitement);
+        dummy.updateMatrix();
+        arms.setMatrixAt(k, dummy.matrix);
+      });
+      dummy.rotation.set(0, 0, 0);
+      arms.instanceMatrix.needsUpdate = true;
+      for (const mm of signMeshes) {
+        mm.userData.list.forEach((ci, k) => {
+          const p = base[ci];
+          dummy.position.set(p.x, p.y + 1.45 + Math.max(0, Math.sin(t * 7 + ci)) * 0.3 * excitement, p.z);
+          dummy.lookAt(0, p.y + 1.4, p.z * 0.6);
+          dummy.updateMatrix();
+          mm.setMatrixAt(k, dummy.matrix);
+        });
+        dummy.rotation.set(0, 0, 0);
+        mm.instanceMatrix.needsUpdate = true;
+      }
       const step = base.length > 2500 ? 2 : 1;
       for (let i = 0; i < base.length; i += step) {
         const p = base[i];

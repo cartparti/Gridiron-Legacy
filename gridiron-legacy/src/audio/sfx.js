@@ -29,6 +29,13 @@ function ac() {
   }
 }
 
+/** Shared audio graph for other modules (stadium crowd + music). Null when sound is off. */
+export function audioGraph() {
+  const c = ac();
+  return c ? { ctx: c, master, noiseBuf } : null;
+}
+export const soundOn = () => enabled;
+
 /** Call from a user gesture once so mobile browsers allow audio. */
 export function unlockAudio() {
   ac();

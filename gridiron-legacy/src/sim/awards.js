@@ -13,6 +13,8 @@ export function seasonPerf(pos, s) {
     prod = (s.passYds / g / 280) * 45 + (s.passTD / g / 2.4) * 35 + (pct - 0.55) * 80 - (s.int / g) * 10;
   } else if (pos === 'RB') {
     prod = (s.rushYds / g / 120) * 55 + (s.rushTD / g / 1.2) * 30 + (s.recYds / g / 40) * 10 - (s.fumbles / g) * 12;
+  } else if (pos === 'DT') {
+    prod = ((s.defSacks ?? 0) / g / 0.7) * 36 + ((s.tfl ?? 0) / g / 1.0) * 20 + (s.tackles / g / 3.5) * 22 + (s.pd / g / 0.4) * 6 + 8;
   } else if (pos === 'CB') {
     prod = (s.defInt / g / 0.4) * 32 + (s.pd / g / 1.1) * 22 + (s.tackles / g / 4.5) * 18 + (s.defTD / g / 0.1) * 8 - (s.ydsAllowed / g / 60) * 12 - (s.tdAllowed / g / 0.4) * 8 + 8;
   } else {
@@ -27,14 +29,15 @@ const STAT_CATS = {
   RB: [['rushYds', 'Rushing Yards'], ['rushTD', 'Rushing TDs']],
   WR: [['recYds', 'Receiving Yards'], ['recTD', 'Receiving TDs']],
   CB: [['defInt', 'Interceptions'], ['defTD', 'Defensive TDs']],
+  DT: [['defSacks', 'Sacks'], ['tfl', 'Tackles for Loss']],
 };
 
 /** Generated stat leaders for the pro league (the competition you're measured against). */
 export function genLeaders(state, league) {
   const leaders = {};
-  const scale = { passYds: [3600, 70], passTD: [26, 0.7], rushYds: [1150, 30], rushTD: [10, 0.4], recYds: [1150, 30], recTD: [9, 0.35], defInt: [6, 0.2], defTD: [1.5, 0.06] };
+  const scale = { passYds: [3600, 70], passTD: [26, 0.7], rushYds: [1150, 30], rushTD: [10, 0.4], recYds: [1150, 30], recTD: [9, 0.35], defInt: [6, 0.2], defTD: [1.5, 0.06], defSacks: [12, 0.35], tfl: [15, 0.35] };
   for (const [pos, cats] of Object.entries(STAT_CATS)) {
-    const top = league.players.filter((p) => p.pos === pos).sort((a, b) => b.ovr - a.ovr).slice(0, 3);
+    const top = league.players.filter((p) => p.pos === (pos === 'DT' ? 'DL' : pos)).sort((a, b) => b.ovr - a.ovr).slice(0, 3);
     for (const [key] of cats) {
       leaders[key] = top.map((pl) => {
         const [base, per] = scale[key];
@@ -56,6 +59,8 @@ export function seedRecords(state) {
       recTD: { value: 21, holder: 'Jalen Sutton', year: 2009 },
       defInt: { value: 14, holder: 'Night Train Lowry', year: 1987 },
       defTD: { value: 5, holder: 'Deion Abara', year: 2001 },
+      defSacks: { value: 23, holder: 'Big Earl Mabry', year: 1994 },
+      tfl: { value: 39, holder: 'Hollis "Hammer" Grant', year: 2013 },
     },
     career: {
       passYds: { value: 68400, holder: 'Ty Prescott', year: 2019 },
@@ -66,13 +71,15 @@ export function seedRecords(state) {
       recTD: { value: 182, holder: 'Andre Whitfield', year: 2023 },
       defInt: { value: 81, holder: 'Paul Kraemer', year: 1979 },
       defTD: { value: 15, holder: 'Rod Wedgewood', year: 2004 },
+      defSacks: { value: 201, holder: 'Big Earl Mabry', year: 2002 },
+      tfl: { value: 230, holder: 'Hollis "Hammer" Grant', year: 2020 },
     },
   };
 }
 
 export const RECORD_LABELS = {
   passYds: 'Passing Yards', passTD: 'Passing TDs', rushYds: 'Rushing Yards',
-  rushTD: 'Rushing TDs', recYds: 'Receiving Yards', recTD: 'Receiving TDs', defInt: 'Interceptions', defTD: 'Defensive TDs',
+  rushTD: 'Rushing TDs', recYds: 'Receiving Yards', recTD: 'Receiving TDs', defInt: 'Interceptions', defTD: 'Defensive TDs', defSacks: 'Sacks', tfl: 'Tackles for Loss',
 };
 
 /** Check the user's (and the league leaders') numbers against the record book. */
@@ -136,7 +143,7 @@ export function seasonAwards(state, { champion, titleGrade, rookie, missedLastSe
     if (champion) awards.push('Heritage Bowl Champion');
   } else {
     if (enough && perf >= 66 && beats(71, 5)) awards.push('All-League');
-    if (enough && perf >= 74 && beats(80, 3.5)) awards.push(p.position === 'CB' ? 'Defensive Player of the Year' : 'Offensive Player of the Year');
+    if (enough && perf >= 74 && beats(80, 3.5)) awards.push(p.position === 'CB' || p.position === 'DT' ? 'Defensive Player of the Year' : 'Offensive Player of the Year');
     if (enough && perf >= 77 && winPct >= 0.6 && beats(83, 3)) awards.push('Most Valuable Player');
     if (rookie && enough && perf >= 58 && beats(64, 5)) awards.push('Rookie of the Year');
     if (missedLastSeason && enough && perf >= 62) awards.push('Comeback Player of the Year');
@@ -244,7 +251,7 @@ export function awardWatch(state) {
   const bars = {
     hs: [['All-State', 64], ['State Player of the Year', 76]],
     college: [['All-Conference', 66], ['Ironstone Trophy', 80]],
-    pro: [['All-League', 71], [p.position === 'CB' ? 'Defensive Player of the Year' : 'Offensive Player of the Year', 80], ['Most Valuable Player', 83]],
+    pro: [['All-League', 71], [p.position === 'CB' || p.position === 'DT' ? 'Defensive Player of the Year' : 'Offensive Player of the Year', 80], ['Most Valuable Player', 83]],
   }[stage] ?? [];
   return { perf: Math.round(perf), games: s.games, winPct: team.w / Math.max(1, team.w + team.l), rows: bars.map(([name, bar]) => ({ name, bar, pct: Math.max(0, Math.min(1.1, perf / bar)) })) };
 }
