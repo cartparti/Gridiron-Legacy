@@ -13,6 +13,7 @@ import { makeControls } from './controls.js';
 import { PLAYS, OFF_FORMATION, OL_X, playMode, dealPlays } from '../../data/playbook.js';
 import { sfx } from '../../audio/sfx.js';
 import { line } from '../../data/commentary.js';
+import { POS_SIZE } from '../../data/looks.js';
 import { react, playMusic, stopMusic } from '../../audio/stadium.js';
 import { flameJet, firework, makeTrail } from '../fx.js';
 
@@ -56,9 +57,15 @@ export function freePlay(ctx) {
     mesh.userData.u.targetYaw = team === 'off' ? 0 : Math.PI;
     mesh.rotation.y = mesh.userData.u.targetYaw;
     group.add(mesh);
+    // Size matters: heavier players are slower but stronger, taller players catch over people.
+    const L = mesh.userData.look ?? {};
+    const [h0, w0] = POS_SIZE[role] ?? [73, 210];
+    const hIn = L.heightIn ?? h0;
+    const wLb = L.weightLb ?? w0;
+    const sizeSpeed = Math.max(0.86, Math.min(1.1, 1 - ((wLb - w0) / w0) * 0.45 + (hIn - h0) * 0.004));
     const e = {
-      team, role, slot, mesh, pos: { x, z }, vel: { x: 0, z: 0 }, start: { x, z },
-      maxSpeed: BASE_SPEED[role] * (team === 'def' ? defBoost : wfx.speed) * rnd(0.95, 1.05),
+      team, role, slot, mesh, pos: { x, z }, vel: { x: 0, z: 0 }, start: { x, z }, hIn, wLb, mass: wLb / 210,
+      maxSpeed: BASE_SPEED[role] * (team === 'def' ? defBoost : wfx.speed) * rnd(0.97, 1.03) * (isUser ? 1 : sizeSpeed),
       user: isUser, route: null, s: 0, engaged: null, out: 0, tell: 0, lunge: 0, lungeDir: null, down: false, ...extra,
     };
     ents.push(e);
@@ -199,7 +206,10 @@ export function freePlay(ctx) {
     preSnapVisuals();
     phase = 'pre';
     t = 0;
-    hud.instr(`${play.name} · get set…`);
+    // size matchup with the guy across from you
+    const foe = dtMode ? nearest(user, blockers) : mode === 'cover' || mode === 'runD' ? user.man : mode === 'route' ? defenders.find((d) => d.man === user) : null;
+    const sz = (e) => `${Math.floor(e.hIn / 12)}'${e.hIn % 12}" ${e.wLb}`;
+    hud.instr(foe ? `${play.name} · you ${sz(user)} vs ${sz(foe)} lb` : `${play.name} · get set…`);
     if (m.defense && userHome) react('defense');
     setButtonsFor();
   };
@@ -304,7 +314,8 @@ export function freePlay(ctx) {
       if ((id === 'rip' || id === 'swim' || id === 'bull') && user.engagedBy && rush.cd <= 0 && rush.stun <= 0) {
         const o = user.engagedBy;
         const stat = id === 'bull' ? (st.strength ?? 60) : id === 'swim' ? (st.skill ?? 60) : ((st.skill ?? 60) + (st.speed ?? 60)) / 2;
-        const pWin = (0.18 + rush.lev * 0.55 + (stat - 50) / 220) * (0.75 + tol * 0.25) * (call === 'risky' ? 0.9 : 1);
+        const massK = id === 'bull' ? Math.max(0.7, Math.min(1.4, user.mass / o.mass)) : Math.max(0.8, Math.min(1.25, o.mass / user.mass));
+        const pWin = (0.18 + rush.lev * 0.55 + (stat - 50) / 220) * (0.75 + tol * 0.25) * (call === 'risky' ? 0.9 : 1) * massK;
         rush.cd = 0.7;
         playAction(user.mesh, id === 'bull' ? 'stiff' : id === 'swim' ? 'throw' : 'juke', { dir: Math.random() < 0.5 ? 1 : -1 });
         sfx.hit();
@@ -440,7 +451,7 @@ export function freePlay(ctx) {
         // drive the defender away from the play
         const hx = play.hole ? (play.hole[0] + play.hole[1]) / 2 : 0;
         const away = runPush ? Math.sign(d.pos.x - hx || 1) * 0.6 : 0;
-        moveToward(e, d.pos.x + away, d.pos.z + (runPush ? -0.3 : 0.9), 1.6, dt);
+        moveToward(e, d.pos.x + away, d.pos.z + (runPush ? -0.3 : 0.9), 1.6 * Math.max(0.7, Math.min(1.45, e.mass / d.mass)), dt);
         d.pos.x += e.vel.x * dt; d.pos.z += e.vel.z * dt;
         battle(e, d, dt);
       }
@@ -556,11 +567,12 @@ export function freePlay(ctx) {
     if (!who.user) playAction(who.mesh, 'stiff', { then: 'block', dur: 0.32 });
     if (b.user || a.user) return;
     const r = Math.random();
-    if (r < 0.07) { // pancake: the blocker plants the defender
+    const ratio = Math.max(0.6, Math.min(1.7, a.mass / b.mass));
+    if (r < 0.07 * ratio) { // pancake: the blocker plants the defender (bigger blockers do it more)
       a.engaged = null; b.engagedBy = null; setPose(a.mesh, null); setPose(b.mesh, null);
       b.out = 1.8; flatten(b, a, 0.75); fxList.push(dustPuff(group, b.pos));
       if (Math.random() < 0.35) say('pancake');
-    } else if (r < 0.1) { // the rusher throws the blocker aside
+    } else if (r < 0.07 * ratio + 0.03 / ratio) { // the rusher throws the blocker aside (bigger rushers do it more)
       a.engaged = null; b.engagedBy = null; setPose(a.mesh, null); setPose(b.mesh, null);
       a.out = 1.4; flatten(a, b, 0.6); fxList.push(dustPuff(group, a.pos)); b.out = 0.15;
     }
@@ -671,8 +683,9 @@ export function freePlay(ctx) {
   /** Hard tackle: ragdoll, maybe slow-mo replay, maybe blood, maybe an injury. */
   const hardHit = (tackler, target) => {
     const rel = Math.hypot(tackler.vel.x - target.vel.x, tackler.vel.z - target.vel.z);
-    const big = globalThis.__forceBigHit || rel > 10 || Math.random() < 0.14;
-    flatten(target, tackler, big ? 1.5 + Math.random() * 0.5 : 0.55 + Math.random() * 0.3);
+    const big = globalThis.__forceBigHit || rel * Math.sqrt(tackler.mass / target.mass) > 10 || Math.random() < 0.12 * Math.min(1.6, tackler.mass / target.mass);
+    const sizeK = Math.max(0.7, Math.min(1.5, tackler.mass / target.mass));
+    flatten(target, tackler, (big ? 1.5 + Math.random() * 0.5 : 0.55 + Math.random() * 0.3) * sizeK);
     fxList.push(dustPuff(group, target.pos, big ? 16 : 9));
     if (!big) return;
     const involved = target.user || tackler.user;
@@ -717,7 +730,7 @@ export function freePlay(ctx) {
     }
     const str = target.user ? (st.strength ?? 60) : 60;
     const pBreak = (str / 100) * 0.3 * (target.user ? (0.6 + tol * 0.4) : mode === 'pass' ? 0.35 : 0.6) * Math.pow(0.5, target.broken ?? 0) + (tackler.user ? -0.1 : 0);
-    if (Math.random() < pBreak) {
+    if (Math.random() < pBreak * Math.max(0.5, Math.min(1.8, Math.pow(target.mass / tackler.mass, 1.3)))) {
       target.broken = (target.broken ?? 0) + 1;
       tackler.out = 1.0; flatten(tackler, target, 0.6);
       if (target.user) { moves.slow = 0.4; hud.big('BROKE A TACKLE!', '#fbbf24', 700); }
@@ -760,14 +773,19 @@ export function freePlay(ctx) {
     if (r === user) {
       const timing = catchPress === null ? 9 : Math.abs(f.t0 + f.T - catchPress - 0.1);
       const win = 0.13 * tol * (0.85 + (st.skill ?? 60) / 400) * (play.jump ? 1.3 : 1);
-      if (dR > 1.4 + tol * 0.3) catchOk = false;
-      else if (timing <= win) catchOk = Math.random() < (crowd ? 0.82 + (st.strength ?? 60) / 600 : 0.97);
+      const tallK = (user.hIn - 73) * 0.04;
+      const nearD = defs.reduce((a, d) => (dist(d.pos, land) < dist(a.pos, land) ? d : a), defs[0]);
+      const heightEdge = nearD ? (user.hIn - nearD.hIn) * 0.02 : 0;
+      if (dR > 1.4 + tol * 0.3 + tallK) catchOk = false;
+      else if (timing <= win) catchOk = Math.random() < (crowd ? 0.82 + (st.strength ?? 60) / 600 + heightEdge : 0.97);
       else if (timing <= win * 2.3) catchOk = Math.random() < (crowd ? 0.45 + (st.strength ?? 60) / 500 : 0.8);
       else catchOk = Math.random() < (crowd ? 0.08 : 0.3); // never pressed: maybe a body catch
       if (catchOk && Math.random() < wfx.slip) { catchOk = false; hud.big('SLIPPERY!', '#fbbf24', 600); }
     } else {
-      const catchR = (f.H > 4 ? 1.7 : 1.15) + 0.2 * tol;
-      catchOk = dR <= catchR && Math.random() < (crowd ? 0.42 : dD < 1.6 ? 0.72 : 0.9) - wfx.slip;
+      const nearD = defs.reduce((a, d) => (dist(d.pos, land) < dist(a.pos, land) ? d : a), defs[0]);
+      const hEdge = nearD ? (r.hIn - nearD.hIn) * 0.025 : 0;
+      const catchR = (f.H > 4 ? 1.7 : 1.15) + 0.2 * tol + (r.hIn - 73) * 0.04 * (f.H > 3 ? 1.6 : 1);
+      catchOk = dR <= catchR && Math.random() < (crowd ? 0.42 + hEdge : dD < 1.6 ? 0.72 + hEdge : 0.9) - wfx.slip;
       // tight coverage: the defender gets a hand in
       if (catchOk && dD < 1.25 && Math.random() < 0.3 / tol) { whistle('incomplete', null, 'Broken up at the catch point!'); return; }
       if (play.hail) catchOk = dR < 2.4 && Math.random() < 0.35 - crowd * 0.05;
@@ -983,7 +1001,9 @@ export function freePlay(ctx) {
       moves.slow = Math.max(0, moves.slow - dt);
       // ---- user control
       const c = controls.state;
-      const userSpeed = BASE_SPEED[user.role] * (0.86 + (st.speed ?? 60) / 100 * 0.28) * wfx.speed * (c.sprint ? 1.15 : 0.95) * (moves.slow > 0 ? 0.55 : 1) * (moves.spin > 0 ? 0.8 : 1);
+      const [uh0, uw0] = POS_SIZE[opts.position] ?? POS_SIZE[user.role] ?? [73, 210];
+      const userSize = Math.max(0.9, Math.min(1.06, 1 - ((user.wLb - uw0) / uw0) * 0.3 + (user.hIn - uh0) * 0.003));
+      const userSpeed = BASE_SPEED[user.role] * userSize * (0.86 + (st.speed ?? 60) / 100 * 0.28) * wfx.speed * (c.sprint ? 1.15 : 0.95) * (moves.slow > 0 ? 0.55 : 1) * (moves.spin > 0 ? 0.8 : 1);
       if (user.out > 0) { user.out -= dt; if (user.out <= 0 && isDown(user.mesh)) knockDown(user.mesh, 0); user.vel.x *= 0.8; user.vel.z *= 0.8; }
       else if (moves.dive) {
         moves.dive += dt;
@@ -1061,7 +1081,13 @@ export function freePlay(ctx) {
           const dx = b.pos.x - a.pos.x;
           const dz = b.pos.z - a.pos.z;
           const d2 = dx * dx + dz * dz;
-          if (d2 < 0.55 && d2 > 1e-5) { const d = Math.sqrt(d2); const push = (0.75 - d) * 0.5; a.pos.x -= (dx / d) * push; a.pos.z -= (dz / d) * push; b.pos.x += (dx / d) * push; b.pos.z += (dz / d) * push; }
+          if (d2 < 0.55 && d2 > 1e-5) {
+            const d = Math.sqrt(d2);
+            const push = (0.75 - d);
+            const wa = b.mass / (a.mass + b.mass); // the lighter player gets moved more
+            a.pos.x -= (dx / d) * push * wa; a.pos.z -= (dz / d) * push * wa;
+            b.pos.x += (dx / d) * push * (1 - wa); b.pos.z += (dz / d) * push * (1 - wa);
+          }
         }
       }
       for (const e of ents) {

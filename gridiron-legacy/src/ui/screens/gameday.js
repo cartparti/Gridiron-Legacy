@@ -14,7 +14,7 @@ import { runMinigame } from '../../scenes/director.js';
 import { tipCard } from './tips.js';
 import { icon } from '../icons.js';
 import { teamKits, oppKitFor, kitUniform, KIT_IDS } from '../../data/kits.js';
-import { randomLook } from '../../data/looks.js';
+import { randomLook, fmtSize } from '../../data/looks.js';
 import { portraitImg } from '../../scenes/portrait.js';
 import { clutchChallenge } from './drills.js';
 import { tunnelCutscene } from '../../scenes/cutscenes.js';
@@ -285,12 +285,12 @@ export function gamedayScreen(app) {
       clear(box);
       const { myId, mine, theirs } = gameKits(st, me, opp);
       const kits = teamKits(me);
-      const star = randomLook(`${opp.id}-star`, { position: st.player.position === 'CB' ? 'WR' : 'CB' });
+      const star = randomLook(`${opp.id}-star`, { position: { CB: 'WR', DT: 'OL', QB: 'DL', RB: 'LB', WR: 'CB' }[st.player.position] ?? 'CB' });
       box.append(
         h('div.lineup',
-          h('div.lineup-side', portraitImg({ uniform: kitUniform(mine), look: st.player.look, number: st.player.number, helmet: false }, 120, { full: true, big: true, yaw: -0.5 })),
+          h('div.lineup-side', portraitImg({ uniform: kitUniform(mine), look: st.player.look, number: st.player.number, helmet: false }, 120, { full: true, big: true, yaw: -0.5 }), h('span.lineup-size.pix', fmtSize(st.player.look))),
           h('div.lineup-vs.pix', 'VS'),
-          h('div.lineup-side', portraitImg({ uniform: kitUniform(theirs), look: star, number: 1 + (opp.id.charCodeAt(0) % 40), helmet: false }, 120, { full: true, big: true, yaw: 0.5 }))),
+          h('div.lineup-side', portraitImg({ uniform: kitUniform(theirs), look: star, number: 1 + (opp.id.charCodeAt(0) % 40), helmet: false }, 120, { full: true, big: true, yaw: 0.5 }), h('span.lineup-size.pix', fmtSize(star)))),
         h('div.section-label', 'Choose your uniform'),
         h('div.kit-row',
           KIT_IDS.map((id) => h(`button.kit-btn${myId === id ? '.on' : ''}`, { 'aria-label': kits[id].label, onclick: () => { sfx.click(); g.kit = id; app.save(); draw(); } },

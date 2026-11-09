@@ -19,6 +19,7 @@ import { openPhone, phoneBadge } from './phone.js';
 import { openLookModal } from './look.js';
 import { DRILLS, DRILL_NAMES, openDrill, grade } from './drills.js';
 import { teamKits } from '../../data/kits.js';
+import { fmtSize } from '../../data/looks.js';
 import { portraitImg } from '../../scenes/portrait.js';
 import { people } from '../../sim/social.js';
 
@@ -445,6 +446,7 @@ function profileView(app) {
       h('div.col.grow', { style: { gap: '4px' } },
         h('h2', `${p.first} ${p.last}`),
         h('span.small.muted', `${POSITIONS[p.position].label} · ${p.hometown}`),
+        p.look?.heightIn ? h('span.small', fmtSize(p.look)) : null,
         h('span.small', `${team.city} ${team.name}`),
         p.draft ? h('span.small.muted', p.draft.undrafted ? 'Undrafted free agent' : `Drafted ${ordinal(p.draft.pick)} overall (${p.draft.year})`) : null,
         p.injury ? h('span.chip.bad', icon('bandage'), `${p.injury.label} · ${p.injury.weeks} wk`) : null,

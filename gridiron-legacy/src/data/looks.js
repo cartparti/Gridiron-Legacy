@@ -31,6 +31,7 @@ export const HEIGHT_RANGE = [66, 80];
 export const WEIGHT_RANGE = [160, 340];
 
 export const fmtHeight = (inches) => `${Math.floor(inches / 12)}'${inches % 12}"`;
+export const fmtSize = (look) => (look?.heightIn ? `${fmtHeight(look.heightIn)} · ${look.weightLb} lb` : '');
 
 /** Width / height multipliers for the 3D body from height and weight. */
 export function bodyScale(look) {
@@ -38,8 +39,8 @@ export function bodyScale(look) {
   const w = look.weightLb ?? 200;
   const bmi = (703 * w) / (hIn * hIn);
   return {
-    height: 0.92 + ((hIn - 66) / 14) * 0.16,
-    build: Math.max(0.86, Math.min(1.28, 0.9 + (bmi - 24) * 0.024)),
+    height: 0.88 + ((hIn - 66) / 14) * 0.24,
+    build: Math.max(0.84, Math.min(1.42, 0.86 + (bmi - 22) * 0.032)),
   };
 }
 

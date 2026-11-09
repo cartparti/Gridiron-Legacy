@@ -259,7 +259,7 @@ export function makeHud() {
       el2.innerHTML = `${side(i.away, i.awayPts, i.awayColors, false)}<div class="sb-mid">${i.clock ?? ''}</div>${side(i.home, i.homePts, i.homeColors, true)}`;
     },
     /** Name tag for your player. */
-    tag: (num, name) => { const t2 = q('.hud-tag'); t2.innerHTML = `<b>${num}</b><span>${String(name).toUpperCase()}</span>`; },
+    tag: (num, name, size = '') => { const t2 = q('.hud-tag'); t2.innerHTML = `<b>${num}</b><span>${String(name).toUpperCase()}${size ? `<small>${size}</small>` : ''}</span>`; },
     instr: (text) => { const i = q('.hud-instr'); i.textContent = text; i.classList.toggle('show', !!text); },
     big: (text, color = '#fff', ms = 1100) => {
       const b = document.createElement('div');
@@ -328,7 +328,7 @@ export function runMinigame(type, opts) {
     if (m.defense) r.stadium.setTeams(opts.teamColors, opts.oppColors, myName, oppName, opts.homeColors);
     else r.stadium.setTeams(opts.oppColors, opts.teamColors, oppName, myName, opts.homeColors);
     if (opts.scoreInfo) { r.stadium.setScoreboard(opts.scoreInfo); hud.score(opts.scoreInfo); }
-    if (opts.lastName) hud.tag(opts.number ?? '', opts.lastName);
+    if (opts.lastName) hud.tag(opts.number ?? '', opts.lastName, opts.look?.heightIn ? `${Math.floor(opts.look.heightIn / 12)}'${opts.look.heightIn % 12}" · ${opts.look.weightLb} lb` : '');
     r.stadium.setYardLine(m.yardLine, m.distance);
     applyAtmosphere(r, m.weather ?? 'clear');
     const group = new THREE.Group();

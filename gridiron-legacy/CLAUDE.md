@@ -139,6 +139,12 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   midfield team letters, team-colored border; broadcast score bug + player name tag in the HUD.
 - Texts: random wordings per reply (`ALT`, `ALT_BACK`), Huddle Mentions thread (`TAGS`, `sendTag`).
 
+## v0.10.1: size matters
+- Bigger visual size spread (`bodyScale` in looks.js). On-field entities carry hIn/wLb/mass: within-position
+  speed from weight/height, mass-weighted collisions, block push and pancakes by mass ratio, broken tackles
+  and hit power by mass, catch radius and contested catches by height, bull rush by mass. Pre-snap shows the
+  size matchup; HUD tag, pregame lineup and profile show height/weight.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).
