@@ -98,6 +98,9 @@ export const app = {
     if (t) {
       root.setProperty('--team', t.colors[0]);
       root.setProperty('--team2', t.colors[1]);
+      const v = parseInt(t.colors[0].slice(1), 16);
+      const lum = (0.299 * ((v >> 16) & 255) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255)) / 255;
+      root.setProperty('--team-ink', lum > 0.6 ? '#111111' : '#ffffff');
     } else {
       root.setProperty('--team', '#2f6f4f');
       root.setProperty('--team2', '#f4c430');

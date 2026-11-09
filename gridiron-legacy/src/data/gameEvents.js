@@ -8,6 +8,7 @@
 //   bigHit       after a moment where you took contact
 //   clutch       4th quarter, close game, before your next moment
 //   random       between drives, any time
+//   presnap      at the line, right before one of your key moments (affects that play)
 // cond: { rivalry, playoff, trailing, leading, positions, weather, minFame }
 // choices[].effects: normal effects (mood, fame, rel, health, injury ...)
 // choices[].game:    effects on THIS game:
@@ -237,6 +238,204 @@ export const GAME_EVENTS = [
     choices: [
       { label: 'Bait the throw', effects: {}, game: {}, chance: { p: 0.5, stat: 'iq', successGame: { momentum: 0.3, points: 0, extra: true }, successText: 'The QB takes the bait... you nearly had it. Next time.', failGame: { oppBoost: true }, failText: 'He sees through it. Big completion behind you.' }, result: '' },
       { label: 'Play it straight', effects: {}, game: { tol: 0.02 }, result: 'Disciplined coverage.' },
+    ],
+  },
+  // ---------------- presnap (at the line, right before your play)
+  {
+    id: 'p_blitz_look', trigger: 'presnap', cond: { positions: ['QB'] }, title: 'Blitz Look',
+    text: 'Both linebackers creep up to the line. The safety is cheating down. Something is coming.',
+    choices: [
+      { label: 'Audible to a quick slant', effects: {}, game: { tol: 0.06 }, result: 'You bark the new call. Everyone adjusts.' },
+      { label: 'Slide the protection', effects: { rel: { teammates: 2 } }, game: { tol: 0.03 }, result: 'Your linemen nod. Nobody is getting a free shot.' },
+      { label: 'Stay with it and take a shot', effects: {}, game: {}, chance: { p: 0.45, stat: 'iq', successGame: { tol: 0.1, momentum: 0.15 }, successText: 'You beat the blitz before it gets there!', failGame: { tol: -0.06 }, failText: 'They got there fast. You are rushed.' }, result: '' },
+    ],
+  },
+  {
+    id: 'p_hard_count', trigger: 'presnap', cond: { positions: ['QB'] }, title: 'Hard Count',
+    text: 'The defensive line is twitchy. One good hard count might pull somebody offside.',
+    choices: [
+      { label: 'Try the hard count', effects: {}, game: {}, chance: { p: 0.4, stat: 'iq', successGame: { tol: 0.08, momentum: 0.1 }, successText: 'Jumped! Free five yards and a fresh look.', failGame: { flag: true }, failText: 'Your own guard flinches. False start.' }, result: '' },
+      { label: 'Just snap it', effects: {}, game: {}, result: 'No games. Let\'s play.' },
+    ],
+  },
+  {
+    id: 'p_hot_route', trigger: 'presnap', cond: { positions: ['WR'] }, title: 'Hot Route',
+    text: 'Your corner is playing way off. The quarterback glances at you, waiting for a signal.',
+    choices: [
+      { label: 'Signal a quick hitch', effects: { rel: { teammates: 1 } }, game: { tol: 0.07 }, result: 'Free yards. You both saw it.' },
+      { label: 'Signal go, beat him deep', effects: {}, game: {}, chance: { p: 0.4, stat: 'speed', successGame: { tol: 0.1, momentum: 0.2 }, successText: 'He bites. You are behind him.', failGame: { tol: -0.04 }, failText: 'He was baiting you. Tight coverage.' }, result: '' },
+      { label: 'Run what is called', effects: { rel: { coach: 1 } }, game: {}, result: 'Stick to the plan.' },
+    ],
+  },
+  {
+    id: 'p_press', trigger: 'presnap', cond: { positions: ['WR'] }, title: 'Press Coverage',
+    text: 'The corner walks right up into your face. "You\'re not getting off the line today."',
+    choices: [
+      { label: 'Swim move off the line', effects: {}, game: {}, chance: { p: 0.55, stat: 'skill', successGame: { tol: 0.08 }, successText: 'Clean release. He is grabbing air.', failGame: { tol: -0.05 }, failText: 'He jams you hard. Route is late.' }, result: '' },
+      { label: 'Ask for a motion to get a free release', effects: {}, game: { tol: 0.03 }, result: 'You motion across and get a running start.' },
+    ],
+  },
+  {
+    id: 'p_stacked_box', trigger: 'presnap', cond: { positions: ['RB'] }, title: 'Stacked Box',
+    text: 'Eight defenders crowd the line. Running into that looks like running into a wall.',
+    choices: [
+      { label: 'Tell the QB to check to a pass', effects: { rel: { coach: 1 } }, game: { tol: 0.05 }, result: 'Smart. A quick toss to the outside instead.' },
+      { label: 'Run it anyway. Pound them.', effects: { fame: 0.5 }, game: {}, chance: { p: 0.45, stat: 'strength', successGame: { tol: 0.08, momentum: 0.15 }, successText: 'You bounce off three guys and keep going!', failGame: { tol: -0.06 }, failText: 'They were waiting for you.' }, result: '' },
+    ],
+  },
+  {
+    id: 'p_cutback', trigger: 'presnap', cond: { positions: ['RB'] }, title: 'Read the Front',
+    text: 'The defensive end is lined up wide. There could be a cutback lane on the backside.',
+    choices: [
+      { label: 'Plan to cut back', effects: {}, game: { tol: 0.05 }, result: 'You will look for the backside crease.' },
+      { label: 'Hit the called hole hard', effects: { rel: { coach: 1 } }, game: { tol: 0.02 }, result: 'Downhill. No dancing.' },
+    ],
+  },
+  {
+    id: 'p_jump_route', trigger: 'presnap', cond: { positions: ['CB'] }, title: 'Film Study Pays Off',
+    text: 'You recognize this formation from film. They ran a slant out of it four times last week.',
+    choices: [
+      { label: 'Jump the slant', effects: {}, game: {}, chance: { p: 0.5, stat: 'iq', successGame: { tol: 0.12, momentum: 0.2 }, successText: 'Called it! You are sitting right on the route.', failGame: { tol: -0.08, oppBoost: true }, failText: 'Double move! He is behind you.' }, result: '' },
+      { label: 'Stay disciplined', effects: {}, game: { tol: 0.03 }, result: 'Eyes on your man, not the QB.' },
+    ],
+  },
+  {
+    id: 'p_switch_coverage', trigger: 'presnap', cond: { positions: ['CB'] }, title: 'Mismatch',
+    text: 'They motion their fastest receiver toward your side. The safety looks at you: switch?',
+    choices: [
+      { label: '"I got him."', effects: { fame: 0.5 }, game: { tol: -0.02, momentum: 0.1 }, result: 'You want the best. You get the best.' },
+      { label: 'Call for safety help over the top', effects: { rel: { teammates: 2 } }, game: { tol: 0.05 }, result: 'Bracket coverage. Smart.' },
+    ],
+  },
+  {
+    id: 'p_crowd_noise', trigger: 'presnap', title: 'Can\'t Hear',
+    text: 'The crowd is deafening. Half the huddle did not hear the call.',
+    choices: [
+      { label: 'Burn a timeout', effects: { rel: { coach: -1 } }, game: { tol: 0.05 }, result: 'Everyone is on the same page now.' },
+      { label: 'Wing it', effects: {}, game: {}, chance: { p: 0.6, successText: 'Everyone figures it out. Phew.', failGame: { tol: -0.06 }, failText: 'Two guys run the same route. Ugly.' }, result: '' },
+    ],
+  },
+  // ---------------- more random / on-field happenings
+  {
+    id: 'g_fumble_scrum', trigger: 'random', title: 'Loose Ball!',
+    text: 'A fumble on the kick return! The ball bounces toward the pile and you are closest.',
+    choices: [
+      { label: 'Dive on it', effects: {}, game: {}, chance: { p: 0.55, stat: 'speed', successGame: { momentum: 0.3, extra: true }, successText: 'You come up with it! The sideline goes crazy.', failGame: { momentum: -0.1 }, failText: 'Somebody rips it out at the bottom of the pile.', successEffects: { fame: 1 } }, result: '' },
+      { label: 'Let the special teams guys handle it', effects: {}, game: {}, result: 'They recover it. Not your job.' },
+    ],
+  },
+  {
+    id: 'g_onside', trigger: 'random', cond: { trailing: true }, title: 'Onside Kick?',
+    text: 'Coach asks the captains: try a surprise onside kick?',
+    choices: [
+      { label: 'Do it. Steal a possession!', effects: {}, game: {}, chance: { p: 0.3, successGame: { extra: true, momentum: 0.3 }, successText: 'RECOVERED! Nobody saw that coming.', failGame: { oppBoost: true, momentum: -0.15 }, failText: 'They pounce on it. Short field for them.' }, result: '' },
+      { label: 'Kick it deep', effects: { rel: { coach: 1 } }, game: {}, result: 'Play the field position game.' },
+    ],
+  },
+  {
+    id: 'g_challenge', trigger: 'random', title: 'Throw the Red Flag?',
+    text: 'You are sure the last catch by their receiver bobbled out of bounds. Coach looks at you.',
+    choices: [
+      { label: '"Challenge it, coach!"', effects: {}, game: {}, chance: { p: 0.45, successGame: { momentum: 0.25 }, successText: 'Overturned! Incomplete.', failGame: { momentum: -0.1 }, failText: 'Call stands. Lost a timeout.' }, result: '' },
+      { label: '"Let it go."', effects: { rel: { coach: 1 } }, game: {}, result: 'Save the timeout.' },
+    ],
+  },
+  {
+    id: 'g_helmet_off', trigger: 'random', title: 'Lost Your Helmet',
+    text: 'Your helmet pops off on a pile-up. Rules say you sit out one play.',
+    choices: [
+      { label: 'Argue with the ref', effects: { rel: { coach: -2 } }, game: {}, chance: { p: 0.2, successText: 'Somehow the ref lets it go.', failGame: { flag: true }, failText: 'Unsportsmanlike conduct. 15 yards.' }, result: '' },
+      { label: 'Jog off, fix the chin strap', effects: {}, game: { tol: 0.02 }, result: 'Quick fix. You come back focused.' },
+    ],
+  },
+  {
+    id: 'g_rain_delay', trigger: 'random', cond: { weather: ['storm'] }, title: 'Lightning Delay',
+    text: 'Lightning! Both teams head to the locker rooms for a 30-minute delay.',
+    choices: [
+      { label: 'Stay loose, stretch and bounce', effects: { health: 2 }, game: { tol: 0.04 }, result: 'You come out warm and ready.' },
+      { label: 'Get a speech going', effects: { rel: { teammates: 3 } }, game: { momentum: 0.2 }, result: 'The room is buzzing when you come back out.' },
+      { label: 'Scroll your phone', effects: { mood: 2 }, game: { tol: -0.03 }, result: 'You come back cold and stiff.' },
+    ],
+  },
+  {
+    id: 'g_mascot', trigger: 'random', title: 'Mascot Shenanigans',
+    text: 'The opposing mascot is mocking you from the sideline. The crowd is loving it.',
+    choices: [
+      { label: 'Do a dance-off with the mascot', effects: { fame: 1.5, mood: 3 }, game: { momentum: 0.1 }, result: 'Instant highlight. Even their fans cheer.' },
+      { label: 'Ignore it', effects: {}, game: { tol: 0.02 }, result: 'Focus.' },
+    ],
+  },
+  {
+    id: 'g_gatorade', trigger: 'random', title: 'Sideline Fire',
+    text: 'Your teammates are dead silent on the sideline. You can feel the energy draining.',
+    choices: [
+      { label: 'Fire them up', effects: { rel: { teammates: 3 } }, game: { momentum: 0.2 }, result: 'Helmets slapping, guys yelling. The sideline is alive.' },
+      { label: 'Lead by example. Stay quiet.', effects: {}, game: { tol: 0.03 }, result: 'Actions over words.' },
+    ],
+  },
+  {
+    id: 'g_trash_talk', trigger: 'random', title: 'Trash Talk',
+    text: 'A defender keeps chirping at you after every play. "You are SOFT, {last}."',
+    choices: [
+      { label: 'Talk back', effects: { fame: 0.5 }, game: { momentum: 0.1 }, chance: { p: 0.7, failGame: { flag: true }, failText: 'The ref only heard you. Flag on YOU.' }, result: 'He has nothing to say back.' },
+      { label: 'Point at the scoreboard', effects: {}, game: { tol: 0.03 }, result: 'Say less.' },
+    ],
+  },
+  {
+    id: 'g_fake_punt', trigger: 'random', title: 'Fake Punt?',
+    text: '4th and 3 near midfield. The special teams coach asks: run the fake?',
+    choices: [
+      { label: 'Run the fake!', effects: {}, game: {}, chance: { p: 0.45, successGame: { extra: true, momentum: 0.25 }, successText: 'First down! The crowd cannot believe it.', failGame: { oppBoost: true, momentum: -0.2 }, failText: 'Stuffed. They take over at midfield.' }, result: '' },
+      { label: 'Punt it', effects: {}, game: {}, result: 'Pinned them deep.' },
+    ],
+  },
+  {
+    id: 'g_hurt_star', trigger: 'random', title: 'Their Star Goes Down',
+    text: 'Their best player limps off. Your team could attack the backup.',
+    choices: [
+      { label: 'Go right at the backup', effects: {}, game: { tol: 0.05, momentum: 0.1 }, result: 'You smell blood.' },
+      { label: 'Check on him first', effects: { fame: 1, rel: { rival: 3 } }, game: {}, result: 'Classy. The cameras catch it.' },
+    ],
+  },
+  {
+    id: 'g_wind_shift', trigger: 'random', cond: { weather: ['wind', 'storm', 'rain', 'snow'] }, title: 'Weather Turns',
+    text: 'The weather is getting worse by the minute. Coach wants to simplify the game plan.',
+    choices: [
+      { label: 'Agree: short and safe', effects: { rel: { coach: 2 } }, game: { tol: 0.04 }, result: 'Grind it out.' },
+      { label: 'Push to keep attacking', effects: {}, game: { momentum: 0.1, tol: -0.02 }, result: 'Fortune favors the bold.' },
+    ],
+  },
+  // ---------------- more afterTD / afterBad / halftime / clutch
+  {
+    id: 'g_lambeau', trigger: 'afterTD', title: 'Into the Stands?',
+    text: 'You are standing right next to the wall. The front row is reaching out to you.',
+    choices: [
+      { label: 'Leap into the crowd', effects: { fame: 2, mood: 4 }, game: { momentum: 0.15 }, result: 'Swallowed by fans. Best feeling in the world.' },
+      { label: 'Find your teammates', effects: { rel: { teammates: 3 } }, game: {}, result: 'Pile of helmets in the end zone.' },
+    ],
+  },
+  {
+    id: 'g_sideline_tablet', trigger: 'afterBad', title: 'Tablet Time',
+    text: 'On the sideline, a coach pulls up the last play on the tablet. You see exactly what went wrong.',
+    choices: [
+      { label: 'Study it closely', effects: { rel: { coach: 2 } }, game: { tol: 0.05 }, result: 'Lesson learned. It will not happen again.' },
+      { label: 'Wave it off, you know', effects: {}, game: { momentum: 0.05 }, result: 'You trust your instincts.' },
+    ],
+  },
+  {
+    id: 'g_halftime_injury', trigger: 'halftime', title: 'Tweaked Something',
+    text: 'Your hamstring is tight. The trainer offers to tape it or keep you out for a bit.',
+    choices: [
+      { label: 'Tape it and go', effects: {}, game: {}, chance: { p: 0.8, successText: 'Feels fine. Let\'s go.', failEffects: { injury: true }, failText: 'It grabs on the first play. You are done for the day.' }, result: '' },
+      { label: 'Sit the first series of the half', effects: { health: 4 }, game: { skip: true }, result: 'Better safe.' },
+    ],
+  },
+  {
+    id: 'g_clutch_icing', trigger: 'clutch', title: 'They Call Timeout',
+    text: 'The other coach calls timeout to make you think about it. Everyone is staring at you.',
+    choices: [
+      { label: 'Laugh it off with teammates', effects: { rel: { teammates: 2 } }, game: { tol: 0.04 }, result: 'Loose and confident.' },
+      { label: 'Visualize the play', effects: {}, game: { tol: 0.05 }, result: 'You have already seen it happen.' },
     ],
   },
 ];

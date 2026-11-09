@@ -30,7 +30,7 @@ import { rollEvent, chooseOption } from './events.js';
 import { newWeek, applyPlan } from './week.js';
 import { newInjury, applyInjury, genPersonName } from './effects.js';
 import { addNews, postGamePress } from './press.js';
-import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf } from './awards.js';
+import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf, recordLeagueAwards } from './awards.js';
 import { computeLegacy } from './legacy.js';
 import { genTeammates } from './social.js';
 import { postGameTexts, weeklyTexts, textFrom } from './phone.js';
@@ -289,6 +289,7 @@ export function endSeason(state) {
   const titleGrade = champion && state.lastGame?.isTitle ? state.lastGame.grade : 0;
   const aw = seasonAwards(state, { champion, titleGrade, rookie: c.stage === 'pro' && proSeasonsBefore === 0, missedLastSeason });
   const records = c.stage === 'pro' ? checkRecords(state, league) : [];
+  recordLeagueAwards(state, aw.awards);
   const entry = {
     year: c.year,
     age: p.age,
@@ -303,6 +304,8 @@ export function endSeason(state) {
     record: `${team.w}-${team.l}`,
     awards: aw.awards,
     champion,
+    madePlayoffs: !!league.playoffs?.seeds?.includes(c.teamId),
+    seed: (league.playoffs?.seeds?.indexOf(c.teamId) ?? -1) + 1 || null,
     perf: aw.perf,
     fame: Math.round(p.fame),
   };

@@ -540,7 +540,7 @@ const ACTION_DUR = { throw: 0.55, catch: 0.5, jump: 0.7, juke: 0.35, spin: 0.5, 
 
 /** Pose for this frame. Returns target joint angles. */
 function computePose(u, dt) {
-  const P = { lh: 0, lk: 0, rh: 0, rk: 0, ls: 0.1, le: 0.3, rs: 0.1, re: 0.3, lout: 0.12, rout: -0.12, spine: 0.05, y: 0, rz: 0, ry: 0, rx: 0, head: 0 };
+  const P = { lh: 0, lk: 0, rh: 0, rk: 0, ls: 0.1, le: 0.3, rs: 0.1, re: 0.3, lout: 0.12, rout: -0.12, spine: 0.05, y: 0, rz: 0, ry: 0, rx: 0, head: 0, hy: 0, sy: 0, ny: 0, sx: 0 };
   const s = u.speed;
   // ---- locomotion
   if (s > 0.4 && !u.down) {
@@ -552,15 +552,34 @@ function computePose(u, dt) {
       P.lh = a * 0.35; P.rh = -a * 0.35; P.lk = 0.4 + Math.max(0, b) * 0.4; P.rk = 0.4 + Math.max(0, -b) * 0.4;
       P.ls = 0.4 - a * 0.3; P.rs = 0.4 + a * 0.3; P.le = 1.2; P.re = 1.2; P.spine = -0.08; P.y = -0.08;
     } else {
-      P.lh = a * (0.45 + run * 0.55); P.rh = -a * (0.45 + run * 0.55);
-      P.lk = 0.15 + Math.max(0, -b) * (0.6 + run * 0.9); P.rk = 0.15 + Math.max(0, b) * (0.6 + run * 0.9);
-      P.ls = -a * (0.4 + run * 0.7); P.rs = a * (0.4 + run * 0.7); P.le = 0.6 + run * 0.9; P.re = 0.6 + run * 0.9;
-      P.spine = 0.08 + run * 0.28; P.y = -Math.abs(Math.sin(u.phase)) * 0.06 * run;
+      // legs: long strides with high knee lift on the recovery swing
+      P.lh = a * (0.45 + run * 0.6) + run * 0.08; P.rh = -a * (0.45 + run * 0.6) + run * 0.08;
+      P.lk = 0.2 + Math.max(0, -b) * (0.6 + run * 1.1) + Math.max(0, a) * 0.25 * run;
+      P.rk = 0.2 + Math.max(0, b) * (0.6 + run * 1.1) + Math.max(0, -a) * 0.25 * run;
+      // arms pump opposite the legs; forearms whip a beat behind the upper arm
+      P.ls = -a * (0.45 + run * 0.75); P.rs = a * (0.45 + run * 0.75);
+      P.le = 0.7 + run * 0.8 + Math.max(0, a) * 0.35; P.re = 0.7 + run * 0.8 + Math.max(0, -a) * 0.35;
+      P.lout = 0.1 + run * 0.08; P.rout = -0.1 - run * 0.08;
+      // hips swing with the legs, shoulders counter-rotate, head stays steady
+      P.hy = a * 0.22 * (0.4 + run * 0.6); P.sy = -a * 0.42 * (0.4 + run * 0.6); P.ny = a * 0.18 * run;
+      P.spine = 0.1 + run * 0.3; P.head = -run * 0.18 + Math.sin(u.phase * 2) * 0.03;
+      // two bounces per stride (a small flight phase when sprinting) and a little side sway
+      P.y = -Math.abs(Math.sin(u.phase)) * (0.05 + 0.05 * run) + run * 0.02;
+      P.rz = Math.sin(u.phase) * 0.035;
+      P.sx = Math.sin(u.phase) * 0.02 * (1 - run * 0.5);
     }
   } else if (!u.down) {
     u.phase += dt * 1.6;
-    P.spine = 0.04 + Math.sin(u.phase) * 0.02; // breathing
+    u.idleT = (u.idleT ?? Math.random() * 10) + dt;
+    P.spine = 0.04 + Math.sin(u.phase) * 0.025; // breathing
     P.ls = 0.08 + Math.sin(u.phase) * 0.03; P.rs = 0.08 - Math.sin(u.phase) * 0.03;
+    P.le = 0.25 + Math.sin(u.phase * 0.7) * 0.06; P.re = 0.25 - Math.sin(u.phase * 0.7) * 0.06;
+    // slow weight shift from foot to foot
+    const w = Math.sin(u.idleT * 0.55);
+    P.rz = w * 0.035; P.sx = w * 0.03; P.lh = Math.max(0, w) * 0.08; P.lk = Math.max(0, w) * 0.16; P.rh = Math.max(0, -w) * 0.08; P.rk = Math.max(0, -w) * 0.16;
+    // glance around every few seconds
+    if (!u.lookT || u.idleT > u.lookT) { u.lookT = u.idleT + 2 + Math.random() * 3; u.look = (Math.random() - 0.5) * 1.1; }
+    P.ny = u.look ?? 0;
   }
   // ---- held poses
   const hold = u.hold;
@@ -613,6 +632,13 @@ function computePose(u, dt) {
     else if (c === 'salute') { P.rs = 2.6; P.re = 2.3; P.rout = -0.6; P.spine = -0.05; }
     else if (c === 'point') { P.rs = 2.9; P.re = 0; P.ls = 2.9; P.le = 0; P.lout = 0.4; P.rout = -0.4; P.head = 0.4; }
   }
+  // ---- momentum: bank into turns, lean into acceleration, dip when planting a cut
+  if (!u.down && !u.celebrate && !u.action && s > 1) {
+    const run = Math.min(1, s / 7);
+    P.rz += Math.max(-0.4, Math.min(0.4, (u.turn ?? 0) * 0.07 * run));
+    P.rx += Math.max(-0.12, Math.min(0.28, (u.accel ?? 0) * 0.025));
+    P.y -= Math.min(0.1, Math.abs(u.turn ?? 0) * 0.012);
+  }
   // ---- down on the ground
   if (u.down) { u.downT += dt; P.rx = -1.5; P.y = -0.66; P.ls = 2.2; P.rs = 1.6; P.lh = 0.3; P.rh = 0.6; P.lk = 0.4; }
   return P;
@@ -629,6 +655,10 @@ function applyPose(p, P, dt) {
   L(r.armR.sh.rotation, 'x', P.rs); L(r.armR.el.rotation, 'x', P.re); L(r.armR.sh.rotation, 'z', -P.rout);
   L(r.spine.rotation, 'x', -P.spine);
   L(r.neck.rotation, 'x', -P.head);
+  L(r.hips.rotation, 'y', P.hy);
+  L(r.spine.rotation, 'y', P.sy);
+  L(r.neck.rotation, 'y', P.ny - P.sy * 0.6 - P.hy * 0.6);
+  L(r.body.position, 'x', P.sx);
   // body: position offset (crouch/hop), roll (juke lean), pitch (dive/fall), yaw (spin)
   u.hop = Math.max(0, u.hop - dt * 2.2);
   L(r.body.position, 'y', P.y + u.hop);
@@ -647,6 +677,16 @@ export function animateRun(p, dt, speed) {
   if (!p.userData?.rig) return;
   const u = p.userData.u;
   p.userData.ticked = FRAME;
+  if (dt > 0) {
+    // turn rate (rad/s) and acceleration, smoothed, drive banking and leaning
+    let dy = p.rotation.y - (u.prevYaw ?? p.rotation.y);
+    while (dy > Math.PI) dy -= Math.PI * 2;
+    while (dy < -Math.PI) dy += Math.PI * 2;
+    const k = Math.min(1, dt * 8);
+    u.turn = (u.turn ?? 0) + (dy / dt - (u.turn ?? 0)) * k;
+    u.accel = (u.accel ?? 0) + ((speed - (u.speed ?? 0)) / dt - (u.accel ?? 0)) * k;
+    u.prevYaw = p.rotation.y;
+  }
   u.speed = speed;
   applyPose(p, computePose(u, dt), dt);
 }

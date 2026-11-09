@@ -1,7 +1,7 @@
 // Season awards, league leaders and records that persist across decades.
 import { clamp } from '../core/util.js';
-import { gauss, chance } from '../core/rng.js';
-import { getTeam } from './league.js';
+import { gauss, chance, rand } from '../core/rng.js';
+import { getTeam, genName } from './league.js';
 import { addNews } from './press.js';
 
 /** Production score 0-100 from per-game stats, comparable across positions. */
@@ -163,4 +163,88 @@ export function seedHistory(state, league) {
 
 export function legacyBonusForChampionship(state) {
   return chance(state, 0.5);
+}
+
+// ------------------------------------------------------------------ league award races
+
+/** The headline trophies for each level, in display order. ind = individual, team = team trophy. */
+export const TROPHIES = {
+  hs: [
+    { name: 'State Player of the Year', kind: 'ind', icon: 'star' },
+    { name: 'All-State', kind: 'ind', icon: 'medal' },
+    { name: 'State Champion', kind: 'team', icon: 'trophy' },
+  ],
+  college: [
+    { name: 'Ironstone Trophy', kind: 'ind', icon: 'star' },
+    { name: 'All-Conference', kind: 'ind', icon: 'medal' },
+    { name: 'Freshman of the Year', kind: 'ind', icon: 'medal' },
+    { name: 'Heritage Bowl Champion', kind: 'team', icon: 'trophy' },
+  ],
+  pro: [
+    { name: 'Most Valuable Player', kind: 'ind', icon: 'star' },
+    { name: 'Offensive Player of the Year', kind: 'ind', icon: 'medal' },
+    { name: 'Defensive Player of the Year', kind: 'ind', icon: 'medal' },
+    { name: 'Rookie of the Year', kind: 'ind', icon: 'medal' },
+    { name: 'Comeback Player of the Year', kind: 'ind', icon: 'medal' },
+    { name: 'All-League', kind: 'ind', icon: 'medal' },
+    { name: 'Legacy Bowl Champion', kind: 'team', icon: 'trophy' },
+    { name: 'Legacy Bowl MVP', kind: 'ind', icon: 'star' },
+  ],
+};
+
+const AWARD_POS = { 'Defensive Player of the Year': ['CB', 'S', 'LB', 'DL'], 'Offensive Player of the Year': ['QB', 'RB', 'WR', 'TE'] };
+
+/**
+ * Who won each headline award this season (you, or someone else in the league).
+ * Stored in state.awardHistory so the Awards screen can show every season's winners.
+ */
+export function recordLeagueAwards(state, myAwards) {
+  const league = state.league;
+  const stage = state.career.stage;
+  const champ = getTeam(league, league.champion);
+  const me = state.player;
+  const myTeam = getTeam(league, state.career.teamId);
+  const pool = (positions) => {
+    if (league.players?.length) {
+      const c = league.players.filter((x) => !positions || positions.includes(x.pos)).sort((a, b) => b.ovr - a.ovr).slice(0, 8);
+      if (c.length) { const pl = c[Math.floor(rand(state) * Math.min(4, c.length))]; return { name: `${pl.first} ${pl.last}`, team: pl.teamId, pos: pl.pos }; }
+    }
+    const n = genName(state);
+    const t = league.teams.slice().sort((a, b) => b.w - a.w)[Math.floor(rand(state) * 4)];
+    const pos = positions ? positions[Math.floor(rand(state) * positions.length)] : ['QB', 'RB', 'WR', 'CB', 'LB'][Math.floor(rand(state) * 5)];
+    return { name: `${n.first} ${n.last}`, team: t.id, pos };
+  };
+  const rows = [];
+  for (const tr of TROPHIES[stage] ?? []) {
+    if (tr.name === 'Rookie of the Year' || tr.name === 'Comeback Player of the Year' || tr.name === 'Freshman of the Year' || tr.name === 'All-State' || tr.name === 'All-Conference' || tr.name === 'All-League') {
+      if (myAwards.includes(tr.name)) rows.push({ name: tr.name, winner: `${me.first} ${me.last}`, team: myTeam.id, pos: me.position, you: true });
+      continue; // multi-winner or niche awards only listed when you win them
+    }
+    if (tr.kind === 'team') { rows.push({ name: tr.name, winner: `${champ.city} ${champ.name}`, team: champ.id, you: champ.id === myTeam.id, team_: true }); continue; }
+    if (tr.name === 'Legacy Bowl MVP') {
+      if (myAwards.includes(tr.name)) rows.push({ name: tr.name, winner: `${me.first} ${me.last}`, team: myTeam.id, pos: me.position, you: true });
+      else { const w = pool(); rows.push({ name: tr.name, winner: w.name, team: champ.id, pos: w.pos, you: false }); }
+      continue;
+    }
+    if (myAwards.includes(tr.name)) rows.push({ name: tr.name, winner: `${me.first} ${me.last}`, team: myTeam.id, pos: me.position, you: true });
+    else { const w = pool(AWARD_POS[tr.name]); rows.push({ name: tr.name, winner: w.name, team: w.team, pos: w.pos, you: false }); }
+  }
+  state.awardHistory ??= [];
+  state.awardHistory.push({ year: state.career.year, stage, rows });
+  return rows;
+}
+
+/** Live "award watch": how close your season is to each award's bar (0-1+). */
+export function awardWatch(state) {
+  const p = state.player;
+  const s = p.seasonStats;
+  const stage = state.career.stage;
+  const perf = s.games ? seasonPerf(p.position, s) : 0;
+  const team = getTeam(state.league, state.career.teamId);
+  const bars = {
+    hs: [['All-State', 64], ['State Player of the Year', 76]],
+    college: [['All-Conference', 66], ['Ironstone Trophy', 80]],
+    pro: [['All-League', 71], [p.position === 'CB' ? 'Defensive Player of the Year' : 'Offensive Player of the Year', 80], ['Most Valuable Player', 83]],
+  }[stage] ?? [];
+  return { perf: Math.round(perf), games: s.games, winPct: team.w / Math.max(1, team.w + team.l), rows: bars.map(([name, bar]) => ({ name, bar, pct: Math.max(0, Math.min(1.1, perf / bar)) })) };
 }

@@ -97,6 +97,18 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Walkable places: 16px pixel floor textures (planks, grass, stone, asphalt, water), brick/painted walls with
   caps, voxel trees/plants, instanced grass tufts and flowers, closer camera.
 
+## v0.8 (round 4 of 5) changes
+- Animation flow: hip/shoulder counter-rotation, steady head, knee lift + forearm lag, double bounce and sway,
+  banking into turns and leaning into acceleration (turn rate/accel tracked in `animateRun`), idle weight shift
+  and glances.
+- In-game: 50 events (24 new) incl. a `presnap` trigger right before your key moments (audibles, hot routes,
+  blitz reads, jump the route...); random penalty flags during free-control plays (holding, PI, facemask).
+- Awards: `TROPHIES`, `recordLeagueAwards` (state.awardHistory: who won each award every season), `awardWatch`.
+  Career tab subtabs: Profile / Awards (trophy case, team achievements, live award watch) / League Awards.
+  `history` entries now store madePlayoffs + seed.
+- Standings: badges, W-L, games back, point diff, last-5 form, playoff line. Team colors carried through menus
+  (card tops, subtabs, labels, tabs) with `--team-ink` for contrast.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

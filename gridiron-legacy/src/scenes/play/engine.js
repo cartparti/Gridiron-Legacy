@@ -701,6 +701,22 @@ export function freePlay(ctx) {
         result = { complete: true, yards: y, quality: Math.max(0.05, 0.3 + y / 22 + (carrier?.broken ?? 0) * 0.05), text: why === 'oob' ? `Out of bounds after ${y}.` : null };
       }
     }
+    maybeFlag();
+  };
+
+  // Penalty flags: occasionally a yellow flag changes the outcome of the play.
+  const maybeFlag = () => {
+    if (!result || result.turnover || Math.random() > 0.07) return;
+    const flag = (msg, patch) => {
+      Object.assign(result, patch, { text: msg, flag: true });
+      setTimeout(() => { hud.big('FLAG!', '#ffd43b', 1100); hud.say?.(msg, 2600); }, 450);
+    };
+    if (m.defense) {
+      if (result.pd || result.yardsAllowed === 0) flag('Pass interference on you. 15 yards.', { pd: false, yardsAllowed: 15, caught: true, quality: Math.min(result.quality, 0.25) });
+      else if (result.tackle) flag('Facemask! 15 more yards.', { yardsAllowed: (result.yardsAllowed ?? 0) + 15, quality: Math.min(result.quality, 0.2) });
+      else if ((result.yardsAllowed ?? 0) >= 12) flag('Holding on the offense! Play comes back.', { yardsAllowed: 0, caught: false, quality: Math.max(result.quality, 0.6) });
+    } else if (result.complete === false && !result.sack) flag('Pass interference on the defense! First down.', { complete: true, yards: Math.max(m.distance, 12), quality: 0.6 });
+    else if (result.complete && result.yards >= 10) flag('Holding on the offense. That big gain comes back.', { yards: -10, quality: 0.12 });
   };
 
   const startCelebration = () => {

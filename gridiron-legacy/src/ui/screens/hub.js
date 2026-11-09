@@ -3,7 +3,7 @@ import { h, clear } from '../dom.js';
 import { STAGES, DAYS, WEATHER } from '../../data/config.js';
 import { POSITIONS } from '../../data/positions.js';
 import { HOUSING, CARS, PERKS, INVESTMENTS } from '../../data/lifestyle.js';
-import { RECORD_LABELS, seasonPerf } from '../../sim/awards.js';
+import { RECORD_LABELS, seasonPerf, TROPHIES, awardWatch } from '../../sim/awards.js';
 import { availableActivities, maxEnergy, planCost, ACTIVITY_BY_ID } from '../../sim/week.js';
 import { getTeam, standings, roundName, capSpace } from '../../sim/league.js';
 import * as flow from '../../sim/flow.js';
@@ -210,15 +210,34 @@ function teamView(app) {
   const out = h('div.col', { style: { gap: '14px' } }, h('h2', STAGES[league.kind].leagueName), tabs);
   if (sub === 'standings') {
     const confs = league.kind === 'pro' ? ['Summit', 'Coastal'] : league.kind === 'college' ? [...new Set(league.teams.map((t) => t.conf))].sort((a, b) => (a === getTeam(league, st.career.teamId).conf ? -1 : b === getTeam(league, st.career.teamId).conf ? 1 : 0)) : [null];
+    // last-5 form from the schedule
+    const form = {};
+    for (const wk of league.schedule) for (const gm of wk) if (gm.result) {
+      const hw = gm.result.home > gm.result.away;
+      (form[gm.home] ??= []).push(hw ? 'W' : 'L');
+      (form[gm.away] ??= []).push(hw ? 'L' : 'W');
+    }
+    const playoffSpots = 4;
+    const nationwide = league.kind === 'college';
+    const natRank = nationwide ? standings(league).map((t) => t.id) : null;
     for (const c of confs) {
       const rows = standings(league, c);
-      out.append(h('div.card', c ? h('h3', `${c} Conference`) : null, h('div.scroll-x', h('table.tbl',
-        h('tr', h('th', '#'), h('th', 'Team'), h('th.num', 'W'), h('th.num', 'L'), h('th.num', 'PF'), h('th.num', 'PA'), h('th.num', 'Str')),
-        rows.map((t, i) => h(`tr${t.id === st.career.teamId ? '.me' : ''}`,
-          h('td', i + 1), h('td', h('span.swatch', { style: { background: t.colors[0] } }), `${t.city} ${t.name}`, t.id === st.career.rivalTeamId ? ' (rival)' : ''),
-          h('td.num', t.w), h('td.num', t.l), h('td.num', t.pf), h('td.num', t.pa), h('td.num', t.streak > 0 ? `W${t.streak}` : t.streak < 0 ? `L${-t.streak}` : '-')))))),
-        h('p.tiny.muted', league.kind === 'pro' ? 'Top 4 in each conference make the playoffs.' : league.kind === 'college' ? 'The top 4 records nationwide make the playoff.' : 'Top 4 make the playoffs.'));
+      const lead = rows[0];
+      out.append(h('div.card.standings', c ? h('div.card-title', h('h3', `${c} Conference`)) : null, h('div.scroll-x', h('table.tbl.stand',
+        h('tr', h('th', '#'), h('th', 'Team'), h('th.num', 'W-L'), h('th.num', 'GB'), h('th.num', '+/-'), h('th', 'Last 5')),
+        rows.map((t, i) => {
+          const inPO = nationwide ? natRank.indexOf(t.id) < playoffSpots : i < playoffSpots;
+          const gb = ((lead.w - t.w) + (t.l - lead.l)) / 2;
+          const diff = t.pf - t.pa;
+          return h(`tr${t.id === st.career.teamId ? '.me' : ''}${inPO ? '.po' : ''}${i === playoffSpots - 1 && !nationwide ? '.cut' : ''}`,
+            h('td', i + 1),
+            h('td', h('div.row', { style: { gap: '6px', flexWrap: 'nowrap' } }, teamBadge(t, 20), h('b.small', t.name), t.id === st.career.rivalTeamId ? h('span.rival-dot', { title: 'Rival' }, icon('flame')) : null)),
+            h('td.num', `${t.w}-${t.l}`), h('td.num', gb ? (gb % 1 ? gb.toFixed(1) : gb) : '-'),
+            h(`td.num.${diff > 0 ? 'good' : diff < 0 ? 'bad' : ''}`, `${diff > 0 ? '+' : ''}${diff}`),
+            h('td', h('div.form', (form[t.id] ?? []).slice(-5).map((r) => h(`i.${r === 'W' ? 'w' : 'l'}`, r)))));
+        })))));
     }
+    out.append(h('p.tiny.muted', league.kind === 'pro' ? 'Highlighted: top 4 in each conference make the playoffs.' : nationwide ? 'Highlighted: the top 4 records nationwide make the playoff.' : 'Highlighted: top 4 make the playoffs.'));
   } else if (sub === 'schedule') {
     out.append(h('div.card', h('div.list', league.schedule.map((wk, i) => {
       const g = wk.find((x) => x.home === st.career.teamId || x.away === st.career.teamId);
@@ -331,6 +350,62 @@ function lifeView(app) {
 // ------------------------------------------------------------------ CAREER
 
 function careerView(app) {
+  const sub = app.ui.careerSub ?? 'profile';
+  const tabs = h('div.subtabs', [['profile', 'Profile'], ['awards', 'Awards'], ['league', 'League Awards']].map(([id, l]) =>
+    h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { sfx.click(); app.ui.careerSub = id; app.render(); } }, l)));
+  const body = sub === 'awards' ? awardsView(app) : sub === 'league' ? leagueAwardsView(app) : profileView(app);
+  return h('div.col', { style: { gap: '14px' } }, tabs, body);
+}
+
+const STAGE_LABEL = { hs: 'High School', college: 'College', pro: 'Pro' };
+
+/** Trophy case: individual awards, team titles, and the live award watch. */
+function awardsView(app) {
+  const st = app.state;
+  const p = st.player;
+  const all = Object.values(TROPHIES).flat();
+  const kindOf = (n) => all.find((t) => t.name === n)?.kind ?? 'ind';
+  const iconOf = (n) => all.find((t) => t.name === n)?.icon ?? 'medal';
+  const counts = {};
+  for (const a of p.awards) { counts[a.name] ??= { n: 0, years: [], stage: a.stage }; counts[a.name].n++; counts[a.name].years.push(a.year); }
+  const tile = (name, c) => h(`div.trophy${c ? '' : '.locked'}${kindOf(name) === 'team' ? '.team' : ''}`,
+    h('div.trophy-ic', icon(iconOf(name))), h('b.tiny', name), c ? h('span.tiny.muted', `${c.n > 1 ? `${c.n}× · ` : ''}${c.years.join(', ')}`) : h('span.tiny.muted', 'Not yet'));
+  const w = awardWatch(st);
+  const madePO = p.history.filter((x) => x.madePlayoffs).length;
+  const titles = p.history.filter((x) => x.champion);
+  const best = p.history.slice().sort((a, b) => parseInt(b.record, 10) - parseInt(a.record, 10))[0];
+  return h('div.col', { style: { gap: '14px' } },
+    h('div.card.hero', h('div.card-title', h('h2', 'Award Watch'), h('span.chip.pix', `${STAGE_LABEL[st.career.stage] ?? ''} · ${st.career.year}`)),
+      w.games ? [h('p.small.muted', `Season rating ${w.perf} after ${w.games} games · team ${Math.round(w.winPct * 100)}% wins`),
+        ...w.rows.map((r) => h('div.watch-row', h('div.row.between', h('b.small', r.name), h(`span.tiny.${r.pct >= 1 ? 'good' : 'muted'}`, r.pct >= 1 ? 'ON PACE' : `${Math.round(r.pct * 100)}%`)),
+          h('div.watch-bar', h('i', { style: { width: `${Math.min(100, r.pct * 100)}%` } }))))]
+        : h('p.small.muted', 'Play some games to see how you stack up for this season\'s awards.')),
+    h('div.card', h('h2', 'Individual Awards'),
+      Object.entries(TROPHIES).map(([stage, list]) => h('div', h('div.section-label', { style: { margin: '10px 0 8px' } }, STAGE_LABEL[stage]),
+        h('div.trophy-grid', list.filter((t) => t.kind === 'ind').map((t) => tile(t.name, counts[t.name])))))),
+    h('div.card', h('h2', 'Team Achievements'),
+      h('div.trophy-grid', Object.values(TROPHIES).flat().filter((t) => t.kind === 'team').map((t) => tile(t.name, counts[t.name]))),
+      h('div.row.wrap', { style: { marginTop: '12px' } },
+        h('span.chip', icon('trophy'), `${titles.length} title${titles.length === 1 ? '' : 's'}`),
+        h('span.chip', icon('shield'), `${madePO} playoff trip${madePO === 1 ? '' : 's'}`),
+        best ? h('span.chip', icon('crown'), `Best record ${best.record} (${best.year})`) : null)),
+    p.records.length ? h('div.card', h('h2', 'Records Held'), h('div.row.wrap', p.records.map((r) => h('span.chip.gold', icon('scroll'), `${r.label} (${r.year})`)))) : null);
+}
+
+/** Who won what, every season of your career. */
+function leagueAwardsView(app) {
+  const st = app.state;
+  const hist = (st.awardHistory ?? []).slice().reverse();
+  if (!hist.length) return h('div.card', h('h2', 'League Awards'), h('p.small.muted', 'Award winners are announced at the end of each season.'));
+  return h('div.col', { style: { gap: '14px' } }, hist.map((season) => h('div.card',
+    h('div.card-title', h('h3', `${season.year} · ${STAGE_LABEL[season.stage]}`)),
+    h('div.list', season.rows.map((r) => h(`div.li${r.you ? '.me' : ''}`,
+      h('span.trophy-ic.sm', icon(r.team_ ? 'trophy' : 'medal')),
+      h('div.grow', h('div.tiny.muted', r.name), h('b', r.winner, r.you ? ' (you)' : '')),
+      r.pos ? h('span.chip.pix', r.pos) : null))))));
+}
+
+function profileView(app) {
   const st = app.state;
   const p = st.player;
   const team = getTeam(st.league, st.career.teamId);
