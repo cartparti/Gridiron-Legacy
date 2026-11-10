@@ -566,10 +566,10 @@ export function freePlay(ctx) {
       const ahead = routePoint(e, e.s + 1.6);
       const hx = ahead.x - e.pos.x, hz = ahead.z - e.pos.z, hl = Math.hypot(hx, hz) || 1, vl = Math.hypot(e.vel.x, e.vel.z);
       const turn = vl > 2 ? 1 - (e.vel.x * hx + e.vel.z * hz) / (vl * hl) : 0;
-      const cut = turn > 0.35 ? (mode === 'pass' ? 0.66 : 0.78) : 1;
+      const cut = turn > 0.35 ? (mode === 'pass' ? 0.8 : 0.82) : 1;
       e.s += e.maxSpeed * dt * Math.min(1, t / 0.4) * (e.jam > 0 ? 0.35 : 1) * cut;
       const p = routePoint(e, e.s);
-      moveToward(e, p.x, p.z, e.maxSpeed * (mode === 'pass' ? 0.95 : 1) * cut, dt, 22);
+      moveToward(e, p.x, p.z, e.maxSpeed * cut, dt, 22);
       return;
     }
     if (e.blockTarget && !e.engaged) {
@@ -692,12 +692,13 @@ export function freePlay(ctx) {
       // Real man technique: read the receiver (velocity read lags by a reaction time), keep a cushion and stay
       // on top of him (deeper), backpedal early, then flip the hips and run with him. Cuts still create
       // separation for a moment, but nobody just runs past a defender. Better QBs face slightly slower reads.
-      const react = (onUser ? 0.2 + (has('routes') ? 0.08 : 0) : mode === 'pass' ? 0.1 + qbSkill * 0.12 : 0.24) * (m.defense ? 1 : 1 - oppK * 0.12);
+      e.lag ??= Math.random() < 0.3 ? 0.12 : Math.random() * 0.06; // some defenders are a step slower to read
+      const react = (onUser ? 0.2 + (has('routes') ? 0.08 : 0) : mode === 'pass' ? 0.2 + qbSkill * 0.12 + e.lag : 0.24) * (m.defense ? 1 : 1 - oppK * 0.12);
       e.rv ??= { x: 0, z: 0 };
       const kk = Math.min(1, dt / react);
       e.rv.x += (r.vel.x - e.rv.x) * kk; e.rv.z += (r.vel.z - e.rv.z) * kk;
       e.cush0 ??= Math.max(1, r.pos.z - e.pos.z);
-      const floor = onUser ? 0.35 : mode === 'pass' ? 0.55 + qbSkill * 0.45 : 0.8;
+      const floor = onUser ? 0.35 : mode === 'pass' ? 1.4 + qbSkill * 0.6 : 0.8;
       const cush = Math.max(floor, e.cush0 * (1 - t / 1.6));
       const look = 0.3;
       const px = r.pos.x + e.rv.x * look + (r.pos.x < 0 ? 0.45 : -0.45);
@@ -706,7 +707,7 @@ export function freePlay(ctx) {
       const pedal = t < 1.4 && d > 2.6 && e.pos.z > pz - 0.5;
       // flip and run: match the receiver's speed (up to your own top speed)
       const rs = Math.hypot(r.vel.x, r.vel.z);
-      const spd = pedal ? e.maxSpeed * 0.78 : Math.min(e.maxSpeed * (onUser ? 1.03 : 1.06), Math.max(e.maxSpeed * 0.9, rs * 1.04));
+      const spd = pedal ? e.maxSpeed * 0.78 : Math.min(e.maxSpeed * (onUser ? 1.03 : 0.99), Math.max(e.maxSpeed * 0.88, rs * (mode === 'pass' ? 0.97 : 1.04)));
       moveToward(e, px, pz, spd, dt, onUser ? 22 : 26);
       backpedalFace(e, pedal, r);
       return;
@@ -1246,7 +1247,7 @@ export function freePlay(ctx) {
         : { yards: 0, complete: false, sack: false, penYds: 5, quality: Math.max(result.quality, 0.45) });
       return;
     }
-    if (Math.random() > (globalThis.__flagRate ?? 0.15)) return; // __flagRate: test hook
+    if (Math.random() > (globalThis.__flagRate ?? 0.05)) return; // __flagRate: test hook
     const ylAfter = m.yardLine - gained;
     const passPlay = mode === 'pass' || mode === 'route' || mode === 'cover' || mode === 'rush';
     const opts2 = [];
@@ -1306,7 +1307,7 @@ export function freePlay(ctx) {
     const def = m.defense;
     let r = null;
     if (delay) r = { msg: `Delay of game on ${offName}! The play clock hit zero. 5 yards back.`, pen: -5 };
-    else if (Math.random() < 0.035) {
+    else if (Math.random() < (globalThis.__flagRate ? 0.035 : 0.012)) {
       const list = [
         { msg: `False start on ${offName} ${pickNum('OL')}. 5 yards back.`, pen: -5 },
         { msg: `Encroachment on ${defName}. 5 free yards.`, pen: 5 },
@@ -1315,7 +1316,7 @@ export function freePlay(ctx) {
       ];
       if (def && dtMode) list.push({ msg: 'You jumped offsides! 5 yards.', pen: 5 });
       r = list[Math.floor(Math.random() * list.length)];
-    } else if (Math.random() < 0.03) {
+    } else if (Math.random() < (globalThis.__flagRate ? 0.03 : 0.008)) {
       freePlay = true;
       setTimeout(() => { hud.big('FLAG! FREE PLAY', '#ffd43b', 1100); hud.say?.(`Flag at the snap: offsides on ${defName}. ${def ? 'They' : 'You'} have a free play!`, 2600); }, 50);
       return false;

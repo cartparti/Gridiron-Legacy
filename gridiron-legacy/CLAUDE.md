@@ -266,6 +266,12 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - In plays: score-bug game clock runs while the ball is live (`gameSecs`, `hud.clock`), stops when the play is dead;
   PLAY CLOCK box pre-snap (`hud.playClock`, real seconds, red at 5) — 20 s on offense, then delay of game.
 
+## v0.17.3: tuning
+- Flags: post-play 5% (was 15%), pre-snap 1.2% + free play 0.8%, sim drive notes 6%.
+- Coverage loosened: AI receivers no longer slow down much at breaks, defenders read later (0.2 s + skill) with a
+  random "slow" defender now and then, bigger cushion floor (1.4 + skill), no longer outrun receivers. Probe: one
+  receiver usually 3+ yd open at 1.8 s; throwing to the most open man completes ~5/6 for 3-8 yd.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

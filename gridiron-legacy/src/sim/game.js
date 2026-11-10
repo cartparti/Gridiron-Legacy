@@ -594,7 +594,7 @@ function finishDrive(state, g, d, out, momentInfo) {
   const who = momentInfo ? `${state.player.last}: ${momentInfo.result.text} → ` : '';
   // penalties happen on the simulated drives too, for both teams
   let flagNote = '';
-  if (!momentInfo && chance(state, 0.16)) {
+  if (!momentInfo && chance(state, 0.06)) {
     const notes = {
       TD: [' (a pass interference flag set it up)', ' (helped by a roughing-the-passer call)', ' (after a defensive holding flag kept it alive)', ' (a facemask call added 15)'],
       FG: [' (a holding call stalled it)', ' (after a false start)', ' (offensive pass interference pushed them back)'],
