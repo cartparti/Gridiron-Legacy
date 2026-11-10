@@ -177,7 +177,7 @@ export function lockerRoom(ctx, opts) {
   const spots = [[-3.0, -0.82], [-4.6, -0.82], [1.6, -0.82], [3.2, -0.82], [4.8, -0.82]];
   const mates = spots.map(([x, z], i) => seat(mk(opts.mateLooks?.[i], undefined), x, z, 4.5 + (i % 2), 2.6));
   mates.push(stand(mk(opts.mateLooks?.[5]), -5.6, 1.6, 4, 2), stand(mk(opts.mateLooks?.[6]), 0.8, -3.6, 4, 2));
-  const coach = makePerson({ ...(opts.coachLook ?? randomLook('coach')), outfit: 'casual', shirt: c0, pants: '#c8b48a', shoe: '#f1f1f1' });
+  const coach = makePerson({ ...(opts.coachLook ?? randomLook('coach', { gender: 'm' })), outfit: 'casual', shirt: c0, pants: '#c8b48a', shoe: '#f1f1f1' });
   stand(shadows(coach), 3.9, 2.0, -1, -1); scene.add(coach);
   let nextGesture = 1.2;
   return (dt, t) => {
@@ -333,7 +333,7 @@ export function hangoutScene(ctx, opts) {
   const couch = makeProp('couch', { w: 2, color: '#b5523b' }); couch.position.set(0.3, 0, 1.2); scene.add(couch);
   rb(scene, 0.7, 0.06, 0.7, M('#d9b38c', 0.8), 0.3, 0.37, 2.35, 0.02); rb(scene, 0.5, 0.02, 0.5, M('#e8b04a', 0.8), 0.3, 0.43, 2.35, 0.01);
   const friends = (opts.friendLooks ?? []).slice(0, 3);
-  while (friends.length < 3) friends.push(randomLook(`friend${friends.length}`));
+  while (friends.length < 3) friends.push(randomLook(`friend${friends.length}`, { gender: 'm' }));
   const f1 = makePerson({ ...friends[0], outfit: 'casual' }); seat(shadows(f1), -0.7, 1.25, 0, 6); scene.add(f1);
   const f2 = makePerson({ ...friends[1], outfit: 'casual' }); seat(shadows(f2), 1.3, 1.25, 0, 6); scene.add(f2);
   const f3 = makePerson({ ...friends[2], outfit: 'casual' }); stand(shadows(f3), -3.6, -2.6, -3.6, -4); scene.add(f3);
@@ -368,7 +368,7 @@ export function gamingScene(ctx, opts) {
   const couch = makeProp('couch', { w: 1.6, color: '#4a5563' }); couch.rotation.y = Math.PI; couch.position.set(0, 0, 1.3); scene.add(couch);
   rb(scene, 0.4, 0.12, 0.3, M('#111', 0.4), 0, 0.5, -3.3, 0.03); // console
   const me = makePerson({ ...opts.look, outfit: 'casual' }); seat(shadows(me), -0.5, 1.1, -0.5, -4); scene.add(me);
-  const pal = makePerson({ ...(opts.friendLook ?? randomLook('gamer')), outfit: 'casual' }); seat(shadows(pal), 0.75, 1.1, 0.75, -4); scene.add(pal);
+  const pal = makePerson({ ...(opts.friendLook ?? randomLook('gamer', { gender: 'm' })), outfit: 'casual' }); seat(shadows(pal), 0.75, 1.1, 0.75, -4); scene.add(pal);
   ctx.caption('Game night', 'Just one more game...');
   let won = false; let drawT = 0;
   return (dt, t) => {

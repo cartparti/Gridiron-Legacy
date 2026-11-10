@@ -10,7 +10,7 @@
 // Looks (skin, hair, face, tattoos, gear, height/weight) come from src/data/looks.js.
 import * as THREE from 'three';
 import {
-  SKIN_TONES, HAIR_COLORS, EYE_COLORS, VISOR_TINTS, MOUTHGUARD_COLORS, bodyScale, randomLook, normalizeLook,
+  SKIN_TONES, HAIR_COLORS, EYE_COLORS, VISOR_TINTS, MOUTHGUARD_COLORS, bodyScale, randomLook, normalizeLook, masculinize,
 } from '../data/looks.js';
 import { shade } from '../data/kits.js';
 
@@ -969,8 +969,11 @@ function uniformFrom(colors) {
  * look: a full look (data/looks.js); random if omitted. helmet: false shows the head and hair.
  */
 export function makePlayer(colors, { highlight = false, number, uniform, look, helmet = true, position } = {}) {
+  // Only guys play on the team: girls are cheerleaders, fans, dates, family, press, never in a uniform.
+  const base = look ? normalizeLook(look) : randomLook(Math.random, { position: position ?? 'WR', gender: 'm' });
+  const L = base.gender === 'f' ? masculinize(base, JSON.stringify(look ?? {}).length) : { ...base, gender: 'm', lips: 'none', dress: null };
   return buildRig({
-    football: true, uniform: uniform ?? uniformFrom(colors), look: look ? normalizeLook(look) : randomLook(Math.random, { position }),
+    football: true, uniform: uniform ?? uniformFrom(colors), look: L,
     number: number ?? Math.floor(Math.random() * 89) + 1, helmet, highlight,
   });
 }
