@@ -7,7 +7,7 @@
 //
 // Returns the same result objects as the old minigames, so the game simulation is unchanged.
 import * as THREE from 'three';
-import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, confetti, ragdoll, bloodBurst, dustPuff, markTicked, bump } from '../actors.js';
+import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, confetti, ragdoll, bloodBurst, dustPuff, markTicked, bump, applyWear, addWear } from '../actors.js';
 import { rig, endPlay, finalize, weatherFx, gaussR } from '../minigames/common.js';
 import { makeControls } from './controls.js';
 import { PLAYS, OFF_FORMATION, OL_X, playMode, dealPlays } from '../../data/playbook.js';
@@ -42,7 +42,25 @@ export function freePlay(ctx) {
   const backLine = goalZ - 9.5;
   const clampPos = (p) => { p.x = Math.max(-FIELD_X - 1, Math.min(FIELD_X + 1, p.x)); p.z = Math.max(backLine, Math.min(25, p.z)); return p; };
   // Defenders get faster on harder settings / risky calls (tolerance is lower).
-  const defBoost = (1.08 - (tol - 1) * 0.12) * wfx.speed;
+  // Opponent quality (-1.5 weak .. +1.5 elite): good teams are faster, read quicker and win more battles.
+  const oppK = Math.max(-1.5, Math.min(1.5, opts.oppStrength ?? 0));
+  const defBoost = (1.08 - (tol - 1) * 0.12) * wfx.speed * (m.defense ? 1 : 1 + oppK * 0.035);
+
+  // ---------------- game wear: uniforms get dirtier as the game goes on (wet in rain, snowy in snow)
+  const wetGame = m.weather === 'rain' || m.weather === 'storm';
+  const snowGame = m.weather === 'snow';
+  const wearFor = (role) => {
+    const prog = opts.wear?.progress ?? 0;
+    const k = role === 'OL' || role === 'DL' ? 1.35 : role === 'QB' ? 0.55 : role === 'S' || role === 'LB' ? 1.1 : 1;
+    return {
+      level: Math.min(1, prog * k * (0.5 + Math.random() * 0.9) * (wetGame ? 1.3 : 1)),
+      wet: wetGame ? 0.9 : snowGame ? 0.5 : 0,
+      snow: snowGame,
+      mud: wetGame,
+      blood: opts.blood !== false && prog > 0.35 && Math.random() < 0.12 * prog ? 0.2 + Math.random() * 0.5 : 0,
+    };
+  };
+  const fw = opts.wear ? ctx.stadium?.fieldWear : null;
 
   // ---------------- entities
   const ents = [];
@@ -55,6 +73,7 @@ export function freePlay(ctx) {
       uniform: team === 'off' ? offUniform : defUniform, look: isUser ? opts.look : undefined, position: role,
     });
     mesh.position.set(x, 0, z);
+    if (opts.wear) applyWear(mesh, wearFor(role));
     faceToward(mesh, x, team === 'off' ? z - 5 : z + 5);
     mesh.userData.u.targetYaw = team === 'off' ? 0 : Math.PI;
     mesh.rotation.y = mesh.userData.u.targetYaw;
@@ -67,7 +86,7 @@ export function freePlay(ctx) {
     const sizeSpeed = Math.max(0.86, Math.min(1.1, 1 - ((wLb - w0) / w0) * 0.45 + (hIn - h0) * 0.004));
     const e = {
       team, role, slot, mesh, pos: { x, z }, vel: { x: 0, z: 0 }, start: { x, z }, hIn, wLb, mass: wLb / 210,
-      maxSpeed: BASE_SPEED[role] * (team === 'def' ? defBoost : wfx.speed) * rnd(0.97, 1.03) * (isUser ? 1 : sizeSpeed),
+      maxSpeed: BASE_SPEED[role] * (team === 'def' ? defBoost : wfx.speed * (m.defense && !isUser ? 1 + oppK * 0.035 : 1)) * rnd(0.97, 1.03) * (isUser ? 1 : sizeSpeed),
       user: isUser, route: null, s: 0, engaged: null, out: 0, tell: 0, lunge: 0, lungeDir: null, down: false, ...extra,
     };
     ents.push(e);
@@ -329,7 +348,7 @@ export function freePlay(ctx) {
         const stat = id === 'bull' ? (st.strength ?? 60) : id === 'swim' ? (st.skill ?? 60) : ((st.skill ?? 60) + (st.speed ?? 60)) / 2;
         const massK = id === 'bull' ? Math.max(0.7, Math.min(1.4, user.mass / o.mass)) : Math.max(0.8, Math.min(1.25, o.mass / user.mass));
         const traitK = id === 'bull' ? (has('bulldozer') ? 1.2 : 1) : (has('swimclub') ? 1.2 : 1);
-        const pWin = (0.18 + rush.lev * 0.55 + (stat - 50) / 220) * (0.75 + tol * 0.25) * (call === 'risky' ? 0.9 : 1) * massK * traitK;
+        const pWin = (0.18 + rush.lev * 0.55 + (stat - 50) / 220) * (0.75 + tol * 0.25) * (call === 'risky' ? 0.9 : 1) * massK * traitK * (1 - oppK * 0.1);
         rush.cd = 0.7;
         playAction(user.mesh, id === 'bull' ? 'stiff' : id === 'swim' ? 'throw' : 'juke', { dir: Math.random() < 0.5 ? 1 : -1 });
         sfx.hit();
@@ -590,7 +609,7 @@ export function freePlay(ctx) {
     moveToward(e, tx, e.pos.z - 6, e.maxSpeed * (moves.slow > 0 && e.user ? 0.55 : !e.user && mode === 'pass' ? 0.88 : 1), dt);
     if (!e.user && e.jukeCd <= 0) {
       const lunger = defenders.find((d) => (d.tell > 0 || d.lunge > 0) && dist(d.pos, e.pos) < 2.6);
-      if (lunger && Math.random() < (mode === 'pass' ? 0.1 : 0.25) * (call === 'risky' ? 1.2 : 1)) { e.juking = 0.3; e.jukeCd = 1.2; playAction(e.mesh, 'juke', { dir: Math.sign(e.pos.x - lunger.pos.x || 1) }); e.vel.x += Math.sign(e.pos.x - lunger.pos.x || 1) * 5; }
+      if (lunger && Math.random() < (mode === 'pass' ? 0.1 : 0.25) * (call === 'risky' ? 1.2 : 1) * (m.defense ? 1 + oppK * 0.3 : 1)) { e.juking = 0.3; e.jukeCd = 1.2; playAction(e.mesh, 'juke', { dir: Math.sign(e.pos.x - lunger.pos.x || 1) }); e.vel.x += Math.sign(e.pos.x - lunger.pos.x || 1) * 5; }
     }
   };
 
@@ -622,7 +641,7 @@ export function freePlay(ctx) {
     if (e.out > 0) { e.out -= dt; if (e.out <= 0 && isDown(e.mesh)) knockDown(e.mesh, 0); return; }
     if (e.engagedBy) {
       // Blocked: try to shed the block over time.
-      e.shed += dt * ((mode === 'run' ? 0.2 : mode === 'pass' || mode === 'route' ? 0.2 : 0.32) + (call === 'risky' ? 0.1 : 0) + (m.defense ? -0.05 : 0.03) + (e.blitz ? 0.1 : 0));
+      e.shed += dt * ((mode === 'run' ? 0.2 : mode === 'pass' || mode === 'route' ? 0.2 : 0.32) + (call === 'risky' ? 0.1 : 0) + (m.defense ? -0.05 : 0.03 + oppK * 0.04) + (e.blitz ? 0.1 : 0));
       if (Math.random() < e.shed * dt * 1.6 || t > 4.5) { const b = e.engagedBy; b.engaged = null; e.engagedBy = null; setPose(b.mesh, null); setPose(e.mesh, null); e.out = 0.25; }
       return;
     }
@@ -665,7 +684,7 @@ export function freePlay(ctx) {
       // Real man technique: read the receiver (velocity read lags by a reaction time), keep a cushion and stay
       // on top of him (deeper), backpedal early, then flip the hips and run with him. Cuts still create
       // separation for a moment, but nobody just runs past a defender. Better QBs face slightly slower reads.
-      const react = onUser ? 0.2 + (has('routes') ? 0.08 : 0) : mode === 'pass' ? 0.1 + qbSkill * 0.12 : 0.24;
+      const react = (onUser ? 0.2 + (has('routes') ? 0.08 : 0) : mode === 'pass' ? 0.1 + qbSkill * 0.12 : 0.24) * (m.defense ? 1 : 1 - oppK * 0.12);
       e.rv ??= { x: 0, z: 0 };
       const kk = Math.min(1, dt / react);
       e.rv.x += (r.vel.x - e.rv.x) * kk; e.rv.z += (r.vel.z - e.rv.z) * kk;
@@ -1445,6 +1464,15 @@ export function freePlay(ctx) {
         if (sp > 0.6 && !e.mesh.userData.u.back && e.lunge <= 0 && e.tell <= 0) faceToward(e.mesh, e.pos.x + e.vel.x, e.pos.z + e.vel.z);
         if (e.jam > 0) e.jam -= dt;
         animateRun(e.mesh, dt, e.engaged || e.engagedBy ? 0.3 : sp);
+        if (fw) {
+          // cleats tear up the turf; going down leaves a slide mark and a dirtier uniform
+          e.stepT = (e.stepT ?? Math.random() * 0.3) - dt;
+          if (sp > 2.5 && e.stepT <= 0) { e.stepT = wetGame || snowGame ? 0.15 : 0.3; e.foot = -(e.foot ?? 1); fw.step(e.pos.x + e.foot * 0.2, e.pos.z); }
+          if (e.engaged && Math.random() < dt * (wetGame ? 2 : 0.8)) fw.divot(e.pos.x, e.pos.z, wetGame ? 2 : 1);
+          const dn = isDown(e.mesh);
+          if (dn && !e.wasDown) { fw.slide(e.pos.x, e.pos.z, e.vel.x || 0.01, e.vel.z || 1, wetGame || snowGame ? 2.6 : 1.4); addWear(e.mesh, wetGame ? 0.25 : 0.15, opts.blood !== false && Math.random() < 0.06 ? 0.4 : 0); }
+          e.wasDown = dn;
+        }
       }
       // QB under pressure (when the user is QB and holding the ball)
       if (holder === qb && !thrown && user === qb && !qb.runner && qb.pos.z < -0.2) { qb.runner = true; carrier = qb; setButtonsFor(); }

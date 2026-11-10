@@ -47,7 +47,7 @@ export function newCareer(opts) {
     rngState: seed >>> 0,
     createdAt: Date.now(),
     phase: 'init',
-    career: { stage: 'hs', stageSeason: 1, year: START_YEAR, teamId: opts.hsTeamId, teamAbbr: opts.hsTeamId, rivalTeamId: null },
+    career: { stage: 'hs', stageSeason: 1, year: START_YEAR, teamId: opts.hsTeamId, teamAbbr: opts.hsTeamId, rivalTeamId: null, customTown: opts.customTown || null },
     news: [],
     seenEvents: {},
     chainQueue: [],

@@ -41,3 +41,33 @@ test('good plays can keep you on the field for the next snap of the same series'
   }
   assert.ok(series > 0, 'expected at least one same-series snap');
 });
+
+test('a typed hometown gets its own two schools (yours + crosstown rival), stable by name', async () => {
+  const { hometownSchools, cleanTown } = await import('../src/data/hometown.js');
+  assert.equal(cleanTown('  cedar   falls!! '), 'Cedar Falls');
+  const a = hometownSchools('Cedar Falls');
+  const b = hometownSchools('cedar falls');
+  assert.deepEqual(a, b);
+  assert.equal(a.length, 2);
+  assert.notEqual(a[0].name, a[1].name);
+  const st = flow.newCareer({ first: 'A', last: 'B', position: 'WR', background: 'natural', number: 9, hometown: 'Cedar Falls', customTown: 'Cedar Falls', hsTeamId: a[0].id, seed: 3 });
+  assert.equal(st.career.teamId, a[0].id);
+  assert.equal(st.career.rivalTeamId, a[1].id);
+  assert.ok(st.league.teams.length >= 12);
+});
+
+test('playing a stronger opponent makes the timing window smaller', async () => {
+  const { tolerance, matchup } = await import('../src/sim/game.js');
+  const st = career('QB', 5);
+  while (st.phase === 'event') flow.resolveEvent(st, 0);
+  flow.submitPlan(st, [null, null, null, null, null]);
+  const g = st.game;
+  const oppSide = g.userSide === 'home' ? 'away' : 'home';
+  g.ratings[oppSide].def = 40;
+  const easy = tolerance(st, 'balanced', 'qb_throw');
+  assert.ok(matchup(st).k < 0);
+  g.ratings[oppSide].def = 85;
+  const hard = tolerance(st, 'balanced', 'qb_throw');
+  assert.ok(matchup(st).k > 0);
+  assert.ok(hard < easy * 0.9, `${hard} vs ${easy}`);
+});

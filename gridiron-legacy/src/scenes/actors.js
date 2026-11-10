@@ -49,6 +49,7 @@ function pixMat(key, w, h, draw, { transparent = false } = {}) {
   t.minFilter = THREE.NearestFilter;
   t.generateMipmaps = false;
   const m = new THREE.MeshToonMaterial({ map: t, gradientMap: toonGradient(), transparent, alphaTest: transparent ? 0.5 : 0 });
+  m.userData.key = key;
   texCache.set(key, m);
   return m;
 }
@@ -467,8 +468,98 @@ function buildRig(o) {
       gait: { stride: 0.88 + Math.random() * 0.24, arm: 0.82 + Math.random() * 0.34, lean: -0.04 + Math.random() * 0.12, tempo: 0.93 + Math.random() * 0.14, bounce: 0.8 + Math.random() * 0.45 } },
     look: L,
     ticked: 0,
+    un: football ? un : null,
+    pantsMat: football ? pants : null,
   };
   return root;
+}
+
+// ------------------------------------------------------------------ game wear: stains + wet gear
+// wear = { level 0..1 (how dirty), wet 0..1, snow bool, blood 0..1, mud bool }. Materials are swapped for
+// stained copies (cached by bucket + variant, so a crowd of players shares a handful of textures).
+const STAIN = {
+  grass: ['#4f7d2c', '#3e6b24', '#5d8f34'],
+  mud: ['#4a3520', '#5d4428', '#6e4e2e', '#3a2a18'],
+  dust: ['#8a7255', '#9c8463', '#7a6346'],
+  blood: ['#7a0c0c', '#a31515', '#5e0909'],
+};
+function stainedMat(base, part, w, variant) {
+  const lv = Math.min(4, Math.round(w.level * 4));
+  const wetB = w.wet > 0.3 ? 1 : 0;
+  const bl = w.blood > 0.5 ? 2 : w.blood > 0.15 ? 1 : 0;
+  const baseKey = base.userData.key ?? `col|${base.color.getHexString()}`;
+  const key = `${baseKey}|wear|${part}|${lv}|${wetB}|${w.snow ? 1 : 0}|${w.mud ? 1 : 0}|${bl}|${variant}`;
+  if (texCache.has(key)) return texCache.get(key);
+  const src = base.map?.image;
+  const W = src?.width ?? 8;
+  const H = src?.height ?? 12;
+  return pixMat(key, W, H, (g) => {
+    if (src) g.drawImage(src, 0, 0); else px(g, 0, 0, `#${base.color.getHexString()}`, W, H);
+    let seed = (variant + 1) * 9301 + lv * 49297 + W * 7 + (part === 'helmet' ? 17 : part === 'pants' ? 3 : 0);
+    const r = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+    if (wetB) {
+      // soaked: darker fabric with a few wet highlights
+      g.globalAlpha = 0.28; px(g, 0, 0, '#0b1220', W, H); g.globalAlpha = 1;
+      const n = part === 'helmet' ? 6 : Math.round(W * H / 40);
+      for (let i = 0; i < n; i++) { g.globalAlpha = part === 'helmet' ? 0.75 : 0.35; px(g, Math.floor(r() * W), Math.floor(r() * H * 0.8), '#e8f4ff', 1, part === 'helmet' ? 1 : 2); }
+      g.globalAlpha = 1;
+    }
+    if (w.snow) { for (let i = 0; i < W * H / 22; i++) px(g, Math.floor(r() * W), Math.floor(r() * H * 0.45), '#f4f8fb'); }
+    if (lv > 0) {
+      const pal = w.mud ? [...STAIN.mud, ...STAIN.mud, ...STAIN.grass] : [...STAIN.grass, ...STAIN.grass, ...STAIN.dust];
+      const blobs = Math.round(lv * (part === 'helmet' ? 1.5 : part === 'pants' ? W * H / 28 : W * H / 60));
+      for (let i = 0; i < blobs; i++) {
+        // pants: knees + thighs get it worst; jerseys: lower half and shoulders
+        const y = part === 'pants' ? Math.floor(H * (0.35 + r() * 0.65)) : part === 'helmet' ? Math.floor(r() * H) : Math.floor(H * (r() < 0.7 ? 0.45 + r() * 0.55 : r() * 0.3));
+        const x = Math.floor(r() * W);
+        const col = pal[Math.floor(r() * pal.length)];
+        g.globalAlpha = part === 'helmet' ? 0.7 : 0.6 + r() * 0.35;
+        if (part === 'helmet') px(g, x, y, r() < 0.5 ? col : '#c8c8c8', 1 + Math.floor(r() * 2), 1);
+        else { px(g, x, y, col, 1 + Math.floor(r() * 3), 1 + Math.floor(r() * 2)); if (r() < 0.4) px(g, x + 1, y + 1, col, 2, 1); }
+      }
+      // a long grass / mud streak from a slide
+      if (lv >= 2 && part !== 'helmet') { const y = Math.floor(H * (0.55 + r() * 0.35)); g.globalAlpha = 0.55; px(g, 0, y, pal[0], Math.floor(W * (0.5 + r() * 0.5)), 1); }
+      g.globalAlpha = 1;
+    }
+    if (bl && part !== 'helmet') {
+      const n = bl === 2 ? 7 : 3;
+      for (let i = 0; i < n; i++) { const x = Math.floor(r() * W), y = Math.floor(H * (0.1 + r() * 0.6)); px(g, x, y, STAIN.blood[Math.floor(r() * 3)], 1 + Math.floor(r() * 2), 1); if (r() < 0.5) px(g, x, y + 1, STAIN.blood[2], 1, 1 + Math.floor(r() * 2)); }
+    }
+    // keep it pixel-crisp (no soft alpha left over)
+    const img = g.getImageData(0, 0, W, H); const d = img.data;
+    for (let i = 3; i < d.length; i += 4) d[i] = 255;
+    g.putImageData(img, 0, 0);
+  });
+}
+
+/** Dirty up a football player's uniform and helmet for the current game situation. */
+export function applyWear(root, w) {
+  const ud = root.userData;
+  if (!ud.un || !w) return;
+  ud.wear = { ...w };
+  ud.wearVar ??= Math.floor(Math.random() * 3);
+  ud.origMats ??= new Map();
+  const v = ud.wearVar;
+  root.traverse((o) => {
+    if (!o.isMesh || o === ud.shadow || o === ud.ring) return;
+    if (!ud.origMats.has(o)) ud.origMats.set(o, o.material);
+    const orig = ud.origMats.get(o);
+    const swap = (m) => {
+      if (!m) return m;
+      const k = m.userData?.key ?? '';
+      const part = k.startsWith('jersey|') || k.startsWith('pads|') ? 'jersey' : k.startsWith('helm|') ? 'helmet' : m === ud.pantsMat ? 'pants' : null;
+      if (!part) return m;
+      if (w.level <= 0.05 && w.wet <= 0.3 && !w.snow && w.blood <= 0.15) return m;
+      return stainedMat(m, part, w, v);
+    };
+    o.material = Array.isArray(orig) ? orig.map(swap) : swap(orig);
+  });
+}
+/** More dirt after going down hard (and a little blood now and then). */
+export function addWear(root, dLevel = 0.15, dBlood = 0) {
+  const w = root.userData.wear;
+  if (!w) return;
+  applyWear(root, { ...w, level: Math.min(1, w.level + dLevel), blood: Math.min(1, (w.blood ?? 0) + dBlood) });
 }
 
 /** Facemask bar layouts: [width, y, z] horizontals, [x, y, h] verticals. */

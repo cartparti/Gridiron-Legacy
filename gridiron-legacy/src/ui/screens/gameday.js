@@ -5,7 +5,7 @@ import { PLAY_CALLS, WEATHER } from '../../data/config.js';
 import { getTeam } from '../../sim/league.js';
 import {
   stepGame, resolveMoment, autoMoment, tolerance, outcomeFromQuality, resolveDecision, autoDecision,
-  resolveGameEvent, autoGameEvent, MOMENT_NAMES, setGamePlan,
+  resolveGameEvent, autoGameEvent, MOMENT_NAMES, setGamePlan, matchup,
 } from '../../sim/game.js';
 import { crest, mascotKind } from '../crest.js';
 import { equippedTraits } from '../../sim/traits.js';
@@ -371,6 +371,9 @@ export function gamedayScreen(app) {
       gameSpeed: app.settings.gameSpeed ?? 0.85,
       traits: equippedTraits(st),
       health: st.player.health,
+      oppStrength: matchup(st).k,
+      // uniforms + field get dirtier as the game goes on
+      wear: { key: `${gid}-${st.career.year}`, progress: Math.min(1, (g.cursor + 1) / Math.max(1, g.drives.length)) },
     });
     ui.busy = false;
     // keep highlight pictures for the menus (last 8)
@@ -455,6 +458,9 @@ export function gamedayScreen(app) {
       w.desc ? h('p.center.tiny.muted', { style: { marginTop: '8px' } }, w.desc) : null,
       h('div.venue-card',
         h('div.vc-head', h('b.pix', culture.stadium), h('span.tiny.muted', `"${culture.nickname}" · ${BIOME_INFO[culture.biome].label}`)),
+        (() => { const mu = matchup(st); const cls = mu.k > 0.35 ? '.bad' : mu.k < -0.35 ? '.good' : ''; return h('div.row', { style: { gap: '8px', margin: '6px 0' } },
+          h(`span.chip.pix${cls}`, `MATCHUP: ${mu.label.toUpperCase()}`),
+          h('span.tiny.muted', `Their ${mu.unit} ${mu.opp} vs league avg ${mu.avg}. ${mu.k > 0.35 ? 'Expect tight windows and a fast pass rush.' : mu.k < -0.35 ? 'You should find room against this group.' : 'Evenly matched.'}`)); })(),
         h('p.tiny', culture.tradition),
         h('div.row.wrap', { style: { gap: '6px', marginTop: '6px' } },
           h(`span.chip.pix${g.userSide === 'away' ? '.bad' : '.good'}`, `HOME FIELD: ${culture.trait.label.toUpperCase()}`),

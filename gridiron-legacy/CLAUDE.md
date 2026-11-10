@@ -231,6 +231,25 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   and Career skill card.
 - tools/balance.js handles DT.
 
+## v0.17 changes
+- Game wear on uniforms (`applyWear`/`addWear` in actors.js): grass, dust, mud (wet games), blood flecks (Settings),
+  soaked/darker fabric with wet glints in rain/storm, snow flecks; grows with `opts.wear.progress` (gameday:
+  drive cursor / drives), linemen dirtiest, more after going down. Stained copies are cached by bucket + variant.
+- Field weathering (`src/scenes/fieldwear.js`, `stadium.fieldWear`): transparent pixel layer per game (key) with
+  footprints, cleat divots, slide marks and worn patches between the hashes; mud in rain, churned snow blanket.
+- Practice mode (`src/ui/screens/practice.js`, title button): every moment type per position, skill level, opponent,
+  weather, field position, call; drills and clutch challenges. Never touches saves.
+- Opponent strength matters (`matchup()` in game.js, k -1.5..1.5 vs league average of the unit you face): scales
+  tolerance (±13%) and, in the engine (`opts.oppStrength`), defender speed, coverage reads, pass-rush shed rate,
+  blocker strength vs your rush and AI ball-carrier jukes. Matchup chip on the pregame venue card.
+- Your real hometown (`src/data/hometown.js`): type a town in Create; two schools (yours + crosstown rival) with
+  mascots from name hints and palette colors, stable by name; replaces Mill Creek in the HS league
+  (`teamDefs(kind, state)` with `state.career.customTown`).
+- More detail: fans with faces, hair/hats, size variety and facing the field (matrices built once, then only Y is
+  updated); bench players with pads, sleeves, facemasks, numbers, socks, helmet-off players and size variety;
+  mascots with brows, cheeks, teeth, number, tails, fingers; cheerleaders with faces, bows, hair styles, trim.
+  Sideline figures are baked into vertex-colored meshes (`bake` in sideline.js) to keep draw calls low.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

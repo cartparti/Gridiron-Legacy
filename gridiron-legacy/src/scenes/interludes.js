@@ -2,7 +2,7 @@
 // headset, the crowd going wild, your huddle, or your sideline hyping you up. ~3 seconds, tap to skip.
 // buildInterlude(kind, ctx) -> update(dt, t) returning false when finished. ctx: { group, camera, stadium, opts, say, hype }.
 import * as THREE from 'three';
-import { makePlayer, faceToward, setPose } from './actors.js';
+import { makePlayer, faceToward, setPose, applyWear } from './actors.js';
 
 export const INTERLUDES = ['mascot', 'cheer', 'coach', 'crowd', 'huddle', 'bench'];
 
@@ -62,6 +62,8 @@ export function buildInterlude(kind, ctx) {
       m.position.set(Math.sin(a) * 1.7, 0, cz + Math.cos(a) * 1.7);
       faceToward(m, 0, cz);
       setPose(m, 'stance');
+      const wx = opts.moment?.weather;
+      if (opts.wear) applyWear(m, { level: (opts.wear.progress ?? 0) * (0.5 + Math.random() * 0.8), wet: wx === 'rain' || wx === 'storm' ? 0.9 : wx === 'snow' ? 0.5 : 0, snow: wx === 'snow', mud: wx === 'rain' || wx === 'storm', blood: 0 });
       ctx.group.add(m);
       temp.push(m);
     }
@@ -75,8 +77,8 @@ export function buildInterlude(kind, ctx) {
     const sd = opts.moment?.defense ? -1 : 1; // your sideline: near side on offense, far side on defense
     const x = sd * (53.3 / 2 + 4) + center.x;
     shot = (k) => {
-      camera.position.set(x - sd * 8, 4.2, center.z + lerp(-16, 4, k));
-      camera.lookAt(x, 1.2, center.z + lerp(-8, 12, k));
+      camera.position.set(x - sd * 4.5, 5.2, center.z + lerp(-14, 2, k));
+      camera.lookAt(x + sd * 0.3, 0.9, center.z + lerp(-8, 8, k));
     };
     ctx.hype(1, dur);
   } else {

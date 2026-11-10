@@ -9,6 +9,41 @@ const box = (w, h, d, color, x = 0, y = 0, z = 0) => {
   m.position.set(x, y, z);
   return m;
 };
+/**
+ * Merge the plain box meshes that are direct children of a group into one vertex-colored mesh (recursing into
+ * sub-groups first). Cuts hundreds of draw calls down to a handful per figure; animated sub-groups keep moving.
+ */
+const bakedMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+function bake(g) {
+  for (const c of [...g.children]) if (c.isGroup) bake(c);
+  const meshes = g.children.filter((c) => c.isMesh && !Array.isArray(c.material) && c.geometry.index);
+  if (meshes.length < 2) return g;
+  const pos = []; const nor = []; const col = []; const idx = []; let off = 0;
+  const v = new THREE.Vector3(); const nm = new THREE.Matrix3();
+  for (const m of meshes) {
+    m.updateMatrix();
+    nm.getNormalMatrix(m.matrix);
+    const ga = m.geometry.attributes;
+    const c = m.material.color;
+    for (let i = 0; i < ga.position.count; i++) {
+      v.fromBufferAttribute(ga.position, i).applyMatrix4(m.matrix); pos.push(v.x, v.y, v.z);
+      v.fromBufferAttribute(ga.normal, i).applyMatrix3(nm).normalize(); nor.push(v.x, v.y, v.z);
+      col.push(c.r, c.g, c.b);
+    }
+    for (const i of m.geometry.index.array) idx.push(i + off);
+    off += ga.position.count;
+    g.remove(m);
+    m.geometry.dispose();
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.setIndex(idx);
+  g.add(new THREE.Mesh(geo, bakedMat));
+  return g;
+}
+
 const SKINS = ['#f7dcc0', '#e0ab7f', '#cc9260', '#b07646', '#8f5a34', '#6e4126'];
 const HAIR = ['#2b1d14', '#5a3a22', '#c9a15a', '#1a1a1a', '#8a3b1f'];
 
@@ -24,10 +59,23 @@ export function makeMascot(kind = 'shield', colors = ['#1d3557', '#f1c40f']) {
   const torso = new THREE.Group(); hips.add(torso);
   torso.add(box(1.25, 1.2, 0.9, c0, 0, 0.6, 0));
   torso.add(box(0.8, 0.8, 0.1, c1, 0, 0.55, 0.46)); // belly / jersey patch
+  torso.add(box(1.3, 0.16, 0.95, c1, 0, 1.14, 0)); // collar trim
+  torso.add(box(0.22, 0.42, 0.04, c0, -0.16, 0.6, 0.52), box(0.22, 0.42, 0.04, c0, 0.16, 0.6, 0.52)); // big number "11"
+  torso.add(box(1.0, 0.7, 0.06, c1, 0, 0.62, -0.46)); // back plate
+  // tail
+  const tailCol = kind === 'scorpion' ? '#111111' : kind === 'horse' ? c1 : c0;
+  const tail = new THREE.Group(); tail.position.set(0, 0.1, -0.5); torso.add(tail);
+  if (['cat', 'wolf', 'horse', 'bear', 'bison', 'scorpion', 'sea'].includes(kind)) {
+    const len = kind === 'bear' ? 0.25 : kind === 'scorpion' ? 1.0 : 0.8;
+    tail.add(box(0.2, 0.2, len, tailCol, 0, 0, -len / 2));
+    tail.add(box(0.26, 0.26, 0.26, kind === 'scorpion' ? c1 : kind === 'wolf' ? '#f4f4f4' : tailCol, 0, kind === 'scorpion' ? 0.25 : 0.05, -len));
+  }
   const arm = (sx) => {
     const sh = new THREE.Group(); sh.position.set(sx * 0.78, 1.05, 0);
     const a = box(0.36, 0.95, 0.36, c0, 0, -0.42, 0); sh.add(a);
     sh.add(box(0.44, 0.36, 0.44, '#f4f4f4', 0, -0.95, 0)); // big glove
+    sh.add(box(0.4, 0.1, 0.4, c1, 0, -0.1, 0)); // sleeve stripe
+    for (const dx of [-0.13, 0, 0.13]) sh.add(box(0.08, 0.08, 0.06, '#d0d0d0', dx, -1.14, 0.18)); // fingers
     torso.add(sh);
     return sh;
   };
@@ -37,6 +85,9 @@ export function makeMascot(kind = 'shield', colors = ['#1d3557', '#f1c40f']) {
   // googly eyes
   for (const sx of [-0.33, 0.33]) { head.add(box(0.38, 0.42, 0.08, '#ffffff', sx, 0.18, 0.7)); head.add(box(0.16, 0.2, 0.06, '#111111', sx, 0.14, 0.75)); }
   head.add(box(0.7, 0.14, 0.06, '#111111', 0, -0.32, 0.7)); // grin
+  head.add(box(0.5, 0.08, 0.04, '#ffffff', 0, -0.27, 0.72)); // teeth
+  for (const sx of [-0.33, 0.33]) head.add(box(0.36, 0.08, 0.06, '#111111', sx, 0.45, 0.71)); // eyebrows
+  for (const sx of [-0.55, 0.55]) head.add(box(0.2, 0.14, 0.04, '#ff9aa8', sx, -0.12, 0.69)); // cheeks
   const feat = {
     cat: () => { head.add(box(0.34, 0.4, 0.2, c0, -0.52, 0.82, 0), box(0.34, 0.4, 0.2, c0, 0.52, 0.82, 0), box(0.2, 0.2, 0.08, c1, -0.52, 0.8, 0.12), box(0.2, 0.2, 0.08, c1, 0.52, 0.8, 0.12), box(0.24, 0.16, 0.1, '#ff8fa3', 0, -0.06, 0.72), box(1.9, 0.04, 0.04, '#eeeeee', 0, -0.14, 0.74)); },
     wolf: () => { head.add(box(0.3, 0.5, 0.2, c0, -0.5, 0.88, -0.1), box(0.3, 0.5, 0.2, c0, 0.5, 0.88, -0.1), box(0.62, 0.5, 0.6, c1, 0, -0.22, 0.9), box(0.24, 0.18, 0.12, '#111', 0, -0.02, 1.2)); },
@@ -54,7 +105,8 @@ export function makeMascot(kind = 'shield', colors = ['#1d3557', '#f1c40f']) {
   };
   (feat[kind] ?? feat.shield)();
   g.userData = { hips, torso, armL, armR, head, legL, legR, kind };
-  return g;
+  if (kind === 'skull') head.children[0].material = head.children[0].material.clone();
+  return bake(g);
 }
 
 function animateMascot(m, t, ex, phase = 0) {
@@ -81,7 +133,16 @@ function makeCheerleader(c0, c1, i) {
   g.add(box(0.62, 0.32, 0.46, c1, 0, 0.88, 0)); // skirt
   const top = box(0.56, 0.62, 0.34, c0, 0, 1.33, 0); g.add(top);
   g.add(box(0.42, 0.42, 0.4, skin, 0, 1.86, 0));
-  g.add(box(0.46, 0.2, 0.44, HAIR[i % HAIR.length], 0, 2.07, -0.02), box(0.2, 0.42, 0.14, HAIR[i % HAIR.length], 0, 1.85, -0.26));
+  const hair = HAIR[i % HAIR.length];
+  g.add(box(0.46, 0.2, 0.44, hair, 0, 2.07, -0.02));
+  const style = i % 3;
+  if (style === 0) g.add(box(0.2, 0.42, 0.14, hair, 0, 1.85, -0.26)); // ponytail
+  else if (style === 1) g.add(box(0.26, 0.24, 0.24, hair, 0, 2.2, -0.12)); // bun
+  else g.add(box(0.48, 0.3, 0.12, hair, 0, 1.86, -0.22)); // long
+  g.add(box(0.3, 0.12, 0.1, c1, 0, 2.12, -0.24)); // bow
+  g.add(box(0.07, 0.07, 0.03, '#1a1410', -0.1, 1.9, 0.21), box(0.07, 0.07, 0.03, '#1a1410', 0.1, 1.9, 0.21)); // eyes
+  g.add(box(0.14, 0.04, 0.03, '#c0392b', 0, 1.76, 0.21)); // smile
+  g.add(box(0.56, 0.08, 0.36, c1, 0, 1.58, 0), box(0.12, 0.3, 0.36, c1, 0, 1.3, 0.001)); // top trim + stripe
   const arm = (sx) => {
     const sh = new THREE.Group(); sh.position.set(sx * 0.36, 1.58, 0);
     sh.add(box(0.16, 0.6, 0.16, skin, 0, -0.28, 0));
@@ -90,7 +151,7 @@ function makeCheerleader(c0, c1, i) {
     return sh;
   };
   g.userData = { armL: arm(-1), armR: arm(1) };
-  return g;
+  return bake(g);
 }
 
 function makeCoach(polo, i) {
@@ -104,7 +165,7 @@ function makeCoach(polo, i) {
   const arm = (sx) => { const sh = new THREE.Group(); sh.position.set(sx * 0.45, 1.6, 0); sh.add(box(0.2, 0.7, 0.2, polo, 0, -0.32, 0)); g.add(sh); return sh; };
   g.add(box(0.26, 0.34, 0.04, '#f4f4f4', 0.26, 1.2, 0.26)); // play sheet
   g.userData = { armL: arm(-1), armR: arm(1) };
-  return g;
+  return bake(g);
 }
 
 export function buildSideline(world) {
@@ -116,18 +177,20 @@ export function buildSideline(world) {
   const spotsObj = {};
   // static: cooler tables, photographers, bench backs (painted later)
   const backs = [];
+  const statics = new THREE.Group(); root.add(statics);
   for (const sd of [-1, 1]) {
     for (const z of [-11, 0, 11]) {
       const back = box(0.25, 0.9, 9, '#1d3557', sd * (FIELD_W / 2 + 6.9), 0.95, z);
       root.add(back); backs.push({ m: back, sd });
     }
     const table = box(1.2, 0.8, 2.6, '#9aa3ad', sd * (FIELD_W / 2 + 5.2), 0.4, 19);
-    root.add(table);
-    for (const dz of [-0.7, 0.7]) root.add(box(0.7, 0.8, 0.7, '#ff7a1a', sd * (FIELD_W / 2 + 5.2), 1.2, 19 + dz), box(0.74, 0.12, 0.74, '#f4f4f4', sd * (FIELD_W / 2 + 5.2), 1.66, 19 + dz));
-    root.add(box(0.8, 0.5, 1.6, '#3a7bd5', sd * (FIELD_W / 2 + 5.2), 0.25, -20)); // equipment trunk
-    root.add(box(0.12, 2.6, 2.4, '#222831', sd * (FIELD_W / 2 + 7.6), 1.3, -24)); // kicking net frame
-    root.add(box(0.06, 2.3, 2.2, '#e8ecf0', sd * (FIELD_W / 2 + 7.55), 1.35, -24));
+    statics.add(table);
+    for (const dz of [-0.7, 0.7]) statics.add(box(0.7, 0.8, 0.7, '#ff7a1a', sd * (FIELD_W / 2 + 5.2), 1.2, 19 + dz), box(0.74, 0.12, 0.74, '#f4f4f4', sd * (FIELD_W / 2 + 5.2), 1.66, 19 + dz));
+    statics.add(box(0.8, 0.5, 1.6, '#3a7bd5', sd * (FIELD_W / 2 + 5.2), 0.25, -20)); // equipment trunk
+    statics.add(box(0.12, 2.6, 2.4, '#222831', sd * (FIELD_W / 2 + 7.6), 1.3, -24)); // kicking net frame
+    statics.add(box(0.06, 2.3, 2.2, '#e8ecf0', sd * (FIELD_W / 2 + 7.55), 1.35, -24));
   }
+  bake(statics);
   // photographers kneeling behind each end zone
   for (const ez of [-1, 1]) for (let i = 0; i < 6; i++) {
     const x = ez < 0 ? 13 + i * 2.6 : -20 + i * 8 + (i % 2) * 1.5; // far end: leave room for the cheer squad + mascot
@@ -135,7 +198,7 @@ export function buildSideline(world) {
     g.add(box(0.5, 0.5, 0.6, '#2b2f36', 0, 0.3, 0), box(0.55, 0.7, 0.4, i % 2 ? '#f2c94c' : '#2f3640', 0, 0.9, 0), box(0.4, 0.4, 0.4, SKINS[i % SKINS.length], 0, 1.45, 0));
     g.add(box(0.3, 0.3, 0.6, '#111', 0, 1.2, -ez * 0.45), box(0.18, 0.18, 0.5, '#333', 0, 1.2, -ez * 0.95)); // camera + lens
     g.position.set(x, 0, ez * 61.9);
-    root.add(g);
+    root.add(bake(g));
   }
   return {
     paint(homeColors, awayColors, nearColors, farColors, kind = 'shield', level = 'pro') {

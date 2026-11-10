@@ -1,5 +1,6 @@
 // Leagues: teams, generated rosters (pro), schedules, standings, playoffs and quick-simmed games.
 import { PRO_TEAMS, COLLEGE_TEAMS, HS_TEAMS } from '../data/teams.js';
+import { hometownSchools } from '../data/hometown.js';
 import { FIRST_NAMES, LAST_NAMES } from '../data/names.js';
 import { STAGES, SALARY_CAP, MIN_SALARY } from '../data/config.js';
 import { clamp } from '../core/util.js';
@@ -10,7 +11,11 @@ const OFF_WEIGHTS = { QB: 0.32, RB: 0.12, WR: 0.24, TE: 0.1, OL: 0.22 };
 const DEF_WEIGHTS = { DL: 0.3, LB: 0.25, CB: 0.27, S: 0.18 };
 const POS_SALARY_MAX = { QB: 52e6, WR: 30e6, RB: 16e6, TE: 17e6, OL: 22e6, DL: 28e6, LB: 20e6, CB: 22e6, S: 17e6, K: 5e6 };
 
-export function teamDefs(kind) {
+export function teamDefs(kind, state = null) {
+  if (kind === 'hs' && state?.career?.customTown) {
+    // your typed hometown takes the place of one built-in town (same league size)
+    return [...HS_TEAMS.filter((t) => t.town !== 'Mill Creek'), ...hometownSchools(state.career.customTown)];
+  }
   return kind === 'hs' ? HS_TEAMS : kind === 'college' ? COLLEGE_TEAMS : PRO_TEAMS;
 }
 
@@ -42,7 +47,7 @@ export function genProPlayer(state, league, pos, teamId, targetOvr, age) {
 }
 
 export function createLeague(state, kind) {
-  const defs = teamDefs(kind);
+  const defs = teamDefs(kind, state);
   const league = {
     kind,
     year: state.career.year,

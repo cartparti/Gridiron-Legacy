@@ -21,6 +21,7 @@ export function titleScreen(app) {
         `Continue · ${cont.meta.name}`) : null,
       h(`button.btn.block${cont ? '' : '.primary'}`, { onclick: () => { sfx.select(); app.ui.newCareer = true; app.go('slots'); } }, 'New Career'),
       anySaves ? h('button.btn.block', { onclick: () => { sfx.click(); app.ui.newCareer = false; app.go('slots'); } }, 'Load Career') : null,
+      h('button.btn.block', { onclick: () => { sfx.click(); app.go('practice'); } }, 'Practice'),
       h('button.btn.block', { onclick: () => { sfx.click(); app.ui.back = 'title'; app.go('settings'); } }, 'Settings')),
     h('p.tiny.center', { style: { color: 'rgba(255,255,255,0.7)' } }, 'All teams, players and leagues are fictional.'));
 }

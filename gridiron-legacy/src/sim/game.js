@@ -271,6 +271,22 @@ function buildMoment(state, g, d, over = {}) {
 }
 
 /** How forgiving minigames are right now (roughly 0.4 to 1.6). */
+/**
+ * How tough is the unit you're facing? Compares the opponent's offense (you on defense) or defense (you on
+ * offense) to the league average. k: -1.5 (weak) .. +1.5 (elite). Used by tolerance() and the play engine.
+ */
+export function matchup(state, g = state.game) {
+  if (!g?.ratings) return { k: 0, label: 'Even', opp: 0, avg: 0 };
+  const oppSide = g.userSide === 'home' ? 'away' : 'home';
+  const unit = isDefense(state) ? 'off' : 'def';
+  const opp = g.ratings[oppSide][unit];
+  const teams = state.league?.teams ?? [];
+  const avg = teams.length ? teams.reduce((a, t) => a + (t[unit] ?? 60), 0) / teams.length : opp;
+  const k = clamp((opp - avg) / 8, -1.5, 1.5);
+  const label = k > 0.9 ? 'Elite' : k > 0.35 ? 'Tough' : k < -0.9 ? 'Weak' : k < -0.35 ? 'Soft' : 'Even';
+  return { k, label, opp: Math.round(opp), avg: Math.round(avg), unit: unit === 'def' ? 'defense' : 'offense' };
+}
+
 export function tolerance(state, call = 'balanced', type = state.game?.pending?.type) {
   const p = state.player;
   const g = state.game;
@@ -292,6 +308,7 @@ export function tolerance(state, call = 'balanced', type = state.game?.pending?.
     if ((g.energy ?? 100) < 50) t *= 0.8 + (g.energy ?? 100) / 250;
     t *= 1 + g.momentum * 0.06;
     if (g.playingHurt) t *= 0.75;
+    t *= 1 - matchup(state, g).k * 0.09; // good teams make for hard games
   }
   return clamp(t / PLAY_CALLS[call].difficulty, 0.35, 1.8);
 }

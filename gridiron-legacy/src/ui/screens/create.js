@@ -10,6 +10,7 @@ import { DIFFICULTIES } from '../../data/config.js';
 import { defaultLook, POS_SIZE } from '../../data/looks.js';
 import { teamKits } from '../../data/kits.js';
 import { lookEditor } from './look.js';
+import { hometownSchools, cleanTown } from '../../data/hometown.js';
 
 const rnd = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -22,7 +23,8 @@ export function createScreen(app) {
   const wrap = h('div.screen');
   const draw = () => {
     clear(wrap);
-    const school = HS_TEAMS.find((t) => t.id === f.hsTeamId);
+    const custom = f.customTown ? hometownSchools(f.customTown) : null;
+    const school = custom ? custom[0] : HS_TEAMS.find((t) => t.id === f.hsTeamId);
     const bg = BACKGROUNDS.find((b) => b.id === f.background);
     const preview = {};
     for (const k of STAT_KEYS) preview[k] = 43 + bg.stats[k];
@@ -64,14 +66,26 @@ export function createScreen(app) {
         h('p.small', { style: { marginTop: '10px' } }, 'Starting overall: ', h('b', `~${ovr}`))),
       h('div.card',
         h('h2', 'Hometown'),
-        h('div.subtabs', { style: { flexWrap: 'wrap' } }, CITIES.map((c) => h(`button.subtab${f.hometown === c.name ? '.on' : ''}`, { onclick: () => {
-          sfx.click(); f.hometown = c.name; f.hsTeamId = c.schools[0].id; draw();
-        } }, c.name))),
-        h('h2', { style: { marginTop: '16px' } }, 'High School'),
-        h('p.small.muted', `${f.hometown} has ${CITIES.find((c) => c.name === f.hometown).schools.length} high schools. The other one in town will be your crosstown rival.`),
-        h('div.list', HS_TEAMS.filter((t) => t.town === f.hometown).map((t) =>
-          h('button.li', { style: { background: f.hsTeamId === t.id ? 'color-mix(in srgb, var(--accent) 16%, transparent)' : 'none', border: '0', borderBottom: '1px solid var(--line)', cursor: 'pointer', textAlign: 'left', minHeight: '48px', color: 'inherit' }, onclick: () => { sfx.click(); f.hsTeamId = t.id; draw(); } },
-            teamBadge(t, 30), h('span.grow', h('b', `${t.city} ${t.name}`)), stars(Math.max(1, Math.round((t.base - 45) / 4))))))),
+        h('p.small.muted', 'Type the name of your real hometown. You get a school there with its own mascot and colors, and the other school in town becomes your crosstown rival.'),
+        h('div.row', { style: { gap: '8px', alignItems: 'flex-end' } },
+          h('label.field.grow', 'Your hometown', h('input', { type: 'text', maxlength: 18, placeholder: 'e.g. Springfield', value: f.customTown ?? '',
+            oninput: (e) => { f.typing = e.target.value; },
+            onchange: (e) => { const town = cleanTown(e.target.value); if (town) { f.customTown = town; f.hometown = town; f.hsTeamId = hometownSchools(town)[0].id; } else { f.customTown = null; } draw(); } })),
+          h('button.btn.small', { onclick: () => { const town = cleanTown(f.typing ?? f.customTown); if (!town) return; sfx.click(); f.customTown = town; f.hometown = town; f.hsTeamId = hometownSchools(town)[0].id; draw(); } }, 'Set')),
+        custom ? h('div.town-preview',
+          h('div.row', { style: { gap: '10px' } }, teamBadge(custom[0], 40), h('div.grow', h('b', `${custom[0].city} ${custom[0].name}`), h('div.tiny.muted', 'Your school')), stars(Math.max(1, Math.round((custom[0].base - 45) / 4)))),
+          h('div.row', { style: { gap: '10px', marginTop: '8px' } }, teamBadge(custom[1], 30), h('div.grow', h('span.small', `${custom[1].city} ${custom[1].name}`), h('div.tiny.muted', 'Crosstown rival'))),
+          h('button.btn.small.ghost', { style: { marginTop: '8px' }, onclick: () => { sfx.click(); f.customTown = null; f.hometown = CITIES[0].name; f.hsTeamId = CITIES[0].schools[0].id; draw(); } }, 'Pick a built-in town instead'))
+          : h('div',
+            h('p.tiny.muted', { style: { marginTop: '12px' } }, 'Or pick one of these towns:'),
+            h('div.subtabs', { style: { flexWrap: 'wrap' } }, CITIES.map((c) => h(`button.subtab${f.hometown === c.name ? '.on' : ''}`, { onclick: () => {
+              sfx.click(); f.hometown = c.name; f.hsTeamId = c.schools[0].id; draw();
+            } }, c.name))),
+            h('h2', { style: { marginTop: '16px' } }, 'High School'),
+            h('p.small.muted', `${f.hometown} has ${CITIES.find((c) => c.name === f.hometown)?.schools.length ?? 2} high schools. The other one in town will be your crosstown rival.`),
+            h('div.list', HS_TEAMS.filter((t) => t.town === f.hometown).map((t) =>
+              h('button.li', { style: { background: f.hsTeamId === t.id ? 'color-mix(in srgb, var(--accent) 16%, transparent)' : 'none', border: '0', borderBottom: '1px solid var(--line)', cursor: 'pointer', textAlign: 'left', minHeight: '48px', color: 'inherit' }, onclick: () => { sfx.click(); f.hsTeamId = t.id; draw(); } },
+                teamBadge(t, 30), h('span.grow', h('b', `${t.city} ${t.name}`)), stars(Math.max(1, Math.round((t.base - 45) / 4)))))))),
       h('div.card',
         h('h2', 'Difficulty'),
         h('div.diff-cards', Object.entries(DIFFICULTIES).map(([id, d]) =>
@@ -81,7 +95,7 @@ export function createScreen(app) {
         onclick: () => {
           if (!f.first.trim() || !f.last.trim()) return;
           sfx.select();
-          const state = newCareer({ ...f, first: f.first.trim(), last: f.last.trim() });
+          const state = newCareer({ ...f, first: f.first.trim(), last: f.last.trim(), customTown: f.customTown || null });
           app.ui.form = null;
           app.screen = 'career';
           app.startCareer(state, app.ui.createSlot ?? 0);

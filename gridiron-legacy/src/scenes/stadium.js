@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { buildEnvironment } from './environment.js';
 import { buildSideline } from './sideline.js';
+import { buildFieldWear } from './fieldwear.js';
 
 const FIELD_W = 53.3;
 const FIELD_L = 120;
@@ -112,6 +113,20 @@ function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWA
   return tex;
 }
 
+/** Merge simple box geometries into one (for instanced multi-part figures). */
+function mergeBoxes(list) {
+  const pos = []; const nor = []; const idx = []; let off = 0;
+  for (const gm of list) {
+    pos.push(...gm.attributes.position.array); nor.push(...gm.attributes.normal.array);
+    idx.push(...gm.index.array.map((i) => i + off)); off += gm.attributes.position.count;
+  }
+  const gg = new THREE.BufferGeometry();
+  gg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  gg.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  gg.setIndex(idx);
+  return gg;
+}
+
 export function buildStadium(scene) {
   const world = new THREE.Group();
   scene.add(world);
@@ -136,6 +151,7 @@ export function buildStadium(scene) {
   const field = new THREE.Mesh(new THREE.PlaneGeometry(FIELD_W, FIELD_L), fieldMat);
   field.rotation.x = -Math.PI / 2; // canvas top ends up at -z (the end zone the offense attacks)
   world.add(field);
+  const fieldWear = buildFieldWear(world, FIELD_W, FIELD_L);
 
   // Stands: stepped tiers on all four sides.
   const pixTex = (w, h, draw, repeat = [1, 1]) => {
@@ -173,7 +189,8 @@ export function buildStadium(scene) {
       const n = Math.floor(len / 1.3);
       for (let i = 0; i < n; i++) {
         const along = -len / 2 + (i + 0.5) * (len / n) + (Math.random() - 0.5) * 0.4;
-        crowdMeta.push({ tier, end: alongX, band: alongX && facing < 0 && tier < 3 && Math.abs(along) < 12 });
+        crowdMeta.push({ tier, end: alongX, band: alongX && facing < 0 && tier < 3 && Math.abs(along) < 12,
+          yaw: alongX ? (facing > 0 ? Math.PI : 0) : (facing > 0 ? -Math.PI / 2 : Math.PI / 2), sx: 0.84 + Math.random() * 0.32, sy: 0.88 + Math.random() * 0.26 });
         crowdPositions.push(alongX
           ? new THREE.Vector3(cx + along, 1.6 + tier * 1.6 + 0.45, cz + facing * off)
           : new THREE.Vector3(cx + facing * off, 1.6 + tier * 1.6 + 0.45, cz + along));
@@ -190,18 +207,37 @@ export function buildStadium(scene) {
   const headGeo = new THREE.BoxGeometry(0.42, 0.42, 0.42);
   headGeo.translate(0, 0.62, 0);
   const crowd = new THREE.InstancedMesh(crowdGeo, new THREE.MeshBasicMaterial(), crowdPositions.length);
-  const heads = new THREE.InstancedMesh(headGeo, new THREE.MeshBasicMaterial(), crowdPositions.length);
+  // faces on the front of each head (instance color = skin tone, so white pixels take the skin color)
+  const faceTex = (() => {
+    const c2 = document.createElement('canvas'); c2.width = 6; c2.height = 6;
+    const g2 = c2.getContext('2d');
+    g2.fillStyle = '#ffffff'; g2.fillRect(0, 0, 6, 6);
+    g2.fillStyle = '#1a1410'; g2.fillRect(1, 2, 1, 1); g2.fillRect(4, 2, 1, 1);
+    g2.fillStyle = '#7a3b2e'; g2.fillRect(2, 4, 2, 1);
+    g2.fillStyle = '#d9d9d9'; g2.fillRect(0, 5, 6, 1);
+    const t = new THREE.CanvasTexture(c2); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  })();
+  const plainHead = new THREE.MeshBasicMaterial();
+  const heads = new THREE.InstancedMesh(headGeo, [plainHead, plainHead, plainHead, plainHead, new THREE.MeshBasicMaterial({ map: faceTex }), plainHead], crowdPositions.length);
+  // hair, caps and beanies on top
+  const topGeo = new THREE.BoxGeometry(0.46, 0.16, 0.46); topGeo.translate(0, 0.9, 0);
+  const tops = new THREE.InstancedMesh(topGeo, new THREE.MeshBasicMaterial(), crowdPositions.length);
+  const hairCols = ['#1a1410', '#2b1d14', '#5a3a22', '#8a5a2b', '#c9a15a', '#e0c070', '#8a3b1f', '#9a9a9a', '#d8d8d8'].map((c) => new THREE.Color(c));
   const dummy = new THREE.Object3D();
+  let crowdBuilt = false;
   const skins = ['#f7dcc0', '#e0ab7f', '#cc9260', '#b07646', '#8f5a34', '#6e4126', '#4d2c1a'].map((c) => new THREE.Color(c));
   crowdPositions.forEach((p, i) => {
     dummy.position.copy(p);
     dummy.updateMatrix();
     crowd.setMatrixAt(i, dummy.matrix);
     heads.setMatrixAt(i, dummy.matrix);
-    heads.setColorAt(i, skins[Math.floor(Math.random() * skins.length)]);
+    const sk = skins[Math.floor(Math.random() * skins.length)];
+    heads.setColorAt(i, sk);
+    tops.setColorAt(i, Math.random() < 0.1 ? sk : hairCols[Math.floor(Math.random() * hairCols.length)]);
   });
   crowd.userData.base = crowdPositions;
-  world.add(crowd, heads);
+  world.add(crowd, heads, tops);
 
   // About a third of the fans have their arms up (one instanced mesh of V-shaped arms).
   const armGeo = (() => {
@@ -365,19 +401,24 @@ export function buildStadium(scene) {
     const bodyG = new THREE.BoxGeometry(0.62, 0.9, 0.4); bodyG.translate(0, 1.15, 0);
     const legG = new THREE.BoxGeometry(0.5, 0.75, 0.32); legG.translate(0, 0.38, 0);
     const headG = new THREE.BoxGeometry(0.46, 0.46, 0.44); headG.translate(0, 1.85, 0);
-    const parts = [bodyG, legG, headG].map((geo) => new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: '#ffffff' }), n));
+    // more detail: shoulder pads, sleeves, a facemask and a back number stripe; every player a different size
+    const padsG = new THREE.BoxGeometry(0.88, 0.24, 0.5); padsG.translate(0, 1.52, 0);
+    const armsG = (() => { const a = new THREE.BoxGeometry(0.2, 0.72, 0.22); a.translate(-0.42, 1.2, 0); const b = new THREE.BoxGeometry(0.2, 0.72, 0.22); b.translate(0.42, 1.2, 0); return mergeBoxes([a, b]); })();
+    const maskG = new THREE.BoxGeometry(0.38, 0.16, 0.06); maskG.translate(0, 1.76, -0.25);
+    const numG = new THREE.BoxGeometry(0.3, 0.36, 0.04); numG.translate(0, 1.16, 0.22);
+    const sockG = new THREE.BoxGeometry(0.52, 0.18, 0.34); sockG.translate(0, 0.09, 0);
+    const parts = [bodyG, legG, headG, padsG, armsG, maskG, numG, sockG].map((geo) => new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: '#ffffff' }), n));
     const base = [];
+    const scl = [];
+    const bare = [];
     for (let i = 0; i < n; i++) {
       const p = new THREE.Vector3(sd * (FIELD_W / 2 + 3 + Math.random() * 2.2), 0, -18 + (i / n) * 36 + Math.random() * 0.8);
       base.push(p);
-      dummy.position.copy(p);
-      dummy.rotation.y = sd > 0 ? Math.PI / 2 : -Math.PI / 2;
-      dummy.updateMatrix();
-      parts.forEach((m) => m.setMatrixAt(i, dummy.matrix));
+      scl.push([0.88 + Math.random() * 0.3, 0.9 + Math.random() * 0.2]);
+      bare.push(i % 5 === 0); // helmet off
     }
-    dummy.rotation.set(0, 0, 0);
     parts.forEach((m) => world.add(m));
-    sideGroups[sd] = { parts, base, rot: sd > 0 ? Math.PI / 2 : -Math.PI / 2 };
+    sideGroups[sd] = { parts, base, scl, bare, rot: sd > 0 ? Math.PI / 2 : -Math.PI / 2 };
   }
 
   const sideline = buildSideline(world);
@@ -507,6 +548,7 @@ export function buildStadium(scene) {
   const api = {
     world,
     sideline,
+    fieldWear,
     crowd,
     /** Re-paint the field and crowd. far = end zone the offense attacks (-z), near = behind the offense. */
     setTeams(farColors, nearColors, farName, nearName, crowdColors = nearColors, style = null) {
@@ -526,9 +568,19 @@ export function buildStadium(scene) {
       arms.instanceColor.needsUpdate = true;
       // sideline teams: near team on the right side (+x), far team on the left
       const paint = (sd, cols) => {
-        const [body, legs, head] = sideGroups[sd].parts;
-        for (let i = 0; i < body.count; i++) { body.setColorAt(i, new THREE.Color(cols[0])); legs.setColorAt(i, new THREE.Color(cols[1])); head.setColorAt(i, new THREE.Color(i % 3 ? cols[0] : '#c68a56')); }
-        [body, legs, head].forEach((m) => { m.instanceColor.needsUpdate = true; });
+        const sg = sideGroups[sd];
+        const [body, legs, head, pads, armsP, mask, num, sock] = sg.parts;
+        const c0 = new THREE.Color(cols[0]); const c1 = new THREE.Color(cols[1]);
+        const skinsB = ['#f1d0b0', '#d9a477', '#c68a56', '#a06a3e', '#7c4a2a', '#5a341d'].map((x) => new THREE.Color(x));
+        const lum = (cc) => { const c = new THREE.Color(cc); return 0.299 * c.r + 0.587 * c.g + 0.114 * c.b; };
+        const pantsC = new THREE.Color(lum(cols[1]) > 0.6 ? '#e3e6ea' : cols[1]);
+        for (let i = 0; i < body.count; i++) {
+          body.setColorAt(i, c0); pads.setColorAt(i, c0.clone().multiplyScalar(0.85)); armsP.setColorAt(i, c0);
+          legs.setColorAt(i, pantsC); sock.setColorAt(i, c0);
+          head.setColorAt(i, sg.bare[i] ? skinsB[i % skinsB.length] : c0); mask.setColorAt(i, new THREE.Color('#9aa3ad'));
+          num.setColorAt(i, c1);
+        }
+        sg.parts.forEach((m) => { m.instanceColor.needsUpdate = true; });
       };
       paint(1, nearColors);
       paint(-1, farColors);
@@ -562,7 +614,7 @@ export function buildStadium(scene) {
       fieldMat.color.setHex(t);
       apron.material.color.setHex(weather === 'snow' ? 0xe6edf2 : weather === 'night' ? 0x1f5a24 : weather === 'storm' ? 0x24582a : weather === 'rain' ? 0x2a6a2f : 0x2a6430);
       crowd.material.color.setHex(weather === 'storm' || weather === 'rain' ? 0x8f99a3 : weather === 'night' ? 0x9aa0b8 : 0xffffff);
-      heads.material.color.copy(crowd.material.color);
+      for (const hm of [...new Set(heads.material), tops.material]) hm.color.copy(crowd.material.color);
     },
     /** Make the crowd bounce (excitement 0..1). */
     /** Scenery outside the stadium for the home team's city. */
@@ -621,26 +673,50 @@ export function buildStadium(scene) {
         dummy.rotation.set(0, 0, 0);
         mm.instanceMatrix.needsUpdate = true;
       }
-      const step = force ? 1 : base.length > 2500 ? 2 : 1;
-      for (let i = 0; i < base.length; i += step) {
-        const p = base[i];
-        dummy.position.set(p.x, crowdMeta[i]?.hidden ? -200 : p.y + Math.max(0, Math.sin(t * 9 + i * 1.7)) * 0.35 * excitement, p.z);
-        dummy.updateMatrix();
-        crowd.setMatrixAt(i, dummy.matrix);
-        heads.setMatrixAt(i, dummy.matrix);
+      if (force || !crowdBuilt) {
+        // full matrices (facing + size) once; afterwards only the bounce height changes
+        crowdBuilt = true;
+        for (let i = 0; i < base.length; i++) {
+          const p = base[i];
+          const cm = crowdMeta[i];
+          dummy.position.set(p.x, cm?.hidden ? -200 : p.y, p.z);
+          dummy.rotation.set(0, cm?.yaw ?? 0, 0);
+          dummy.scale.set(cm?.sx ?? 1, cm?.sy ?? 1, cm?.sx ?? 1);
+          dummy.updateMatrix();
+          crowd.setMatrixAt(i, dummy.matrix);
+          heads.setMatrixAt(i, dummy.matrix);
+          tops.setMatrixAt(i, dummy.matrix);
+        }
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(1, 1, 1);
+      } else {
+        const A = crowd.instanceMatrix.array; const B = heads.instanceMatrix.array; const C = tops.instanceMatrix.array;
+        for (let i = 0; i < base.length; i++) {
+          const cm = crowdMeta[i];
+          const y = cm?.hidden ? -200 : base[i].y + Math.max(0, Math.sin(t * 9 + i * 1.7)) * 0.35 * excitement;
+          const o = i * 16 + 13;
+          A[o] = y; B[o] = y; C[o] = y;
+        }
       }
       crowd.instanceMatrix.needsUpdate = true;
       heads.instanceMatrix.needsUpdate = true;
+      tops.instanceMatrix.needsUpdate = true;
       sideline.animate(t, excitement);
+      fieldWear.tick();
       for (const sd of [-1, 1]) {
         const sg = sideGroups[sd];
         sg.base.forEach((p, i) => {
           dummy.position.set(p.x, Math.max(0, Math.sin(t * 7 + i * 2.3)) * 0.25 * excitement, p.z);
-          dummy.rotation.y = sg.rot;
+          dummy.rotation.y = sg.rot + Math.sin(t * 0.7 + i) * 0.25; // looking around
+          dummy.scale.set(sg.scl[i][0], sg.scl[i][1], sg.scl[i][0]);
           dummy.updateMatrix();
-          sg.parts.forEach((m) => m.setMatrixAt(i, dummy.matrix));
+          sg.parts.forEach((m, k) => {
+            if (k === 5 && sg.bare[i]) { dummy.scale.setScalar(0); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix); dummy.scale.set(sg.scl[i][0], sg.scl[i][1], sg.scl[i][0]); dummy.updateMatrix(); return; }
+            m.setMatrixAt(i, dummy.matrix);
+          });
         });
         dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(1, 1, 1);
         sg.parts.forEach((m) => { m.instanceMatrix.needsUpdate = true; });
       }
     },

@@ -8,6 +8,7 @@ import { getTeam } from '../sim/league.js';
 import { titleScreen } from './screens/title.js';
 import { slotsScreen } from './screens/slots.js';
 import { createScreen } from './screens/create.js';
+import { practiceScreen } from './screens/practice.js';
 import { settingsScreen } from './screens/settings.js';
 import { hubScreen } from './screens/hub.js';
 import { gamedayScreen } from './screens/gameday.js';
@@ -123,6 +124,7 @@ export const app = {
     else if (!this.state) {
       if (this.screen === 'slots') view = slotsScreen(this);
       else if (this.screen === 'create') view = createScreen(this);
+      else if (this.screen === 'practice') view = practiceScreen(this);
       else view = titleScreen(this);
     } else {
       if (this.screen !== 'settings') stopBackdrop();

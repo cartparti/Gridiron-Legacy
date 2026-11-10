@@ -354,6 +354,8 @@ export function runMinigame(type, opts) {
     r.stadium.setLevel?.(opts.stage ?? 'pro');
     r.stadium.setYardLine(m.yardLine, m.distance);
     applyAtmosphere(r, m.weather ?? 'clear');
+    // field weathering for this game (footprints, mud, churned snow)
+    if (opts.wear?.key) r.stadium.fieldWear?.set(opts.wear.key, m.weather ?? 'clear', opts.wear.progress ?? 0); else r.stadium.fieldWear?.clear();
     const group = new THREE.Group();
     r.scene.add(group);
     cleanups.push(() => {
@@ -455,6 +457,7 @@ export function runCutscene(build, { setup } = {}) {
     const group = new THREE.Group();
     r.scene.add(group);
     r.stadium.hideLines();
+    r.stadium.fieldWear?.clear();
     applyAtmosphere(r, 'clear');
     setup?.(r);
     let done = false;
