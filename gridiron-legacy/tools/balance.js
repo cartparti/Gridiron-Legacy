@@ -25,13 +25,13 @@ for (const [key, strat] of Object.entries(STRATEGIES)) {
   const legacy = [];
   const reasons = {};
   const awards = {};
-  const perfByPos = { QB: [], RB: [], WR: [], CB: [] };
+  const perfByPos = { QB: [], RB: [], WR: [], CB: [], DT: [] };
   let seasons = 0;
   let titles = 0;
   let undrafted = 0;
   const draftPicks = [];
-  const perGame = { QB: [], RB: [], WR: [], CB: [] };
-  const perGameTD = { QB: [], RB: [], WR: [], CB: [] };
+  const perGame = { QB: [], RB: [], WR: [], CB: [], DT: [] };
+  const perGameTD = { QB: [], RB: [], WR: [], CB: [], DT: [] };
   for (let i = 0; i < N; i++) {
     const seed = 1000 + i * 7919 + key.length * 104729;
     const st = simulateCareer(randomCareerOpts(seed), strat, SKILL);
@@ -55,7 +55,7 @@ for (const [key, strat] of Object.entries(STRATEGIES)) {
     else if (p.draft) draftPicks.push(p.draft.pick);
     const g = Math.max(1, p.proCareerStats.games);
     const s = p.proCareerStats;
-    perGame[p.position].push(p.position === 'QB' ? s.passYds / g : p.position === 'RB' ? s.rushYds / g : p.position === 'CB' ? s.pd / g : s.recYds / g);
+    perGame[p.position].push(p.position === 'QB' ? s.passYds / g : p.position === 'RB' ? s.rushYds / g : p.position === 'CB' ? s.pd / g : p.position === 'DT' ? (s.defSacks ?? 0) / g : s.recYds / g);
     perGameTD[p.position].push(p.position === 'CB' ? s.defInt / g : (s.passTD + s.rushTD + s.recTD) / g);
   }
   rows.push({ perGame, perGameTD, key, tiers, peak, proSeasons, winPct, money, legacy, reasons, awards, seasons, titles, perfByPos, undrafted, draftPicks });

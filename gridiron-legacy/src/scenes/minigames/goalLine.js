@@ -55,7 +55,10 @@ export function goalLine(ctx) {
 
   rig(camera, 0, 0, 0, { zoom: 0.7, ahead: 4, snap: true });
 
+  let snapBtn = null;
+  const goPush = () => { snapBtn?.remove(); phase = 'push'; t = 0; sfx.whistle(); hud.instr('TAP TAP TAP! Drive the pile!'); };
   const tap = () => {
+    if (phase === 'presnap') { if (t > 0.3) goPush(); return; }
     if (phase === 'push') {
       push = Math.min(1, push + perTap);
       sfx.tick();
@@ -71,11 +74,22 @@ export function goalLine(ctx) {
   maybeTip(ctx, 'Goal-Line Dive', [
     'Tap as fast as you can to drive the pile (Strength makes each tap count more).',
     'Then a marker swings across the bar: tap when it is in the green to leap over the top.',
-  ], () => { phase = 'push'; t = 0; sfx.whistle(); hud.instr('TAP TAP TAP! Drive the pile!'); });
+  ], () => {
+    // you snap the ball yourself
+    phase = 'presnap'; t = 0;
+    hud.instr('Goal line. Press SNAP when you are ready');
+    snapBtn = document.createElement('button');
+    snapBtn.className = 'fc-btn big gold gl-snap';
+    snapBtn.innerHTML = '<b>SNAP</b><small>Space</small>';
+    snapBtn.addEventListener('pointerdown', (ev) => { ev.preventDefault(); ev.stopPropagation(); goPush(); });
+    hud.el.append(snapBtn);
+    ctx.addCleanup(() => snapBtn?.remove());
+  });
 
   const finish = (r) => { phase = 'over'; endPlay(ctx, finalize(r, m)); };
 
   return (dt) => {
+    if (phase === 'presnap') { t += dt; if (t > 15) goPush(); return; }
     if (phase === 'wait' || phase === 'over') { if (fx && !fx(dt)) fx = null; return; }
     t += dt;
     if (fx && !fx(dt)) fx = null;

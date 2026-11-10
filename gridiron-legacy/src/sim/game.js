@@ -44,6 +44,7 @@ export const isDefense = (state) => DEF_POSITIONS.has(state.player.position);
 
 export function momentCount(state, { playoff, rivalry }) {
   const c = state.player.rel.coach;
+  // 5-8 drives with a key moment; a series can keep you on the field for more snaps (see resolveMoment).
   let n = 5;
   if (c >= 60) n++;
   if (c >= 80) n++;
@@ -468,6 +469,25 @@ export function resolveMoment(state, result) {
       afterMomentEvents(state, result, m);
       return { outcome: 'CONT' };
     }
+    // Same series: you stay on the field for the next snap (more often for better players and good plays).
+    if (!d.twoMin && (d.series ?? 0) < 2 && yl > 0 && (converted || m.down < 3)) {
+      const ovr = state.player.ovr ?? 60;
+      const pNext = clamp((d.series ? 0.1 : 0.2) + (ovr - 60) / 300 + (result.quality - 0.5) * 0.2 + (converted ? 0.05 : 0), 0.08, 0.45);
+      if (chance(state, pNext)) {
+        d.series = (d.series ?? 0) + 1;
+        const left = Math.max(1, m.distance - Math.max(0, m.yardLine - yl));
+        g.pending = buildMoment(state, g, d, converted
+          ? { yardLine: Math.min(99, yl), down: 1, distance: Math.min(10, yl) }
+          : { yardLine: Math.min(99, yl), down: m.down + 1, distance: Math.min(left, yl) });
+        g.pending.series = true;
+        g.pending.situation ??= 'Same series: you stay on the field';
+        // keep the game's total workload sane: a long series can use up one of your later drives
+        if (chance(state, 0.7)) { const later = g.drives.slice(g.cursor + 1).find((x) => x.moment && !x.twoMin && x.side === d.side); if (later) later.moment = false; }
+        rec.outcome = 'CONT';
+        afterMomentEvents(state, result, m);
+        return { outcome: 'CONT' };
+      }
+    }
     if (!m.defense && !d.twoMin && m.down === 3 && !converted && yl <= 55 && yl > 0) {
       g.pendingDecision = { yardLine: yl, distance: Math.max(1, m.distance - Math.max(0, m.yardLine - yl)), quarter: d.quarter, clock: d.clock, fgRange: yl <= 38 };
       rec.outcome = 'DECIDE';
@@ -536,7 +556,7 @@ function finishDrive(state, g, d, out, momentInfo) {
   if (out === 'TO' || out === 'DOWNS') g.toBonus[otherSide(d.side)] = 0.07;
   const team = d.side === 'home' ? g.homeId : g.awayId;
   const isUserTeam = d.side === g.userSide;
-  if (momentInfo && isUserTeam && !isDefense(state) && !g.sitOut && (out === 'TD' || out === 'FG' || out === 'PUNT') && !momentInfo.result.td) {
+  if (momentInfo && isUserTeam && !isDefense(state) && !g.sitOut && (out === 'TD' || out === 'FG' || out === 'PUNT') && !momentInfo.result.td && !d.series) {
     autoDriveStats(state, g, out, true); // the rest of the drive after the key moment
   }
   if (!momentInfo) {

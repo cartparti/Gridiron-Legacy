@@ -3,7 +3,8 @@
 // If WebGL is unavailable, a simple 2D timing meter is used instead.
 import * as THREE from 'three';
 import { buildStadium } from './stadium.js';
-import { startCrowd, stopCrowd, playMusic, stopMusic } from '../audio/stadium.js';
+import { startCrowd, stopCrowd, playMusic, stopMusic, react } from '../audio/stadium.js';
+import { buildInterlude } from './interludes.js';
 import { nextFrame, tickIdle } from './actors.js';
 import { buildWorld } from './world.js';
 import { goalLine } from './minigames/goalLine.js';
@@ -381,8 +382,9 @@ export function runMinigame(type, opts) {
         return ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), pt) ? pt : null;
       },
     };
-    const update = GAMES[type](ctx);
     let errors = 0;
+    const begin = () => {
+    const update = GAMES[type](ctx);
     start((dt, t) => {
       nextFrame();
       try { update(dt, t); } catch (err) {
@@ -395,6 +397,39 @@ export function runMinigame(type, opts) {
       r.stadium.setExcitement(ex);
       r.stadium.animateCrowd(t, ex);
     });
+    };
+    // Broadcast shot between plays (mascot, coach, huddle...). Tap or press any key to skip.
+    if (opts.interlude && !opts.reducedMotion) {
+      let inter = null;
+      try { inter = buildInterlude(opts.interlude, { group, camera: r.camera, stadium: r.stadium, opts, say: hud.say, hype: ctx.hype, roar: () => react('big', true) }); } catch (err) { console.error('interlude', err); }
+      if (inter) {
+        document.body.classList.add('cine');
+        let skip = false;
+        const sk = () => { skip = true; };
+        window.addEventListener('pointerdown', sk); window.addEventListener('keydown', sk);
+        const endInter = () => {
+          window.removeEventListener('pointerdown', sk); window.removeEventListener('keydown', sk);
+          document.body.classList.remove('cine');
+          stop();
+          r.stadium.setYardLine(m.yardLine, m.distance);
+          begin();
+        };
+        let it = 0;
+        start((dt, t) => {
+          nextFrame();
+          it += dt;
+          let more = false;
+          try { more = inter(dt, it) !== false && !skip; } catch (err) { console.error('interlude', err); }
+          tickIdle(group, dt);
+          const ex = r.hype && performance.now() < r.hype.until ? r.hype.level : 0.35;
+          r.stadium.setExcitement(ex);
+          r.stadium.animateCrowd(t, ex);
+          if (!more) { if (skip) inter(0, 99); endInter(); }
+        });
+        return;
+      }
+    }
+    begin();
   });
 }
 

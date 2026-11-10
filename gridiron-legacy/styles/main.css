@@ -892,3 +892,8 @@ body.replaying .hud-tag, body.replaying .hud-score { opacity: 0; }
 .trait.locked .tr-ic { filter: grayscale(1); }
 .tr-ic { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: 8px; background: linear-gradient(135deg, #e8b730, #b5832a); color: #1a1400; border: 2px solid #07080a; box-shadow: inset 0 2px 0 rgba(255,255,255,0.35); }
 .unlock-card { border-left: 4px solid var(--good); }
+
+/* v0.16 training points */
+.train-pts { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+.train-pts .watch-bar i { background: linear-gradient(90deg, #f1c40f, #4ade80); }
+.gl-snap { position: absolute; right: 18px; bottom: calc(24px + env(safe-area-inset-bottom)); pointer-events: auto; z-index: 5; }

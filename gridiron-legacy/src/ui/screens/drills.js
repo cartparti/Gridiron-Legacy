@@ -8,6 +8,7 @@ import { h, clear } from '../dom.js';
 import { openModal } from '../components.js';
 import { sfx } from '../../audio/sfx.js';
 import { drillMultiplier } from '../../sim/week.js';
+import { trainValue } from '../../sim/progress.js';
 
 export const DRILLS = { sprints: 'sprint', weights: 'reps', drills: 'cones', film: 'film', doubles: 'sprint' };
 export const DRILL_NAMES = { sprint: 'Sprint Ladder', reps: 'Power Reps', cones: 'Cone Reaction', film: 'Film Room' };
@@ -29,6 +30,7 @@ export function openDrill(actId, onDone) {
       h('div.kicker.pix', DRILL_NAMES[kind]),
       h('div.drill-grade.pix', grade(q)),
       h('p.center', `Training gains today: ${mult >= 1 ? '+' : ''}${Math.round((mult - 1) * 100)}%`),
+      h('p.center.small.muted', trainValue(q) ? `Training points: up to +${Math.round(trainValue(q) * 100)}% toward a skill point` : 'Score a C or better to earn training points.'),
       h('button.btn.primary.block', { onclick: () => { m.close(); onDone(q); } }, 'Done'));
   };
   const intro = (title, how, startFn) => {

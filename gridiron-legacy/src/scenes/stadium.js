@@ -3,6 +3,7 @@
 // Field coordinates (yards): x across (-26.65..26.65), z along. Goal lines at z = ±50.
 import * as THREE from 'three';
 import { buildEnvironment } from './environment.js';
+import { buildSideline } from './sideline.js';
 
 const FIELD_W = 53.3;
 const FIELD_L = 120;
@@ -379,6 +380,9 @@ export function buildStadium(scene) {
     sideGroups[sd] = { parts, base, rot: sd > 0 ? Math.PI / 2 : -Math.PI / 2 };
   }
 
+  const sideline = buildSideline(world);
+  let sidePaint = null;
+
   // Pylons at the corners of each end zone.
   const pylonMat = lambert('#ff7a1a');
   for (const z of [-50, -60, 50, 60]) for (const x of [-FIELD_W / 2, FIELD_W / 2]) {
@@ -502,6 +506,7 @@ export function buildStadium(scene) {
 
   const api = {
     world,
+    sideline,
     crowd,
     /** Re-paint the field and crowd. far = end zone the offense attacks (-z), near = behind the offense. */
     setTeams(farColors, nearColors, farName, nearName, crowdColors = nearColors, style = null) {
@@ -533,6 +538,8 @@ export function buildStadium(scene) {
       for (let i = 0; i < col.count; i += 3) { const c = bc[(i / 3) % 3]; for (let k = 0; k < 3; k++) col.setXYZ(i + k, c.r, c.g, c.b); }
       col.needsUpdate = true;
       paintTifo(crowdColors, crowdColors === nearColors ? nearName : farName);
+      sidePaint = [crowdColors, crowdColors === nearColors ? farColors : nearColors, nearColors, farColors, style?.mascot ?? 'shield'];
+      sideline.paint(...sidePaint, this.level ?? 'pro');
     },
     /** Place the world so the opponent goal line is `yardLine` yards ahead of z = 0. */
     setYardLine(yardLine, distance) {
@@ -578,6 +585,7 @@ export function buildStadium(scene) {
       standMat.color.set(metal ? '#c8d0d8' : '#ffffff');
       standMat2.color.set(metal ? '#aeb6bf' : '#ffffff');
       this.level = level;
+      if (sidePaint) sideline.paint(...sidePaint, level);
       // camera flashes only where people are sitting
       const vis = crowdPositions.filter((_, i) => !crowdMeta[i].hidden);
       for (let i = 0; i < flashN; i++) { const p2 = vis[Math.floor(Math.random() * vis.length)] ?? crowdPositions[0]; fpos.set([p2.x, p2.y + 0.9, p2.z], i * 3); }
@@ -623,6 +631,7 @@ export function buildStadium(scene) {
       }
       crowd.instanceMatrix.needsUpdate = true;
       heads.instanceMatrix.needsUpdate = true;
+      sideline.animate(t, excitement);
       for (const sd of [-1, 1]) {
         const sg = sideGroups[sd];
         sg.base.forEach((p, i) => {

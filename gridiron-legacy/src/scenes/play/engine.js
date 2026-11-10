@@ -30,6 +30,8 @@ export function freePlay(ctx) {
   const mode = playMode(type);
   const st = opts.stats;
   const tol = opts.tolerance;
+  // 0 (raw) .. 1 (elite): how much room your skill buys you. Low-rated QBs see tighter windows.
+  const qbSkill = Math.max(0, Math.min(1, (((st.skill ?? 60) + (st.iq ?? 60)) / 2 - 50) / 45));
   const call = opts.call;
   const wfx = weatherFx(m);
   const offColors = m.defense ? opts.oppColors : opts.teamColors;
@@ -152,6 +154,7 @@ export function freePlay(ctx) {
     if (play.twoDeep || zone) { ss.deep = -1; fs.deep = 1; } else { fs.deep = 0; ss.robber = true; }
     if (mode === 'runD') cbZ.zone = false;
     user = ents.find((e) => e.user);
+    if (globalThis.__playDebug) globalThis.__play = { receivers, defenders, time: () => t, phase: () => phase };
     // routes for receivers
     const routeFor = (slot) => {
       if (mode === 'route' && slot === 'Z') return play.route;
@@ -210,12 +213,16 @@ export function freePlay(ctx) {
     // size matchup with the guy across from you
     const foe = dtMode ? nearest(user, blockers) : mode === 'cover' || mode === 'runD' ? user.man : mode === 'route' ? defenders.find((d) => d.man === user) : null;
     const sz = (e) => `${Math.floor(e.hIn / 12)}'${e.hIn % 12}" ${e.wLb}`;
-    hud.instr(foe ? `${play.name} · you ${sz(user)} vs ${sz(foe)} lb` : `${play.name} · get set…`);
+    hud.instr((foe ? `${play.name} · you ${sz(user)} vs ${sz(foe)} lb` : play.name) + (m.defense ? ' · get set…' : ' · press SNAP when ready'));
+    snapCalled = false;
     if (m.defense && userHome) react('defense');
     setButtonsFor();
   };
 
   let routeLine = null;
+  let snapCalled = false;
+  let clockShown = -1;
+  const PLAY_CLOCK = 15;
   let assignLine = null;
   let holeArrow = null;
   const preSnapVisuals = () => {
@@ -258,6 +265,7 @@ export function freePlay(ctx) {
     bull: { id: 'bull', label: 'BULL RUSH', key: 'L', big: true, tint: 'red' },
     sack: { id: 'tackle', label: 'SACK / TACKLE', key: 'F', big: true, tint: 'red' },
     bat: { id: 'swat', label: 'BAT IT', key: 'Space' },
+    snap: { id: 'snap', label: 'SNAP', key: 'Space', big: true, tint: 'gold' },
   };
   // pass-rush battle state: leverage builds while you drive into the blocker
   const rush = { lev: 0, cd: 0, stun: 0, burst: 0 };
@@ -275,6 +283,7 @@ export function freePlay(ctx) {
   const setButtonsFor = () => {
     let mode2;
     if (phase === 'pick') mode2 = 'none';
+    else if (phase === 'pre') mode2 = m.defense ? 'none' : 'pre';
     else if (user === carrier) mode2 = 'runner';
     else if (user.role === 'QB' && holder === user && !user.runner) mode2 = 'qb';
     else if (user.team === 'off') mode2 = flight && flight.target === user ? 'catch' : 'route';
@@ -284,6 +293,7 @@ export function freePlay(ctx) {
     btnMode = mode2;
     const sets = {
       none: [],
+      pre: [btn.snap],
       runner: [btn.sprint, btn.juke, btn.spin, btn.stiff, btn.dive],
       qb: [btn.sprint, btn.pass],
       route: [btn.sprint, btn.call, btn.catch],
@@ -300,6 +310,7 @@ export function freePlay(ctx) {
     onPress: (id) => {
       if (qteActive) return;
       if (phase === 'pick' && /^key[1-3]$/.test(id)) return choose(Number(id.slice(3)) - 1);
+      if (id === 'snap' && phase === 'pre' && !m.defense && t > 0.35) { snapCalled = true; return; }
       if (phase !== 'live') return;
       if (/^key[1-5]$/.test(id) && user.role === 'QB' && holder === user && !user.runner) return throwTo(receivers[Number(id.slice(3)) - 1]);
       if (id === 'juke' && user === carrier && moves.jukeCd <= 0) {
@@ -524,9 +535,14 @@ export function freePlay(ctx) {
       return;
     }
     if (e.route && !(mode === 'run' && e.role !== 'RB')) {
-      e.s += e.maxSpeed * dt * Math.min(1, t / 0.4) * (e.jam > 0 ? 0.35 : 1);
+      // receivers throttle down to plant and cut at the breaks (that's when the defender is a step late)
+      const ahead = routePoint(e, e.s + 1.6);
+      const hx = ahead.x - e.pos.x, hz = ahead.z - e.pos.z, hl = Math.hypot(hx, hz) || 1, vl = Math.hypot(e.vel.x, e.vel.z);
+      const turn = vl > 2 ? 1 - (e.vel.x * hx + e.vel.z * hz) / (vl * hl) : 0;
+      const cut = turn > 0.35 ? (mode === 'pass' ? 0.66 : 0.78) : 1;
+      e.s += e.maxSpeed * dt * Math.min(1, t / 0.4) * (e.jam > 0 ? 0.35 : 1) * cut;
       const p = routePoint(e, e.s);
-      moveToward(e, p.x, p.z, e.maxSpeed, dt, 22);
+      moveToward(e, p.x, p.z, e.maxSpeed * (mode === 'pass' ? 0.95 : 1) * cut, dt, 22);
       return;
     }
     if (e.blockTarget && !e.engaged) {
@@ -625,8 +641,11 @@ export function freePlay(ctx) {
     if ((e.role === 'DL' || e.blitz) && holder) { pursueAndTackle(e, holder, dt, 0.85); return; }
     if (e.role === 'S') {
       const deepZ = Math.min(e.start.z, -12, ...receivers.map((r) => r.pos.z - 4));
-      const tx = e.deep !== undefined ? e.deep * 10 + (ballPos.x - e.deep * 10) * 0.25 : ballPos.x * 0.5;
-      moveToward(e, tx, Math.max(backLine + 1, e.robber ? -7 : deepZ), e.maxSpeed * 0.75, dt);
+      const half = receivers.filter((r) => r.route && (e.deep === undefined || e.deep === 0 || Math.sign(r.pos.x || 1) === e.deep));
+      const deepest = half.sort((a, b) => a.pos.z - b.pos.z)[0];
+      let tx = e.deep !== undefined ? e.deep * 10 + (ballPos.x - e.deep * 10) * 0.25 : ballPos.x * 0.5;
+      if (deepest && deepest.pos.z < -6 && !e.robber) tx = tx * 0.35 + deepest.pos.x * 0.65; // over the top of the deep threat
+      moveToward(e, tx, Math.max(backLine + 1, e.robber ? -7 : deepZ), e.maxSpeed * (deepest && deepest.pos.z < -8 ? 0.95 : 0.75), dt);
       backpedalFace(e, e.vel.z < -0.3);
       return;
     }
@@ -643,9 +662,26 @@ export function freePlay(ctx) {
       }
       if (e.handT > 0) e.handT -= dt;
       const onUser = r.user && mode === 'route';
-      const lag = (onUser ? 0.12 + (has('routes') ? 0.08 : 0) : mode === 'pass' ? 0.2 : 0.28) + Math.random() * 0.05;
-      moveToward(e, r.pos.x - r.vel.x * lag + (r.pos.x < 0 ? 0.5 : -0.5), r.pos.z - r.vel.z * lag - 0.6, e.maxSpeed * (onUser ? 1.05 : 1), dt, onUser ? 24 : 18);
-      backpedalFace(e, e.vel.z < -0.3 && t < 1.8, r);
+      // Real man technique: read the receiver (velocity read lags by a reaction time), keep a cushion and stay
+      // on top of him (deeper), backpedal early, then flip the hips and run with him. Cuts still create
+      // separation for a moment, but nobody just runs past a defender. Better QBs face slightly slower reads.
+      const react = onUser ? 0.2 + (has('routes') ? 0.08 : 0) : mode === 'pass' ? 0.1 + qbSkill * 0.12 : 0.24;
+      e.rv ??= { x: 0, z: 0 };
+      const kk = Math.min(1, dt / react);
+      e.rv.x += (r.vel.x - e.rv.x) * kk; e.rv.z += (r.vel.z - e.rv.z) * kk;
+      e.cush0 ??= Math.max(1, r.pos.z - e.pos.z);
+      const floor = onUser ? 0.35 : mode === 'pass' ? 0.55 + qbSkill * 0.45 : 0.8;
+      const cush = Math.max(floor, e.cush0 * (1 - t / 1.6));
+      const look = 0.3;
+      const px = r.pos.x + e.rv.x * look + (r.pos.x < 0 ? 0.45 : -0.45);
+      const pz = r.pos.z + e.rv.z * look - cush;
+      const d = dist(e.pos, r.pos);
+      const pedal = t < 1.4 && d > 2.6 && e.pos.z > pz - 0.5;
+      // flip and run: match the receiver's speed (up to your own top speed)
+      const rs = Math.hypot(r.vel.x, r.vel.z);
+      const spd = pedal ? e.maxSpeed * 0.78 : Math.min(e.maxSpeed * (onUser ? 1.03 : 1.06), Math.max(e.maxSpeed * 0.9, rs * 1.04));
+      moveToward(e, px, pz, spd, dt, onUser ? 22 : 26);
+      backpedalFace(e, pedal, r);
       return;
     }
     // Zone: hold an area and squeeze whoever enters it.
@@ -1200,9 +1236,9 @@ export function freePlay(ctx) {
 
   // ---------------- start
   const tips = {
-    pass: ['Pick a play, then move your QB with the joystick (left side) or WASD.', 'Tap a receiver (or press 1-5) to throw. Green ring = open.', 'Red ring under a defender = they are about to tackle. Get rid of it or run!'],
-    run: ['Pick a run play. Follow the green arrow to the hole.', 'Move with the joystick / WASD. Hold SPRINT (Shift) for speed.', 'When a defender flashes a red ring, they are about to lunge: hit JUKE or SPIN right then. STIFF ARM bullies them.'],
-    route: ['Pick your route. Run it yourself with the joystick, or let go and you will run it automatically.', 'Get open, tap CALL FOR IT, then press CATCH as the ball arrives.', 'After the catch, juke, spin and stiff-arm your way upfield.'],
+    pass: ['Pick a play, then press SNAP (Space) when you are ready. Move your QB with the joystick (left side) or WASD.', 'Tap a receiver (or press 1-5) to throw. Green ring = open.', 'Red ring under a defender = they are about to tackle. Get rid of it or run!'],
+    run: ['Pick a run play and press SNAP (Space). Follow the green arrow to the hole.', 'Move with the joystick / WASD. Hold SPRINT (Shift) for speed.', 'When a defender flashes a red ring, they are about to lunge: hit JUKE or SPIN right then. STIFF ARM bullies them.'],
+    route: ['Pick your route and press SNAP (Space). Run it yourself with the joystick, or let go and you will run it automatically.', 'Get open, tap CALL FOR IT, then press CATCH as the ball arrives.', 'After the catch, juke, spin and stiff-arm your way upfield.'],
     cover: ['Pick a coverage. Stay close to your receiver (blue line) with the joystick.', 'When the ball is in the air, press SWAT / PICK as it arrives.', 'Press TACKLE near the ball carrier to bring them down.'],
     runD: ['They are running at you. Come up and make the tackle.', 'Move with the joystick, press TACKLE when close. Watch for jukes!'],
     rush: ['A lineman locks onto you at the snap. Push the stick toward the QB to build LEVERAGE.', 'Then hit RIP, SWIM or BULL RUSH to break free. More leverage = better odds.', 'Free? Chase the QB and press SACK. Near the line when he throws? BAT IT down.'],
@@ -1241,8 +1277,14 @@ export function freePlay(ctx) {
     if (phase === 'pre') {
       rig(camera, (user?.pos.x ?? 0) * 0.4, -4, dt, { zoom: mode === 'pass' ? 1.1 : 0.95, k: 3 });
       if (holeArrow) holeArrow.material.opacity = 0.6 + Math.sin(t * 8) * 0.25;
-      if (t > 1.1) {
-        phase = 'live'; t = 0;
+      // Offense snaps the ball yourself (SNAP button / Space); the play clock snaps it for you at 0.
+      // Defense: the offense snaps it after a short moment.
+      if (!m.defense && !snapCalled) {
+        const left = Math.ceil(PLAY_CLOCK - t);
+        if (left !== clockShown) { clockShown = left; hud.instr(`${play.name} · press SNAP · play clock ${Math.max(0, left)}`); if (left <= 3 && left > 0) sfx.click(); }
+      }
+      if (m.defense ? t > 1.4 : snapCalled || t > PLAY_CLOCK) {
+        phase = 'live'; t = 0; snapCalled = false; setButtonsFor();
         sfx.whistle();
         say(m.defense ? 'snapDef' : 'snap');
         stopMusic();

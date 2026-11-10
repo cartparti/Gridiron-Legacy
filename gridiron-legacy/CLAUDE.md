@@ -212,6 +212,25 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   knockdowns are short ragdolls, hard hits ragdoll the tackler too.
 - Game speed: `settings.gameSpeed` (Slow 0.72 / Realistic 0.85 default / Fast 1) sets `R.playSpeed` during plays.
 
+## v0.16 changes
+- SNAP button (Space) on offense, incl. the goal-line dive: you snap the ball when ready; a 15-second play clock
+  snaps it for you. Defense still snaps automatically.
+- Coverage (engine `aiDefense` man block): defenders read the receiver with a reaction lag (`e.rv`), keep a
+  shrinking cushion and stay on top, backpedal then flip and match speed; safeties shade over the deepest route;
+  AI receivers throttle down at breaks. Window size scales with your QB skill (`qbSkill`). Separation at 1.8s went
+  from ~3-7 yd to ~1-2.5 yd.
+- Sideline life (`src/scenes/sideline.js`, `stadium.sideline`): voxel team mascot per mascot kind (sideline + behind
+  the far end zone), cheer squads (fewer in HS), bench backrests in team colors, coaches with headsets pacing,
+  cooler tables, kicking nets, photographers.
+- Between-play broadcast shots (`src/scenes/interludes.js`, run by `runMinigame` when `opts.interlude` is set,
+  ~55% of plays from gameday): mascot, cheer, coach, crowd, huddle (your unit), bench. Tap/any key skips.
+- More time on the ball: after a non-scoring moment the same series can continue (`d.series`, up to 2 extra snaps,
+  odds rise with OVR and play quality); a long series can use up a later scheduled drive; label "Same series".
+- Training points (`creditTraining` in progress.js, `player.trainPts`): drill grades earn A+ 60% / A 45% / B 30% /
+  C 15% toward a bonus skill point (only improvements count on retries). Shown on the drill card, result screen
+  and Career skill card.
+- tools/balance.js handles DT.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

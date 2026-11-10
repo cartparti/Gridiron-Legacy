@@ -22,6 +22,7 @@ import { lineupView } from './lineup.js';
 import { homeView } from './home.js';
 import { careerStatsSections, legendsPage, racePage, traitsPage } from './careerStats.js';
 import { DRILLS, DRILL_NAMES, openDrill, grade } from './drills.js';
+import { creditTraining } from '../../sim/progress.js';
 import { teamKits } from '../../data/kits.js';
 import { fmtSize } from '../../data/looks.js';
 import { crest, mascotKind } from '../crest.js';
@@ -226,10 +227,19 @@ function weekView(app) {
           q !== undefined ? h('span.chip.gold.pix', `GRADE ${grade(q)}`) : null,
           h(`button.btn.small${q === undefined ? '.primary' : ''}`, { onclick: () => {
             sfx.click();
-            openDrill(id, (res) => { st.week.drills ??= {}; st.week.drills[i] = Math.max(res, q ?? 0); app.save(); app.render(); });
+            openDrill(id, (res) => {
+              st.week.drills ??= {};
+              const cr = creditTraining(st, res, q);
+              st.week.drills[i] = Math.max(res, q ?? 0);
+              app.save(); app.render();
+              if (cr.points) { sfx.levelUp(); toast(`+${cr.points} SKILL POINT from training! Spend it in Career.`); }
+              else if (cr.gain) toast(`Training points +${Math.round(cr.gain * 100)}%`);
+            });
           } }, q === undefined ? '▶ Play' : 'Retry'));
       })),
-      h('p.tiny.muted', { style: { marginTop: '8px' } }, 'Great drills give up to +50% training that day; a bad one cuts it to 60%. Skip it for normal gains.')));
+      h('div.train-pts', h('div.row', h('b.tiny.pix', 'TRAINING POINTS'), h('span.grow'), h('span.tiny', `${Math.round((p.trainPts ?? 0) * 100)}% to next skill point`)),
+        h('div.watch-bar', h('i', { style: { width: `${Math.min(100, (p.trainPts ?? 0) * 100)}%` } }))),
+      h('p.tiny.muted', { style: { marginTop: '8px' } }, 'Great drills give up to +50% training that day and earn training points (A+ 60%, A 45%, B 30%, C 15%). Every 100% = 1 skill point. Skip it for normal gains.')));
   }
 
   // Activity picker

@@ -7,13 +7,14 @@ import {
   stepGame, resolveMoment, autoMoment, tolerance, outcomeFromQuality, resolveDecision, autoDecision,
   resolveGameEvent, autoGameEvent, MOMENT_NAMES, setGamePlan,
 } from '../../sim/game.js';
-import { crest } from '../crest.js';
+import { crest, mascotKind } from '../crest.js';
 import { equippedTraits } from '../../sim/traits.js';
 import { teamCulture, BIOME_INFO } from '../../data/culture.js';
 import * as flow from '../../sim/flow.js';
 import { teamBadge, changeChips } from '../components.js';
 import { sfx } from '../../audio/sfx.js';
 import { runMinigame } from '../../scenes/director.js';
+import { INTERLUDES } from '../../scenes/interludes.js';
 import { tipCard } from './tips.js';
 import { icon } from '../icons.js';
 import { teamKits, oppKitFor, kitUniform, KIT_IDS } from '../../data/kits.js';
@@ -353,7 +354,10 @@ export function gamedayScreen(app) {
       lastName: st.player.last,
       userHome: g.userSide === 'home',
       stage: st.career.stage,
-      culture,
+      culture: { ...culture, mascot: mascotKind(home) },
+      homeName: home.name,
+      // a broadcast shot between plays about half the time (mascot, cheer squad, coach, crowd, huddle, bench)
+      interlude: Math.random() < 0.55 ? INTERLUDES[Math.floor(Math.random() * INTERLUDES.length)] : null,
       song: culture.song,
       bigGame: !!(g.playoff || g.rivalry),
       teamName: me.name,

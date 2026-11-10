@@ -40,6 +40,7 @@ export function careerStatsSections(app) {
     h('div.card-title', h('h3', `Level ${lv.level}`), h(`span.chip.pix${lv.points ? '.gold' : ''}`, `${lv.points} SKILL POINT${lv.points === 1 ? '' : 'S'}`)),
     h('div.watch-bar', h('i', { style: { width: `${(lv.xp / lv.need) * 100}%` } })),
     h('p.tiny.muted', `${lv.xp} / ${lv.need} XP · earn XP from games, training and awards. Each level = 1 point.`),
+    h('p.tiny.muted', `Training points: ${Math.round((p.trainPts ?? 0) * 100)}% · ace your training drills (Week tab) to earn extra skill points.`),
     h('div.col', { style: { gap: '6px', marginTop: '8px' } }, STAT_KEYS.map((k) => {
       const v = Math.round(p.stats[k]);
       const cost = pointCost(v);
