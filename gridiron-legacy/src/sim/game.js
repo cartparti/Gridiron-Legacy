@@ -443,8 +443,10 @@ export function resolveMoment(state, result) {
     if (result.turnover) out = 'TO';
     else if (result.tdAllowed) out = 'TD';
     else {
-      yl = m.yardLine - (result.yardsAllowed ?? 0);
-      converted = (result.yardsAllowed ?? 0) >= m.distance;
+      // penalty yards move the ball but never count in anyone's stats
+      yl = m.yardLine - (result.yardsAllowed ?? 0) - (result.penYds ?? 0);
+      converted = (result.yardsAllowed ?? 0) + (result.penYds ?? 0) >= m.distance || !!result.autoFirst;
+      yl = Math.min(99, yl);
     }
     momentumShift(g, ((result.quality - 0.5) * 0.35 + (result.turnover ? 0.25 : 0) - (result.tdAllowed ? 0.2 : 0)) * ((state.player.traits?.equipped ?? []).includes('captain') && result.quality > 0.5 ? 1.25 : 1));
   } else {
@@ -469,8 +471,9 @@ export function resolveMoment(state, result) {
     if (result.td) out = 'TD';
     else if (result.turnover) out = 'TO';
     else {
-      yl = m.yardLine - result.yards;
-      converted = result.yards >= m.distance;
+      yl = m.yardLine - result.yards - (result.penYds ?? 0);
+      converted = result.yards + (result.penYds ?? 0) >= m.distance || !!result.autoFirst;
+      yl = Math.min(99, yl);
     }
     momentumShift(g, (result.quality - 0.5) * 0.35 + (result.td ? 0.2 : 0) - (result.turnover ? 0.3 : 0));
   }
@@ -587,9 +590,21 @@ function finishDrive(state, g, d, out, momentInfo) {
   (g.chart ??= []).push({ m: g.momentum, out, user: isUserTeam, q: d.quarter });
   const verb = { TD: 'Touchdown', FG: 'Field goal', TO: 'Turnover', PUNT: 'Punt', DOWNS: 'Turnover on downs' }[out];
   const who = momentInfo ? `${state.player.last}: ${momentInfo.result.text} → ` : '';
+  // penalties happen on the simulated drives too, for both teams
+  let flagNote = '';
+  if (!momentInfo && chance(state, 0.16)) {
+    const notes = {
+      TD: [' (a pass interference flag set it up)', ' (helped by a roughing-the-passer call)', ' (after a defensive holding flag kept it alive)', ' (a facemask call added 15)'],
+      FG: [' (a holding call stalled it)', ' (after a false start)', ' (offensive pass interference pushed them back)'],
+      PUNT: [' (a holding flag killed the drive)', ' (back-to-back false starts)', ' (an illegal block wiped out a big return)', ' (intentional grounding)'],
+      TO: [' (after a chop block backed them up)', ' (right after a delay of game)'],
+      DOWNS: [' (a false start on 4th and short)'],
+    }[out] ?? [];
+    if (notes.length) flagNote = notes[Math.floor(rand(state) * notes.length)];
+  }
   g.log.push({
     q: d.quarter, clock: d.clock, team: team, user: isUserTeam, out,
-    text: `${who}${verb}${momentInfo?.result.defTD ? ' (then pick six!)' : ''}`, score: `${g.score.away}-${g.score.home}`, key: !!momentInfo,
+    text: `${who}${verb}${flagNote}${momentInfo?.result.defTD ? ' (then pick six!)' : ''}`, score: `${g.score.away}-${g.score.home}`, key: !!momentInfo,
   });
 }
 

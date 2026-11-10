@@ -105,7 +105,7 @@ export function endPlay(ctx, result, { color, delay = 1600, beforeDone = null } 
 
 export function finalize(result, moment) {
   if (result.defense) {
-    result.yardsAllowed = result.sack || result.tfl ? Math.round(result.yardsAllowed ?? 0) : Math.max(0, Math.round(result.yardsAllowed ?? 0));
+    result.yardsAllowed = result.sack || result.tfl || result.flag ? Math.round(result.yardsAllowed ?? 0) : Math.max(0, Math.round(result.yardsAllowed ?? 0));
     if (!result.turnover && !result.pd && result.yardsAllowed >= moment.yardLine) { result.yardsAllowed = moment.yardLine; result.tdAllowed = true; }
     result.text = result.text ?? (result.defTD ? 'PICK SIX!' : result.int ? 'INTERCEPTED!' : result.pd ? 'Broken up!' : result.tdAllowed ? 'They scored on you.' : `${result.yardsAllowed} yards allowed.`);
     result.quality = Math.max(0, Math.min(1, result.quality));

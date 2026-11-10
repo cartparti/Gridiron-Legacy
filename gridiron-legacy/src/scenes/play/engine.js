@@ -241,7 +241,7 @@ export function freePlay(ctx) {
   let routeLine = null;
   let snapCalled = false;
   let clockShown = -1;
-  const PLAY_CLOCK = 15;
+  const PLAY_CLOCK = 20;
   let assignLine = null;
   let holeArrow = null;
   const preSnapVisuals = () => {
@@ -1215,19 +1215,116 @@ export function freePlay(ctx) {
     if (!def && result.complete && result.yards >= 20) snap(`${result.yards}-yard gain`, 100);
   };
 
-  // Penalty flags: occasionally a yellow flag changes the outcome of the play.
+  // Penalty flags: a yellow flag now and then, on either team. penYds moves the ball without counting in anyone's
+  // stats (+ = toward the offense's goal), autoFirst = automatic first down. Half the distance near the goal.
+  const usName = opts.teamName ?? 'your team';
+  const themName = opts.oppName ?? 'the other team';
+  const offName = m.defense ? themName : usName;
+  const defName = m.defense ? usName : themName;
+  const pickNum = (role) => { const e = ents.find((x) => x.role === role && !x.user); return e ? `#${e.mesh.userData.number ?? Math.floor(rnd(20, 99))}` : ''; };
+  let freePlay = null; // offsides at the snap: the offense gets a free play
+  const halfDist = (pen, ylAfter) => (pen > 0 ? Math.max(1, Math.min(pen, Math.floor(Math.max(1, ylAfter) / 2) || 1)) : pen);
+  const flagShow = (msg) => setTimeout(() => { sfx.whistle(); hud.big('FLAG!', '#ffd43b', 1100); hud.say?.(msg, 3000); }, 450);
   const maybeFlag = () => {
-    if (!result || result.turnover || Math.random() > 0.07) return;
-    const flag = (msg, patch) => {
-      Object.assign(result, patch, { text: msg, flag: true });
-      setTimeout(() => { hud.big('FLAG!', '#ffd43b', 1100); hud.say?.(msg, 2600); }, 450);
-    };
-    if (m.defense) {
-      if (result.pd || result.yardsAllowed === 0) flag('Pass interference on you. 15 yards.', { pd: false, yardsAllowed: 15, caught: true, quality: Math.min(result.quality, 0.25) });
-      else if (result.tackle) flag('Facemask! 15 more yards.', { yardsAllowed: (result.yardsAllowed ?? 0) + 15, quality: Math.min(result.quality, 0.2) });
-      else if ((result.yardsAllowed ?? 0) >= 12) flag('Holding on the offense! Play comes back.', { yardsAllowed: 0, caught: false, quality: Math.max(result.quality, 0.6) });
-    } else if (result.complete === false && !result.sack) flag('Pass interference on the defense! First down.', { complete: true, yards: Math.max(m.distance, 12), quality: 0.6 });
-    else if (result.complete && result.yards >= 10) flag('Holding on the offense. That big gain comes back.', { yards: -10, quality: 0.12 });
+    if (!result || result.turnover) return;
+    const fl = (msg, patch) => { Object.assign(result, patch, { text: msg, flag: true }); flagShow(msg); };
+    const def = m.defense;
+    const gained = def ? (result.yardsAllowed ?? 0) : (result.yards ?? 0);
+    // free play from an offsides at the snap: offense takes the 5 yards only if the play went badly
+    if (freePlay) {
+      const offenseGood = gained >= 5 || result.td;
+      if (offenseGood) { result.text = `${result.text ?? ''} (Offsides on ${defName} declined.)`.trim(); flagShow(`Offsides on ${defName}, declined.`); }
+      else fl(`Offsides on ${defName}. Free play! 5 yards.`, def ? { yardsAllowed: 0, caught: false, pd: false, sack: false, tfl: false, tackle: false, penYds: 5, quality: Math.min(result.quality, 0.4) }
+        : { yards: 0, complete: false, sack: false, penYds: 5, quality: Math.max(result.quality, 0.45) });
+      return;
+    }
+    if (Math.random() > (globalThis.__flagRate ?? 0.15)) return; // __flagRate: test hook
+    const ylAfter = m.yardLine - gained;
+    const passPlay = mode === 'pass' || mode === 'route' || mode === 'cover' || mode === 'rush';
+    const opts2 = [];
+    if (!def) {
+      // ---- you're on offense
+      if (result.complete === false && !result.sack && passPlay) {
+        const spot = 12 + Math.floor(Math.random() * 22);
+        opts2.push(() => fl(`Pass interference on ${defName} ${pickNum('CB')}! Spot foul, ${halfDist(spot, m.yardLine)} yards and a first down.`, { penYds: halfDist(spot, m.yardLine), autoFirst: true, quality: 0.6 }));
+        opts2.push(() => fl(`Defensive holding on ${defName}. 5 yards and an automatic first down.`, { penYds: halfDist(5, m.yardLine), autoFirst: true, quality: 0.5 }));
+        if (user === qb && t > 1.8) opts2.push(() => fl('Intentional grounding on you! Loss of down, 10 yards.', { penYds: -10, quality: 0.08 }));
+        opts2.push(() => fl(`Illegal formation on ${offName}. 5 yards back.`, { penYds: -5, quality: 0.15 }));
+      }
+      if (result.sack) {
+        opts2.push(() => fl(`Roughing the passer on ${defName}! The sack is wiped out. 15 yards, first down.`, { sack: false, yards: 0, penYds: halfDist(15, m.yardLine), autoFirst: true, quality: 0.5 }));
+        opts2.push(() => fl(`Illegal contact downfield on ${defName}. No sack, 5 yards and a first down.`, { sack: false, yards: 0, penYds: halfDist(5, m.yardLine), autoFirst: true, quality: 0.45 }));
+      }
+      if (result.complete && gained >= 8) {
+        opts2.push(() => fl(`Holding on ${offName} ${pickNum('OL')}. That ${gained}-yard gain comes back. 10 yards.`, { yards: 0, complete: false, penYds: -10, quality: 0.12 }));
+        if (passPlay) opts2.push(() => fl(`Offensive pass interference! The catch is wiped out. 10 yards.`, { yards: 0, complete: false, penYds: -10, quality: 0.1 }));
+        else opts2.push(() => fl(`Illegal block in the back on ${offName}. Ball comes back to the spot of the foul.`, { yards: Math.floor(gained / 2), penYds: -10, quality: 0.2 }));
+      }
+      if (result.complete && gained < 30) {
+        opts2.push(() => fl(`Facemask on ${defName}! 15 more yards.`, { penYds: halfDist(15, ylAfter), autoFirst: true, quality: Math.max(result.quality, 0.55) }));
+        opts2.push(() => fl(`Horse-collar tackle on ${defName}! Tack on 15.`, { penYds: halfDist(15, ylAfter), autoFirst: true, quality: Math.max(result.quality, 0.55) }));
+        opts2.push(() => fl(`Late hit out of bounds! Unnecessary roughness on ${defName}, 15 yards.`, { penYds: halfDist(15, ylAfter), autoFirst: true, quality: Math.max(result.quality, 0.55) }));
+        opts2.push(() => fl(`Chop block on ${offName}. 15 yards back.`, { yards: Math.min(gained, 0), complete: gained > 0 ? result.complete : false, penYds: -15, quality: 0.1 }));
+      }
+      if (Math.random() < 0.15) opts2.push(() => fl('Offsetting penalties. Nobody gains anything.', { yards: 0, complete: false, sack: false, penYds: 0, quality: 0.35 }));
+    } else {
+      // ---- you're on defense
+      const coverUser = mode === 'cover';
+      if ((result.pd || result.yardsAllowed === 0) && passPlay && !result.sack) {
+        const spot = 12 + Math.floor(Math.random() * 22);
+        opts2.push(() => fl(`Pass interference on ${coverUser && Math.random() < 0.6 ? 'you' : `${defName} ${pickNum('CB')}`}! Spot foul, ${halfDist(spot, m.yardLine)} yards.`, { pd: false, caught: false, yardsAllowed: 0, penYds: halfDist(spot, m.yardLine), autoFirst: true, quality: Math.min(result.quality, 0.22) }));
+        opts2.push(() => fl(`Defensive holding on ${defName}. 5 yards, automatic first down.`, { pd: false, yardsAllowed: 0, penYds: halfDist(5, m.yardLine), autoFirst: true, quality: Math.min(result.quality, 0.35) }));
+        opts2.push(() => fl(`Illegal shift on ${offName}. 5 yards back.`, { penYds: -5, quality: Math.max(result.quality, 0.65) }));
+      }
+      if (result.sack) {
+        opts2.push(() => fl(`Roughing the passer${result.tackle ? ' on you' : ''}! No sack, 15 yards and a first down.`, { sack: false, tfl: false, yardsAllowed: 0, penYds: halfDist(15, m.yardLine), autoFirst: true, quality: 0.2 }));
+        opts2.push(() => fl(`Holding on ${offName} while you got home. Declined, the sack stands!`, {}));
+      }
+      if ((result.tackle || result.caught) && gained >= 0 && !result.sack) {
+        opts2.push(() => fl(`Facemask${result.tackle ? ' on you' : ` on ${defName}`}! 15 more yards.`, { penYds: halfDist(15, ylAfter), autoFirst: true, quality: Math.min(result.quality, 0.2) }));
+        opts2.push(() => fl(`Unnecessary roughness on ${defName}. Late hit, 15 yards.`, { penYds: halfDist(15, ylAfter), autoFirst: true, quality: Math.min(result.quality, 0.25) }));
+      }
+      if (gained >= 8) {
+        opts2.push(() => fl(`Holding on ${offName} ${pickNum('OL')}! That ${gained}-yard gain comes back. 10 yards.`, { yardsAllowed: 0, caught: false, tackle: false, tfl: false, penYds: -10, quality: Math.max(result.quality, 0.65) }));
+        opts2.push(() => fl(`Offensive pass interference on ${offName}! Play wiped out, 10 yards.`, { yardsAllowed: 0, caught: false, penYds: -10, quality: Math.max(result.quality, 0.7) }));
+        opts2.push(() => fl(`Illegal block in the back on ${offName}. Back to the spot of the foul.`, { yardsAllowed: Math.floor(gained / 2), penYds: -10, quality: Math.max(result.quality, 0.5) }));
+      }
+      if (Math.random() < 0.15) opts2.push(() => fl('Offsetting penalties. Nobody gains anything.', { yardsAllowed: 0, caught: false, pd: false, sack: false, tfl: false, penYds: 0, quality: 0.5 }));
+    }
+    if (opts2.length) opts2[Math.floor(Math.random() * opts2.length)]();
+  };
+  /** Flags before the snap: false starts, encroachment, delay of game. Returns true if the play is dead. */
+  const preSnapFlag = (delay = false) => {
+    const def = m.defense;
+    let r = null;
+    if (delay) r = { msg: `Delay of game on ${offName}! The play clock hit zero. 5 yards back.`, pen: -5 };
+    else if (Math.random() < 0.035) {
+      const list = [
+        { msg: `False start on ${offName} ${pickNum('OL')}. 5 yards back.`, pen: -5 },
+        { msg: `Encroachment on ${defName}. 5 free yards.`, pen: 5 },
+        { msg: `Neutral zone infraction on ${defName}. 5 yards.`, pen: 5 },
+        { msg: `Illegal motion on ${offName}. 5 yards back.`, pen: -5 },
+      ];
+      if (def && dtMode) list.push({ msg: 'You jumped offsides! 5 yards.', pen: 5 });
+      r = list[Math.floor(Math.random() * list.length)];
+    } else if (Math.random() < 0.03) {
+      freePlay = true;
+      setTimeout(() => { hud.big('FLAG! FREE PLAY', '#ffd43b', 1100); hud.say?.(`Flag at the snap: offsides on ${defName}. ${def ? 'They' : 'You'} have a free play!`, 2600); }, 50);
+      return false;
+    }
+    if (!r) return false;
+    const pen = r.pen > 0 ? halfDist(r.pen, m.yardLine) : r.pen;
+    result = def
+      ? { defense: true, yardsAllowed: 0, penYds: pen, quality: pen < 0 ? 0.62 : 0.32, text: r.msg, flag: true, presnap: true }
+      : { complete: false, yards: 0, penYds: pen, quality: pen > 0 ? 0.5 : 0.15, text: r.msg, flag: true, presnap: true };
+    phase = 'over';
+    sfx.whistle();
+    hud.big('FLAG!', '#ffd43b', 1400);
+    hud.say?.(r.msg, 3000);
+    hud.instr('');
+    controls.setButtons([]);
+    endPlay(ctx, finalize(result, m), { delay: 1800, color: '#ffd43b' });
+    return true;
   };
 
   const startCelebration = () => {
@@ -1302,7 +1399,9 @@ export function freePlay(ctx) {
         const left = Math.ceil(PLAY_CLOCK - t);
         if (left !== clockShown) { clockShown = left; hud.instr(`${play.name} · press SNAP · play clock ${Math.max(0, left)}`); if (left <= 3 && left > 0) sfx.click(); }
       }
-      if (m.defense ? t > 1.4 : snapCalled || t > PLAY_CLOCK) {
+      if (!m.defense && !snapCalled && t > PLAY_CLOCK) { preSnapFlag(true); return; }
+      if (m.defense ? t > 1.4 : snapCalled) {
+        if (preSnapFlag()) return;
         phase = 'live'; t = 0; snapCalled = false; setButtonsFor();
         sfx.whistle();
         say(m.defense ? 'snapDef' : 'snap');

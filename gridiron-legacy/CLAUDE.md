@@ -250,6 +250,16 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   mascots with brows, cheeks, teeth, number, tails, fingers; cheerleaders with faces, bows, hair styles, trim.
   Sideline figures are baked into vertex-colored meshes (`bake` in sideline.js) to keep draw calls low.
 
+## v0.17.1: more flags, both sides
+- Post-play flags (~15% of plays, `maybeFlag` in engine; `globalThis.__flagRate` overrides for tests): DPI (spot foul),
+  defensive holding, roughing the passer (wipes out sacks), facemask, horse-collar, late hit, illegal contact on the
+  defense; holding, OPI, illegal block in the back, chop block, illegal formation/shift, intentional grounding on the
+  offense; offsetting penalties; flags on you when you're involved. Half the distance near the goal.
+- Pre-snap flags (`preSnapFlag`): false start, illegal motion, encroachment, neutral zone, DT offsides, offsides =
+  free play (accepted only if the play went badly), delay of game when the 20-second play clock runs out.
+- Results carry `penYds` (+ toward the offense's goal) and `autoFirst`; resolveMoment moves the ball with them but
+  never adds them to stats. Simulated drives in the feed get penalty notes too.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

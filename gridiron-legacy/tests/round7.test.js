@@ -71,3 +71,16 @@ test('playing a stronger opponent makes the timing window smaller', async () => 
   assert.ok(matchup(st).k > 0);
   assert.ok(hard < easy * 0.9, `${hard} vs ${easy}`);
 });
+
+test('penalty yards move the ball and can give a first down, without counting in stats', () => {
+  const st = career('RB', 8);
+  while (st.phase === 'event') flow.resolveEvent(st, 0);
+  flow.submitPlan(st, [null, null, null, null, null]);
+  let r;
+  for (let i = 0; i < 50; i++) { r = stepGame(st); if (r.type === 'moment') break; if (r.type === 'gameEvent') resolveGameEvent(st, 0); if (r.type === 'decision') resolveDecision(st, false); }
+  assert.equal(r.type, 'moment');
+  const before = st.game.userStats.rushYds;
+  const res = resolveMoment(st, { complete: true, yards: 2, penYds: 15, autoFirst: true, flag: true, quality: 0.5, text: 'Facemask! 15 more yards.' });
+  assert.equal(st.game.userStats.rushYds, before + 2);
+  assert.ok(res.outcome);
+});

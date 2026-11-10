@@ -469,6 +469,7 @@ function buildRig(o) {
     look: L,
     ticked: 0,
     un: football ? un : null,
+    number: o.number,
     pantsMat: football ? pants : null,
   };
   return root;
