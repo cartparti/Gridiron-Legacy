@@ -1,7 +1,8 @@
 // Walkable places: Home, Park, Stadium, Downtown. Doing activities here fills your week's day slots.
 import { h, clear } from '../dom.js';
 import { openModal, toast } from '../components.js';
-import { runWorld, stopWorld } from '../../scenes/director.js';
+import { runWorld, stopWorld, runSetCutscene } from '../../scenes/director.js';
+import { gamingScene, hangoutScene, dateScene } from '../../scenes/sets.js';
 import { placeFor } from '../../data/places.js';
 import { DAYS } from '../../data/config.js';
 import { ACTIVITY_BY_ID, isAvailable, maxEnergy, planCost } from '../../sim/week.js';
@@ -118,6 +119,12 @@ export function worldScreen(app) {
     app.save();
     sfx.levelUp();
     world?.emote('do');
+    // a little scene for the fun stuff
+    const friends = people(st).filter((x) => x.kind === 'teammate').map((x) => x.look);
+    const life = id === 'gaming' ? (ctx) => gamingScene(ctx, { look: p.look, friendLook: friends[0] })
+      : id === 'hangout' || id === 'nightout' ? (ctx) => hangoutScene(ctx, { look: p.look, friendLooks: friends, title: act.label })
+        : id === 'date' && p.partnerName ? (ctx) => dateScene(ctx, { look: p.look, partnerLook: p.partnerLook, partnerName: p.partnerName, venue: act.label }) : null;
+    if (life && !app.settings.reducedMotion) runSetCutscene(life, { music: 'groove' });
     flash(`${DAYS[slot]}: ${act.label}`);
     drawTop();
     if (weekFull()) setTimeout(() => offerGameDay(), 900);

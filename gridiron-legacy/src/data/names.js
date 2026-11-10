@@ -25,11 +25,14 @@ export const LAST_NAMES = [
 ];
 
 export const PARTNER_NAMES = [
-  'Maya', 'Aaliyah', 'Sofia', 'Jordan', 'Riley', 'Camila', 'Taylor', 'Zara', 'Alex', 'Nia', 'Hannah', 'Priya',
-  'Elena', 'Morgan', 'Jasmine', 'Lena', 'Avery', 'Imani', 'Chloe', 'Sam',
+  'Maya', 'Aaliyah', 'Sofia', 'Brianna', 'Riley', 'Camila', 'Taylor', 'Zara', 'Alexis', 'Nia', 'Hannah', 'Priya',
+  'Elena', 'Gabriela', 'Jasmine', 'Lena', 'Ava', 'Imani', 'Chloe', 'Savannah', 'Kayla', 'Mia', 'Destiny', 'Isabella',
 ];
 
 export const AGENT_NAMES = ['Ray Castellano', 'Dana Whitlock', 'Victor Mbatha', 'Sheila Park', 'Lou Brennan', 'Tasha Greer'];
+
+/** Agents whose names read as women (the rest are men). */
+export const FEMALE_AGENTS = new Set(['Dana Whitlock', 'Sheila Park', 'Tasha Greer']);
 
 export const COACH_TITLES = { hs: 'Coach', college: 'Coach', pro: 'Coach' };
 

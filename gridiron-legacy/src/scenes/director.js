@@ -568,3 +568,93 @@ export function stopWorld() {
 export function webglAvailable() {
   return !!ensure();
 }
+
+// ------------------------------------------------------------------ indoor sets (locker room, banquet, date night...)
+
+function newSetScene(r, bg = '#15171b') {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(bg);
+  scene.environment = r.scene.environment;
+  scene.environmentIntensity = 0.4;
+  return scene;
+}
+
+/**
+ * Open a persistent 3D set behind the menus (the halftime locker room). build({ THREE, scene, camera }) returns
+ * update(dt, t). Returns { close() } or null without WebGL. The caller owns any UI drawn on top.
+ */
+export function openSet(build, { bg } = {}) {
+  stopBackdrop();
+  const r = ensure();
+  if (!r) return null;
+  const scene = newSetScene(r, bg);
+  R.active = scene;
+  let update = null;
+  try { update = build({ THREE, scene, camera: r.camera }); } catch (err) { console.error('set', err); R.active = null; return null; }
+  let t = 0;
+  start((dt) => {
+    nextFrame();
+    t += dt;
+    try { update?.(dt, t); } catch (err) { console.error('set update', err); update = null; }
+    tickIdle(scene, dt);
+  });
+  return { close() { stop(); if (R) R.active = null; } };
+}
+
+/**
+ * Play a short scripted scene on its own set. build(ctx) returns update(dt, t) -> false when done.
+ * ctx: { THREE, scene, camera, caption(text, sub) }. Resolves when it ends or the player taps Skip.
+ */
+export function runSetCutscene(build, { bg, music = 'groove' } = {}) {
+  stopBackdrop();
+  const r = ensure();
+  if (!r) return Promise.resolve();
+  const app = document.getElementById('app');
+  const prevVis = app.style.visibility;
+  app.style.visibility = 'hidden';
+  const ui = document.createElement('div');
+  ui.className = 'cutscene-ui';
+  ui.innerHTML = '<div class="cut-caption"><div class="cut-main"></div><div class="cut-sub"></div></div><button class="btn small cut-skip">Skip ▸</button>';
+  document.body.append(ui);
+  document.body.classList.add('cine');
+  const prevActive = R.active;
+  const wasLoop = loopFn;
+  return new Promise((resolve) => {
+    const scene = newSetScene(r, bg);
+    R.active = scene;
+    let done = false;
+    if (music) playMusic(music, { vol: 0.6 });
+    const finish = () => {
+      if (done) return;
+      done = true;
+      stopMusic();
+      ui.remove();
+      document.body.classList.remove('cine');
+      app.style.visibility = prevVis;
+      R.active = prevActive ?? null;
+      if (wasLoop) loopFn = wasLoop; else stop(); // hand the render loop back (e.g. to the walkable world)
+      resolve();
+    };
+    ui.querySelector('.cut-skip').onclick = finish;
+    const main = ui.querySelector('.cut-main');
+    const sub = ui.querySelector('.cut-sub');
+    const ctx = {
+      THREE, scene, camera: r.camera,
+      caption(text, subText = '') {
+        main.textContent = text; sub.textContent = subText;
+        const c = ui.querySelector('.cut-caption'); c.classList.remove('show'); void main.offsetWidth; c.classList.add('show');
+      },
+    };
+    let update;
+    try { update = build(ctx); } catch (err) { console.error('set cutscene', err); finish(); return; }
+    let t = 0;
+    start((dt) => {
+      nextFrame();
+      t += dt;
+      let more = false;
+      try { more = update(dt, t) !== false; } catch (err) { console.error('set cutscene', err); }
+      tickIdle(scene, dt);
+      if (!more) finish();
+    });
+  });
+}

@@ -14,9 +14,10 @@ export function relLabel(k) {
   return REL_LABELS[k] ?? k;
 }
 
-export function newInjury(state, { allowMajor = false } = {}) {
+export function newInjury(state, { allowMajor = false, id = null } = {}) {
   const pool = INJURIES.filter((i) => allowMajor || !i.major);
-  const inj = weightedPick(state, pool, (i) => i.weight);
+  // id: the injury you just watched happen on the field (so the report matches the X-ray)
+  const inj = INJURIES.find((i) => i.id === id) ?? weightedPick(state, pool, (i) => i.weight);
   return { id: inj.id, label: inj.label, weeks: randInt(state, inj.weeks[0], inj.weeks[1]), major: !!inj.major, perm: inj.perm ?? null };
 }
 
@@ -99,7 +100,7 @@ export function applyEffects(state, eff, ctx = {}) {
   if (eff.flags) Object.assign(p.flags, eff.flags);
   if (eff.clearFlags) for (const f of eff.clearFlags) delete p.flags[f];
   if (eff.injury) {
-    const inj = newInjury(state);
+    const inj = newInjury(state, { id: eff.injuryId ?? null });
     applyInjury(state, inj);
     out.push({ label: 'Injury', delta: -1, text: `${inj.label} (${inj.weeks} wk)` });
   }

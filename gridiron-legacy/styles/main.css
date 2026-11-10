@@ -926,3 +926,28 @@ h1, h2, .display { text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35); }
 :root { --pixel: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; }
 .pix, h1, h2, h3, .btn, .hud, .subtab, .tab, .chip, .kicker, .section-label, .card-title, .mh-pts, .mh-clock, .sb-mid, .sb-team,
 .hud-big, .hud-comm, .hud-instr, .fc-btn, .fc-play, .hud-pill, .tr-slots, .drill-grade { font-weight: 800; letter-spacing: 0.02em; }
+
+/* injury X-ray card */
+.xray { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(0.6); opacity: 0; z-index: 30; pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: 0; border: 2px solid #7fc4ff; border-radius: 12px; overflow: hidden; background: #040a10; box-shadow: 0 0 40px rgba(80, 170, 255, 0.45), 0 12px 30px rgba(0,0,0,0.7); animation: xray-in 3.6s ease forwards; }
+.xray canvas { display: block; width: 220px; height: 220px; }
+.xray-cap { width: 100%; padding: 8px 12px 10px; background: #0b1722; color: #fff; text-align: center; display: flex; flex-direction: column; gap: 2px; }
+.xray-cap small { color: #ff5d5d; font-weight: 800; letter-spacing: 0.14em; font-size: 0.6rem; }
+.xray-cap b { font-size: 1.05rem; font-weight: 800; }
+.xray-cap span { font-size: 0.7rem; opacity: 0.7; }
+@keyframes xray-in { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); } 8% { opacity: 1; transform: translate(-50%, -50%) scale(1.04); } 12% { transform: translate(-50%, -50%) scale(1); } 88% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(0.96); } }
+
+/* halftime locker room panel (sits over the 3D room) */
+.halftime { position: fixed; left: 50%; bottom: calc(10px + var(--safe-bottom)); transform: translateX(-50%); width: min(94vw, 460px); z-index: 20; padding: 12px 14px 14px; border-radius: 14px; background: rgba(14, 17, 22, 0.86); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.14); color: #fff; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 14px 40px rgba(0,0,0,0.55); }
+.ht-head { display: flex; justify-content: space-between; align-items: center; }
+.ht-score { display: flex; justify-content: center; align-items: center; gap: 14px; font-size: 1.7rem; font-weight: 800; }
+.ht-score > div { display: flex; align-items: center; gap: 8px; }
+.ht-stats, .ht-meters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; text-align: center; }
+.ht-stats > div, .ht-meters > div { display: flex; flex-direction: column; gap: 2px; padding: 6px 4px; border-radius: 8px; background: rgba(255,255,255,0.06); }
+.ht-stats b { font-size: 1.05rem; }
+.ht-quote { margin: 0; font-size: 0.86rem; line-height: 1.35; }
+.ht-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.ht-choices .btn { display: flex; flex-direction: column; gap: 2px; padding: 8px 6px; height: auto; white-space: normal; text-align: center; line-height: 1.2; }
+body.cine .world-hud, body.cine .joy { display: none !important; }
+.halftime.min > :not(.ht-head) { display: none; }
+.halftime.min { background: rgba(14, 17, 22, 0.6); }
+.ht-head { gap: 6px; }

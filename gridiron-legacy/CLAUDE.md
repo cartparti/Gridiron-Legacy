@@ -324,6 +324,25 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   props turned to face the room (couches face the TV), near-side shops cut low with floating name boards, skyline /
   tree backdrops, soft shadow-mapped key light (renderer.shadowMap on; only world lights cast).
 
+## v0.22: people, plays, halftime, injuries, cinematics
+- People: `sculpt()` lathe limbs (calf/forearm/thigh muscle profiles), rounder cranium, nose + ears. Gender is a look
+  field: `randomLook(r, {gender})` picks from `MALE_HAIR`/`FEMALE_HAIR`; girls get earrings, lips, lashes, softer
+  brows, narrower shoulders/wider hips, and a dress (`o.dress`) when not in uniform. `feminize`/`masculinize` fix up
+  old saves; `sim/social.js ensure()` enforces partner/agent gender (female `PARTNER_NAMES`, `FEMALE_AGENTS`).
+- Playbook: big per-mode pools (`BIG`) merged into `PLAYS`; `dealPlays(mode, call)` shows 2 from your call + a wildcard
+  and skips the last 12 shown. In-play QTEs are rolled per play (`qteOn`, max one per play) instead of every catch;
+  new sack QTEs (`WRAP HIM UP!` for DL/blitz, `BREAK THE SACK!` for QB).
+- Hometown "Sandy" → school 1 is "Stone Lopez Academy" (`hometown.js`).
+- Halftime: `g.halftimeUI` makes `stepGame` return `{type:'halftime'}` once; `g.half` is the first-half snapshot.
+  `showHalftime()` opens the locker room (`sets.js lockerRoom`, styled per level, team colours + crest) via
+  `director.openSet`; one pick from `HALFTIME_CHOICES` (rest +15 energy / speech momentum / study +5% timing).
+- Injuries: INJURIES carry `part`/`severe`/`bone`. `hardHit` can injure (you or ~3% AI), bends the limb wrong
+  (`applyInjuryLook`, bone poke for `bone`), slows the dead phase, and pops an X-ray card (`play/xray.js`). The
+  result's `injuryId` feeds `newInjury(state, {id})` so the report matches what you saw.
+- Cinematics: `cutscenes.playerOfGameCutscene` (postgame POTG, `lastGame.potg`), `sets.js` banquet (season awards),
+  date, hangout, gaming scenes via `runSetCutscene` (social screen dates/hangouts, world activities).
+- Tests: `tests/round8.test.js`.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

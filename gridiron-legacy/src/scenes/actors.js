@@ -99,6 +99,19 @@ function softBox(w, h, d, r = Math.min(w, h, d) * 0.3, seg = 3) {
   return geo;
 }
 const box = (w, h, d, py = 0, round = 0.32, seg = 2) => { const b = softBox(w, h, d, Math.min(w, h, d) * round, seg); if (py) b.translate(0, py, 0); return b; };
+/**
+ * Sculpted limb: a lathe (turned) shape following a muscle profile, so thighs, calves, biceps and forearms
+ * bulge and taper like real ones. prof = [[t 0..1 from the top joint, radius], ...]; depth = front-to-back scale.
+ * Points run bottom -> top so the top of the texture (sleeve rows) lands at the shoulder / hip.
+ */
+const sculpt = (len, prof, depth = 1, seg = 14) => {
+  const pts = prof.slice().reverse().map(([t, r]) => new THREE.Vector2(Math.max(0.002, r), -t * len));
+  const g = new THREE.LatheGeometry(pts, seg);
+  g.scale(1, 1, depth);
+  g.computeVertexNormals();
+  g.computeBoundingBox();
+  return g;
+};
 /** Limb: almost capsule-like (big rounding) and a touch of taper read as muscle. */
 const limb = (w, h, d, py, taper = 0.9) => {
   const b = softBox(w, h, d, Math.min(w, d) * 0.48, 4);
@@ -111,14 +124,14 @@ const limb = (w, h, d, py, taper = 0.9) => {
 function geo() {
   if (G.thigh) return G;
   // human proportions: smaller head, tapered limbs, rounded torso and pads
-  G.thigh = limb(0.175, 0.5, 0.19, -0.24, 0.82);
-  G.shin = limb(0.14, 0.45, 0.15, -0.22, 0.78);
+  G.thigh = sculpt(0.5, [[0, 0.07], [0.04, 0.094], [0.22, 0.104], [0.48, 0.092], [0.78, 0.074], [0.95, 0.064], [1, 0.05]], 1.06);
+  G.shin = sculpt(0.45, [[0, 0.052], [0.06, 0.066], [0.24, 0.078], [0.45, 0.068], [0.75, 0.05], [0.94, 0.043], [1, 0.03]], 1.1);
   G.shoe = box(0.15, 0.09, 0.29, 0, 0.45, 3);
   G.hips = box(0.37, 0.21, 0.24, 0, 0.42, 3);
   G.torso = (() => { const b = softBox(0.44, 0.54, 0.27, 0.11, 5); const pos = b.attributes.position; for (let i = 0; i < pos.count; i++) { const y = pos.getY(i); pos.setX(i, pos.getX(i) * (0.86 + (y + 0.27) * 0.3)); } b.translate(0, 0.26, 0); return b; })(); // V-taper
   G.pads = softBox(0.64, 0.18, 0.35, 0.085, 4);
-  G.upper = limb(0.14, 0.34, 0.14, -0.15, 0.82);
-  G.fore = limb(0.12, 0.31, 0.12, -0.15, 0.8);
+  G.upper = sculpt(0.34, [[-0.05, 0.03], [0, 0.064], [0.18, 0.074], [0.45, 0.078], [0.75, 0.064], [0.95, 0.054], [1, 0.04]], 0.98);
+  G.fore = sculpt(0.31, [[-0.02, 0.03], [0.02, 0.056], [0.22, 0.064], [0.5, 0.054], [0.85, 0.042], [1, 0.036]], 0.85);
   G.hand = box(0.1, 0.12, 0.11, 0, 0.45, 3);
   G.band = box(0.135, 0.06, 0.135, 0, 0.45, 3);
   G.head = headGeo('oval');
@@ -142,6 +155,16 @@ function headGeo(shape = 'oval') {
     const y = pos.getY(i) / (h / 2); // -1 chin .. 1 crown
     if (y < 0.1) { const k = 1 - (1 - jaw) * Math.min(1, (0.1 - y) / 1.1); pos.setX(i, pos.getX(i) * k); }
     if (y < -0.3) pos.setZ(i, pos.getZ(i) * (1 - (-0.3 - y) * 0.12)); // chin a touch forward/narrower front to back
+    // round the cranium: back and top blend toward an ellipsoid; the face (front, -z) stays flatter for the features
+    const x = pos.getX(i); const z = pos.getZ(i); const yy = pos.getY(i);
+    const back = z > 0 ? Math.min(1, z / (d / 2)) : 0;
+    const top = Math.max(0, y);
+    const k = Math.min(1, back * 0.7 + top * 0.5);
+    if (k > 0) {
+      const ex = x / (w / 2); const ey = yy / (h / 2); const ez = z / (d / 2);
+      const len = Math.hypot(ex, ey, ez) || 1;
+      pos.setXYZ(i, x + (ex / len * (w / 2) - x) * k * 0.6, yy + (ey / len * (h / 2) - yy) * k * 0.35, z + (ez / len * (d / 2) - z) * k * 0.6);
+    }
   }
   headCache[shape] = b;
   return b;
@@ -204,7 +227,8 @@ const HAIR_FRONT = { bald: 0, buzz: 1, short: 2, fade: 2, flattop: 2, curly: 3, 
 const HAIR_BACK = { bald: 0, buzz: 6, short: 7, fade: 5, flattop: 6, curly: 8, afro: 10, mohawk: 0, dreads: 12, braids: 12, long: 12, bun: 8, twists: 9, cornrows: 7, undercut: 4, pompadour: 6, spiky: 6, ponytail: 7, waves: 5, frohawk: 0, slick: 8 };
 
 function faceMat(L, hc, { eyeBlack = false } = {}) {
-  const key = `face2|${L.skin}|${L.hairStyle}|${L.hairColor}|${L.eyeColor}|${L.eyes}|${L.brows}|${L.nose}|${L.mouth}|${L.beard}|${eyeBlack}`;
+  const fem = L.gender === 'f';
+  const key = `face2|${L.skin}|${L.hairStyle}|${L.hairColor}|${L.eyeColor}|${L.eyes}|${L.brows}|${L.nose}|${L.mouth}|${L.beard}|${eyeBlack}|${L.gender}|${L.lips}`;
   // Drawn with smooth shapes on a 12x12 logical grid (rendered at 72x72): shading, real eyes, nose, lips.
   return pixMat(key, 12, 12, (g) => {
     const sk = SKIN_TONES[L.skin % SKIN_TONES.length];
@@ -230,7 +254,7 @@ function faceMat(L, hc, { eyeBlack = false } = {}) {
     const bc = (L.hairColor ?? 0) > 8 ? '#2a1a12' : shade(hc, -0.12);
     g.strokeStyle = bc; g.lineCap = 'round';
     const by = L.brows === 'raised' ? 3.6 : 4.2;
-    g.lineWidth = L.brows === 'thick' ? 0.9 : L.brows === 'thin' ? 0.35 : 0.6;
+    g.lineWidth = fem ? 0.38 : L.brows === 'thick' ? 0.9 : L.brows === 'thin' ? 0.35 : 0.6;
     const brow = (x0, x1, tilt) => { g.beginPath(); g.moveTo(x0, by + tilt); g.quadraticCurveTo((x0 + x1) / 2, by - 0.5, x1, by - tilt); g.stroke(); };
     if (L.brows === 'angry') { brow(2, 4.8, -0.5); brow(9.9, 7.2, -0.5); } else { brow(2, 4.9, 0); brow(7.1, 10, 0); }
     // eyes: white, iris, pupil, a highlight, lid line
@@ -242,8 +266,9 @@ function faceMat(L, hc, { eyeBlack = false } = {}) {
       ell(cx, 5.75, 0.55, Math.min(0.55, ry), ec);
       ell(cx, 5.75, 0.25, Math.min(0.25, ry), '#0d0d0d');
       ell(cx + 0.18, 5.55, 0.1, 0.1, '#ffffff');
-      g.strokeStyle = shade(sk, -0.45); g.lineWidth = L.eyes === 'sleepy' ? 0.45 : 0.25;
+      g.strokeStyle = fem ? '#1a1210' : shade(sk, -0.45); g.lineWidth = fem ? 0.42 : L.eyes === 'sleepy' ? 0.45 : 0.25;
       g.beginPath(); g.ellipse(cx, 5.7, 1.25, ry, 0, Math.PI, 0); g.stroke();
+      if (fem) { const out = cx < 6 ? -1 : 1; g.beginPath(); g.moveTo(cx + out * 1.2, 5.6); g.lineTo(cx + out * 1.6, 5.15); g.stroke(); } // lashes
     }
     if (eyeBlack) { g.globalAlpha = 0.9; ell(3.4, 7.15, 1.2, 0.38, '#111111'); ell(8.6, 7.15, 1.2, 0.38, '#111111'); g.globalAlpha = 1; }
     // nose: side shadow + nostrils
@@ -282,6 +307,7 @@ function faceMat(L, hc, { eyeBlack = false } = {}) {
     else { g.moveTo(4.6, 9.4); g.quadraticCurveTo(6, 9.7, 7.4, 9.4); }
     g.stroke();
     g.globalAlpha = 0.35; ell(6, 9.95, 1.1, 0.25, lip); g.globalAlpha = 1; // lower lip
+    if (fem && L.lips && L.lips !== 'none') { g.globalAlpha = 0.9; ell(6, 9.35, 1.25, 0.28, L.lips); ell(6, 9.85, 1.05, 0.3, L.lips); g.globalAlpha = 1; }
   }, { rough: 0.6 });
 }
 
@@ -500,8 +526,9 @@ function buildRig(o) {
   const un = o.uniform;
   const football = !!o.football;
   const shirtC = football ? un.jersey : o.shirt;
-  const pantsC = football ? un.pants : o.pants;
-  const pants = toon(pantsC);
+  const fem = L.gender === 'f';
+  const pantsC = football ? un.pants : o.dress ? skinC : o.pants;
+  const pants = toon(pantsC, o.dress ? 0.6 : 0.72);
   const sock = football && L.sockStyle && L.sockStyle !== 'team' ? sockTex(L.sockStyle, un.socks ?? un.jersey, un.trim) : toon(football ? un.socks ?? un.jersey : skinC);
   const teamCol = (v, white = '#f4f4f4', black = '#16181c') => (v === 'white' ? white : v === 'black' ? black : v === 'team' ? un?.trim ?? '#c0392b' : v);
   const underC = football ? (L.underColor === 'team' ? un.jersey : L.underColor ?? '#16181c') : null;
@@ -510,7 +537,14 @@ function buildRig(o) {
   const hips = new THREE.Group();
   hips.position.y = 0.95;
   body.add(hips);
-  hips.add(new THREE.Mesh(g.hips, pants));
+  const hipMesh = new THREE.Mesh(g.hips, o.dress ? toon(o.dress, 0.6) : pants);
+  if (fem) hipMesh.scale.x = 1.08; // wider hips
+  hips.add(hipMesh);
+  if (o.dress) { // a-line skirt from the waist to the knee
+    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 0.55, 18, 1, true), new THREE.MeshStandardMaterial({ color: o.dress, roughness: 0.55, side: THREE.DoubleSide }));
+    skirt.scale.z = 0.72; skirt.position.y = -0.22; skirt.castShadow = true;
+    hips.add(skirt);
+  }
   if (football && L.towel && L.towel !== 'none') {
     const tw = new THREE.Mesh(box(0.12, 0.3, 0.02), towelTex(L.towel === 'white' ? '#f4f4f4' : L.towel === 'black' ? '#16181c' : un.trim));
     tw.position.set(0.09, -0.2, -0.13);
@@ -559,7 +593,7 @@ function buildRig(o) {
       knee.add(sp);
     }
     hips.add(hip);
-    return { hip, knee };
+    return { hip, knee, foot };
   };
   const legL = mkLeg(-1);
   const legR = mkLeg(1);
@@ -573,10 +607,10 @@ function buildRig(o) {
   torso.position.y = -0.02;
   spine.add(torso);
   const fitK = football ? ({ tight: 0.92, loose: 1.09 }[L.jFit] ?? 1) : 1;
-  torso.scale.set(fitK * bt.torso, 1, fitK * bt.depth);
+  torso.scale.set(fitK * bt.torso * (fem ? 0.84 : 1), 1, fitK * bt.depth * (fem ? 0.92 : 1));
   if (bt.belly) { const belly = joint(0.17, football ? toon(un.jersey) : toon(shirtC), 0, 0.12, -0.07, 0.85); belly.scale.z *= 0.75; spine.add(belly); }
   // trapezius: slopes the neck down into the shoulders so the head doesn't sit on a flat shelf
-  const traps = joint(0.15, football ? toon(un.jersey) : (o.tie ? toon(shirtC) : toon(shirtC)), 0, 0.5, 0.02, 0.45); traps.scale.x *= 1.25; spine.add(traps);
+  const traps = joint(fem ? 0.12 : 0.15, football ? toon(un.jersey) : toon(shirtC), 0, 0.5, 0.02, 0.45); traps.scale.x *= fem ? 1.05 : 1.25; spine.add(traps);
   if (football && L.jLength === 'crop') {
     // cropped jersey: shorter, showing a band of undershirt (or skin) above the pants
     torso.scale.y = 0.8;
@@ -629,14 +663,32 @@ function buildRig(o) {
     faceMat(L, hairC, { eyeBlack: helmetOn && L.eyeBlack }),
   ));
   head.position.y = 0.23;
+  // 3D nose and ears so the face has real shape (the face texture shades the rest)
+  const nw = L.nose === 'wide' ? 0.06 : L.nose === 'long' ? 0.04 : 0.048;
+  const noseM = new THREE.Mesh(new THREE.ConeGeometry(nw * 0.6, L.nose === 'long' ? 0.085 : 0.07, 4), skin);
+  noseM.rotation.x = -Math.PI / 2 + 0.35; noseM.rotation.y = Math.PI / 4; noseM.scale.set(1, 1, 0.7);
+  const hd = HEAD_DIMS[L.headShape] ?? HEAD_DIMS.oval;
+  noseM.position.set(0, 0.23 - hd[1] * 0.06, -hd[2] / 2 - 0.012);
+  const ears = [];
+  for (const sd of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), skin); e.scale.set(0.45, 1, 0.75); e.position.set(sd * (hd[0] / 2 - 0.004), 0.22, 0.01); ears.push(e); }
   // Big chunky heads: everything above the neck lives in a scaled group.
   const headGroup = new THREE.Group();
   headGroup.scale.setScalar(g.headScale);
   headGroup.position.y = -0.02;
   neck.add(headGroup);
-  headGroup.add(head);
+  headGroup.add(head, noseM);
+  if (!(football && o.helmet !== false)) headGroup.add(...ears);
   if (helmetOn) addHelmet(headGroup, un, L, hairC);
   else addHairVolume(headGroup, L, hairC);
+  if (!helmetOn && L.earrings && L.earrings !== 'none') {
+    const gold = shiny(L.earrings === 'studs' ? '#e9eef4' : '#e6b422', { rough: 0.2, metal: 0.9 });
+    for (const sd of [-1, 1]) {
+      const x = sd * 0.172; const y = 0.15; const z = 0.0;
+      if (L.earrings === 'hoops') { const r = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.007, 6, 16), gold); r.position.set(x, y - 0.03, z); r.rotation.y = Math.PI / 2; headGroup.add(r); }
+      else if (L.earrings === 'drops') { const d = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 6), gold); d.position.set(x, y - 0.045, z); headGroup.add(d); const st2 = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.03, 4), gold); st2.position.set(x, y - 0.02, z); headGroup.add(st2); }
+      else { const d = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), gold); d.position.set(x, y, z); headGroup.add(d); }
+    }
+  }
   if (!helmetOn && L.beard === 'long') { // a beard that hangs below the chin
     const bm = toon(shade((L.hairColor ?? 0) <= 8 ? hairC : HAIR_COLORS[1], -0.05));
     const lb = new THREE.Mesh(box(0.22, 0.12, 0.1, 0, 0.45, 3), bm); lb.position.set(0, 0.05, -0.12); headGroup.add(lb);
@@ -649,7 +701,7 @@ function buildRig(o) {
 
   const mkArm = (side) => {
     const sh = new THREE.Group();
-    sh.position.set(side * (football ? 0.3 * (0.6 + padK * 0.4) * (0.7 + fitK * 0.3) : 0.27), -0.06, 0);
+    sh.position.set(side * (football ? 0.3 * (0.6 + padK * 0.4) * (0.7 + fitK * 0.3) : fem ? 0.235 : 0.27), -0.06, 0);
     const tat = side < 0 ? L.tatL : L.tatR;
     const sleeveOn = football && (L.sleeve === 'both' || L.sleeve === (side < 0 ? 'left' : 'right'));
     const longSleeve = football && L.jSleeve === 'long';
@@ -673,7 +725,7 @@ function buildRig(o) {
     hand.position.y = -0.34;
     el.add(hand);
     chest.add(sh);
-    return { sh, el };
+    return { sh, el, hand };
   };
   const armL = mkArm(-1);
   const armR = mkArm(1);
@@ -779,6 +831,39 @@ export function applyWear(root, w) {
     o.material = Array.isArray(orig) ? orig.map(swap) : swap(orig);
   });
 }
+/**
+ * Show a bad injury on the body: the limb bends the wrong way, and for open breaks a bit of bone shows.
+ * part: ankle | knee | shin | arm | hand | shoulder. opts: { side: -1 | 1, bone, blood }
+ */
+export function applyInjuryLook(root, part, { side = Math.random() < 0.5 ? -1 : 1, bone = false, blood = true } = {}) {
+  const rig = root.userData.rig;
+  if (!rig || root.userData.injuryLook) return;
+  root.userData.injuryLook = part;
+  const leg = side < 0 ? rig.legL : rig.legR;
+  const arm = side < 0 ? rig.armL : rig.armR;
+  // wrap everything below a joint in a "bend" group so it stays bent through every animation
+  const bendBelow = (joint, rx, ry, rz) => {
+    const bend = new THREE.Group();
+    for (const c of [...joint.children]) bend.add(c);
+    joint.add(bend);
+    bend.rotation.set(rx, ry, rz);
+    return bend;
+  };
+  const boneMat = shiny('#f3efe2', { rough: 0.5 });
+  const bloodMat = toon('#7a0c0c', 0.4);
+  const addBone = (parent, x, y, z, rz) => {
+    if (!bone) return;
+    const b = new THREE.Mesh(box(0.035, 0.13, 0.035, 0, 0.3, 2), boneMat); b.position.set(x, y, z); b.rotation.z = rz; parent.add(b);
+    if (blood) for (let i = 0; i < 4; i++) { const d = new THREE.Mesh(box(0.05 + Math.random() * 0.04, 0.02, 0.05, 0, 0.4, 1), bloodMat); d.position.set(x + (Math.random() - 0.5) * 0.08, y - 0.03 - i * 0.03, z + (Math.random() - 0.5) * 0.08); parent.add(d); }
+  };
+  if (part === 'ankle') { leg.foot.rotation.set(0.2, side * 1.5, side * 0.5); leg.foot.position.x += side * 0.05; addBone(leg.knee, side * 0.07, -0.36, 0, side * 0.9); }
+  else if (part === 'knee') bendBelow(leg.knee, -0.5, 0, side * 0.75); // lower leg buckled sideways
+  else if (part === 'shin') { const bend = bendBelow(leg.knee, 0, 0, 0); bend.position.y = -0.2; for (const c of bend.children) c.position.y += 0.2; bend.rotation.z = side * 1.05; bend.rotation.x = 0.45; addBone(leg.knee, side * 0.05, -0.2, 0, side * 1.1); }
+  else if (part === 'arm') { bendBelow(arm.el, 1.25, 0, side * 0.5); addBone(arm.el, side * 0.05, -0.03, 0.02, side * 0.8); } // elbow folds backwards
+  else if (part === 'hand') { arm.hand.rotation.set(0.4, 0, side * 1.3); arm.hand.position.x += side * 0.04; }
+  else if (part === 'shoulder') { arm.sh.position.y -= 0.08; arm.sh.position.z += 0.05; arm.sh.scale.y = 1.06; }
+}
+
 /** More dirt after going down hard (and a little blood now and then). */
 export function addWear(root, dLevel = 0.15, dBlood = 0) {
   const w = root.userData.wear;
@@ -855,15 +940,18 @@ function addHairVolume(neck, L, hairC) {
     case 'flattop': add(0.36, 0.12, 0.32, 0, top + 0.06, 0.01); break;
     case 'mohawk': add(0.07, 0.1, 0.36, 0, top + 0.05, 0.01); break;
     case 'short': add(0.37, 0.04, 0.35, 0, top + 0.01, 0.005); break;
-    case 'bun': add(0.37, 0.03, 0.35, 0, top, 0); add(0.14, 0.12, 0.12, 0, top + 0.04, 0.16); break;
-    case 'long': add(0.38, 0.04, 0.36, 0, top + 0.01, 0); add(0.38, 0.42, 0.06, 0, 0.12, 0.19); break;
+    case 'bun': add(0.39, 0.06, 0.37, 0, top + 0.01, 0); add(0.2, 0.18, 0.18, 0, top + 0.07, 0.13); add(0.07, 0.16, 0.2, -0.18, 0.31, 0.02); add(0.07, 0.16, 0.2, 0.18, 0.31, 0.02); break;
+    case 'long': // full hair that frames the face and falls past the shoulders
+      add(0.4, 0.07, 0.38, 0, top + 0.02, 0.01); add(0.4, 0.5, 0.12, 0, 0.1, 0.17);
+      add(0.07, 0.42, 0.24, -0.19, 0.17, 0.04); add(0.07, 0.42, 0.24, 0.19, 0.17, 0.04);
+      add(0.36, 0.12, 0.08, 0, top - 0.06, -0.17); break;
     case 'dreads': add(0.38, 0.05, 0.36, 0, top + 0.02, 0); for (let i = 0; i < 6; i++) add(0.05, 0.32, 0.05, -0.15 + i * 0.06, 0.1, 0.18); add(0.05, 0.26, 0.05, -0.19, 0.13, 0.06); add(0.05, 0.26, 0.05, 0.19, 0.13, 0.06); break;
     case 'braids': add(0.37, 0.03, 0.35, 0, top, 0); add(0.06, 0.36, 0.06, -0.08, 0.1, 0.19); add(0.06, 0.36, 0.06, 0.08, 0.1, 0.19); break;
     case 'twists': add(0.39, 0.06, 0.37, 0, top + 0.02, 0.01); for (let i = 0; i < 7; i++) add(0.06, 0.08, 0.06, -0.15 + (i % 4) * 0.1, top + 0.08, -0.12 + Math.floor(i / 4) * 0.2); break;
     case 'undercut': add(0.24, 0.06, 0.34, 0, top + 0.03, 0); add(0.24, 0.05, 0.08, 0, top + 0.02, -0.17); break;
     case 'pompadour': add(0.34, 0.05, 0.3, 0, top + 0.02, 0.02); add(0.3, 0.12, 0.12, 0, top + 0.07, -0.12); break;
     case 'spiky': add(0.37, 0.04, 0.35, 0, top + 0.01, 0); for (let i = 0; i < 6; i++) { const sp = add(0.07, 0.11, 0.07, -0.13 + (i % 3) * 0.13, top + 0.08, -0.08 + Math.floor(i / 3) * 0.16); sp.rotation.z = (i % 2 ? 0.3 : -0.3); } break;
-    case 'ponytail': add(0.37, 0.03, 0.35, 0, top, 0); add(0.1, 0.1, 0.1, 0, 0.3, 0.2); add(0.08, 0.26, 0.08, 0, 0.14, 0.22); break;
+    case 'ponytail': add(0.39, 0.06, 0.37, 0, top + 0.01, 0); add(0.07, 0.18, 0.22, -0.18, 0.3, 0.03); add(0.07, 0.18, 0.22, 0.18, 0.3, 0.03); add(0.13, 0.13, 0.13, 0, 0.33, 0.2); add(0.1, 0.36, 0.1, 0, 0.12, 0.25); break;
     case 'frohawk': add(0.16, 0.16, 0.38, 0, top + 0.07, 0.01); break;
     case 'slick': add(0.37, 0.03, 0.36, 0, top + 0.01, 0.01); add(0.36, 0.08, 0.06, 0, 0.32, 0.18); break;
     default: break;
@@ -890,6 +978,7 @@ export function makePlayer(colors, { highlight = false, number, uniform, look, h
 /** Person in casual clothes. look = full look (shirt, pants, shoe + face/hair/body fields). */
 export function makePerson(look, { highlight = false } = {}) {
   const L = normalizeLook(look, JSON.stringify(look ?? {}).length);
+  if (L.outfit === 'gala' && L.gender === 'f') return buildRig({ football: false, look: L, shirt: L.dress ?? L.suit ?? '#7a1f3a', pants: '#000', dress: L.dress ?? L.suit ?? '#7a1f3a', shoe: '#1b1b1b', highlight });
   if (L.outfit === 'gala') return buildRig({ football: false, look: L, shirt: L.suit ?? '#16181f', pants: L.suit ?? '#16181f', shoe: '#111111', tie: L.tie ?? '#c92a2a', highlight });
   return buildRig({ football: false, look: L, shirt: L.shirt ?? '#3a86ff', pants: L.pants ?? '#34495e', shoe: L.shoe ?? '#f1f1f1', highlight });
 }

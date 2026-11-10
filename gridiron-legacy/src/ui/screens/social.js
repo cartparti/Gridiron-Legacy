@@ -1,5 +1,8 @@
 // Life tab → Social: dating (meet someone / date nights) and hangouts with friends.
 import { h, clear } from '../dom.js';
+import { runSetCutscene } from '../../scenes/director.js';
+import { dateScene, hangoutScene, gamingScene } from '../../scenes/sets.js';
+import { people } from '../../sim/social.js';
 import { openModal, changeChips } from '../components.js';
 import { lifeBlock, meetSomeone, datingRound, answerDate, openDate, finishDate, openHangout, finishHangout, DATE_VENUES, HANGOUTS, PERSONALITIES } from '../../sim/life.js';
 import { portraitImg } from '../../scenes/portrait.js';
@@ -76,23 +79,33 @@ function firstDate(app) {
     });
   };
   const intro = `You meet ${c.name} at a coffee shop. ${pers.blurb} Into ${c.interest}.`;
-  scene(app, { title: `First date · ${c.name}`, portrait: pic, text: intro, choices: ['Say hi'], onChoose: (_, ui) => ask(ui) });
+  const open = () => scene(app, { title: `First date · ${c.name}`, portrait: pic, text: intro, choices: ['Say hi'], onChoose: (_, ui) => ask(ui) });
+  playLife(app, (ctx) => dateScene(ctx, { look: st.player.look, partnerLook: c.look, partnerName: c.name, venue: 'First date' })).then(open);
 }
 
 function dateNight(app, venueId) {
   const st = app.state;
   const o = openDate(st, venueId);
-  scene(app, {
+  playLife(app, (ctx) => dateScene(ctx, { look: st.player.look, partnerLook: st.player.partnerLook, partnerName: st.player.partnerName, venue: o.venue.label })).then(() => scene(app, {
     title: `${o.venue.label} · ${st.player.partnerName}`, portrait: st.player.partnerLook ? portraitImg(st.player.partnerLook, 64) : null, text: o.moment, choices: o.choices,
     onChoose: (i, ui) => { const r = finishDate(st, venueId, i); sfx.select(); ui.result(r.text, r.changes); },
-  });
+  }));
 }
 
 function hangout(app, id) {
   const st = app.state;
   const o = openHangout(st, id);
-  scene(app, {
-    title: o.hangout.label, text: o.text, choices: o.choices,
-    onChoose: (i, ui) => { const r = finishHangout(st, id, i); sfx.select(); ui.result(r.text, r.changes); },
-  });
+  const friends = people(st).filter((x) => x.kind === 'teammate').map((x) => x.look);
+  const gaming = /game|arcade|video/i.test(`${id} ${o.hangout.label}`);
+  playLife(app, (ctx) => (gaming ? gamingScene(ctx, { look: st.player.look, friendLook: friends[0] }) : hangoutScene(ctx, { look: st.player.look, friendLooks: friends, title: o.hangout.label })))
+    .then(() => scene(app, {
+      title: o.hangout.label, text: o.text, choices: o.choices,
+      onChoose: (i, ui) => { const r = finishHangout(st, id, i); sfx.select(); ui.result(r.text, r.changes); },
+    }));
+}
+
+/** Short 3D scene before a life moment (skipped with Reduced motion). */
+export function playLife(app, build) {
+  if (app.settings.reducedMotion) return Promise.resolve();
+  return runSetCutscene(build, { music: 'groove' });
 }

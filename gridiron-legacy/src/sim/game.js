@@ -150,8 +150,12 @@ export function stepGame(state) {
       g.halfDone = true;
       g.log.push({ q: 2, clock: '0:00', team: '', user: false, out: 'HALF', text: 'Halftime', score: `${g.score.away}-${g.score.home}`, key: false });
       g.energy = Math.min(100, (g.energy ?? 80) + 10); // catch your breath
+      // first-half snapshot for the halftime locker room
+      g.half = { score: { ...g.score }, stats: { ...g.userStats }, rating: g.rating ?? 6, energy: g.energy, moments: g.moments.length, momentum: g.momentum };
       if (!g.sitOut && !g.userOut && maybeEvent(state, 'halftime', 0.5)) return { type: 'gameEvent', event: g.pendingEvent };
     }
+    // the game screen asks for a halftime stop (bots and tests never set halftimeUI)
+    if (g.halfDone && g.halftimeUI && !g.halftimeShown) { g.halftimeShown = true; return { type: 'halftime' }; }
     const active = !g.sitOut && !g.userOut;
     // Two-minute drill / final defensive stand.
     if (active && !g.twoMinDone && d.quarter === 4 && isLastDriveFor(g, g.cursor, d.side) && d.side === g.momentSide) {
@@ -198,6 +202,22 @@ export function stepGame(state) {
 // ---------------- game plan (approach + intensity)
 const INTENSITY = { low: { tol: 0.95, drain: 4 }, mid: { tol: 1, drain: 6 }, high: { tol: 1.07, drain: 9 } };
 /** Change the game plan mid-game. key 'approach' (aggressive/balanced/conservative) or 'intensity' (low/mid/high). */
+/** What you do with your halftime: rest, fire the team up, or study the adjustments. One pick per game. */
+export const HALFTIME_CHOICES = {
+  rest: { label: 'Rest & refuel', desc: '+15 energy for the second half.' },
+  speech: { label: 'Fire up the team', desc: 'Momentum swings your way.' },
+  study: { label: 'Study the adjustments', desc: '+5% timing for the rest of the game.' },
+};
+export function halftimeChoice(state, id) {
+  const g = state.game;
+  if (!g || g.halftimePick || !HALFTIME_CHOICES[id]) return false;
+  g.halftimePick = id;
+  if (id === 'rest') g.energy = Math.min(100, (g.energy ?? 80) + 15);
+  else if (id === 'speech') { g.momentum = clamp(g.momentum + 0.3, -1, 1); state.player.rel.teammates = clamp(state.player.rel.teammates + 1, 0, 100); }
+  else g.tolMod *= 1.05;
+  return true;
+}
+
 export function setGamePlan(state, key, value) {
   const g = state.game;
   if (!g) return;
@@ -410,7 +430,7 @@ export function resolveMoment(state, result) {
   let yl = m.yardLine;
   let converted = false;
   if (result.injured && !g.userOut) {
-    applyEffects(state, { injury: true });
+    applyEffects(state, { injury: true, injuryId: result.injuryId ?? null });
     g.userOut = true;
     g.log.push({ q: m.quarter, clock: m.clock, team: '', user: true, out: 'INFO', text: `${state.player.last} is helped off the field${state.player.injury ? ` (${state.player.injury.label.toLowerCase()})` : ''}.`, score: `${g.score.away}-${g.score.home}`, key: true });
   }

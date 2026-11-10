@@ -30,7 +30,7 @@ export function meetSomeone(state) {
     name: pick(state, PARTNER_NAMES),
     personality: pick(state, PERSONALITIES).id,
     interest: pick(state, INTERESTS),
-    look: genLook(() => rand(state)),
+    look: genLook(() => rand(state), { gender: 'f' }),
     chem: clamp(20 + p.fame * 0.25 + (p.mood - 50) * 0.15, 10, 45),
     round: 0,
   };

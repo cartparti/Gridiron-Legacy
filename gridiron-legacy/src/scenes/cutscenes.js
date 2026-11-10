@@ -3,7 +3,7 @@
 // sequence of camera moves, character animation and captions. Tap Skip to jump past it.
 import * as THREE from 'three';
 import { runCutscene } from './director.js';
-import { makePlayer, makePerson, animateRun, faceToward, celebrate, playAction, setPose, confetti, toon } from './actors.js';
+import { makePlayer, makePerson, animateRun, faceToward, celebrate, playAction, setPose, confetti, toon, makeBall } from './actors.js';
 import { randomLook } from '../data/looks.js';
 
 const lerp = (a, b, k) => a + (b - a) * k;
@@ -307,6 +307,93 @@ export function hofCutscene(opts) {
       stadiumSetup(opts.colors ?? ['#d4af37', '#111111'], 'LEGENDS')(r);
       r.scene.background = new THREE.Color('#05070d');
       r.stadium.setTint('night');
+    },
+  });
+}
+
+// ------------------------------------------------------------------ player of the game
+
+/** opts: { colors, uniform, look, number, teamName, stage, culture, title, sub } */
+export function playerOfGameCutscene(opts) {
+  return runCutscene((ctx) => {
+    const g = ctx.group;
+    const me = makePlayer(opts.colors, { uniform: opts.uniform, look: opts.look, number: opts.number, helmet: false });
+    me.position.set(0, 0, 0);
+    me.rotation.y = Math.PI; // face the reporters (and the camera)
+    me.userData.u.targetYaw = Math.PI;
+    g.add(me);
+    // game ball raised in one hand
+    const ball = makeBall();
+    ball.scale.setScalar(1.15);
+    g.add(ball);
+    // reporters with mics and a camera operator, in a half circle in front
+    const press = [];
+    for (let i = 0; i < 4; i++) {
+      const a = -0.9 + i * 0.6;
+      const p = makePerson({ ...randomLook(`press${i}`, { gender: i % 2 ? 'f' : 'm' }), outfit: 'casual', shirt: ['#2b2f36', '#5a6472', '#1d3557', '#7a1f2b'][i], pants: '#2b2d42' });
+      p.position.set(Math.sin(a) * 2.4, 0, Math.cos(a) * 2.4);
+      faceToward(p, 0, 0);
+      p.rotation.y = p.userData.u.targetYaw;
+      g.add(p);
+      press.push(p);
+      if (i !== 3) { // handheld mic toward you
+        const mic = new THREE.Group();
+        const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.3, 8), toon('#1b1d22'));
+        stick.rotation.x = Math.PI / 2 - 0.4; mic.add(stick);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), toon('#3a3f46')); head.position.set(0, 0.06, -0.14); mic.add(head);
+        const flag = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.07, 0.09), toon(['#c0392b', '#2471a3', '#d4ac0d'][i])); flag.position.set(0, 0.0, -0.06); mic.add(flag);
+        mic.position.set(Math.sin(a) * 1.75, 1.45, Math.cos(a) * 1.75);
+        mic.lookAt(0, 1.55, 0);
+        g.add(mic);
+      } else { // TV camera on the shoulder
+        const cam = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.24, 0.55), toon('#22262c'));
+        cam.position.set(Math.sin(a) * 2.25, 1.78, Math.cos(a) * 2.25); cam.lookAt(0, 1.6, 0); g.add(cam);
+        const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.14, 12), toon('#111')); lens.position.copy(cam.position).lerp(new THREE.Vector3(0, 1.7, 0), 0.12); lens.lookAt(0, 1.6, 0); lens.rotateX(Math.PI / 2); g.add(lens);
+      }
+    }
+    // teammates celebrating behind you
+    const mates = [];
+    for (let i = 0; i < 6; i++) {
+      const m = makePlayer(opts.colors, { uniform: opts.uniform, helmet: Math.random() < 0.4 });
+      m.position.set(-3 + i * 1.2 + (Math.random() - 0.5) * 0.4, 0, -2.4 - Math.random() * 1.2);
+      faceToward(m, 0, 0);
+      m.rotation.y = m.userData.u.targetYaw;
+      g.add(m);
+      mates.push(m);
+      setTimeout(() => celebrate(m, ['pump', 'dance', 'flex'][i % 3]), 400 + i * 120);
+    }
+    // camera flashes
+    const flash = new THREE.PointLight('#ffffff', 0, 6);
+    flash.position.set(0, 2, 2.5);
+    g.add(flash);
+    let nextFlash = 0.4;
+    let fx = null;
+    ctx.caption(opts.title ?? 'PLAYER OF THE GAME', opts.sub ?? '');
+    return (dt) => {
+      const T = (ctx._t = (ctx._t ?? 0) + dt);
+      // raise the game ball at 1s
+      const up = Math.min(1, Math.max(0, (T - 1) / 0.6));
+      if (up > 0 && !me.userData.raised) { me.userData.raised = true; celebrate(me, 'point'); }
+      ball.position.set(-0.32, lerp(1.1, 2.35, ease(up)), 0.05);
+      ball.rotation.set(0.2, T * 0.6, 0.4 + up);
+      if (T > nextFlash) { nextFlash = T + 0.25 + Math.random() * 0.5; flash.intensity = 30; flash.position.set((Math.random() - 0.5) * 4, 1.8, 2 + Math.random()); }
+      flash.intensity *= 0.82;
+      if (T > 2.2 && !fx) fx = confetti(ctx.scene, new THREE.Vector3(0, 4, -1), [opts.colors[0], opts.colors[1], '#ffffff']);
+      if (fx && !fx(dt)) fx = null;
+      animateRun(me, dt, 0);
+      for (const p of press) animateRun(p, dt, 0);
+      for (const m of mates) animateRun(m, dt, 0);
+      camPath(ctx.camera, [
+        { t: 0, pos: [1.5, 2.1, 1.7], look: [0, 1.55, 0] },
+        { t: 3.2, pos: [0.35, 1.9, 1.55], look: [0, 1.75, 0] },
+        { t: 6.5, pos: [-1.3, 2.2, 1.8], look: [0, 1.5, -0.6] },
+      ], T);
+      return T < 6.6;
+    };
+  }, {
+    setup: (r) => {
+      stadiumSetup(opts.colors, opts.teamName, opts.stage, opts.culture)(r);
+      r.stadium.setTint?.('night');
     },
   });
 }

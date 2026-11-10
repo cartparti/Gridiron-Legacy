@@ -47,8 +47,10 @@ export function hometownSchools(rawTown) {
   for (let i = 0; i < 8 && c2 === c1; i++) c2 = pick(PALETTE);
   const flip = r() < 0.3;
   const code = town.replace(/[^A-Za-z]/g, '').toUpperCase().padEnd(3, 'X').slice(0, 3);
+  // special request: the school in Sandy is Stone Lopez Academy
+  const school1 = town.toLowerCase() === 'sandy' ? 'Stone Lopez Academy' : town;
   return [
-    { id: `H${code}1`, city: town, name: m1, colors: flip ? [c1[1], c1[0]] : c1.slice(), base: 56 + Math.floor(r() * 9), town },
+    { id: `H${code}1`, city: school1, name: m1, colors: flip ? [c1[1], c1[0]] : c1.slice(), base: 56 + Math.floor(r() * 9), town },
     { id: `H${code}2`, city: `${town} ${pick(SECOND)}`, name: m2, colors: c2.slice(), base: 52 + Math.floor(r() * 11), town },
   ];
 }

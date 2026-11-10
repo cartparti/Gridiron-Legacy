@@ -5,8 +5,12 @@ import { PLAY_CALLS, WEATHER } from '../../data/config.js';
 import { getTeam } from '../../sim/league.js';
 import {
   stepGame, resolveMoment, autoMoment, tolerance, outcomeFromQuality, resolveDecision, autoDecision,
-  resolveGameEvent, autoGameEvent, MOMENT_NAMES, setGamePlan, matchup,
+  resolveGameEvent, autoGameEvent, MOMENT_NAMES, setGamePlan, matchup, HALFTIME_CHOICES, halftimeChoice,
 } from '../../sim/game.js';
+import { openSet, runSetCutscene } from '../../scenes/director.js';
+import { lockerRoom } from '../../scenes/sets.js';
+import { crestURL } from '../crest.js';
+import { people } from '../../sim/social.js';
 import { crest, mascotKind } from '../crest.js';
 import { equippedTraits } from '../../sim/traits.js';
 import { teamCulture, BIOME_INFO } from '../../data/culture.js';
@@ -70,6 +74,14 @@ const CALL_DESC_DEF = {
   risky: 'Press and jump routes. Picks or burns.',
 };
 
+function statLineOf(pos, s) {
+  if (pos === 'QB') return [[`${s.passComp}/${s.passAtt}`, 'Comp/Att'], [s.passYds, 'Pass yds'], [`${s.passTD}/${s.int}`, 'TD/INT']];
+  if (pos === 'RB') return [[s.rushAtt, 'Carries'], [s.rushYds, 'Rush yds'], [s.rushTD, 'TD']];
+  if (pos === 'DT') return [[s.defSacks ?? 0, 'Sacks'], [s.tfl ?? 0, 'TFL'], [s.tackles ?? 0, 'Tackles']];
+  if (pos === 'CB') return [[s.defInt ?? 0, 'INT'], [s.pd ?? 0, 'Pass def'], [s.tackles ?? 0, 'Tackles']];
+  return [[`${s.rec}/${s.targets}`, 'Rec/Tgt'], [s.recYds, 'Rec yds'], [s.recTD, 'TD']];
+}
+
 export function gamedayScreen(app) {
   const st = app.state;
   const g = st.game;
@@ -79,6 +91,7 @@ export function gamedayScreen(app) {
   const defense = st.player.position === 'CB' || st.player.position === 'DT';
   const root = h('div');
   const culture = teamCulture(home, st.career.stage);
+  g.halftimeUI = true; // ask the sim to stop at halftime for the locker room
   const gid = `${g.homeId}-${g.awayId}-${g.week}`;
   const ui = app.ui.game && app.ui.game.id === gid ? app.ui.game
     : (app.ui.game = { id: gid, shown: g.log.length, started: g.log.length > 0 || !!g.pending || g.pregameDone, busy: false });
@@ -276,6 +289,7 @@ export function gamedayScreen(app) {
       if (r.type === 'moment') showMoment(r.moment);
       else if (r.type === 'decision') showDecision(r.decision);
       else if (r.type === 'gameEvent') showGameEvent(r.event);
+      else if (r.type === 'halftime') showHalftime();
       else showEnd();
     });
   };
@@ -437,6 +451,59 @@ export function gamedayScreen(app) {
       reveal(showEnd);
     },
   }, 'Sim rest of game');
+
+  // ---- halftime: the locker room with your teammates and coach, first-half numbers, one choice
+  const showHalftime = () => {
+    clear(momentSlot);
+    clear(controls);
+    const me = getTeam(league, st.career.teamId);
+    const opp = getTeam(league, g.oppId);
+    const hf = g.half ?? { score: g.score, stats: g.userStats, rating: g.rating ?? 6, energy: g.energy ?? 80, moments: g.moments.length };
+    const mine = hf.score[g.userSide]; const theirs = hf.score[g.userSide === 'home' ? 'away' : 'home'];
+    const winning = mine > theirs; const tied = mine === theirs;
+    const folks = people(st);
+    const wx = g.weather;
+    const set = app.settings.reducedMotion ? null : openSet((ctx) => lockerRoom(ctx, {
+      stage: st.career.stage, colors: me.colors, uniform: kitUniform(gameKits(st, me, opp).mine), crestUrl: crestURL(me), teamName: me.name,
+      mascot: mascotKind(me), look: st.player.look, number: st.player.number, coachLook: st.player.coachLook,
+      mateLooks: folks.filter((x) => x.kind === 'teammate').map((x) => x.look), winning,
+      fullView: () => panel.classList.contains('min'),
+      wear: { progress: 0.5, wet: wx === 'rain' || wx === 'storm' ? 0.9 : wx === 'snow' ? 0.5 : 0, snow: wx === 'snow', mud: wx === 'rain' || wx === 'storm' },
+    }));
+    const appEl = document.getElementById('app');
+    if (set) appEl.style.visibility = 'hidden';
+    const coachName = st.player.coachName?.split(' ').slice(-1)[0] ?? 'Coach';
+    const diff = mine - theirs;
+    const speech = diff >= 14 ? 'Great half. Now finish it. Nobody lets up.' : winning ? 'We are ahead, but that team is not going away. Stay sharp.'
+      : tied ? 'Dead even. The next thirty minutes decide who wanted it more.' : diff >= -8 ? 'One score. We have been here before. Clean it up and go take it.'
+        : 'That was not us out there. Forget the scoreboard and win the next play.';
+    const mate = folks.find((x) => x.kind === 'teammate');
+    const chatter = (hf.rating ?? 6) >= 7.5 ? `${mate?.short ?? 'A teammate'}: "You're on fire. Keep feeding us."` : (hf.rating ?? 6) < 5 ? `${mate?.short ?? 'A teammate'}: "Shake it off. We need you in the second half."` : `${mate?.short ?? 'A teammate'}: "Let's go get this one."`;
+    const panel = h('div.halftime');
+    const close = () => { panel.remove(); set?.close(); appEl.style.visibility = ''; app.save(); advance(); };
+    const draw = () => {
+      clear(panel);
+      const energy = Math.round(g.energy ?? 80);
+      panel.append(
+        h('div.ht-head', h('span.chip.pix', 'HALFTIME'), h('span.tiny.grow', { style: { marginLeft: '8px' } }, `${culture.stadium} · locker room`),
+          set ? h('button.btn.small.ghost', { onclick: () => { sfx.click(); panel.classList.toggle('min'); } }, 'Look around') : null),
+        h('div.ht-score', h('div', crest(away, 34), h('b', g.score.away)), h('span.muted', '–'), h('div', h('b', g.score.home), crest(home, 34))),
+        h('div.ht-stats', statLineOf(st.player.position, hf.stats).map(([v, l]) => h('div', h('b.pix', String(v)), h('span.tiny.muted', l)))),
+        h('div.ht-meters',
+          h('div', h('span.tiny.muted', 'ENERGY'), h('div.watch-bar', h('i', { style: { width: `${energy}%`, background: energy < 40 ? 'var(--bad)' : 'var(--good)' } })), h('b.tiny', `${energy}%`)),
+          h('div', h('span.tiny.muted', 'RATING'), h('b.pix', (hf.rating ?? 6).toFixed(1))),
+          h('div', h('span.tiny.muted', 'PLAYS'), h('b.pix', String(hf.moments ?? 0)))),
+        h('p.ht-quote', h('b', `Coach ${coachName}: `), `"${speech}"`),
+        h('p.ht-quote.small.muted', chatter),
+        g.halftimePick
+          ? h('p.small', h('span.chip.pix.good', HALFTIME_CHOICES[g.halftimePick].label.toUpperCase()), ` ${HALFTIME_CHOICES[g.halftimePick].desc}`)
+          : h('div.ht-choices', Object.entries(HALFTIME_CHOICES).map(([id, c]) => h('button.btn.small', { onclick: () => { sfx.select(); halftimeChoice(st, id); app.save(); draw(); } }, h('b', c.label), h('span.tiny.muted', c.desc)))),
+        h('button.btn.primary.block', { onclick: () => { sfx.whistle(); close(); } }, 'Back out for the second half'));
+    };
+    draw();
+    document.body.append(panel);
+    app.ui.cleanupWorld = () => { panel.remove(); set?.close(); appEl.style.visibility = ''; };
+  };
 
   const showEnd = () => {
     clear(momentSlot);

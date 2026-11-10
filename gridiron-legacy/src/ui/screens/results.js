@@ -8,7 +8,10 @@ import { fmtMoney, signed } from '../../core/util.js';
 import { teamBadge } from '../components.js';
 import { sfx } from '../../audio/sfx.js';
 import { icon } from '../icons.js';
-import { trophyCutscene } from '../../scenes/cutscenes.js';
+import { trophyCutscene, playerOfGameCutscene } from '../../scenes/cutscenes.js';
+import { runSetCutscene } from '../../scenes/director.js';
+import { banquetScene } from '../../scenes/sets.js';
+import { teamCulture } from '../../data/culture.js';
 import { teamKits } from '../../data/kits.js';
 
 const AWARD_ICONS = { 'Most Valuable Player': 'crown', 'Legacy Bowl Champion': 'trophy', 'Heritage Bowl Champion': 'trophy', 'State Champion': 'trophy', 'Ironstone Trophy': 'medal', 'Legacy Bowl MVP': 'star' };
@@ -28,6 +31,15 @@ export function postgameScreen(app) {
   const home = getTeam(st.league, g.homeId);
   const away = getTeam(st.league, g.awayId);
   const d = g.deltas;
+  if (g.potg && !g.potgPlayed && !app.settings.reducedMotion) {
+    g.potgPlayed = true;
+    app.save();
+    const mine = getTeam(st.league, st.career.teamId);
+    const homeT = getTeam(st.league, g.homeId);
+    const top = statLine(p.position, g.userStats).map(([v, l]) => `${v} ${l.toLowerCase()}`).slice(0, 2).join(' · ');
+    setTimeout(() => playerOfGameCutscene({ colors: mine.colors, uniform: teamKits(mine).home, look: p.look, number: p.number, teamName: mine.name,
+      stage: st.career.stage, culture: teamCulture(homeT, st.career.stage), title: 'PLAYER OF THE GAME', sub: `${p.first} ${p.last} · ${top}` }), 60);
+  }
   return h('div.screen',
     h('div.card',
       h('div.row.between', h('span.chip', g.roundName), g.won ? h('span.chip.good', 'WIN') : h('span.chip.bad', 'LOSS')),
@@ -40,7 +52,7 @@ export function postgameScreen(app) {
       h('h2', { style: { textTransform: 'none' } }, g.headline)),
     g.sitOut ? h('div.card', h('p', 'You watched this one from the sideline.')) : h('div.card',
       h('div.row', h('div.grade', { style: { color: g.grade >= 70 ? 'var(--good)' : g.grade >= 50 ? 'var(--warn)' : 'var(--bad)' } }, g.letter),
-        h('div.grow', h('b', 'Your game'), h('div.small.muted', `Grade ${g.grade}/100`))),
+        h('div.grow', h('b', 'Your game'), h('div.small.muted', `Grade ${g.grade}/100`)), g.potg ? h('span.chip.gold.pix', 'PLAYER OF THE GAME') : null),
       h('div.bigstat', { style: { marginTop: '10px' } }, statLine(p.position, g.userStats).map(([v, l]) => h('div', h('b', v), h('span', l))))),
     g.moments.length ? h('div.card', h('h3', 'Key Moments'), h('div.list', g.moments.map((m) =>
       h('div.li', h('span.chip', PLAY_CALLS[m.call]?.label ?? m.call), h('div.grow', h('div.small', m.label), h('div.tiny.muted', `${m.text} → ${m.outcome === 'TD' ? 'Touchdown' : m.outcome === 'FG' ? 'Field goal' : m.outcome === 'TO' ? 'Turnover' : 'Punt'}`)),
@@ -67,6 +79,12 @@ export function reviewScreen(app) {
     const titleName = STAGES[st.career.stage]?.titleName ?? 'Championship';
     setTimeout(() => trophyCutscene({ stage: st.career.stage, colors: champ.colors, uniform: teamKits(champ).home, look: p.look, number: p.number, teamName: champ.name,
       title: 'Champions!', sub: `${champ.city} ${champ.name} win the ${titleName}` }), 50);
+  }
+  if (r.awards.length && !r.banquetPlayed && !app.settings.reducedMotion) {
+    r.banquetPlayed = true;
+    app.save();
+    const wait = r.champion ? 8600 : 60; // after the trophy lift
+    setTimeout(() => runSetCutscene((ctx) => banquetScene(ctx, { look: p.look, name: `${p.first} ${p.last}`, awards: r.awards, year: r.year }), { music: 'anthem' }), wait);
   }
   const delta = r.ovrAfter - r.ovrBefore;
   setTimeout(() => (r.awards.length ? sfx.levelUp() : null), 300);

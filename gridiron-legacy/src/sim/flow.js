@@ -226,6 +226,9 @@ export function finishGame(state) {
   const press = postGamePress(state, g, `${opp.city}`, teamName(state));
   simOtherGames(state, league, sched);
   state.lastGame = {
+    // player of the game: a great grade, or a very good one in a win
+    potg: !g.sitOut && !g.userOut && (g.grade >= 88 || (g.won && g.grade >= 80)),
+    rating: g.rating ?? null,
     newTraits: g.newTraits ?? [],
     levelUps: g.levelUps ?? 0,
     won: g.won,

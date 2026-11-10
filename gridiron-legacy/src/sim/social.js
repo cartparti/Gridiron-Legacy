@@ -6,7 +6,8 @@ import { clamp, fillTokens } from '../core/util.js';
 import { rand, randInt, pick } from '../core/rng.js';
 import { applyEffects } from './effects.js';
 import { maxEnergy, planCost } from './week.js';
-import { randomLook as genLook, normalizeLook, defaultLook } from '../data/looks.js';
+import { randomLook as genLook, normalizeLook, defaultLook, feminize, masculinize } from '../data/looks.js';
+import { FEMALE_AGENTS } from '../data/names.js';
 
 const MATE_POS = ['OL', 'DL', 'LB', 'S', 'TE', 'WR', 'RB', 'QB', 'CB'];
 
@@ -40,6 +41,13 @@ function ensure(state) {
   p.look = p.look ? normalizeLook(p.look, p.first + p.last) : defaultLook(p.position);
   for (const m of p.teammates) m.look = normalizeLook(m.look, m.name);
   for (const k of ['familyLook', 'partnerLook', 'coachLook', 'agentLook', 'rivalLook']) p[k] = normalizeLook(p[k], k + p.last);
+  // the right gender for everyone you know (older saves had gender-neutral random looks)
+  if (p.familyLook.gender !== 'f') p.familyLook = feminize(p.familyLook, `mom${p.last}`);
+  if (p.partnerLook.gender !== 'f') p.partnerLook = feminize(p.partnerLook, `partner${p.partnerName ?? p.last}`);
+  const agentF = p.agentName ? FEMALE_AGENTS.has(p.agentName) : false;
+  if (p.agentName && (p.agentLook.gender === 'f') !== agentF) p.agentLook = agentF ? feminize(p.agentLook, p.agentName) : masculinize(p.agentLook, p.agentName);
+  for (const k of ['coachLook', 'rivalLook']) if (p[k].gender !== 'm') p[k] = masculinize(p[k], k + p.last);
+  for (const m of p.teammates) if (m.look.gender !== 'm') m.look = masculinize(m.look, m.name);
 }
 
 /** Everyone you can interact with right now. */

@@ -7,7 +7,9 @@
 //
 // Returns the same result objects as the old minigames, so the game simulation is unchanged.
 import * as THREE from 'three';
-import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, confetti, ragdoll, bloodBurst, dustPuff, markTicked, bump, applyWear, addWear } from '../actors.js';
+import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, confetti, ragdoll, bloodBurst, dustPuff, markTicked, bump, applyWear, addWear, applyInjuryLook } from '../actors.js';
+import { INJURIES } from '../../data/lifestyle.js';
+import { xrayCard } from './xray.js';
 import { rig, endPlay, finalize, weatherFx, gaussR } from '../minigames/common.js';
 import { makeControls } from './controls.js';
 import { PLAYS, OFF_FORMATION, OL_X, playMode, dealPlays } from '../../data/playbook.js';
@@ -887,10 +889,14 @@ export function freePlay(ctx) {
   // ---------------- quick-time events (contested catches, breakups, fighting for yards)
   let qteActive = false;
   let qteUsed = 0;
+  // Quick-time events are a sometimes thing: about 1 play in 3, and rarely two plays in a row.
+  const qteOn = !opts.reducedMotion && (globalThis.__forceQte || Math.random() < (globalThis.__lastPlayHadQte ? 0.12 : 0.32));
+  globalThis.__lastPlayHadQte = false;
   /** kind 'ring': tap when the shrinking ring hits the target. kind 'mash': tap fast. onDone(success). */
   const startQte = (kind, label, onDone) => {
     qteActive = true;
     qteUsed++;
+    globalThis.__lastPlayHadQte = true;
     ctx.setTimeScale?.(0.07);
     sfx.select();
     const ov = document.createElement('div');
@@ -986,9 +992,33 @@ export function freePlay(ctx) {
       fxList.push(bloodBurst(group, { x: target.pos.x, y: 1.6, z: target.pos.z }, d));
     }
     // the hit can hurt you (more likely when already banged up)
-    if (target.user && Math.random() < 0.07 * (1.6 - (opts.health ?? 100) / 100) * (has('ironman') ? 0.5 : 1)) {
+    const pickInjury = () => {
+      const forced = INJURIES.find((i) => i.id === globalThis.__forceInjury);
+      if (forced) return forced;
+      let tot = 0; for (const i of INJURIES) tot += i.weight;
+      let x = Math.random() * tot;
+      for (const i of INJURIES) { x -= i.weight; if (x <= 0) return i; }
+      return INJURIES[0];
+    };
+    if (target.user && !target.injured && (globalThis.__forceInjury || Math.random() < 0.07 * (1.6 - (opts.health ?? 100) / 100) * (has('ironman') ? 0.5 : 1))) {
+      const inj = pickInjury();
+      const boneOut = !!inj.bone && opts.blood !== false && Math.random() < 0.4;
       target.injured = true;
-      setTimeout(() => { hud.big('INJURED', '#ff6b6b', 1600); hud.say?.(`${opts.lastName ?? 'He'} is slow to get up... trainers are running out.`, 3000); }, 700);
+      target.injury = { id: inj.id, label: inj.label, part: inj.part, boneOut };
+      target.out = 30; // you are not getting up from this one
+      if (inj.severe) applyInjuryLook(target.mesh, inj.part, { bone: boneOut, blood: opts.blood !== false });
+      setTimeout(() => {
+        hud.big('INJURED', '#ff6b6b', 1600);
+        hud.say?.(`${opts.lastName ?? 'He'} is down and not getting up... trainers are running out.`, 3600);
+        if (!opts.reducedMotion) ctx.cinematic?.(() => target.pos, 1.6);
+      }, 700);
+      setTimeout(() => { const card = xrayCard(target.injury); document.body.append(card); setTimeout(() => card.remove(), 3700); sfx.error?.(); }, 1900);
+    } else if (!target.user && big && !target.hurt && Math.random() < 0.03) {
+      // every so often someone else stays down too
+      const inj = INJURIES.filter((i) => i.severe)[Math.floor(Math.random() * INJURIES.filter((i) => i.severe).length)];
+      target.hurt = true; target.out = 30;
+      applyInjuryLook(target.mesh, inj.part, { bone: !!inj.bone && opts.blood !== false && Math.random() < 0.3, blood: opts.blood !== false });
+      setTimeout(() => hud.say?.(`A player is down for ${target.team === (m.defense ? 'def' : 'off') ? usName : themName}. That looked like his ${inj.part === 'shin' ? 'leg' : inj.part}.`, 3200), 900);
     }
   };
 
@@ -1012,7 +1042,7 @@ export function freePlay(ctx) {
         hud.big('STIFF ARM!', '#fbbf24', 700); sfx.hit(); ctx.shake(0.25); return;
       }
     }
-    if (u && qteUsed < 2 && !opts.reducedMotion && (globalThis.__forceQte || Math.random() < 0.3 || target.pos.z - goalZ < 3)) {
+    if (u && qteUsed < 1 && !opts.reducedMotion && (qteOn || (target.pos.z - goalZ < 3 && Math.random() < 0.35))) {
       target.vel.x *= 0.3; target.vel.z *= 0.3;
       startQte('mash', target.pos.z - goalZ < 3 ? 'REACH FOR THE END ZONE!' : 'FIGHT FOR YARDS!', (ok) => {
         if (phase !== 'live') return;
@@ -1059,7 +1089,7 @@ export function freePlay(ctx) {
     const dD = Math.min(...defs.map((d) => dist(d.pos, land)));
     const crowd = defs.filter((d) => dist(d.pos, land) < 2).length;
     // --- defense player (you) trying to swat / pick
-    if (user.team === 'def' && swatPress === null && qteUsed < 2 && dist(user.pos, land) < 1.7 && dR < 1.8 && !opts.reducedMotion) {
+    if (user.team === 'def' && qteOn && swatPress === null && qteUsed < 1 && dist(user.pos, land) < 1.7 && dR < 1.8) {
       ball.position.set(land.x, 1.6, land.z);
       startQte('ring', 'BREAK IT UP!', (ok) => {
         if (phase !== 'live') return;
@@ -1081,7 +1111,7 @@ export function freePlay(ctx) {
       if (timing <= win * 2.2 || dist(user.pos, land) < 0.9) { whistle('pd'); return; }
     }
     // --- you are the receiver: contested balls become a quick-time event
-    if (r === user && qteUsed < 2 && !opts.reducedMotion) {
+    if (r === user && qteOn && qteUsed < 1) {
       const nearD0 = defs.reduce((a, d) => (dist(d.pos, land) < dist(a.pos, land) ? d : a), defs[0]);
       if (nearD0 && dist(nearD0.pos, land) < 1.7 && dR < 1.9 + (user.hIn - 73) * 0.04) {
         ball.position.set(land.x, 1.7, land.z);
@@ -1220,7 +1250,7 @@ export function freePlay(ctx) {
       }
     }
     maybeFlag();
-    if (user.injured && result) result.injured = true;
+    if (user.injured && result) { result.injured = true; result.injuryId = user.injury?.id ?? null; }
     if (!def && result.complete && result.yards >= 20) snap(`${result.yards}-yard gain`, 100);
   };
 
@@ -1486,8 +1516,19 @@ export function freePlay(ctx) {
         user.lunge -= dt;
         user.vel.x = user.lungeDir.x * 9.5; user.vel.z = user.lungeDir.z * 9.5;
         if (carrier && carrier !== user && dist(user.pos, carrier.pos) < 1.15) tryTackle(user, carrier);
-        else if (!carrier && holder === qb && !flight && passD && dist(user.pos, qb.pos) < (has('closer') ? 1.55 : 1.2)) { qb.down = true; user.lunge = 0; hardHit(user, qb); hud.big('SACK!', '#4ade80', 1100); sfx.cheer(); snap('Sack!', 200); whistle('sack', user); }
-        if (user.lunge <= 0 && phase === 'live') { user.out = 0.7; knockDown(user.mesh, 1); }
+        else if (!carrier && holder === qb && !flight && passD && dist(user.pos, qb.pos) < (has('closer') ? 1.55 : 1.2)) {
+          const finishSack = () => { qb.down = true; user.lunge = 0; hardHit(user, qb); hud.big('SACK!', '#4ade80', 1100); sfx.cheer(); snap('Sack!', 200); whistle('sack', user); };
+          if (qteOn && qteUsed < 1) {
+            // the QB tries to slip out: time it to wrap him up
+            user.lunge = 0; user.vel.x = 0; user.vel.z = 0;
+            startQte('ring', 'WRAP HIM UP!', (ok) => {
+              if (phase !== 'live') return;
+              if (ok) finishSack();
+              else { hud.big('HE SLIPS AWAY!', '#f87171', 800); user.out = 0.9; knockDown(user.mesh, 1); qb.vel.x += (Math.random() < 0.5 ? -1 : 1) * 6; }
+            });
+          } else finishSack();
+        }
+        if (user.lunge <= 0 && phase === 'live' && !qteActive) { user.out = 0.7; knockDown(user.mesh, 1); }
       } else if (user.engagedBy) {
         // locked up with a blocker: drive into him to build leverage, use moves to break free
         rush.cd = Math.max(0, rush.cd - dt);
@@ -1537,6 +1578,15 @@ export function freePlay(ctx) {
           if (target === qb && holder === qb && !carrier) {
             // sack (QB can still dodge with moves if he is the user and scrambling)
             if (user === qb && (moves.juke > 0 || moves.spin > 0 || (has('pocket') && Math.random() < 0.3))) { e.out = 1.2; knockDown(e.mesh, 1); hud.big('ESCAPED!', '#4ade80', 600); }
+            else if (user === qb && qteOn && qteUsed < 1) {
+              // you feel the rusher grab you: mash to break free
+              e.lunge = 0; e.vel.x = 0; e.vel.z = 0; qb.vel.x *= 0.2; qb.vel.z *= 0.2;
+              startQte('mash', 'BREAK THE SACK!', (ok) => {
+                if (phase !== 'live') return;
+                if (ok) { e.out = 1.4; flatten(e, qb, 0.6); hud.big('ESCAPED!', '#4ade80', 800); ctx.cinematic?.(() => qb.pos, 0.9); snap('Escapes the sack!', 150); }
+                else { qb.down = true; hardHit(e, qb); playAction(e.mesh, 'tackle'); sfx.hit(); ctx.shake(0.4); whistle('sack'); }
+              });
+            }
             else { qb.down = true; hardHit(e, qb); playAction(e.mesh, 'tackle'); sfx.hit(); ctx.shake(0.4); whistle('sack'); }
           } else tryTackle(e, target);
           e.lunge = 0;
@@ -1694,7 +1744,7 @@ export function freePlay(ctx) {
           ctx.shake(0.08);
         }
       }
-      if (t > 1.6) { phase = 'over'; endPlay(ctx, Object.assign(finalize(result, m), { highlights }), { delay: 900, beforeDone: replayPrompt }); }
+      if (t > (user.injured ? 5.6 : 1.6)) { phase = 'over'; endPlay(ctx, Object.assign(finalize(result, m), { highlights }), { delay: 900, beforeDone: replayPrompt }); }
     }
   };
 

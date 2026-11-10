@@ -35,6 +35,11 @@ export const CLEAT_DESIGNS = [{ id: 'stripe', label: 'Stripe' }, { id: 'solid', 
   { id: 'checker', label: 'Checker' }, { id: 'flames', label: 'Flames' }, { id: 'bolt', label: 'Lightning' }, { id: 'speckle', label: 'Speckle' }];
 export const CLEAT_CUTS = [{ id: 'low', label: 'Low' }, { id: 'mid', label: 'Mid' }, { id: 'high', label: 'High top' }];
 export const GLOVE_DESIGNS = [{ id: 'solid', label: 'Solid' }, { id: 'palm', label: 'Two-tone palm' }, { id: 'stripe', label: 'Wrist stripe' }];
+// Hair that reads as a guy's cut vs a girl's style (random people only pick from their own list).
+export const MALE_HAIR = ['bald', 'buzz', 'short', 'fade', 'flattop', 'curly', 'afro', 'mohawk', 'dreads', 'braids', 'twists', 'cornrows', 'undercut', 'pompadour', 'spiky', 'waves', 'frohawk', 'slick'];
+export const FEMALE_HAIR = ['long', 'long', 'bun', 'ponytail', 'ponytail', 'braids', 'curly', 'afro', 'twists', 'dreads'];
+export const EARRINGS = [{ id: 'none', label: 'None' }, { id: 'studs', label: 'Studs' }, { id: 'hoops', label: 'Hoops' }, { id: 'drops', label: 'Drops' }];
+export const LIP_COLORS = ['none', '#b5485d', '#c9305a', '#8e3b46', '#d97a7a', '#a0522d'];
 export const HEAD_SHAPES = [{ id: 'oval', label: 'Oval' }, { id: 'round', label: 'Round' }, { id: 'square', label: 'Square jaw' }, { id: 'long', label: 'Long' }, { id: 'wide', label: 'Wide' }, { id: 'heart', label: 'Narrow chin' }];
 export const BODY_TYPES = [{ id: 'lean', label: 'Lean' }, { id: 'athletic', label: 'Athletic' }, { id: 'muscular', label: 'Muscular' }, { id: 'stocky', label: 'Stocky' }, { id: 'lanky', label: 'Lanky' }];
 export const SIDES = [{ id: 'none', label: 'None' }, { id: 'left', label: 'Left' }, { id: 'right', label: 'Right' }, { id: 'both', label: 'Both' }];
@@ -107,18 +112,23 @@ const PANTS = ['#264653', '#1d3557', '#3d405b', '#5c4033', '#2b2d42', '#6c757d',
  */
 export function randomLook(r, opts = {}) {
   if (typeof r !== 'function') r = seededRandom(r);
+  // players are guys; everyone else is a guy or a girl (pass gender to choose)
+  const gender = opts.gender ?? (opts.position ? 'm' : r() < 0.5 ? 'f' : 'm');
   const skin = Math.floor(r() * SKIN_TONES.length);
   // Darker hair is more common; bright dyes are rare.
   const hc = r() < 0.06 ? 9 + Math.floor(r() * 3) : r() < 0.12 ? 8 : Math.floor(Math.pow(r(), 1.6) * 8);
-  const style = pickR(r, HAIR_STYLES).id;
+  const style = gender === 'f' ? FEMALE_HAIR[Math.floor(r() * FEMALE_HAIR.length)] : MALE_HAIR[Math.floor(r() * MALE_HAIR.length)];
   const [h0, w0] = POS_SIZE[opts.position] ?? [70 + Math.floor(r() * 6), 175 + Math.floor(r() * 50)];
   const tat = () => (r() < 0.72 ? 'none' : pickR(r, TATTOOS.slice(1)).id);
   return {
     skin, hairStyle: style, hairColor: style === 'bald' ? 0 : hc, eyeColor: skin > 3 ? (r() < 0.8 ? 0 : 1) : Math.floor(r() * EYE_COLORS.length),
     eyes: pickR(r, EYES).id, brows: pickR(r, BROWS).id, nose: pickR(r, NOSES).id, mouth: pickR(r, MOUTHS).id,
-    beard: r() < 0.55 ? 'none' : pickR(r, BEARDS.slice(1)).id,
+    beard: gender === 'f' || r() < 0.55 ? 'none' : pickR(r, BEARDS.slice(1)).id,
+    gender, earrings: gender === 'f' ? pickR(r, EARRINGS.slice(1)).id : r() < 0.12 ? 'studs' : 'none',
+    lips: gender === 'f' && r() < 0.75 ? pickR(r, LIP_COLORS.slice(1)) : 'none',
+    dress: gender === 'f' ? pickR(r, ['#7a1f3a', '#1d3557', '#16181f', '#2f4a3a', '#c9a227', '#b5485d', '#5b2c6f']) : null,
     tatL: tat(), tatR: tat(),
-    heightIn: Math.round(h0 + (r() - 0.5) * 4), weightLb: Math.round(w0 + (r() - 0.5) * 30),
+    heightIn: gender === 'f' && !opts.position ? Math.round(64 + r() * 6) : Math.round(h0 + (r() - 0.5) * 4), weightLb: gender === 'f' && !opts.position ? Math.round(120 + r() * 40) : Math.round(w0 + (r() - 0.5) * 30),
     gloves: r() < 0.5 ? null : pickR(r, GEAR_COLORS), cleats: pickR(r, GEAR_COLORS),
     wristband: pickR(r, SIDES).id, wristColor: pickR(r, GEAR_COLORS),
     sleeve: r() < 0.6 ? 'none' : pickR(r, SIDES.slice(1)).id, sleeveColor: pickR(r, GEAR_COLORS),
@@ -129,7 +139,7 @@ export function randomLook(r, opts = {}) {
     elbowPad: r() < 0.85 ? 'none' : pickR(r, SIDES.slice(1)).id, elbowColor: pickR(r, GEAR_COLORS),
     towel: r() < 0.75 ? 'none' : pickR(r, TOWELS.slice(1)).id, handWarmer: r() < 0.12, chain: r() < 0.88 ? 'none' : pickR(r, CHAINS.slice(1)).id,
     celebration: pickR(r, CELEBRATIONS).id,
-    headShape: pickR(r, HEAD_SHAPES).id, bodyType: randomBodyType(r, opts.position),
+    headShape: gender === 'f' ? pickR(r, ['oval', 'heart', 'round', 'long']) : pickR(r, HEAD_SHAPES).id, bodyType: gender === 'f' ? pickR(r, ['lean', 'athletic', 'athletic', 'stocky']) : randomBodyType(r, opts.position),
     ...randomJersey(r, opts.position), tatNeck: r() < 0.9 ? 'none' : pickR(r, NECK_TATTOOS.slice(1)).id,
     cleatDesign: pickR(r, CLEAT_DESIGNS).id, cleatCut: r() < 0.6 ? 'low' : r() < 0.75 ? 'mid' : 'high',
     gloveDesign: pickR(r, GLOVE_DESIGNS).id, gloveAccent: pickR(r, GEAR_COLORS),
@@ -162,6 +172,32 @@ function randomJersey(r, pos) {
   };
 }
 
+/**
+ * Make a look a girl's (keeps skin, eyes and face shape; swaps hair to a girl's style, no beard, adds earrings and
+ * lipstick). Used for Mom, partners and anyone saved before looks had a gender.
+ */
+export function feminize(look, seed = 'f') {
+  const r = seededRandom(`fem:${seed}`);
+  const out = { ...look, gender: 'f', beard: 'none' };
+  if (!FEMALE_HAIR.includes(out.hairStyle)) out.hairStyle = FEMALE_HAIR[Math.floor(r() * FEMALE_HAIR.length)];
+  if (!out.earrings || out.earrings === 'none') out.earrings = ['studs', 'hoops', 'drops'][Math.floor(r() * 3)];
+  if (!out.lips || out.lips === 'none') out.lips = LIP_COLORS[1 + Math.floor(r() * (LIP_COLORS.length - 1))];
+  out.dress ??= ['#7a1f3a', '#1d3557', '#16181f', '#2f4a3a', '#b5485d'][Math.floor(r() * 5)];
+  if ((out.heightIn ?? 70) > 70) out.heightIn = 64 + Math.floor(r() * 6);
+  if ((out.weightLb ?? 150) > 165) out.weightLb = 125 + Math.floor(r() * 35);
+  if (out.bodyType === 'muscular' || out.bodyType === 'lanky') out.bodyType = 'athletic';
+  if (out.headShape === 'square' || out.headShape === 'wide') out.headShape = 'oval';
+  return out;
+}
+/** Make a look a guy's (girl-only hair styles swapped, no makeup or dress). */
+export function masculinize(look, seed = 'm') {
+  const r = seededRandom(`masc:${seed}`);
+  const out = { ...look, gender: 'm', lips: 'none', dress: null };
+  if (!MALE_HAIR.includes(out.hairStyle)) out.hairStyle = MALE_HAIR[Math.floor(r() * MALE_HAIR.length)];
+  if (out.earrings && out.earrings !== 'studs') out.earrings = 'none';
+  return out;
+}
+
 /** Starting look for a new athlete. */
 export function defaultLook(position = 'QB') {
   const [h, w] = POS_SIZE[position] ?? [72, 200];
@@ -179,7 +215,7 @@ export function defaultLook(position = 'QB') {
 
 /** New customization fields (older saves get these). */
 export const JERSEY_DEFAULTS = {
-  headShape: 'oval', bodyType: 'athletic',
+  headShape: 'oval', bodyType: 'athletic', gender: 'm', earrings: 'none', lips: 'none',
   jSleeve: 'short', jLength: 'normal', jFit: 'normal', padSize: 'normal', backplate: 'none', neckRoll: 'none', underColor: '#16181c',
   sockStyle: 'team', mouthguard: 'none', tatNeck: 'none', cleatDesign: 'stripe', cleatCut: 'low', gloveDesign: 'solid', gloveAccent: '#f2f2f2',
 };
