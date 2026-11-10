@@ -137,3 +137,10 @@ gridiron-legacy/
 - The UI and the balance bot drive the game through the same functions in `sim/flow.js`.
 - If WebGL is unavailable, minigames fall back to a 2D timing meter.
 - All teams, players, leagues, brands and trophies are fictional. See `ASSETS.md`.
+
+## Play it on your phone (installable app)
+The game is published with GitHub Pages at https://cartparti.github.io/Star-wars-blaster-battle/
+- iPhone: open it in **Safari** → Share → **Add to Home Screen**. Always launch it from the icon.
+- Android: open it in **Chrome** → ⋮ menu → **Install app** (or Add to Home screen).
+Saves stay on the phone; updates load automatically the next time you open the app.
+Settings → Export save makes a backup you can import on another device.
