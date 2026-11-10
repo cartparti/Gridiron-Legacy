@@ -289,7 +289,7 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   updates appear on next open, offline falls back to cache; bump CACHE when the file list changes), iOS/Android meta
   tags and SW registration + `navigator.storage.persist()` in index.html (skipped inside iframes like the artifact).
 - Hosting: `.github/workflows/pages.yml` deploys gridiron-legacy/ to GitHub Pages on pushes to the dev branch and
-  main. Live app: https://cartparti.github.io/gridiron-legacy/ (repo renamed from Star-wars-blaster-battle). Saves stay in localStorage on that address, so never change the Pages URL without telling the owner
+  main. Live app: https://cartparti.github.io/Gridiron-Legacy/ (repo renamed from Star-wars-blaster-battle). Saves stay in localStorage on that address, so never change the Pages URL without telling the owner
   (Export/Import save moves careers).
 
 ## Known gaps / next ideas
