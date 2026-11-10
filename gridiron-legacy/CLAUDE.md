@@ -343,6 +343,22 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   date, hangout, gaming scenes via `runSetCutscene` (social screen dates/hangouts, world activities).
 - Tests: `tests/round8.test.js`.
 
+## v0.23: real hair + football physics
+- Uniforms are guys only: `makePlayer` forces a male look (girls are cheerleaders, fans, dates, family, press).
+- Hair (`actors.js` HAIR_SPEC / addHairVolume): no boxes. A shell = hi-res `headGeo(shape, 16)` pushed out along
+  the ellipsoid normal by a per-style thickness, feathered under the scalp at a hairline (F/S/B polar angles, or a
+  custom mask for mohawks); strand/curl/wave/rows canvas textures with bump. Hanging hair = tapered `lockGeo`
+  tubes (long, ponytail, braids with bumps, locs); buns/twists/curls are blobs, spikes are cones, mohawk/frohawk a
+  squashed ridge tube. `helmetHair` hangs long hair/ponytails/braids/locs out of the helmet. Geometry cached per
+  head shape + style.
+- Football: `makeBall` is a lathe football (pebbled leather, stripes, laces). `play/ballphys.js` simulates it:
+  gravity, tumbling, the erratic tip bounce, then a curling side-roll to rest. Passes spiral (`orientInFlight`,
+  `flight.wobble` for ducks); the carrier holds it in the right hand (`carryBall`).
+- Fumbles are live: big hits raise `fumbleP` (also the QTE-fail tackle path and strip sacks); `fumbleOut` pops the
+  ball, everyone `chaseLoose`s, `updateLoose` handles bobbles, falls on it (`finishLoose` → tackle/td/fumble
+  whistle), out of bounds (offense keeps it), or YOU scoop it (`e.scoop` → SCOOP AND SCORE / FUMBLE RECOVERY).
+  Incompletions/PDs/batted balls bounce away. Test hook: `globalThis.__forceFumble`.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

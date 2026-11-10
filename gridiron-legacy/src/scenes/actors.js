@@ -146,10 +146,11 @@ function geo() {
 const HEAD_DIMS = { oval: [0.33, 0.39, 0.36, 0.15, 0.84], round: [0.37, 0.36, 0.37, 0.18, 0.95], square: [0.36, 0.38, 0.35, 0.075, 1.04],
   long: [0.31, 0.43, 0.35, 0.13, 0.84], wide: [0.39, 0.36, 0.36, 0.13, 0.97], heart: [0.35, 0.39, 0.35, 0.15, 0.66] };
 const headCache = {};
-function headGeo(shape = 'oval') {
-  if (headCache[shape]) return headCache[shape];
+function headGeo(shape = 'oval', seg = 6) {
+  const ck = `${shape}|${seg}`;
+  if (headCache[ck]) return headCache[ck];
   const [w, h, d, r, jaw] = HEAD_DIMS[shape] ?? HEAD_DIMS.oval;
-  const b = softBox(w, h, d, r, 6);
+  const b = softBox(w, h, d, r, seg);
   const pos = b.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const y = pos.getY(i) / (h / 2); // -1 chin .. 1 crown
@@ -166,7 +167,7 @@ function headGeo(shape = 'oval') {
       pos.setXYZ(i, x + (ex / len * (w / 2) - x) * k * 0.6, yy + (ey / len * (h / 2) - yy) * k * 0.35, z + (ez / len * (d / 2) - z) * k * 0.6);
     }
   }
-  headCache[shape] = b;
+  headCache[ck] = b;
   return b;
 }
 /** Body types: overall build multipliers + limb thickness. */
@@ -920,42 +921,263 @@ function addHelmet(neck, un, L, hairC) {
     v.position.set(0, 0.05, -0.2);
     H.add(v);
   }
-  // long hair and locs hang out the back of the helmet
-  if (['long', 'dreads', 'braids'].includes(L.hairStyle)) {
-    const hm = toon(hairC);
-    if (L.hairStyle === 'long') add(box(0.3, 0.22, 0.06), hm, 0, -0.27, 0.19);
-    else for (const x of [-0.12, -0.04, 0.04, 0.12]) add(box(0.05, 0.26, 0.05), hm, x, -0.28, 0.2);
-  }
+  // long hair, ponytails, braids and locs hang out the back of the helmet
+  helmetHair(neck, L, hairC);
 }
 
-function addHairVolume(neck, L, hairC) {
-  const hm = toon(hairC, 0.85);
-  // hair hugs the (smaller, rounder) head: pulled down and in a little, with soft rounded clumps
-  const hg = new THREE.Group(); hg.position.y = -0.045; hg.scale.set(0.9, 1, 0.94); neck.add(hg);
-  const add = (w, h, d, x, y, z, m = hm) => { const mesh = new THREE.Mesh(box(w, h, d, 0, 0.48, 3), m); mesh.position.set(x, y, z); hg.add(mesh); return mesh; };
-  const top = 0.23 + 0.18;
-  switch (L.hairStyle) {
-    case 'afro': add(0.46, 0.22, 0.44, 0, top + 0.06, 0.02); add(0.44, 0.16, 0.2, 0, top - 0.08, 0.13); break;
-    case 'curly': add(0.39, 0.08, 0.37, 0, top + 0.02, 0.01); add(0.1, 0.06, 0.1, -0.1, top + 0.08, -0.05); add(0.1, 0.06, 0.1, 0.08, top + 0.08, 0.06); break;
-    case 'flattop': add(0.36, 0.12, 0.32, 0, top + 0.06, 0.01); break;
-    case 'mohawk': add(0.07, 0.1, 0.36, 0, top + 0.05, 0.01); break;
-    case 'short': add(0.37, 0.04, 0.35, 0, top + 0.01, 0.005); break;
-    case 'bun': add(0.39, 0.06, 0.37, 0, top + 0.01, 0); add(0.2, 0.18, 0.18, 0, top + 0.07, 0.13); add(0.07, 0.16, 0.2, -0.18, 0.31, 0.02); add(0.07, 0.16, 0.2, 0.18, 0.31, 0.02); break;
-    case 'long': // full hair that frames the face and falls past the shoulders
-      add(0.4, 0.07, 0.38, 0, top + 0.02, 0.01); add(0.4, 0.5, 0.12, 0, 0.1, 0.17);
-      add(0.07, 0.42, 0.24, -0.19, 0.17, 0.04); add(0.07, 0.42, 0.24, 0.19, 0.17, 0.04);
-      add(0.36, 0.12, 0.08, 0, top - 0.06, -0.17); break;
-    case 'dreads': add(0.38, 0.05, 0.36, 0, top + 0.02, 0); for (let i = 0; i < 6; i++) add(0.05, 0.32, 0.05, -0.15 + i * 0.06, 0.1, 0.18); add(0.05, 0.26, 0.05, -0.19, 0.13, 0.06); add(0.05, 0.26, 0.05, 0.19, 0.13, 0.06); break;
-    case 'braids': add(0.37, 0.03, 0.35, 0, top, 0); add(0.06, 0.36, 0.06, -0.08, 0.1, 0.19); add(0.06, 0.36, 0.06, 0.08, 0.1, 0.19); break;
-    case 'twists': add(0.39, 0.06, 0.37, 0, top + 0.02, 0.01); for (let i = 0; i < 7; i++) add(0.06, 0.08, 0.06, -0.15 + (i % 4) * 0.1, top + 0.08, -0.12 + Math.floor(i / 4) * 0.2); break;
-    case 'undercut': add(0.24, 0.06, 0.34, 0, top + 0.03, 0); add(0.24, 0.05, 0.08, 0, top + 0.02, -0.17); break;
-    case 'pompadour': add(0.34, 0.05, 0.3, 0, top + 0.02, 0.02); add(0.3, 0.12, 0.12, 0, top + 0.07, -0.12); break;
-    case 'spiky': add(0.37, 0.04, 0.35, 0, top + 0.01, 0); for (let i = 0; i < 6; i++) { const sp = add(0.07, 0.11, 0.07, -0.13 + (i % 3) * 0.13, top + 0.08, -0.08 + Math.floor(i / 3) * 0.16); sp.rotation.z = (i % 2 ? 0.3 : -0.3); } break;
-    case 'ponytail': add(0.39, 0.06, 0.37, 0, top + 0.01, 0); add(0.07, 0.18, 0.22, -0.18, 0.3, 0.03); add(0.07, 0.18, 0.22, 0.18, 0.3, 0.03); add(0.13, 0.13, 0.13, 0, 0.33, 0.2); add(0.1, 0.36, 0.1, 0, 0.12, 0.25); break;
-    case 'frohawk': add(0.16, 0.16, 0.38, 0, top + 0.07, 0.01); break;
-    case 'slick': add(0.37, 0.03, 0.36, 0, top + 0.01, 0.01); add(0.36, 0.08, 0.06, 0, 0.32, 0.18); break;
+// ---------------- hair: smooth sculpted shells + tapered locks (no blocks)
+// The shell is a hi-res copy of the person's own head pushed out by a per-style thickness; below the hairline
+// it tucks under the scalp, so the edge feathers in like a real hairline. Hanging hair is tapered tubes.
+const sstep = (e0, e1, x) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+const hairTexCache = {};
+function hairTex(kind) {
+  if (hairTexCache[kind]) return hairTexCache[kind];
+  const N = 128;
+  const c = document.createElement('canvas'); c.width = c.height = N;
+  const g = c.getContext('2d');
+  let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  g.fillStyle = '#e4e4e4'; g.fillRect(0, 0, N, N);
+  const strands = (count, lo, alpha) => {
+    for (let i = 0; i < count; i++) {
+      const x = rnd() * N; const v = (lo + rnd() * (255 - lo)) | 0;
+      g.strokeStyle = `rgba(${v},${v},${v},${alpha})`; g.lineWidth = 0.6 + rnd() * 1.3;
+      const dx1 = (rnd() - 0.5) * 8, dx2 = (rnd() - 0.5) * 8, dx3 = (rnd() - 0.5) * 5;
+      for (const o of [-N, 0, N]) { g.beginPath(); g.moveTo(x + o, 0); g.bezierCurveTo(x + o + dx1, N * 0.33, x + o + dx2, N * 0.66, x + o + dx3, N); g.stroke(); }
+    }
+  };
+  if (kind === 'curl') {
+    for (let i = 0; i < 1400; i++) { const v = (130 + rnd() * 125) | 0; g.fillStyle = `rgba(${v},${v},${v},0.8)`; const x = rnd() * N, y = rnd() * N, r = 1 + rnd() * 2.4; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+  } else if (kind === 'wave') {
+    for (let y = 0; y < N; y++) { const v = (175 + 75 * Math.sin((y / N) * Math.PI * 2 * 9)) | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(0, y, N, 1); }
+    strands(120, 170, 0.35);
+  } else if (kind === 'rows') {
+    strands(200, 150, 0.5);
+    for (let x = 0; x < N; x += 16) { g.fillStyle = 'rgba(70,70,70,0.75)'; g.fillRect(x, 0, 2.5, N); }
+  } else strands(280, 120, 0.55);
+  const map = new THREE.CanvasTexture(c); map.wrapS = map.wrapT = THREE.RepeatWrapping; map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
+  const bump = new THREE.CanvasTexture(c); bump.wrapS = bump.wrapT = THREE.RepeatWrapping;
+  return (hairTexCache[kind] = { map, bump });
+}
+function hairMat(color, kind = 'strand', rough = 0.6) {
+  const key = `hair2|${color}|${kind}|${rough}`;
+  if (!matCache.has(key)) {
+    const t = hairTex(kind);
+    matCache.set(key, new THREE.MeshStandardMaterial({ color, map: t.map, bumpMap: t.bump, bumpScale: 1.4, roughness: rough, metalness: 0, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
+  }
+  return matCache.get(key);
+}
+const top = (ny) => Math.max(0, ny);
+const front = (nz) => Math.max(0, -nz);
+// F/S/B: hairline as a polar angle from the crown (radians) at the front, sides and back.
+const HAIR_SPEC = {
+  buzz: { F: 0.95, S: 1.45, B: 1.9, thick: () => 0.005, kind: 'curl', rough: 0.9 },
+  short: { F: 0.95, S: 1.45, B: 1.95, thick: (nx, ny, nz) => 0.014 + 0.022 * top(ny) + 0.01 * front(nz) * top(ny) },
+  fade: { F: 0.95, S: 1.5, B: 1.9, thick: (nx, ny) => 0.003 + 0.034 * sstep(0.15, 0.7, ny) },
+  waves: { F: 0.85, S: 1.45, B: 1.9, thick: () => 0.01, kind: 'wave', rough: 0.45 },
+  cornrows: { F: 0.8, S: 1.45, B: 1.95, thick: () => 0.012, kind: 'rows' },
+  flattop: { F: 0.95, S: 1.45, B: 1.85, thick: (nx, ny, nz) => 0.005 + 0.12 * sstep(0.2, 0.85, ny) * (1 - 0.6 * front(nz)), flat: 0.06, kind: 'curl', rough: 0.8 },
+  curly: { F: 1.05, S: 1.5, B: 2.0, thick: (nx, ny) => 0.03 + 0.03 * top(ny), noise: 0.012, kind: 'curl', rough: 0.8 },
+  afro: { F: 1.1, S: 1.65, B: 2.05, thick: (nx, ny) => 0.075 + 0.075 * top(ny) + 0.02 * Math.abs(nx), noise: 0.014, kind: 'curl', rough: 0.85 },
+  mohawk: { mask: (nx, ny, nz, th) => sstep(0.26, 0.16, Math.abs(nx)) * sstep(2.0, 1.85, th), thick: () => 0.008, ridge: { w: 0.35, r: 0.06 } },
+  frohawk: { mask: (nx, ny, nz, th) => sstep(0.45, 0.32, Math.abs(nx)) * sstep(2.0, 1.85, th), thick: () => 0.02, ridge: { w: 0.6, r: 0.07 }, kind: 'curl', rough: 0.85 },
+  undercut: { F: 0.92, S: 0.98, B: 1.05, thick: (nx, ny, nz) => 0.03 + 0.025 * front(nz) },
+  pompadour: { F: 0.95, S: 1.45, B: 1.9, thick: (nx, ny, nz) => 0.014 + 0.018 * top(ny) + 0.08 * front(nz) * sstep(0.15, 0.8, ny), rough: 0.4 },
+  spiky: { F: 0.95, S: 1.45, B: 1.9, thick: (nx, ny) => 0.018 + 0.012 * top(ny) },
+  slick: { F: 0.85, S: 1.45, B: 2.05, thick: (nx, ny, nz) => 0.012 + 0.012 * top(ny) + 0.006 * Math.max(0, nz), rough: 0.28 },
+  long: { F: 0.95, S: 1.85, B: 2.3, thick: (nx, ny, nz) => 0.02 + 0.018 * top(ny) + 0.012 * Math.max(0, nz), rough: 0.5 },
+  bun: { F: 0.95, S: 1.5, B: 2.0, thick: (nx, ny) => 0.012 + 0.008 * top(ny), rough: 0.45 },
+  ponytail: { F: 0.95, S: 1.5, B: 2.0, thick: (nx, ny) => 0.012 + 0.008 * top(ny), rough: 0.45 },
+  braids: { F: 0.85, S: 1.5, B: 2.0, thick: () => 0.013, kind: 'rows' },
+  dreads: { F: 1.0, S: 1.55, B: 2.0, thick: () => 0.026, kind: 'curl', rough: 0.85 },
+  twists: { F: 1.0, S: 1.5, B: 1.95, thick: () => 0.026, kind: 'curl', rough: 0.8 },
+};
+const hairGeoCache = {};
+function hairShellGeo(shape, style, spec) {
+  const [w, h, d] = HEAD_DIMS[shape] ?? HEAD_DIMS.oval;
+  const g = headGeo(shape, 16).clone();
+  const pos = g.attributes.position; const uv = g.attributes.uv;
+  const hw = w / 2, hh = h / 2, hd = d / 2;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    const ex = v.x / hw, ey = v.y / hh, ez = v.z / hd;
+    const len = Math.hypot(ex, ey, ez) || 1;
+    const nx = ex / len, ny = ey / len, nz = ez / len;
+    const th = Math.acos(Math.max(-1, Math.min(1, ny)));
+    const az = Math.atan2(nx, -nz); // 0 = face, +-PI = back of the head
+    let m;
+    if (spec.mask) m = spec.mask(nx, ny, nz, th, az);
+    else {
+      const c = Math.cos(az);
+      const lim = c >= 0 ? spec.S + (spec.F - spec.S) * c : spec.S + (spec.B - spec.S) * -c;
+      m = sstep(lim + 0.08, lim - 0.08, th);
+    }
+    let t = spec.thick(nx, ny, nz, th, az);
+    if (spec.noise) t += spec.noise * Math.sin(17 * nx + 3.1) * Math.sin(19 * ny + 1.3) * Math.sin(23 * nz + 2.2);
+    const off = -0.009 + (t + 0.009) * m;
+    // push out along the ellipsoid normal (smooth everywhere, no seams at the box faces)
+    const gx = ex / hw, gy = ey / hh, gz = ez / hd; const gl = Math.hypot(gx, gy, gz) || 1;
+    v.x += (gx / gl) * off; v.y += (gy / gl) * off; v.z += (gz / gl) * off;
+    if (spec.flat !== undefined && v.y > hh + spec.flat) v.y = hh + spec.flat;
+    pos.setXYZ(i, v.x, v.y, v.z);
+    uv.setXY(i, (Math.abs(az) / Math.PI) * 3, (th / Math.PI) * 2);
+  }
+  g.computeVertexNormals();
+  // average normals across coincident vertices so the box seams of the base mesh don't show
+  const nor = g.attributes.normal; const acc = new Map();
+  for (let i = 0; i < pos.count; i++) {
+    const k = `${pos.getX(i).toFixed(4)},${pos.getY(i).toFixed(4)},${pos.getZ(i).toFixed(4)}`;
+    const a = acc.get(k) ?? [0, 0, 0, []]; a[0] += nor.getX(i); a[1] += nor.getY(i); a[2] += nor.getZ(i); a[3].push(i); acc.set(k, a);
+  }
+  for (const [x, y, z, ids] of acc.values()) { const l = Math.hypot(x, y, z) || 1; for (const i of ids) nor.setXYZ(i, x / l, y / l, z / l); }
+  g.translate(0, 0.23, 0);
+  return g;
+}
+/** A tapered (optionally braided) tube along points; prof = [[t, r], ...] radius along the length. */
+function lockGeo(points, prof, { bumps = 0, amp = 0, squash = 1, seg = 22, radial = 10 } = {}) {
+  const curve = new THREE.CatmullRomCurve3(points);
+  const g = new THREE.TubeGeometry(curve, seg, 1, radial, false);
+  const pos = g.attributes.position;
+  const rAt = (t) => { for (let k = 1; k < prof.length; k++) if (t <= prof[k][0]) { const [t0, r0] = prof[k - 1]; const [t1, r1] = prof[k]; return r0 + (r1 - r0) * ((t - t0) / (t1 - t0 || 1)); } return prof[prof.length - 1][1]; };
+  const ctr = new THREE.Vector3(); const p = new THREE.Vector3();
+  for (let i = 0; i <= seg; i++) {
+    const t = i / seg;
+    curve.getPointAt(t, ctr);
+    let r = rAt(t);
+    if (bumps) r *= 1 + amp * (Math.abs(Math.sin(t * bumps * Math.PI)) - 0.5);
+    for (let j = 0; j <= radial; j++) {
+      const idx = i * (radial + 1) + j;
+      p.fromBufferAttribute(pos, idx).sub(ctr).multiplyScalar(r);
+      p.x *= squash;
+      pos.setXYZ(idx, ctr.x + p.x, ctr.y + p.y, ctr.z + p.z);
+    }
+  }
+  g.computeVertexNormals();
+  return g;
+}
+const SPH = new THREE.SphereGeometry(1, 20, 14);
+function hairExtras(shape, style, spec) {
+  const [w, h, d] = HEAD_DIMS[shape] ?? HEAD_DIMS.oval;
+  const hw = w / 2, hh = h / 2, hd = d / 2, cy = 0.23;
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  // point on (a little outside) the head: az 0 = face, PI = back; th from the crown
+  const surf = (az, th, k = 1) => V(Math.sin(th) * Math.sin(az) * hw * k, cy + Math.cos(th) * hh * k, -Math.sin(th) * Math.cos(az) * hd * k);
+  let seed = [...style].reduce((a, ch) => a + ch.charCodeAt(0), 7); const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const out = []; // { geo, matrix?, tie? }
+  const blob = (x, y, z, rx, ry, rz, rot = null) => { const g = SPH.clone(); g.scale(rx, ry, rz); if (rot) g.applyQuaternion(rot); g.translate(x, y, z); out.push({ geo: g }); };
+  const along = (n, len, rad) => { const q = new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), n.clone().normalize()); return q; };
+  switch (style) {
+    case 'long': {
+      for (const az0 of [1.2, 1.5, 1.82, 2.15, 2.5, 2.85]) for (const sd of [-1, 1]) {
+        const az = az0 * sd; const back = (1 - Math.cos(az)) / 2;
+        const p0 = surf(az, 1.15, 1.04); const p1 = surf(az, 1.7, 1.12);
+        const endY = cy - (0.19 + 0.2 * back) - rnd() * 0.04;
+        const ex = Math.sin(az) * hw * (1.04 - 0.3 * back); const ez = Math.max(-Math.cos(az) * hd * 1.05, 0.02 + 0.09 * back);
+        const p2 = V(ex * 1.02, (p1.y + endY) / 2, (p1.z + ez) / 2 + 0.01); const p3 = V(ex * 0.95, endY, ez);
+        out.push({ geo: lockGeo([p0, p1, p2, p3], [[0, 0.03], [0.18, 0.05], [0.75, 0.045], [1, 0.006]]) });
+      }
+      const pb = [surf(Math.PI, 1.1, 1.04), surf(Math.PI, 1.7, 1.12), V(0, cy - 0.27, hd + 0.05), V(0, cy - 0.44, hd + 0.05)];
+      out.push({ geo: lockGeo(pb, [[0, 0.03], [0.18, 0.055], [0.75, 0.05], [1, 0.006]]) });
+      break;
+    }
+    case 'bun': {
+      const c = surf(Math.PI, 0.72, 1.18);
+      blob(c.x, c.y, c.z, 0.085, 0.075, 0.08);
+      const tieP = surf(Math.PI, 0.82, 1.06); out.push({ geo: new THREE.TorusGeometry(0.05, 0.01, 8, 18).rotateX(Math.PI / 2 - 0.7).translate(tieP.x, tieP.y, tieP.z), tie: true });
+      break;
+    }
+    case 'ponytail': {
+      const s0 = surf(Math.PI, 1.0, 1.04);
+      const pts = [s0, V(0, s0.y - 0.01, s0.z + 0.06), V(0, cy - 0.12, hd + 0.08), V(0, cy - 0.3, hd + 0.05), V(0, cy - 0.38, hd + 0.04)];
+      out.push({ geo: lockGeo(pts, [[0, 0.036], [0.15, 0.05], [0.5, 0.048], [0.85, 0.03], [1, 0.006]]) });
+      out.push({ geo: new THREE.TorusGeometry(0.036, 0.01, 8, 16).translate(s0.x, s0.y - 0.005, s0.z + 0.035).rotateX(0), tie: true });
+      break;
+    }
+    case 'braids': {
+      for (const sd of [-1, 1]) {
+        const p0 = surf(sd * 2.4, 1.55, 1.0);
+        const pts = [p0, V(sd * 0.09, cy - 0.16, hd * 0.95), V(sd * 0.105, cy - 0.3, hd * 0.9 + 0.02), V(sd * 0.1, cy - 0.42, hd * 0.85 + 0.03)];
+        out.push({ geo: lockGeo(pts, [[0, 0.03], [0.1, 0.034], [0.9, 0.028], [1, 0.01]], { bumps: 11, amp: 0.4, seg: 44 }) });
+        const tp = pts[3]; out.push({ geo: new THREE.TorusGeometry(0.02, 0.007, 6, 12).rotateX(Math.PI / 2).translate(tp.x, tp.y + 0.015, tp.z), tie: true });
+      }
+      break;
+    }
+    case 'dreads': {
+      for (let i = 0; i < 16; i++) {
+        const sd = i % 2 ? 1 : -1; const az = sd * (1.25 + (Math.floor(i / 2) / 7) * (Math.PI - 1.25) + rnd() * 0.06);
+        const th = 1.3 + rnd() * 0.2; const back = (1 - Math.cos(az)) / 2;
+        const p0 = surf(az, th, 0.98); const p1 = surf(az, th + 0.4, 1.12);
+        const len = 0.22 + 0.12 * back + rnd() * 0.05;
+        const p2 = V(p1.x * 1.05, p1.y - len * 0.55, p1.z + 0.02 * back + 0.01); const p3 = V(p1.x * 1.02, p1.y - len, p1.z + 0.03 * back);
+        out.push({ geo: lockGeo([p0, p1, p2, p3], [[0, 0.02], [0.1, 0.023], [0.92, 0.02], [1, 0.012]], { radial: 7, seg: 14 }) });
+      }
+      break;
+    }
+    case 'twists': {
+      for (let i = 0; i < 30; i++) {
+        const th = 0.12 + Math.sqrt(rnd()) * 1.3; const az = rnd() * Math.PI * 2;
+        const p = surf(az, th, 1.06); const n = V(p.x / (hw * hw), (p.y - cy) / (hh * hh), p.z / (hd * hd)).normalize();
+        blob(p.x + n.x * 0.025, p.y + n.y * 0.025, p.z + n.z * 0.025, 0.021, 0.045, 0.021, along(n));
+      }
+      break;
+    }
+    case 'spiky': {
+      for (let i = 0; i < 16; i++) {
+        const th = 0.1 + Math.sqrt(rnd()) * 0.95; const az = rnd() * Math.PI * 2;
+        const p = surf(az, th, 1.05); const n = V(p.x / (hw * hw), (p.y - cy) / (hh * hh), p.z / (hd * hd)).normalize();
+        n.z -= 0.25; n.normalize(); // swept up and forward a touch
+        const g = new THREE.ConeGeometry(0.03, 0.085, 10).translate(0, 0.04, 0).applyQuaternion(along(n)).translate(p.x, p.y, p.z);
+        out.push({ geo: g });
+      }
+      break;
+    }
+    case 'curly': {
+      for (let i = 0; i < 22; i++) {
+        const th = 0.1 + Math.sqrt(rnd()) * 1.15; const az = rnd() * Math.PI * 2;
+        const p = surf(az, th, 1.12 + 0.05 * Math.cos(th)); blob(p.x, p.y, p.z, 0.04, 0.035, 0.04);
+      }
+      break;
+    }
     default: break;
   }
+  if (spec.ridge) {
+    // mohawk / frohawk: a crest from the forehead over the crown to the nape
+    const pts = [];
+    for (const [az, th] of [[0, 0.5], [0, 0.3], [0, 0.1], [Math.PI, 0.15], [Math.PI, 0.55], [Math.PI, 1.0], [Math.PI, 1.45], [Math.PI, 1.8]]) pts.push(surf(az, th, 0.98));
+    const r = spec.ridge.r;
+    out.push({ geo: lockGeo(pts, [[0, r * 0.45], [0.2, r], [0.5, r * 1.05], [0.8, r * 0.7], [1, r * 0.25]], { squash: spec.ridge.w, seg: 30, radial: 14 }) });
+  }
+  return out;
+}
+function addHairVolume(neck, L, hairC) {
+  const style = L.hairStyle;
+  const spec = HAIR_SPEC[style];
+  if (!spec) return; // bald
+  const shape = L.headShape ?? 'oval';
+  const key = `${shape}|${style}`;
+  const cached = (hairGeoCache[key] ??= { shell: hairShellGeo(shape, style, spec), extras: hairExtras(shape, style, spec) });
+  const mat = hairMat(hairC, spec.kind ?? 'strand', spec.rough ?? 0.6);
+  const lockMat = style === 'dreads' || style === 'twists' || style === 'curly' ? hairMat(hairC, 'curl', 0.85) : hairMat(hairC, 'strand', spec.rough ?? 0.55);
+  const tieMat = shiny(L.gender === 'f' ? '#c2185b' : '#1b1b1b', { rough: 0.5 });
+  neck.add(new THREE.Mesh(cached.shell, mat));
+  for (const e of cached.extras) neck.add(new THREE.Mesh(e.geo, e.tie ? tieMat : lockMat));
+}
+/** Hair that shows under a helmet: long hair, ponytails, braids and locs hang out the back. */
+function helmetHair(neck, L, hairC) {
+  const style = L.hairStyle;
+  if (!['long', 'ponytail', 'braids', 'dreads', 'bun'].includes(style)) return;
+  const key = `helmet|${style}`;
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const geos = (hairGeoCache[key] ??= (() => {
+    const out = [];
+    if (style === 'long') for (const x of [-0.12, -0.06, 0, 0.06, 0.12]) out.push(lockGeo([V(x * 0.9, 0.08, 0.17), V(x, 0.0, 0.225), V(x * 1.05, -0.1, 0.24), V(x, -0.2 - Math.abs(x) * 0.3, 0.235)], [[0, 0.035], [0.2, 0.045], [0.8, 0.04], [1, 0.006]]));
+    else if (style === 'ponytail' || style === 'bun') out.push(lockGeo([V(0, 0.06, 0.2), V(0, -0.01, 0.245), V(0, -0.12, 0.25), V(0, -0.22, 0.235)], [[0, 0.035], [0.25, 0.045], [0.8, 0.032], [1, 0.006]]));
+    else if (style === 'braids') for (const sd of [-1, 1]) out.push(lockGeo([V(sd * 0.08, 0.06, 0.19), V(sd * 0.09, -0.04, 0.235), V(sd * 0.1, -0.16, 0.24), V(sd * 0.1, -0.27, 0.23)], [[0, 0.028], [0.9, 0.026], [1, 0.01]], { bumps: 10, amp: 0.4, seg: 40 }));
+    else for (let i = 0; i < 7; i++) { const x = -0.14 + i * 0.047; out.push(lockGeo([V(x * 0.9, 0.07, 0.18), V(x, -0.02, 0.228), V(x * 1.04, -0.12, 0.236), V(x, -0.18 - (i % 3) * 0.03, 0.232)], [[0, 0.02], [0.9, 0.019], [1, 0.012]], { radial: 7, seg: 12 })); }
+    return out;
+  })());
+  const mat = hairMat(hairC, style === 'dreads' ? 'curl' : 'strand', 0.55);
+  for (const g of geos) neck.add(new THREE.Mesh(g, mat));
 }
 
 function uniformFrom(colors) {
@@ -1347,14 +1569,31 @@ export function setHop(p, h) { p.userData.u.hop = Math.max(p.userData.u.hop, h);
 
 // ------------------------------------------------------------------ ball & markers
 
+const ballParts = {};
+/** A real football: pointed prolate spheroid, pebbled leather, white stripes and laces. Local +z = long axis. */
 export function makeBall() {
+  if (!ballParts.body) {
+    const A = 0.19, B = 0.11;
+    const pts = [];
+    for (let i = 0; i <= 24; i++) { const s = -1 + (i / 24) * 2; pts.push(new THREE.Vector2(Math.max(0.0015, B * Math.pow(1 - s * s, 0.78)), s * A)); }
+    ballParts.body = new THREE.LatheGeometry(pts, 22).rotateX(Math.PI / 2);
+    // pebbled leather texture
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'); g.fillStyle = '#d0d0d0'; g.fillRect(0, 0, 64, 64);
+    for (let i = 0; i < 700; i++) { const v = (150 + Math.random() * 105) | 0; g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(Math.random() * 64, Math.random() * 64, 1.2, 1.2); }
+    const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(4, 4);
+    ballParts.leather = new THREE.MeshStandardMaterial({ color: '#7a3b1a', roughness: 0.62, bumpMap: tex, bumpScale: 0.6 });
+    ballParts.white = new THREE.MeshStandardMaterial({ color: '#f4f1ea', roughness: 0.5 });
+    const rAt = (s) => B * Math.pow(1 - s * s, 0.78);
+    ballParts.stripe = (s) => new THREE.TorusGeometry(rAt(s) + 0.001, 0.0055, 6, 24, Math.PI * 0.9).rotateZ(Math.PI * 0.05).translate(0, 0, s * A);
+    ballParts.lace = new THREE.BoxGeometry(0.018, 0.012, 0.13);
+    ballParts.stitch = new THREE.BoxGeometry(0.05, 0.01, 0.012);
+  }
   const g = new THREE.Group();
-  const b = new THREE.Mesh(geo().ball, Object.assign(toon('#8b4513').clone(), { flatShading: true }));
-  b.scale.set(1, 1, 1.75);
-  g.add(b);
-  const lace = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.02, 0.14), toon('#ffffff'));
-  lace.position.y = 0.105;
-  g.add(lace);
+  g.add(new THREE.Mesh(ballParts.body, ballParts.leather));
+  for (const s of [-0.62, 0.62]) g.add(new THREE.Mesh(ballParts.stripe(s), ballParts.white));
+  const lace = new THREE.Mesh(ballParts.lace, ballParts.white); lace.position.y = 0.109; g.add(lace);
+  for (let i = 0; i < 6; i++) { const st = new THREE.Mesh(ballParts.stitch, ballParts.white); st.position.set(0, 0.108, -0.055 + i * 0.022); g.add(st); }
   const shadow = new THREE.Mesh(geo().shadow, shadowMat);
   shadow.rotation.x = -Math.PI / 2;
   shadow.scale.setScalar(0.3);

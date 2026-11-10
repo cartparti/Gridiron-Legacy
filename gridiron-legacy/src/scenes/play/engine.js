@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, confetti, ragdoll, bloodBurst, dustPuff, markTicked, bump, applyWear, addWear, applyInjuryLook } from '../actors.js';
 import { INJURIES } from '../../data/lifestyle.js';
 import { xrayCard } from './xray.js';
+import { createBallPhysics, orientInFlight } from './ballphys.js';
 import { rig, endPlay, finalize, weatherFx, gaussR } from '../minigames/common.js';
 import { makeControls } from './controls.js';
 import { PLAYS, OFF_FORMATION, OL_X, playMode, dealPlays } from '../../data/playbook.js';
@@ -126,6 +127,18 @@ export function freePlay(ctx) {
   const ball = makeBall();
   group.add(ball);
   group.add(ball.userData.shadow);
+  // the ball is a physical object: it bounces, tumbles and rolls whenever nobody has it
+  const bphys = createBallPhysics(ball, { onBounce: (imp) => { if (imp > 1.5) sfx.bounce(Math.min(1, imp / 6)); if (imp > 4) fxList.push(dustPuff(group, { x: ball.position.x, z: ball.position.z }, 3)); } });
+  let loose = null; // a live fumble: { from, by, t, bobbles, rec }
+  let lastFumble = null;
+  const lastVel = new THREE.Vector3(0, 0, -8);
+  const handV = new THREE.Vector3();
+  /** Where someone's right hand is (so the ball sits in it). */
+  const handPos = (e, out = handV) => {
+    const hnd = e.mesh.userData.rig?.armR?.hand;
+    if (hnd) { hnd.getWorldPosition(out); group.worldToLocal(out); if (out.y > 0.05) return out; }
+    return out.set(e.pos.x + 0.25, 1.15, e.pos.z - 0.1);
+  };
   let holder = null; // entity holding the ball
   let flight = null; // { from, to, T, t0, H, target, reason }
   let carrier = null; // ball carrier once the ball is past the QB stage
@@ -378,7 +391,7 @@ export function freePlay(ctx) {
       if (id === 'call' && user.team === 'off') { callForBall = true; hud.big('OPEN!', '#60a5fa', 500); }
       if (id === 'swat' && user.role === 'DL' && flight && !flight.pitch && t - flight.t0 < (has('batter') ? 0.45 : 0.3) && dist(user.pos, qb.pos) < (has('batter') ? 4.2 : 3.2)) {
         playAction(user.mesh, 'jump');
-        if (Math.random() < 0.55 + (st.skill ?? 60) / 300 + (has('batter') ? 0.2 : 0)) { flight = null; ball.visible = false; hud.big('BATTED DOWN!', '#4ade80', 900); sfx.hit(); whistle('pd'); return; }
+        if (Math.random() < 0.55 + (st.skill ?? 60) / 300 + (has('batter') ? 0.2 : 0)) { flight = null; bphys.launch(ball.position.clone(), new THREE.Vector3((Math.random() - 0.5) * 4, 4 + Math.random() * 2, 2 + Math.random() * 2)); hud.big('BATTED DOWN!', '#4ade80', 900); sfx.hit(); whistle('pd'); return; }
       }
       if ((id === 'catch' || id === 'swat') && flight && catchPress === null && swatPress === null) {
         if (user.team === 'off') catchPress = t; else swatPress = t;
@@ -440,7 +453,7 @@ export function freePlay(ctx) {
     const to = clampPos({ x: lead.x + gaussR() * sd * 0.7 + wfx.wind.x * T * 0.45, z: lead.z + gaussR() * sd + wfx.wind.z * T * 0.45 });
     if (play.hail) to.z = Math.min(to.z, goalZ - 1);
     const H = Math.max(1.4, dist(qbP, to) * (play.hail ? 0.3 : 0.12));
-    flight = { from: { x: qbP.x + 0.3, z: qbP.z - 0.2 }, to, T: Math.max(0.4, dist(qbP, to) / v), t0: t, H, target: r };
+    flight = { from: { x: qbP.x + 0.3, z: qbP.z - 0.2 }, to, T: Math.max(0.4, dist(qbP, to) / v), t0: t, H, target: r, wobble: Math.random() < (user === qb ? 0.06 + Math.max(0, 70 - (st.skill ?? 60)) / 200 : 0.08) ? 0.22 : 0.025 };
     holder = null;
     playAction(qb.mesh, 'throw');
     sfx.throw();
@@ -964,6 +977,107 @@ export function freePlay(ctx) {
   const flatten = (victim, hitter, power) => {
     ragdoll(victim.mesh, pushDir(hitter, victim), power);
   };
+  /** The ball in a carrier's hand: tucked along the forearm, nose up a little. */
+  const carryBall = (e) => {
+    const hp = handPos(e);
+    ball.position.copy(hp);
+    ball.quaternion.copy(e.mesh.quaternion);
+    ball.rotateX(e === qb && !thrown ? -0.9 : 0.55);
+    ball.userData.shadow.position.set(hp.x, 0.03, hp.z);
+    ball.userData.shadow.scale.setScalar(0.3);
+  };
+  /** The ball pops loose: physics takes over and everybody goes for it. */
+  const fumbleOut = (from, hitter) => {
+    if (phase !== 'live' || loose) return;
+    const d = pushDir(hitter, from);
+    const hp = handPos(from).clone();
+    holder = null; carrier = null; flight = null;
+    loose = { from, by: hitter, t: 0, bobbles: 0, rec: null };
+    lastFumble = { from, by: hitter };
+    bphys.launch(hp, new THREE.Vector3(from.vel.x * 0.35 + d.x * 3.2 + (Math.random() - 0.5) * 3, 2.4 + Math.random() * 2.6, from.vel.z * 0.35 + d.z * 3.2 + (Math.random() - 0.5) * 3));
+    hud.big('FUMBLE!', '#ffd43b', 1100);
+    sfx.hit(); ctx.shake(0.5);
+    crowd('turnover', from.team !== (m.defense ? 'def' : 'off'));
+    if (!opts.reducedMotion) { ctx.slowMo?.(0.5); ctx.cinematic?.(() => ({ x: ball.position.x, z: ball.position.z }), 1.2); }
+    setButtonsFor();
+  };
+  /** Everyone near a loose ball races to it (blocks hold, anyone down stays down). */
+  const chaseLoose = (e, dt) => {
+    if (e.out > 0) { e.out -= dt; if (e.out <= 0 && isDown(e.mesh)) knockDown(e.mesh, 0); return; }
+    if (e.engaged || e.engagedBy) { e.vel.x *= 0.9; e.vel.z *= 0.9; return; }
+    if (loose.rec) { e.vel.x *= 0.9; e.vel.z *= 0.9; return; }
+    const bp = ball.position;
+    const d = Math.hypot(e.pos.x - bp.x, e.pos.z - bp.z);
+    const react = (e.react ??= 0.1 + Math.random() * 0.35);
+    if (loose.t < react) return;
+    moveToward(e, bp.x + bphys.v.x * 0.3, bp.z + bphys.v.z * 0.3, e.maxSpeed * (d > 20 ? 0.5 : 1), dt, 20);
+  };
+  /** Who comes up with it. */
+  const updateLoose = (dt) => {
+    loose.t += dt;
+    const bp = ball.position;
+    if (loose.rec) {
+      loose.rec.t += dt;
+      const e = loose.rec.e;
+      ball.position.set(e.pos.x + 0.15, 0.22, e.pos.z); ball.userData.shadow.position.set(e.pos.x, 0.03, e.pos.z);
+      if (loose.rec.t > 0.6) finishLoose(e);
+      return;
+    }
+    // squirts out of bounds: dead ball, the offense keeps it where it was fumbled
+    if (Math.abs(bp.x) > FIELD_X + 0.3 && bp.y < 1) {
+      const f = loose.from; loose = null; carrier = f; holder = null;
+      whistle('oob');
+      if (result) result.text = 'The fumble rolls out of bounds. ' + (m.defense ? 'They keep it.' : 'You keep it.');
+      return;
+    }
+    if (bphys.grabbable() || loose.t > 6) {
+      let best = null; let bd = loose.t > 6 ? 99 : 0.95;
+      for (const e of ents) {
+        if (e.down || e.out > 0 || e.engaged || e.engagedBy) continue;
+        const d = Math.hypot(e.pos.x - bp.x, e.pos.z - bp.z);
+        if (d < bd) { best = e; bd = d; }
+      }
+      if (!best) return;
+      if (loose.t <= 6 && Math.random() > dt * (bphys.rolling || bphys.resting ? 9 : 4) * (best.user ? 1.6 : 1)) return;
+      // it squirts away from him
+      if (loose.t <= 6 && !bphys.resting && loose.bobbles < 2 && Math.random() < 0.28) {
+        loose.bobbles++;
+        bphys.launch(bp.clone().setY(Math.max(0.3, bp.y)), new THREE.Vector3((Math.random() - 0.5) * 6, 1.8 + Math.random() * 2, (Math.random() - 0.5) * 6));
+        best.out = 0.35;
+        hud.big('BOBBLED!', '#fbbf24', 600); sfx.bounce(0.8);
+        return;
+      }
+      recoverLoose(best);
+    }
+  };
+  const recoverLoose = (e) => {
+    if (e.user) {
+      // you scoop it up and keep going
+      loose = null; bphys.stop();
+      holder = e; carrier = e;
+      if (e.team === 'def') e.scoop = true;
+      hud.big(e.team === 'def' ? 'SCOOPED IT! RUN!' : 'GOT IT BACK!', '#4ade80', 900);
+      sfx.catch(); ctx.slowMo?.(0.35);
+      setButtonsFor();
+      return;
+    }
+    // falls on it
+    playAction(e.mesh, 'dive', { dur: 0.5 });
+    e.vel.x *= 0.3; e.vel.z *= 0.3;
+    e.down = true;
+    bphys.stop();
+    loose.rec = { e, t: 0 };
+    sfx.hit();
+  };
+  const finishLoose = (e) => {
+    loose = null;
+    carrier = e; holder = e;
+    if (e.team === 'off') {
+      if (e.pos.z <= goalZ) { whistle('td'); return; }
+      whistle('tackle', null);
+      if (result) result.text = 'Fumble! ' + (m.defense ? 'They fall on it and keep it.' : 'Your team falls on it. Still your ball.');
+    } else whistle('fumble', e);
+  };
   /** Hard tackle: ragdoll, maybe slow-mo replay, maybe blood, maybe an injury. */
   const hardHit = (tackler, target) => {
     const rel = Math.hypot(tackler.vel.x - target.vel.x, tackler.vel.z - target.vel.z);
@@ -976,7 +1090,7 @@ export function freePlay(ctx) {
     const sizeK = Math.max(0.7, Math.min(1.5, tackler.mass / target.mass));
     flatten(target, tackler, (big ? 1.5 + Math.random() * 0.5 : 0.55 + Math.random() * 0.3) * sizeK);
     fxList.push(dustPuff(group, target.pos, big ? 16 : 9));
-    if (!big) return;
+    if (!big) return false;
     const involved = target.user || tackler.user;
     hud.big(tackler.user ? 'BOOM!' : 'BIG HIT!', '#ff6b6b', 900);
     ctx.hype?.(0.8, 2);
@@ -1020,6 +1134,7 @@ export function freePlay(ctx) {
       applyInjuryLook(target.mesh, inj.part, { bone: !!inj.bone && opts.blood !== false && Math.random() < 0.3, blood: opts.blood !== false });
       setTimeout(() => hud.say?.(`A player is down for ${target.team === (m.defense ? 'def' : 'off') ? usName : themName}. That looked like his ${inj.part === 'shin' ? 'leg' : inj.part}.`, 3200), 900);
     }
+    return true;
   };
 
   const tryTackle = (tackler, target) => {
@@ -1053,7 +1168,8 @@ export function freePlay(ctx) {
           hud.big('BREAKS FREE!', '#4ade80', 800); ctx.cinematic?.(() => target.pos, 1.0); snap('Broke free!', 200);
           return;
         }
-        playAction(tackler.mesh, 'tackle'); target.down = true; hardHit(tackler, target); sfx.hit(); whistle('tackle', tackler);
+        playAction(tackler.mesh, 'tackle'); target.down = true; const big = hardHit(tackler, target); sfx.hit();
+        if (!target.injured && (globalThis.__forceFumble || (big && Math.random() < (has('secure') ? 0.04 : 0.08)))) fumbleOut(target, tackler); else whistle('tackle', tackler);
       });
       return;
     }
@@ -1070,11 +1186,13 @@ export function freePlay(ctx) {
     // Tackled.
     playAction(tackler.mesh, 'tackle', { then: null });
     target.down = true;
-    hardHit(tackler, target);
+    const bigHit = hardHit(tackler, target);
     sfx.hit();
     ctx.shake(0.4);
-    const fumbleP = (0.012 * (call === 'risky' ? 2 : 1) + wfx.slip * 0.25 + (tackler.user ? 0.04 + (has('hitstick') ? 0.04 : 0) : 0)) * (target.user && has('secure') ? 0.5 : 1);
-    whistle(Math.random() < fumbleP ? 'fumble' : 'tackle', tackler);
+    // big hits jar the ball loose much more often
+    const fumbleP = (0.012 * (call === 'risky' ? 2 : 1) + wfx.slip * 0.25 + (tackler.user ? 0.04 + (has('hitstick') ? 0.04 : 0) : 0) + (bigHit ? (target.user ? 0.07 : 0.14) : 0)) * (target.user && has('secure') ? 0.5 : 1);
+    if (!target.injured && (globalThis.__forceFumble || Math.random() < fumbleP)) fumbleOut(target, tackler);
+    else whistle('tackle', tackler);
   };
 
   // ---------------- catch resolution
@@ -1207,6 +1325,10 @@ export function freePlay(ctx) {
     phase = 'dead';
     t = 0;
     sfx.whistle();
+    if ((why === 'incomplete' || why === 'pd') && !holder && !bphys.active) {
+      const pop = why === 'pd' ? 3.5 + Math.random() * 2 : 0.5 + Math.random();
+      bphys.launch(ball.position.clone(), new THREE.Vector3(lastVel.x * 0.35 + (Math.random() - 0.5) * (why === 'pd' ? 5 : 2), pop, lastVel.z * 0.35 + (Math.random() - 0.5) * 2));
+    }
     // pile on the ball carrier, and maybe a little scuffle after the whistle
     const spot = (carrier ?? holder ?? qb)?.pos;
     if (spot && (why === 'tackle' || why === 'sack' || why === 'fumble')) {
@@ -1224,16 +1346,17 @@ export function freePlay(ctx) {
       scorer = carrier;
       const chaser = defenders.concat(ents.filter((x) => x.team === 'off')).filter((d) => d.team !== carrier.team && !d.down).sort((a, b) => dist(a.pos, carrier.pos) - dist(b.pos, carrier.pos))[0];
       if (chaser && dist(chaser.pos, carrier.pos) < 2.6 && !opts.reducedMotion) { playAction(carrier.mesh, 'dive', { dur: 0.5 }); ctx.cinematic?.(() => carrier.pos, 1.2); snap('Dives in!', 200); }
-      result = def ? (carrier.team === 'def' ? { defense: true, int: true, turnover: true, defTD: true, quality: 0.98, text: 'PICK SIX!' } : { defense: true, caught: true, yardsAllowed: m.yardLine, tdAllowed: true, quality: 0.05, text: 'They score.' })
+      result = def ? (carrier.team === 'def' ? (user.scoop ? { defense: true, forcedFumble: lastFumble?.by === user, fumbleRec: true, turnover: true, defTD: true, quality: 0.99, text: 'SCOOP AND SCORE!' } : { defense: true, int: true, turnover: true, defTD: true, quality: 0.98, text: 'PICK SIX!' }) : { defense: true, caught: true, yardsAllowed: m.yardLine, tdAllowed: true, quality: 0.05, text: 'They score.' })
         : { complete: true, yards: m.yardLine, td: true, quality: 0.95, text: 'TOUCHDOWN!' };
       if ((def && carrier.team === 'def') || (!def && carrier.team === 'off')) startCelebration();
       return;
     }
     if (def) {
-      if (why === 'int' || user.int) result = { defense: true, int: true, turnover: true, quality: 0.92, text: 'INTERCEPTED!' };
+      if (user.scoop) result = { defense: true, forcedFumble: lastFumble?.by === user, fumbleRec: true, turnover: true, tackle: lastFumble?.by === user, quality: 0.96, text: 'FUMBLE RECOVERY! You scoop it up.' };
+      else if (why === 'int' || user.int) result = { defense: true, int: true, turnover: true, quality: 0.92, text: 'INTERCEPTED!' };
       else if (why === 'pd' || why === 'incomplete') result = { defense: true, pd: why === 'pd', yardsAllowed: 0, quality: why === 'pd' ? 0.72 : 0.55, text: why === 'pd' ? 'Pass broken up!' : 'Incomplete.' };
       else if (why === 'sack') { const loss = Math.max(1, Math.round(qb.pos.z - 0)); result = { defense: true, sack: true, tackle: by === user, tfl: true, yardsAllowed: -loss, quality: by === user ? 0.96 : 0.72, text: by === user ? `SACK! You drop him for a loss of ${loss}.` : `Sacked by a teammate for a loss of ${loss}.` }; }
-      else if (why === 'fumble' && by?.team === 'def') result = { defense: true, forcedFumble: true, turnover: true, tackle: true, yardsAllowed: Math.max(0, yardsFrom(carrier)), quality: 0.95, text: 'FUMBLE! Defense recovers!' };
+      else if (why === 'fumble' && by?.team === 'def') { const mine = !lastFumble || lastFumble.by === user; result = { defense: true, forcedFumble: mine, fumbleRec: !mine, turnover: true, tackle: mine, yardsAllowed: Math.max(0, yardsFrom(lastFumble?.from ?? carrier)), quality: mine ? 0.95 : 0.85, text: mine ? 'FUMBLE! You knock it loose and your team recovers!' : 'FUMBLE! Your team recovers!' }; }
       else {
         const ya = Math.max(0, yardsFrom(carrier));
         const yr = yardsFrom(carrier);
@@ -1243,7 +1366,7 @@ export function freePlay(ctx) {
       if (why === 'int') result = { turnover: true, complete: false, yards: 0, quality: 0.03, text: 'INTERCEPTED!' };
       else if (why === 'incomplete') result = { complete: false, yards: 0, quality: 0.2, text: text ?? 'Incomplete.' };
       else if (why === 'sack') result = { sack: true, complete: false, yards: Math.min(-1, yardsFrom(qb)), quality: 0.06, text: 'SACKED!' };
-      else if (why === 'fumble') result = { turnover: true, complete: false, yards: yardsFrom(carrier), quality: 0.05, text: 'FUMBLE! Defense recovers.' };
+      else if (why === 'fumble') result = { turnover: true, complete: false, yards: yardsFrom(lastFumble?.from ?? carrier), quality: 0.05, text: 'FUMBLE! Defense recovers.' };
       else {
         const y = yardsFrom(carrier);
         result = { complete: true, yards: y, quality: Math.max(0.05, 0.3 + y / 22 + (carrier?.broken ?? 0) * 0.05), text: why === 'oob' ? `Out of bounds after ${y}.` : null };
@@ -1427,6 +1550,8 @@ export function freePlay(ctx) {
       if (!keep) fxList.splice(i, 1);
     }
     if (phase === 'replay') { runReplay(dt); return; }
+    if (bphys.active && !flight && !(holder && phase !== 'live')) bphys.step(dt);
+    if (holder && phase !== 'live') carryBall(holder);
     if (phase === 'live' || phase === 'dead' || phase === 'celebrate') record(dt);
     if (phase === 'pick' || phase === 'over') return;
     if (phase === 'pre') {
@@ -1517,7 +1642,7 @@ export function freePlay(ctx) {
         user.vel.x = user.lungeDir.x * 9.5; user.vel.z = user.lungeDir.z * 9.5;
         if (carrier && carrier !== user && dist(user.pos, carrier.pos) < 1.15) tryTackle(user, carrier);
         else if (!carrier && holder === qb && !flight && passD && dist(user.pos, qb.pos) < (has('closer') ? 1.55 : 1.2)) {
-          const finishSack = () => { qb.down = true; user.lunge = 0; hardHit(user, qb); hud.big('SACK!', '#4ade80', 1100); sfx.cheer(); snap('Sack!', 200); whistle('sack', user); };
+          const finishSack = () => { qb.down = true; user.lunge = 0; const big = hardHit(user, qb); if ((big && Math.random() < 0.35) || globalThis.__forceFumble) { hud.big('STRIP SACK!', '#4ade80', 1100); sfx.cheer(); snap('Strip sack!', 200); fumbleOut(qb, user); return; } hud.big('SACK!', '#4ade80', 1100); sfx.cheer(); snap('Sack!', 200); whistle('sack', user); };
           if (qteOn && qteUsed < 1) {
             // the QB tries to slip out: time it to wrap him up
             user.lunge = 0; user.vel.x = 0; user.vel.z = 0;
@@ -1550,7 +1675,8 @@ export function freePlay(ctx) {
         if (moves.juke > 0.15) { user.vel.x += moves.jukeDir * 7 * dt * 10; }
       } else {
         // assists when you let go of the stick
-        if (user.team === 'off' && user.route && !carrier && !flight) { user.s += userSpeed * dt; const p = routePoint(user, user.s); moveToward(user, p.x, p.z, userSpeed, dt, 22); }
+        if (loose && !loose.rec) moveToward(user, ball.position.x + bphys.v.x * 0.25, ball.position.z + bphys.v.z * 0.25, userSpeed, dt, 22);
+        else if (user.team === 'off' && user.route && !carrier && !flight) { user.s += userSpeed * dt; const p = routePoint(user, user.s); moveToward(user, p.x, p.z, userSpeed, dt, 22); }
         else if (user === carrier) moveToward(user, play.hole && user.pos.z > -1 ? play.hole[1] : user.pos.x, user.pos.z - 4, userSpeed * 0.85, dt, 20);
         else if (user === rb && mode === 'run' && !carrier) moveToward(user, play.pitch ? play.hole[0] * 0.6 : qb.pos.x + 0.3, play.pitch ? rb.start.z - 0.5 : qb.pos.z - 0.3, 6, dt);
         else if (user === rb && play.screen !== undefined && !carrier) moveToward(user, play.screen * 7, 2.2, 5, dt);
@@ -1563,6 +1689,7 @@ export function freePlay(ctx) {
       for (const e of ents) {
         if (e.user || e.down) continue;
         if (e.joinCeleb) continue;
+        if (loose) { chaseLoose(e, dt); continue; }
         if (e.team === 'off') aiOffense(e, dt);
         else aiDefense(e, dt);
         if (e.jukeCd > 0) e.jukeCd -= dt;
@@ -1584,10 +1711,10 @@ export function freePlay(ctx) {
               startQte('mash', 'BREAK THE SACK!', (ok) => {
                 if (phase !== 'live') return;
                 if (ok) { e.out = 1.4; flatten(e, qb, 0.6); hud.big('ESCAPED!', '#4ade80', 800); ctx.cinematic?.(() => qb.pos, 0.9); snap('Escapes the sack!', 150); }
-                else { qb.down = true; hardHit(e, qb); playAction(e.mesh, 'tackle'); sfx.hit(); ctx.shake(0.4); whistle('sack'); }
+                else { qb.down = true; const big = hardHit(e, qb); playAction(e.mesh, 'tackle'); sfx.hit(); ctx.shake(0.4); if (big && Math.random() < 0.25) fumbleOut(qb, e); else whistle('sack'); }
               });
             }
-            else { qb.down = true; hardHit(e, qb); playAction(e.mesh, 'tackle'); sfx.hit(); ctx.shake(0.4); whistle('sack'); }
+            else { qb.down = true; const big = hardHit(e, qb); playAction(e.mesh, 'tackle'); sfx.hit(); ctx.shake(0.4); if (big && Math.random() < 0.25) fumbleOut(qb, e); else whistle('sack'); }
           } else tryTackle(e, target);
           e.lunge = 0;
         }
@@ -1650,14 +1777,14 @@ export function freePlay(ctx) {
         const z = flight.from.z + (flight.to.z - flight.from.z) * f;
         ball.position.set(x, 1.6 + (1.3 - 1.6) * f + 4 * flight.H * f * (1 - f), z);
         if (!flight.pitch) { trail ??= makeTrail(group); trail.push(ball.position); }
-        ball.lookAt(flight.to.x, 1.3, flight.to.z);
+        lastVel.set((flight.to.x - flight.from.x) / flight.T, (-0.3 + 4 * flight.H * (1 - 2 * f)) / flight.T, (flight.to.z - flight.from.z) / flight.T);
+        orientInFlight(ball, lastVel, (t - flight.t0) * (flight.pitch ? 9 : 48), flight.pitch ? 0.12 : flight.wobble ?? 0.03, t);
         ball.userData.shadow.position.set(x, 0.03, z);
         if (f >= 1) resolveFlight();
       } else if (holder) {
-        ball.position.set(holder.pos.x + 0.25, 1.15, holder.pos.z - 0.1);
+        carryBall(holder);
         trail?.fade();
-        ball.userData.shadow.position.set(holder.pos.x, 0.03, holder.pos.z);
-      }
+      } else if (loose) updateLoose(dt);
       // ---- end conditions
       if (play.qbRun && t > 0.35 && !carrier && holder === qb) { carrier = qb; qb.runner = true; }
       if (phase === 'live' && carrier && !carrier.down) {
@@ -1673,10 +1800,10 @@ export function freePlay(ctx) {
           }
         }
       }
-      if (phase === 'live' && t > 18) whistle(carrier ? 'tackle' : thrown ? 'incomplete' : 'sack');
+      if (phase === 'live' && t > 18 && !loose) whistle(carrier ? 'tackle' : thrown ? 'incomplete' : 'sack');
       setButtonsFor();
       // ---- camera
-      const focus = carrier ? carrier.pos : flight ? { x: ball.position.x, z: ball.position.z } : user.pos;
+      const focus = loose ? { x: ball.position.x, z: ball.position.z } : carrier ? carrier.pos : flight ? { x: ball.position.x, z: ball.position.z } : user.pos;
       const zoom = mode === 'pass' && !thrown && !carrier ? 1.05 : carrier ? 0.72 : 0.9;
       rig(camera, focus.x * 0.85, Math.min(4, focus.z), dt, { zoom, k: 3.5, ahead: carrier?.team === 'def' ? -6 : 8 });
       return;
