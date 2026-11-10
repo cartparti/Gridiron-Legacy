@@ -86,14 +86,46 @@ export function gamedayScreen(app) {
   // ---- Scoreboard + momentum
   const ptsAway = h('span.mh-pts', g.score.away);
   const ptsHome = h('span.mh-pts', g.score.home);
-  const clock = h('div.mh-clock', g.roundName);
+  // scoreboard game clock: ticks down between feed entries, quarter progress bar underneath
+  const clockQ = h('span.mc-q', '');
+  const clockT = h('span.mc-t', g.roundName ?? '');
+  const clockBar = h('i');
+  const clock = h('div.mh-clock', clockQ, clockT);
+  const clockWrap = h('div.mh-clockwrap', clock, h('div.mc-bar', clockBar));
+  const toSecs = (c) => { const m = /^(\d+):(\d+)/.exec(c ?? ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+  const fmt = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;
+  const live = ui.clock ?? (ui.clock = { q: 1, secs: 900 });
+  let tickAnim = 0;
+  const showClock = (q, secs) => {
+    clockQ.textContent = q === 'OT' ? 'OT' : `Q${q}`;
+    clockT.textContent = fmt(Math.max(0, secs));
+    clockBar.style.width = `${Math.max(0, Math.min(1, 1 - secs / 900)) * 100}%`;
+  };
+  /** Run the clock from where it is to (q, target) over ms (a new quarter starts from 15:00). */
+  const runClockTo = (q, target, ms) => {
+    cancelAnimationFrame(tickAnim);
+    if (q !== live.q) { live.q = q; live.secs = 900; }
+    const from = live.secs;
+    const to = Math.min(from, target);
+    if (!(ms > 0) || from === to) { live.secs = to; showClock(q, to); return; }
+    const t0 = performance.now();
+    const step = (now) => {
+      if (ui.paused) { tickAnim = requestAnimationFrame(step); return; }
+      const k = Math.min(1, (now - t0) / ms);
+      live.secs = from + (to - from) * k;
+      showClock(q, live.secs);
+      if (k < 1) tickAnim = requestAnimationFrame(step);
+    };
+    tickAnim = requestAnimationFrame(step);
+  };
+  if (g.log.length || g.pregameDone) showClock(live.q, live.secs); else { clockQ.textContent = 'Q1'; clockT.textContent = '15:00'; }
   const sideEl = (t, right, isUser) => h(`div.mh-side${right ? '.r' : ''}`, crest(t, 44), h('div.mh-name', t.city), h('div.mh-sub', `${t.name}${isUser ? ' ★' : ''}`));
   // momentum / possession chart: one bar per drive, markers for scores and turnovers
   const chart = h('canvas.mh-chart', { width: 600, height: 120 });
   const momPct = h('div.mh-mompct');
   root.append(h('div.match-head',
     h('div.mh-top', h('span.pix', league.kind === 'pro' ? 'PRO LEAGUE' : league.kind === 'college' ? 'COLLEGE' : 'HIGH SCHOOL'), h('span.tiny', `${culture.stadium} · Wk ${(g.week ?? 0) + 1}`)),
-    h('div.mh-row', sideEl(away, false, g.userSide === 'away'), h('div.mh-score', ptsAway, h('div.mh-mid', h('span.mh-live', '● LIVE'), clock), ptsHome), sideEl(home, true, g.userSide === 'home'))),
+    h('div.mh-row', sideEl(away, false, g.userSide === 'away'), h('div.mh-score', ptsAway, h('div.mh-mid', h('span.mh-live', '● LIVE'), clockWrap), ptsHome), sideEl(home, true, g.userSide === 'home'))),
     h('div.mh-chartbox', momPct, chart, h('div.mh-axis', h('span', 'Q1'), h('span', 'Q2'), h('span', 'Q3'), h('span', 'Q4'))));
   const myColor = getTeam(league, st.career.teamId).colors[0];
   const drawChart = () => {
@@ -212,7 +244,9 @@ export function gamedayScreen(app) {
       if (e.out === 'TD' && e.user) sfx.cheer();
       else sfx.tick();
       setScore();
-      if (e.q) clock.textContent = e.q === 'OT' ? 'Overtime' : `Q${e.q} · ${e.clock}`;
+      if (e.q === 'OT') { live.q = 'OT'; showClock('OT', 600); }
+      else if (e.q && toSecs(e.clock) !== null) runClockTo(e.q, toSecs(e.clock), fast || ui.skipAnim ? 0 : 480 / (ui.speed ?? 1));
+      else if (e.out === 'HALF') { live.q = 2; live.secs = 0; showClock(2, 0); }
       if (e.text && (e.key || e.out === 'TD' || e.out === 'TO' || e.out === 'INFO')) {
         headline.querySelector('.hl-q').textContent = e.q ? `Q${e.q} ${e.clock ?? ''}` : '';
         headline.querySelector('.hl-text').textContent = e.text.replace(/^[^:]*: /, '');
@@ -409,7 +443,8 @@ export function gamedayScreen(app) {
     clear(controls);
     const won = g.won;
     if (won) sfx.cheer(true); else sfx.groan();
-    clock.textContent = 'FINAL';
+    cancelAnimationFrame(tickAnim);
+    clockQ.textContent = ''; clockT.textContent = 'FINAL'; clockBar.style.width = '100%';
     momentSlot.append(h('div.card.center',
       h('div.display', { style: { fontSize: '2.2rem', color: won ? 'var(--good)' : 'var(--bad)' } }, won ? 'VICTORY' : 'DEFEAT'),
       h('p.muted', `${away.city} ${g.score.away} · ${home.city} ${g.score.home}`),

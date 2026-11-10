@@ -260,6 +260,12 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Results carry `penYds` (+ toward the offense's goal) and `autoFirst`; resolveMoment moves the ball with them but
   never adds them to stats. Simulated drives in the feed get penalty notes too.
 
+## v0.17.2: clocks
+- Match screen: scoreboard game clock (`runClockTo` in gameday.js) ticks down between feed entries, quarter progress
+  bar; drive clocks now always run down within a quarter (createUserGame).
+- In plays: score-bug game clock runs while the ball is live (`gameSecs`, `hud.clock`), stops when the play is dead;
+  PLAY CLOCK box pre-snap (`hud.playClock`, real seconds, red at 5) — 20 s on offense, then delay of game.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

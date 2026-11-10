@@ -90,8 +90,10 @@ export function createUserGame(state, league, sched, { playoff = false, round = 
   if (chance(state, 0.5)) for (let i = 0; i < drives.length; i += 2) [drives[i], drives[i + 1]] = [drives[i + 1], drives[i]];
   drives.forEach((d, idx) => {
     d.quarter = Math.min(4, 1 + Math.floor((idx / drives.length) * 4));
-    const mins = 15 - Math.floor(((idx / drives.length) * 4 - (d.quarter - 1)) * 15);
-    d.clock = `${clamp(mins, 1, 15)}:${String(randInt(state, 0, 59)).padStart(2, '0')}`;
+    // game clock always runs down within a quarter (mm:ss when the drive starts)
+    const frac = (idx / drives.length) * 4 - (d.quarter - 1);
+    const secs = clamp(Math.round(900 * (1 - frac)) - randInt(state, 0, 25), 8, 900);
+    d.clock = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
   });
   const userSide = isHome ? 'home' : 'away';
   const momentSide = isDefense(state) ? (userSide === 'home' ? 'away' : 'home') : userSide;

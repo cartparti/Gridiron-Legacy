@@ -903,3 +903,17 @@ body.replaying .hud-tag, body.replaying .hud-score { opacity: 0; }
 .practice-ev:hover { border-color: var(--accent); }
 .practice-last { border-color: var(--accent); }
 .practice .subtabs { margin-top: 4px; }
+/* game clock */
+.mh-clockwrap { display: flex; flex-direction: column; align-items: stretch; gap: 3px; }
+.mh-clock { display: flex; gap: 6px; align-items: center; justify-content: center; }
+.mc-q { color: #fff; opacity: 0.85; }
+.mc-t { font-variant-numeric: tabular-nums; letter-spacing: 0.06em; min-width: 3.6em; text-align: center; }
+.mc-bar { height: 3px; background: rgba(255,255,255,0.15); border-radius: 2px; overflow: hidden; }
+.mc-bar i { display: block; height: 100%; width: 0; background: #ffd43b; transition: width 0.2s linear; }
+/* in-play play clock */
+.hud-pclock { position: absolute; top: calc(var(--safe-top) + 118px); right: 12px; display: none; flex-direction: column; align-items: center; padding: 4px 8px 5px; background: #0b0d10; border: 2px solid #07080a; border-radius: 6px; box-shadow: 0 3px 0 rgba(0,0,0,0.5); font-family: var(--pixel); color: #ffd43b; pointer-events: none; z-index: 3; }
+.hud-pclock.show { display: flex; }
+.hud-pclock small { font-size: 0.42rem; opacity: 0.75; letter-spacing: 0.08em; }
+.hud-pclock b { font-size: 1.2rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.hud-pclock.low b { color: #ff5d5d; animation: rp-blink 0.5s steps(2) infinite; }
+body.cine .hud-pclock { opacity: 0; }

@@ -248,6 +248,7 @@ export function makeHud() {
   el.className = 'hud';
   el.innerHTML = `
     <div class="hud-score"></div>
+    <div class="hud-pclock"><small>PLAY CLOCK</small><b></b></div>
     <div class="hud-tag"></div>
     <div class="hud-top">
       <div class="hud-pill sit"></div>
@@ -275,6 +276,16 @@ export function makeHud() {
       if (!i) { el2.style.display = 'none'; return; }
       const side = (name, pts, cols, right) => `<div class="sb-team${right ? ' r' : ''}" style="--c1:${cols[0]};--c2:${cols[1]}"><b>${String(name).slice(0, 3).toUpperCase()}</b><span>${pts}</span></div>`;
       el2.innerHTML = `${side(i.away, i.awayPts, i.awayColors, false)}<div class="sb-mid">${i.clock ?? ''}</div>${side(i.home, i.homePts, i.homeColors, true)}`;
+    },
+    /** Update just the game clock in the score bug (ticks during the play). */
+    clock: (text) => { const m = q('.sb-mid'); if (m) m.textContent = text; },
+    /** Play clock box: a number shows it (red at 5 and under), null hides it. */
+    playClock: (n) => {
+      const pc = q('.hud-pclock');
+      if (n === null || n === undefined) { pc.classList.remove('show'); return; }
+      pc.classList.add('show');
+      pc.classList.toggle('low', n <= 5);
+      pc.querySelector('b').textContent = String(Math.max(0, n)).padStart(2, '0');
     },
     /** Name tag for your player. */
     tag: (num, name, size = '') => { const t2 = q('.hud-tag'); t2.innerHTML = `<b>${num}</b><span>${String(name).toUpperCase()}${size ? `<small>${size}</small>` : ''}</span>`; },

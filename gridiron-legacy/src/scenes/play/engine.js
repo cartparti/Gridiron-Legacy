@@ -233,13 +233,21 @@ export function freePlay(ctx) {
     const foe = dtMode ? nearest(user, blockers) : mode === 'cover' || mode === 'runD' ? user.man : mode === 'route' ? defenders.find((d) => d.man === user) : null;
     const sz = (e) => `${Math.floor(e.hIn / 12)}'${e.hIn % 12}" ${e.wLb}`;
     hud.instr((foe ? `${play.name} · you ${sz(user)} vs ${sz(foe)} lb` : play.name) + (m.defense ? ' · get set…' : ' · press SNAP when ready'));
+    if (gameSecs !== null) hud.clock?.(clockText());
     snapCalled = false;
+    preStart = performance.now();
     if (m.defense && userHome) react('defense');
     setButtonsFor();
   };
 
+  // game clock (from the situation) runs while the ball is live; it stops on incompletions and out of bounds
+  const clk = (() => { const mm = /^(\d+):(\d+)/.exec(m.clock ?? ''); return mm ? Number(mm[1]) * 60 + Number(mm[2]) : null; })();
+  let gameSecs = clk;
+  let clockStopped = false;
+  const clockText = () => `Q${m.quarter ?? 1} ${Math.floor(gameSecs / 60)}:${String(Math.max(0, Math.floor(gameSecs % 60))).padStart(2, '0')}`;
   let routeLine = null;
   let snapCalled = false;
+  let preStart = 0;
   let clockShown = -1;
   const PLAY_CLOCK = 20;
   let assignLine = null;
@@ -1396,11 +1404,13 @@ export function freePlay(ctx) {
       // Offense snaps the ball yourself (SNAP button / Space); the play clock snaps it for you at 0.
       // Defense: the offense snaps it after a short moment.
       if (!m.defense && !snapCalled) {
-        const left = Math.ceil(PLAY_CLOCK - t);
-        if (left !== clockShown) { clockShown = left; hud.instr(`${play.name} · press SNAP · play clock ${Math.max(0, left)}`); if (left <= 3 && left > 0) sfx.click(); }
+        const left = Math.ceil(PLAY_CLOCK - (performance.now() - preStart) / 1000); // real seconds
+        if (left !== clockShown) { clockShown = left; hud.playClock?.(Math.max(0, left)); if (left <= 5 && left > 0) sfx.click(); }
       }
-      if (!m.defense && !snapCalled && t > PLAY_CLOCK) { preSnapFlag(true); return; }
+      if (!m.defense && !snapCalled && performance.now() - preStart > PLAY_CLOCK * 1000) { hud.playClock?.(null); preSnapFlag(true); return; }
+      if (m.defense) hud.playClock?.(Math.max(1, Math.ceil(7 - t * 4)));
       if (m.defense ? t > 1.4 : snapCalled) {
+        hud.playClock?.(null);
         if (preSnapFlag()) return;
         phase = 'live'; t = 0; snapCalled = false; setButtonsFor();
         sfx.whistle();
@@ -1450,6 +1460,11 @@ export function freePlay(ctx) {
     }
 
     if (phase === 'live') {
+      if (gameSecs !== null && gameSecs > 0) {
+        const before = Math.floor(gameSecs);
+        gameSecs = Math.max(0, gameSecs - dt);
+        if (Math.floor(gameSecs) !== before) hud.clock?.(clockText());
+      }
       moves.juke = Math.max(0, moves.juke - dt); moves.jukeCd = Math.max(0, moves.jukeCd - dt);
       moves.spin = Math.max(0, moves.spin - dt); moves.spinCd = Math.max(0, moves.spinCd - dt);
       moves.stiff = Math.max(0, moves.stiff - dt); moves.stiffCd = Math.max(0, moves.stiffCd - dt);
