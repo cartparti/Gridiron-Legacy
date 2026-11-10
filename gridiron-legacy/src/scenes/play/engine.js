@@ -7,7 +7,7 @@
 //
 // Returns the same result objects as the old minigames, so the game simulation is unchanged.
 import * as THREE from 'three';
-import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, confetti, ragdoll, bloodBurst, dustPuff, markTicked } from '../actors.js';
+import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, confetti, ragdoll, bloodBurst, dustPuff, markTicked, bump } from '../actors.js';
 import { rig, endPlay, finalize, weatherFx, gaussR } from '../minigames/common.js';
 import { makeControls } from './controls.js';
 import { PLAYS, OFF_FORMATION, OL_X, playMode, dealPlays } from '../../data/playbook.js';
@@ -74,6 +74,7 @@ export function freePlay(ctx) {
 
   // ---------------- choose user + formation
   const userRole = { pass: 'QB', run: type === 'qb_scramble' ? 'QB' : 'RB', route: 'WR', cover: 'CB', runD: 'CB', rush: 'DL', runStop: 'DL' }[mode];
+  const has = (id) => (opts.traits ?? []).includes(id); // equipped player traits
   const runO = mode === 'run' || mode === 'runD' || mode === 'runStop'; // the offense runs the ball
   const passD = mode === 'cover' || mode === 'rush'; // you defend a pass play
   const dtMode = mode === 'rush' || mode === 'runStop';
@@ -303,12 +304,12 @@ export function freePlay(ctx) {
       if (/^key[1-5]$/.test(id) && user.role === 'QB' && holder === user && !user.runner) return throwTo(receivers[Number(id.slice(3)) - 1]);
       if (id === 'juke' && user === carrier && moves.jukeCd <= 0) {
         const dir = controls.state.x !== 0 ? Math.sign(controls.state.x) : (Math.random() < 0.5 ? -1 : 1);
-        moves.juke = (0.24 + st.skill / 100 * 0.16) * tol; moves.jukeCd = 0.8; moves.jukeDir = dir;
+        moves.juke = (0.24 + st.skill / 100 * 0.16) * tol * (has('ankles') || (has('escape') && user === qb) ? 1.4 : 1); moves.jukeCd = 0.8; moves.jukeDir = dir;
         playAction(user.mesh, 'juke', { dir });
         sfx.juke();
         if (Math.random() < wfx.slip * 1.5) { moves.slow = 0.6; hud.big('SLIPPED!', '#fbbf24', 600); }
       }
-      if (id === 'spin' && user === carrier && moves.spinCd <= 0) { moves.spin = 0.42 * Math.sqrt(tol); moves.spinCd = 1.3; playAction(user.mesh, 'spin'); sfx.juke(); }
+      if (id === 'spin' && user === carrier && moves.spinCd <= 0) { moves.spin = 0.42 * Math.sqrt(tol) * (has('ankles') ? 1.4 : 1); moves.spinCd = 1.3; playAction(user.mesh, 'spin'); sfx.juke(); }
       if (id === 'stiff' && user === carrier && moves.stiffCd <= 0) { moves.stiff = 0.6; moves.stiffCd = 1.1; playAction(user.mesh, 'stiff'); }
       if (id === 'dive' && user === carrier && !moves.dive) { moves.dive = 0.01; playAction(user.mesh, 'dive'); }
       // pass-rush moves: win the battle with the blocker
@@ -316,7 +317,8 @@ export function freePlay(ctx) {
         const o = user.engagedBy;
         const stat = id === 'bull' ? (st.strength ?? 60) : id === 'swim' ? (st.skill ?? 60) : ((st.skill ?? 60) + (st.speed ?? 60)) / 2;
         const massK = id === 'bull' ? Math.max(0.7, Math.min(1.4, user.mass / o.mass)) : Math.max(0.8, Math.min(1.25, o.mass / user.mass));
-        const pWin = (0.18 + rush.lev * 0.55 + (stat - 50) / 220) * (0.75 + tol * 0.25) * (call === 'risky' ? 0.9 : 1) * massK;
+        const traitK = id === 'bull' ? (has('bulldozer') ? 1.2 : 1) : (has('swimclub') ? 1.2 : 1);
+        const pWin = (0.18 + rush.lev * 0.55 + (stat - 50) / 220) * (0.75 + tol * 0.25) * (call === 'risky' ? 0.9 : 1) * massK * traitK;
         rush.cd = 0.7;
         playAction(user.mesh, id === 'bull' ? 'stiff' : id === 'swim' ? 'throw' : 'juke', { dir: Math.random() < 0.5 ? 1 : -1 });
         sfx.hit();
@@ -334,9 +336,9 @@ export function freePlay(ctx) {
         return;
       }
       if (id === 'call' && user.team === 'off') { callForBall = true; hud.big('OPEN!', '#60a5fa', 500); }
-      if (id === 'swat' && user.role === 'DL' && flight && !flight.pitch && t - flight.t0 < 0.3 && dist(user.pos, qb.pos) < 3.2) {
+      if (id === 'swat' && user.role === 'DL' && flight && !flight.pitch && t - flight.t0 < (has('batter') ? 0.45 : 0.3) && dist(user.pos, qb.pos) < (has('batter') ? 4.2 : 3.2)) {
         playAction(user.mesh, 'jump');
-        if (Math.random() < 0.55 + (st.skill ?? 60) / 300) { flight = null; ball.visible = false; hud.big('BATTED DOWN!', '#4ade80', 900); sfx.hit(); whistle('pd'); return; }
+        if (Math.random() < 0.55 + (st.skill ?? 60) / 300 + (has('batter') ? 0.2 : 0)) { flight = null; ball.visible = false; hud.big('BATTED DOWN!', '#4ade80', 900); sfx.hit(); whistle('pd'); return; }
       }
       if ((id === 'catch' || id === 'swat') && flight && catchPress === null && swatPress === null) {
         if (user.team === 'off') catchPress = t; else swatPress = t;
@@ -370,7 +372,7 @@ export function freePlay(ctx) {
     const qbP = qb.pos;
     const pressure = Math.min(...defenders.filter((d) => !d.engaged).map((d) => dist(d.pos, qbP)));
     const moving = Math.hypot(qb.vel.x, qb.vel.z);
-    const v = 17 + (st.strength ?? 60) * 0.08;
+    const v = (17 + (st.strength ?? 60) * 0.08) * (user === qb && has('gunslinger') ? 1.12 : 1);
     // lead the receiver: iterate the intercept time
     let T = dist(qbP, r.pos) / v;
     let lead = { ...r.pos };
@@ -394,7 +396,7 @@ export function freePlay(ctx) {
       for (let i = 0; i < 3; i++) { lead = { x: r.pos.x + r.vel.x * T, z: r.pos.z + r.vel.z * T }; T = Math.max(0.35, dist(qbP, lead) / v); }
     }
     const isUserQB = user === qb;
-    const sd = isUserQB ? ((1.35 - (st.skill ?? 60) * 0.009) / tol) * (pressure < 2.5 ? 1.6 : 1) * (moving > 3 ? 1.3 : 1) : 0.7;
+    const sd = isUserQB ? ((1.35 - (st.skill ?? 60) * 0.009) / tol) * (pressure < 2.5 ? (has('pocket') ? 1.25 : 1.6) : 1) * (moving > 3 ? 1.3 : 1) * (has('dimes') ? 0.75 : 1) : 0.7;
     const to = clampPos({ x: lead.x + gaussR() * sd * 0.7 + wfx.wind.x * T * 0.45, z: lead.z + gaussR() * sd + wfx.wind.z * T * 0.45 });
     if (play.hail) to.z = Math.min(to.z, goalZ - 1);
     const H = Math.max(1.4, dist(qbP, to) * (play.hail ? 0.3 : 0.12));
@@ -641,7 +643,7 @@ export function freePlay(ctx) {
       }
       if (e.handT > 0) e.handT -= dt;
       const onUser = r.user && mode === 'route';
-      const lag = (onUser ? 0.12 : mode === 'pass' ? 0.2 : 0.28) + Math.random() * 0.05;
+      const lag = (onUser ? 0.12 + (has('routes') ? 0.08 : 0) : mode === 'pass' ? 0.2 : 0.28) + Math.random() * 0.05;
       moveToward(e, r.pos.x - r.vel.x * lag + (r.pos.x < 0 ? 0.5 : -0.5), r.pos.z - r.vel.z * lag - 0.6, e.maxSpeed * (onUser ? 1.05 : 1), dt, onUser ? 24 : 18);
       backpedalFace(e, e.vel.z < -0.3 && t < 1.8, r);
       return;
@@ -671,7 +673,7 @@ export function freePlay(ctx) {
       return;
     }
     if (d < 2.3 && target !== qb || (target === qb && d < 1.8)) {
-      e.tell = 0.26 * (m.defense ? 1 : 1 + (tol - 1) * 0.4); // the readable "tell"
+      e.tell = 0.26 * (m.defense ? 1 : 1 + (tol - 1) * 0.4) * (target === qb && user === qb && has('pocket') ? 1.5 : 1); // the readable "tell"
       playAction(e.mesh, 'lunge');
       showTell(e);
       return;
@@ -835,7 +837,7 @@ export function freePlay(ctx) {
     hud.el.append(ov);
     const t0 = performance.now();
     const DUR = kind === 'ring' ? 1150 : 1500;
-    const need = Math.round(8 - Math.min(2, (st.strength ?? 60) / 50));
+    const need = Math.round(8 - Math.min(2, (st.strength ?? 60) / 50) - (has('icevein') || has('clutchgene') || has('truck') ? 1 : 0));
     let taps = 0;
     let over = false;
     const finish2 = (ok) => {
@@ -854,7 +856,8 @@ export function freePlay(ctx) {
       if (kind === 'ring') {
         // ring shrinks from 1 to 0; target window around 0.32 (bigger with skill / tolerance)
         const size = 1 - k;
-        const win = 0.09 + (st.skill ?? 60) / 1200 + (tol - 1) * 0.05;
+        const traitQ = 1 + (has('icevein') ? 0.4 : 0) + (has('clutchgene') ? 0.25 : 0) + (label.includes('CATCH') && has('moss') ? 0.45 : 0) + (label.includes('BREAK') && has('jumper') ? 0.4 : 0);
+        const win = (0.09 + (st.skill ?? 60) / 1200 + (tol - 1) * 0.05) * traitQ;
         finish2(Math.abs(size - 0.32) <= win);
       } else {
         taps++;
@@ -894,7 +897,12 @@ export function freePlay(ctx) {
   /** Hard tackle: ragdoll, maybe slow-mo replay, maybe blood, maybe an injury. */
   const hardHit = (tackler, target) => {
     const rel = Math.hypot(tackler.vel.x - target.vel.x, tackler.vel.z - target.vel.z);
-    const big = globalThis.__forceBigHit || rel * Math.sqrt(tackler.mass / target.mass) > 10 || Math.random() < 0.12 * Math.min(1.6, tackler.mass / target.mass);
+    // the tackler goes down with him (wrapped up), unless he's a huge hitter who stays on his feet
+    if (!tackler.user || Math.random() < 0.6) {
+      const dd = pushDir(tackler, target);
+      setTimeout(() => { if (tackler.mesh.userData.u && !tackler.down) { ragdoll(tackler.mesh, dd, 0.35 + Math.random() * 0.25); tackler.out = Math.max(tackler.out ?? 0, 1.3); } }, 120);
+    }
+    const big = globalThis.__forceBigHit || rel * Math.sqrt(tackler.mass / target.mass) > 10 || Math.random() < 0.12 * Math.min(1.6, tackler.mass / target.mass) * (tackler.user && has('hitstick') ? 1.8 : 1);
     const sizeK = Math.max(0.7, Math.min(1.5, tackler.mass / target.mass));
     flatten(target, tackler, (big ? 1.5 + Math.random() * 0.5 : 0.55 + Math.random() * 0.3) * sizeK);
     fxList.push(dustPuff(group, target.pos, big ? 16 : 9));
@@ -914,7 +922,7 @@ export function freePlay(ctx) {
       fxList.push(bloodBurst(group, { x: target.pos.x, y: 1.6, z: target.pos.z }, d));
     }
     // the hit can hurt you (more likely when already banged up)
-    if (target.user && Math.random() < 0.07 * (1.6 - (opts.health ?? 100) / 100)) {
+    if (target.user && Math.random() < 0.07 * (1.6 - (opts.health ?? 100) / 100) * (has('ironman') ? 0.5 : 1)) {
       target.injured = true;
       setTimeout(() => { hud.big('INJURED', '#ff6b6b', 1600); hud.say?.(`${opts.lastName ?? 'He'} is slow to get up... trainers are running out.`, 3000); }, 700);
     }
@@ -935,7 +943,7 @@ export function freePlay(ctx) {
     if (!u && target.juking > 0) { tackler.out = 1.1; flatten(tackler, target, 0.45); return; }
     if (u && moves.stiff > 0) {
       const facing = (tackler.pos.z < target.pos.z + 0.5);
-      if (facing && Math.random() < 0.35 + (st.strength ?? 60) / 160) {
+      if (facing && Math.random() < (0.35 + (st.strength ?? 60) / 160) * (has('truck') ? 1.3 : 1)) {
         tackler.out = 1.2; flatten(tackler, target, 0.9); moves.slow = 0.3;
         hud.big('STIFF ARM!', '#fbbf24', 700); sfx.hit(); ctx.shake(0.25); return;
       }
@@ -957,7 +965,8 @@ export function freePlay(ctx) {
     }
     const str = target.user ? (st.strength ?? 60) : 60;
     const pBreak = (str / 100) * 0.3 * (target.user ? (0.6 + tol * 0.4) : mode === 'pass' ? 0.35 : 0.6) * Math.pow(0.5, target.broken ?? 0) + (tackler.user ? -0.1 : 0);
-    if (Math.random() < pBreak * Math.max(0.5, Math.min(1.8, Math.pow(target.mass / tackler.mass, 1.3)))) {
+    const traitBreak = target.user ? (has('truck') ? 1.3 : 1) * (has('yac') && mode === 'route' ? 1.4 : 1) : 1;
+    if (Math.random() < pBreak * traitBreak * Math.max(0.5, Math.min(1.8, Math.pow(target.mass / tackler.mass, 1.3)))) {
       target.broken = (target.broken ?? 0) + 1;
       tackler.out = 1.0; flatten(tackler, target, 0.6);
       if (target.user) { moves.slow = 0.4; hud.big('BROKE A TACKLE!', '#fbbf24', 700); }
@@ -970,7 +979,7 @@ export function freePlay(ctx) {
     hardHit(tackler, target);
     sfx.hit();
     ctx.shake(0.4);
-    const fumbleP = 0.012 * (call === 'risky' ? 2 : 1) + wfx.slip * 0.25 + (tackler.user ? 0.04 : 0);
+    const fumbleP = (0.012 * (call === 'risky' ? 2 : 1) + wfx.slip * 0.25 + (tackler.user ? 0.04 + (has('hitstick') ? 0.04 : 0) : 0)) * (target.user && has('secure') ? 0.5 : 1);
     whistle(Math.random() < fumbleP ? 'fumble' : 'tackle', tackler);
   };
 
@@ -991,7 +1000,7 @@ export function freePlay(ctx) {
       startQte('ring', 'BREAK IT UP!', (ok) => {
         if (phase !== 'live') return;
         if (ok) {
-          if (Math.random() < 0.45 + (st.skill ?? 60) / 500) { holder = user; carrier = user; user.int = true; snap('Interception!', 100); hud.big('INTERCEPTION!', '#4ade80', 900); ctx.cinematic?.(() => user.pos, 1.3); sfx.catch(); setButtonsFor(); return; }
+          if (Math.random() < 0.45 + (st.skill ?? 60) / 500 + (has('ballhawk') ? 0.2 : 0)) { holder = user; carrier = user; user.int = true; snap('Interception!', 100); hud.big('INTERCEPTION!', '#4ade80', 900); ctx.cinematic?.(() => user.pos, 1.3); sfx.catch(); setButtonsFor(); return; }
           playAction(user.mesh, 'dive'); hud.big('BROKEN UP!', '#4ade80', 800); ctx.cinematic?.(() => user.pos, 1.1); whistle('pd'); return;
         }
         completeCatch(r, land);
@@ -1002,7 +1011,7 @@ export function freePlay(ctx) {
       const timing = swatPress === null ? 9 : Math.abs(f.t0 + f.T - swatPress - 0.12);
       const win = (0.16 + (st.skill ?? 60) / 100 * 0.12) * tol;
       if (timing <= win && dist(user.pos, land) <= dR + 0.5) {
-        if (Math.random() < 0.55 + (st.skill ?? 60) / 400) { holder = user; carrier = user; user.int = true; snap('Interception!', 150); hud.big('INTERCEPTION!', '#4ade80', 900); ctx.slowMo(0.5); sfx.catch(); setButtonsFor(); return; }
+        if (Math.random() < 0.55 + (st.skill ?? 60) / 400 + (has('ballhawk') ? 0.2 : 0)) { holder = user; carrier = user; user.int = true; snap('Interception!', 150); hud.big('INTERCEPTION!', '#4ade80', 900); ctx.slowMo(0.5); sfx.catch(); setButtonsFor(); return; }
         whistle('pd'); return;
       }
       if (timing <= win * 2.2 || dist(user.pos, land) < 0.9) { whistle('pd'); return; }
@@ -1025,7 +1034,7 @@ export function freePlay(ctx) {
     let catchOk;
     if (r === user) {
       const timing = catchPress === null ? 9 : Math.abs(f.t0 + f.T - catchPress - 0.1);
-      const win = 0.13 * tol * (0.85 + (st.skill ?? 60) / 400) * (play.jump ? 1.3 : 1);
+      const win = 0.13 * tol * (0.85 + (st.skill ?? 60) / 400) * (play.jump ? 1.3 : 1) * (has('velcro') ? 1.3 : 1);
       const tallK = (user.hIn - 73) * 0.04;
       const nearD = defs.reduce((a, d) => (dist(d.pos, land) < dist(a.pos, land) ? d : a), defs[0]);
       const heightEdge = nearD ? (user.hIn - nearD.hIn) * 0.02 : 0;
@@ -1038,7 +1047,8 @@ export function freePlay(ctx) {
       const nearD = defs.reduce((a, d) => (dist(d.pos, land) < dist(a.pos, land) ? d : a), defs[0]);
       const hEdge = nearD ? (r.hIn - nearD.hIn) * 0.025 : 0;
       const catchR = (f.H > 4 ? 1.7 : 1.15) + 0.2 * tol + (r.hIn - 73) * 0.04 * (f.H > 3 ? 1.6 : 1);
-      catchOk = dR <= catchR && Math.random() < (crowd ? 0.42 + hEdge : dD < 1.6 ? 0.72 + hEdge : 0.9) - wfx.slip;
+      const lock = has('lockdown') && user.team === 'def' && dist(user.pos, land) < 3 ? 0.15 : 0;
+      catchOk = dR <= catchR && Math.random() < (crowd ? 0.42 + hEdge : dD < 1.6 ? 0.72 + hEdge : 0.9) - wfx.slip - lock;
       // tight coverage: the defender gets a hand in
       if (catchOk && dD < 1.25 && Math.random() < 0.3 / tol) { whistle('incomplete', null, 'Broken up at the catch point!'); return; }
       if (play.hail) catchOk = dR < 2.4 && Math.random() < 0.35 - crowd * 0.05;
@@ -1288,7 +1298,8 @@ export function freePlay(ctx) {
       const c = controls.state;
       const [uh0, uw0] = POS_SIZE[opts.position] ?? POS_SIZE[user.role] ?? [73, 210];
       const userSize = Math.max(0.9, Math.min(1.06, 1 - ((user.wLb - uw0) / uw0) * 0.3 + (user.hIn - uh0) * 0.003));
-      const userSpeed = BASE_SPEED[user.role] * userSize * (0.86 + (st.speed ?? 60) / 100 * 0.28) * wfx.speed * (c.sprint ? 1.15 : 0.95) * (moves.slow > 0 ? 0.55 : 1) * (moves.spin > 0 ? 0.8 : 1);
+      const traitSpeed = (has('gear2') && c.sprint ? 1.08 : 1) * (has('escape') && user === qb && carrier === qb ? 1.08 : 1) * (has('deep') && mode === 'route' && user.pos.z < -10 ? 1.07 : 1) * (has('closing') && flight && user.team === 'def' ? 1.1 : 1);
+      const userSpeed = traitSpeed * BASE_SPEED[user.role] * userSize * (0.86 + (st.speed ?? 60) / 100 * 0.28) * wfx.speed * (c.sprint ? 1.15 : 0.95) * (moves.slow > 0 ? 0.55 : 1) * (moves.spin > 0 ? 0.8 : 1);
       if (user.out > 0) { user.out -= dt; if (user.out <= 0 && isDown(user.mesh)) knockDown(user.mesh, 0); user.vel.x *= 0.8; user.vel.z *= 0.8; }
       else if (moves.dive) {
         moves.dive += dt;
@@ -1299,7 +1310,7 @@ export function freePlay(ctx) {
         user.lunge -= dt;
         user.vel.x = user.lungeDir.x * 9.5; user.vel.z = user.lungeDir.z * 9.5;
         if (carrier && carrier !== user && dist(user.pos, carrier.pos) < 1.15) tryTackle(user, carrier);
-        else if (!carrier && holder === qb && !flight && passD && dist(user.pos, qb.pos) < 1.2) { qb.down = true; user.lunge = 0; hardHit(user, qb); hud.big('SACK!', '#4ade80', 1100); sfx.cheer(); snap('Sack!', 200); whistle('sack', user); }
+        else if (!carrier && holder === qb && !flight && passD && dist(user.pos, qb.pos) < (has('closer') ? 1.55 : 1.2)) { qb.down = true; user.lunge = 0; hardHit(user, qb); hud.big('SACK!', '#4ade80', 1100); sfx.cheer(); snap('Sack!', 200); whistle('sack', user); }
         if (user.lunge <= 0 && phase === 'live') { user.out = 0.7; knockDown(user.mesh, 1); }
       } else if (user.engagedBy) {
         // locked up with a blocker: drive into him to build leverage, use moves to break free
@@ -1307,7 +1318,7 @@ export function freePlay(ctx) {
         rush.stun = Math.max(0, rush.stun - dt);
         const o = user.engagedBy;
         const toward = c.active ? Math.max(0, -(c.z) * 0.8 + 0.2) : 0.15;
-        rush.lev = Math.min(1, rush.lev + dt * toward * (0.5 + (st.strength ?? 60) / 200));
+        rush.lev = Math.min(1, rush.lev + dt * toward * (0.5 + (st.strength ?? 60) / 200) * (has('motor') ? 1.4 : 1));
         if (levBar) levBar.querySelector('i').style.width = `${rush.lev * 100}%`;
         const push = c.active ? 1.6 : 0.6;
         moveToward(user, o.pos.x + c.x * 1.2, o.pos.z + 0.2, push, dt, 10);
@@ -1349,7 +1360,7 @@ export function freePlay(ctx) {
         if (target && target.team === 'off' && dist(e.pos, target.pos) < 1.0) {
           if (target === qb && holder === qb && !carrier) {
             // sack (QB can still dodge with moves if he is the user and scrambling)
-            if (user === qb && (moves.juke > 0 || moves.spin > 0)) { e.out = 1.2; knockDown(e.mesh, 1); hud.big('ESCAPED!', '#4ade80', 600); }
+            if (user === qb && (moves.juke > 0 || moves.spin > 0 || (has('pocket') && Math.random() < 0.3))) { e.out = 1.2; knockDown(e.mesh, 1); hud.big('ESCAPED!', '#4ade80', 600); }
             else { qb.down = true; hardHit(e, qb); playAction(e.mesh, 'tackle'); sfx.hit(); ctx.shake(0.4); whistle('sack'); }
           } else tryTackle(e, target);
           e.lunge = 0;
@@ -1370,6 +1381,13 @@ export function freePlay(ctx) {
             const d = Math.sqrt(d2);
             const push = (0.75 - d);
             const wa = b.mass / (a.mass + b.mass); // the lighter player gets moved more
+            // a real collision makes both players stagger
+            const rel = Math.hypot(a.vel.x - b.vel.x, a.vel.z - b.vel.z);
+            if (rel > 3.5 && !(a.bumpCd > t) && !(b.bumpCd > t)) {
+              a.bumpCd = b.bumpCd = t + 0.6;
+              bump(a.mesh, { x: -dx / d, z: -dz / d }, Math.min(1.6, rel / 6) * wa * 2);
+              bump(b.mesh, { x: dx / d, z: dz / d }, Math.min(1.6, rel / 6) * (1 - wa) * 2);
+            }
             a.pos.x -= (dx / d) * push * wa; a.pos.z -= (dz / d) * push * wa;
             b.pos.x += (dx / d) * push * (1 - wa); b.pos.z += (dz / d) * push * (1 - wa);
           }

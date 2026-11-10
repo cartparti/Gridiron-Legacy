@@ -8,6 +8,7 @@ import {
   resolveGameEvent, autoGameEvent, MOMENT_NAMES, setGamePlan,
 } from '../../sim/game.js';
 import { crest } from '../crest.js';
+import { equippedTraits } from '../../sim/traits.js';
 import { teamCulture, BIOME_INFO } from '../../data/culture.js';
 import * as flow from '../../sim/flow.js';
 import { teamBadge, changeChips } from '../components.js';
@@ -363,6 +364,8 @@ export function gamedayScreen(app) {
       markTip: () => { app.settings.seenTips = { ...(app.settings.seenTips ?? {}), [`mg_${m.type}`]: true }; app.saveSettings(); },
       reducedMotion: app.settings.reducedMotion,
       blood: app.settings.blood !== false,
+      gameSpeed: app.settings.gameSpeed ?? 0.85,
+      traits: equippedTraits(st),
       health: st.player.health,
     });
     ui.busy = false;

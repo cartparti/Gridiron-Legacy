@@ -462,7 +462,9 @@ function buildRig(o) {
   root.userData = {
     ...root.userData,
     rig: { body, hips, spine, chest, neck, legL, legR, armL, armR },
-    u: { speed: 0, phase: Math.random() * 6, back: false, hold: null, action: null, down: false, downT: 0, hop: 0, yaw: 0, targetYaw: 0, celebrate: null },
+    u: { speed: 0, phase: Math.random() * 6, back: false, hold: null, action: null, down: false, downT: 0, hop: 0, yaw: 0, targetYaw: 0, celebrate: null,
+      // everyone runs a little differently
+      gait: { stride: 0.88 + Math.random() * 0.24, arm: 0.82 + Math.random() * 0.34, lean: -0.04 + Math.random() * 0.12, tempo: 0.93 + Math.random() * 0.14, bounce: 0.8 + Math.random() * 0.45 } },
     look: L,
     ticked: 0,
   };
@@ -581,7 +583,8 @@ function computePose(u, dt) {
   // ---- locomotion
   if (s > 0.4 && !u.down) {
     const run = Math.min(1, s / 7);
-    u.phase += dt * (5 + s * 1.25) * (u.back ? 1.3 : 1);
+    const gt = u.gait ?? { stride: 1, arm: 1, lean: 0, tempo: 1, bounce: 1 };
+    u.phase += dt * (5 + s * 1.25) * (u.back ? 1.3 : 1) * gt.tempo;
     const a = Math.sin(u.phase);
     const b = Math.cos(u.phase);
     if (u.back) {
@@ -589,18 +592,18 @@ function computePose(u, dt) {
       P.ls = 0.4 - a * 0.3; P.rs = 0.4 + a * 0.3; P.le = 1.2; P.re = 1.2; P.spine = -0.08; P.y = -0.08;
     } else {
       // legs: long strides with high knee lift on the recovery swing
-      P.lh = a * (0.45 + run * 0.6) + run * 0.08; P.rh = -a * (0.45 + run * 0.6) + run * 0.08;
+      P.lh = a * (0.45 + run * 0.6) * gt.stride + run * 0.08; P.rh = -a * (0.45 + run * 0.6) * gt.stride + run * 0.08;
       P.lk = 0.2 + Math.max(0, -b) * (0.6 + run * 1.1) + Math.max(0, a) * 0.25 * run;
       P.rk = 0.2 + Math.max(0, b) * (0.6 + run * 1.1) + Math.max(0, -a) * 0.25 * run;
       // arms pump opposite the legs; forearms whip a beat behind the upper arm
-      P.ls = -a * (0.45 + run * 0.75); P.rs = a * (0.45 + run * 0.75);
+      P.ls = -a * (0.45 + run * 0.75) * gt.arm; P.rs = a * (0.45 + run * 0.75) * gt.arm;
       P.le = 0.7 + run * 0.8 + Math.max(0, a) * 0.35; P.re = 0.7 + run * 0.8 + Math.max(0, -a) * 0.35;
       P.lout = 0.1 + run * 0.08; P.rout = -0.1 - run * 0.08;
       // hips swing with the legs, shoulders counter-rotate, head stays steady
       P.hy = a * 0.22 * (0.4 + run * 0.6); P.sy = -a * 0.42 * (0.4 + run * 0.6); P.ny = a * 0.18 * run;
-      P.spine = 0.1 + run * 0.3; P.head = -run * 0.18 + Math.sin(u.phase * 2) * 0.03;
+      P.spine = 0.1 + run * 0.3 + gt.lean; P.head = -run * 0.18 + Math.sin(u.phase * 2) * 0.03;
       // two bounces per stride (a small flight phase when sprinting) and a little side sway
-      P.y = -Math.abs(Math.sin(u.phase)) * (0.05 + 0.05 * run) + run * 0.02;
+      P.y = (-Math.abs(Math.sin(u.phase)) * (0.05 + 0.05 * run) + run * 0.02) * gt.bounce;
       P.rz = Math.sin(u.phase) * 0.035;
       P.sx = Math.sin(u.phase) * 0.02 * (1 - run * 0.5);
     }
@@ -689,12 +692,25 @@ function applyPose(p, P, dt) {
   if (p.userData.shadow) { p.userData.shadow.position.x = r.body.position.x; p.userData.shadow.position.z = r.body.position.z; }
   const k = 1 - Math.exp(-16 * dt);
   const L = (obj, prop, v) => { obj[prop] += (v - obj[prop]) * k; };
-  L(r.legL.hip.rotation, 'x', P.lh); L(r.legL.knee.rotation, 'x', -P.lk);
-  L(r.legR.hip.rotation, 'x', P.rh); L(r.legR.knee.rotation, 'x', -P.rk);
-  L(r.armL.sh.rotation, 'x', P.ls); L(r.armL.el.rotation, 'x', P.le); L(r.armL.sh.rotation, 'z', -P.lout);
-  L(r.armR.sh.rotation, 'x', P.rs); L(r.armR.el.rotation, 'x', P.re); L(r.armR.sh.rotation, 'z', -P.rout);
-  L(r.spine.rotation, 'x', -P.spine);
-  L(r.neck.rotation, 'x', -P.head);
+  // Joints ride on slightly under-damped springs: limbs overshoot a touch and settle, which reads as
+  // weight and follow-through instead of snapping straight into each pose.
+  const jv = (u.jv ??= {});
+  const sdt = Math.min(dt, 0.034);
+  let ji = 0;
+  const S = (obj, prop, v, stiff = 165, damp = 19) => {
+    const key = ji++;
+    const vel = jv[key] ?? 0;
+    const a = stiff * (v - obj[prop]) - damp * vel;
+    const nv = vel + a * sdt;
+    jv[key] = nv;
+    obj[prop] += nv * sdt;
+  };
+  S(r.legL.hip.rotation, 'x', P.lh, 190, 21); S(r.legL.knee.rotation, 'x', -P.lk, 190, 21);
+  S(r.legR.hip.rotation, 'x', P.rh, 190, 21); S(r.legR.knee.rotation, 'x', -P.rk, 190, 21);
+  S(r.armL.sh.rotation, 'x', P.ls, 140, 15); S(r.armL.el.rotation, 'x', P.le, 120, 13); S(r.armL.sh.rotation, 'z', -P.lout, 120, 14);
+  S(r.armR.sh.rotation, 'x', P.rs, 140, 15); S(r.armR.el.rotation, 'x', P.re, 120, 13); S(r.armR.sh.rotation, 'z', -P.rout, 120, 14);
+  S(r.spine.rotation, 'x', -P.spine, 110, 14);
+  S(r.neck.rotation, 'x', -P.head, 90, 12);
   L(r.hips.rotation, 'y', P.hy);
   L(r.spine.rotation, 'y', P.sy);
   L(r.neck.rotation, 'y', P.ny - P.sy * 0.6 - P.hy * 0.6);
@@ -702,7 +718,9 @@ function applyPose(p, P, dt) {
   // body: position offset (crouch/hop), roll (juke lean), pitch (dive/fall), yaw (spin)
   u.hop = Math.max(0, u.hop - dt * 2.2);
   L(r.body.position, 'y', P.y + u.hop);
-  L(r.body.rotation, 'z', P.rz);
+  // body roll wobbles a little (bumps, cuts) on a softer spring
+  u.rzv = (u.rzv ?? 0) + (95 * (P.rz - r.body.rotation.z) - 11 * (u.rzv ?? 0)) * sdt;
+  r.body.rotation.z += u.rzv * sdt;
   r.body.rotation.x += (-P.rx - r.body.rotation.x) * k; // pitch forward = negative x on this rig
   if (Math.abs(P.ry) > 3) r.body.rotation.y = P.ry; else L(r.body.rotation, 'y', P.ry);
   // smooth facing
@@ -883,7 +901,22 @@ export function knockDown(p, t = 1) {
   const u = p.userData.u;
   if (t <= 0) { endRagdoll(p); u.down = false; playAction(p, 'getup'); return; }
   u.celebrate = null;
-  playAction(p, 'fall', { then: 'down' });
+  // a real stumble: tip over in a loose, physical way
+  const a = Math.random() * Math.PI * 2;
+  ragdoll(p, { x: Math.cos(a), z: Math.sin(a) }, 0.3);
+}
+
+/** A shove or collision: the body staggers sideways and the arms fly out for a moment. */
+export function bump(p, dir = { x: 1, z: 0 }, strength = 1) {
+  const u = p.userData.u;
+  if (!u || u.rag || u.down) return;
+  const yaw = p.rotation.y;
+  const lx = dir.x * Math.cos(yaw) - dir.z * Math.sin(yaw);
+  u.rzv = (u.rzv ?? 0) - lx * 4 * strength;
+  u.hop = Math.max(u.hop, 0.05 * strength);
+  const jv = (u.jv ??= {});
+  jv[4] = (jv[4] ?? 0) + (Math.random() - 0.5) * 8 * strength;
+  jv[7] = (jv[7] ?? 0) + (Math.random() - 0.5) * 8 * strength;
 }
 
 export function isDown(p) { return p.userData.u.down; }

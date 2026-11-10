@@ -50,6 +50,9 @@ export function postgameScreen(app) {
       h(`span.chip.${d.coach >= 0 ? 'good' : 'bad'}`, `Coach ${signed(d.coach, 1)}`),
       h(`span.chip.${d.mood >= 0 ? 'good' : 'bad'}`, `Mood ${signed(d.mood, 1)}`)),
       g.injury ? h('p.bad', h('b', `Injured: ${g.injury.label}, out ~${g.injury.weeks} week${g.injury.weeks > 1 ? 's' : ''}.`)) : null),
+    g.newTraits?.length || g.levelUps ? h('div.card.unlock-card',
+      g.levelUps ? h('div.row', { style: { gap: '8px' } }, h('span.chip.gold.pix', 'LEVEL UP'), h('span.small', `Level ${st.player.level}. You have ${st.player.skillPoints} skill point${st.player.skillPoints === 1 ? '' : 's'} to spend (Career tab).`)) : null,
+      (g.newTraits ?? []).map((n) => h('div.row', { style: { gap: '8px', marginTop: '6px' } }, h('span.chip.good.pix', 'NEW TRAIT'), h('b', n), h('span.tiny.muted', 'Equip it in Career → Traits')))) : null,
     h('button.btn.primary.block', { onclick: () => { sfx.click(); flow.continueAfterGame(st); app.hubTab = 'week'; app.commit(); } }, 'Continue'));
 }
 

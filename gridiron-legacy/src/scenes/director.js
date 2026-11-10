@@ -65,7 +65,7 @@ function frame() {
   raf = requestAnimationFrame(frame);
   const dt = Math.min(0.05, R.clock.getDelta());
   const cine = R.cine;
-  const slow = (cine ? 0.2 : R.slowmo > 0 ? 0.3 : 1) * (R.timeScale ?? 1);
+  const slow = (cine ? 0.2 : R.slowmo > 0 ? 0.3 : 1) * (R.timeScale ?? 1) * (R.playSpeed ?? 1);
   R.slowmo = Math.max(0, (R.slowmo ?? 0) - dt);
   elapsed += dt * slow;
   if (loopFn) loopFn(dt * slow, elapsed);
@@ -321,8 +321,9 @@ export function runMinigame(type, opts) {
   return new Promise((resolve) => {
     const cleanups = [];
     startCrowd(0.3);
+    if (R) R.playSpeed = opts.gameSpeed ?? 0.85; // plays run a bit slower than real time for a realistic feel
     const finish = (result) => {
-      if (R) R.timeScale = 1;
+      if (R) { R.timeScale = 1; R.playSpeed = 1; }
       stopCrowd();
       stopMusic();
       if (R) { R.cine = null; document.body.classList.remove('cine'); }

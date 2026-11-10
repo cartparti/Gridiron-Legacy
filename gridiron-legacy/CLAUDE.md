@@ -202,6 +202,16 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Helmets: 8 facemask styles (`MASK_BARS` in actors.js), facemask color (incl. team), stripe (single/double/
   triple/none), shell finish (gloss/matte/chrome); Helmet tab in the editor; AI masks by position (`POS_MASK`).
 
+## v0.15 changes
+- Traits (`src/data/traits.js`, `src/sim/traits.js`): 5 per position (QB/RB/WR/CB/DT) plus 3 for any position,
+  unlocked by career stats, player level or teammate relationship (`checkTraitUnlocks` after each game, new
+  unlocks are auto-equipped into a free slot). Slots: 1 at the start, 2 at level 5, 3 at level 10. Stored in
+  `player.traits {unlocked, equipped}`; Career > Traits page; unlock cards on the results screen. The play
+  engine reads `opts.traits` via `has(id)`; workhorse/captain also affect the sim (game.js).
+- Animation: joints are damped springs (`u.jv`, `u.rzv`), per-player gait, `bump()` staggers on contact,
+  knockdowns are short ragdolls, hard hits ragdoll the tackler too.
+- Game speed: `settings.gameSpeed` (Slow 0.72 / Realistic 0.85 default / Fast 1) sets `R.playSpeed` during plays.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

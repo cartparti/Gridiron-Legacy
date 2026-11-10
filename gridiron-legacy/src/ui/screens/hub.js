@@ -20,7 +20,7 @@ import { openLookModal } from './look.js';
 import { socialView } from './social.js';
 import { lineupView } from './lineup.js';
 import { homeView } from './home.js';
-import { careerStatsSections, legendsPage, racePage } from './careerStats.js';
+import { careerStatsSections, legendsPage, racePage, traitsPage } from './careerStats.js';
 import { DRILLS, DRILL_NAMES, openDrill, grade } from './drills.js';
 import { teamKits } from '../../data/kits.js';
 import { fmtSize } from '../../data/looks.js';
@@ -435,13 +435,14 @@ function lifeView(app) {
 
 function careerView(app) {
   const sub = app.ui.careerSub ?? 'profile';
-  const tabs = h('div.subtabs', [['profile', 'Career'], ['awards', 'Trophies'], ['race', 'Award Race'], ['legends', 'Legends'], ['league', 'League Awards']].map(([id, l]) =>
+  const tabs = h('div.subtabs', [['profile', 'Career'], ['traits', 'Traits'], ['awards', 'Trophies'], ['race', 'Award Race'], ['legends', 'Legends'], ['league', 'League Awards']].map(([id, l]) =>
     h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { sfx.click(); app.ui.careerSub = id; app.render(); } }, l)));
   let body;
   if (sub === 'awards') body = awardsView(app);
   else if (sub === 'league') body = leagueAwardsView(app);
   else if (sub === 'legends') body = legendsPage(app);
   else if (sub === 'race') body = racePage(app);
+  else if (sub === 'traits') body = traitsPage(app);
   else { body = profileView(app); body.append(...careerStatsSections(app)); }
   return h('div.col', { style: { gap: '14px' } }, tabs, body);
 }

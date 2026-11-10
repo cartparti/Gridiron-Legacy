@@ -73,3 +73,18 @@ test('every team has a stable, varied culture (biome, stadium, trait)', async ()
   assert.equal(biomeFor({ city: 'Palm Shores', name: 'Sharks' }), 'coast');
   assert.equal(biomeFor({ city: 'Red Mesa', name: 'Scorpions' }), 'desert');
 });
+
+test('traits unlock from career goals and equip into limited slots', async () => {
+  const T = await import('../src/sim/traits.js');
+  const st = career('QB');
+  st.player.careerStats.passTD = 30;
+  st.player.careerStats.passYds = 6000;
+  const fresh = T.checkTraitUnlocks(st);
+  assert.ok(fresh.some((t) => t.id === 'gunslinger') && fresh.some((t) => t.id === 'dimes'));
+  assert.equal(T.equippedTraits(st).length, 1, 'level 1 = one slot');
+  assert.equal(T.toggleTrait(st, 'dimes').ok, false, 'slots full');
+  st.player.level = 5;
+  assert.ok(T.toggleTrait(st, 'dimes').ok);
+  assert.equal(T.equippedTraits(st).length, 2);
+  assert.equal(T.toggleTrait(st, 'velcro').ok, false, 'other positions are locked');
+});

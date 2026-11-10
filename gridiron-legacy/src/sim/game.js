@@ -396,7 +396,8 @@ export function resolveMoment(state, result) {
   }
 
   // energy and live rating
-  g.energy = Math.max(0, (g.energy ?? 80) - INTENSITY[g.plan?.intensity ?? 'mid'].drain - (g.userSide === 'away' ? TRAITS[g.homeTrait]?.awayDrain ?? 0 : 0));
+  const eq = state.player.traits?.equipped ?? [];
+  g.energy = Math.max(0, (g.energy ?? 80) - (INTENSITY[g.plan?.intensity ?? 'mid'].drain + (g.userSide === 'away' ? TRAITS[g.homeTrait]?.awayDrain ?? 0 : 0)) * (eq.includes('workhorse') ? 0.7 : 1));
   {
     const big = result.td || result.int || result.defTD || result.sack && m.defense;
     const bad = (!m.defense && (result.turnover || result.sack)) || result.tdAllowed;
@@ -427,7 +428,7 @@ export function resolveMoment(state, result) {
       yl = m.yardLine - (result.yardsAllowed ?? 0);
       converted = (result.yardsAllowed ?? 0) >= m.distance;
     }
-    momentumShift(g, (result.quality - 0.5) * 0.35 + (result.turnover ? 0.25 : 0) - (result.tdAllowed ? 0.2 : 0));
+    momentumShift(g, ((result.quality - 0.5) * 0.35 + (result.turnover ? 0.25 : 0) - (result.tdAllowed ? 0.2 : 0)) * ((state.player.traits?.equipped ?? []).includes('captain') && result.quality > 0.5 ? 1.25 : 1));
   } else {
     if (m.type === 'qb_throw' || m.type === 'qb_hailmary') {
       if (result.sack) s.sacks++;

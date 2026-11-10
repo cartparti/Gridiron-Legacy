@@ -7,6 +7,7 @@ import { mainStats, totalTD, bigPlaysD, myTrophies, legendBoard, allTimeRank, aw
 import { crest } from '../crest.js';
 import { icon } from '../icons.js';
 import { levelInfo, spendPoint, pointCost } from '../../sim/progress.js';
+import { traitList, toggleTrait, equipSlots } from '../../sim/traits.js';
 import { STAT_KEYS, STAT_LABELS } from '../../data/positions.js';
 import { sfx } from '../../audio/sfx.js';
 
@@ -146,4 +147,33 @@ export function racePage(app) {
       h('p.tiny.muted', 'Points come from game performance and team wins. Voters decide at the end of the season.')),
     h('div.card', h('h3', r.kidAward), h('div.list', r.kids.map((x, i) => h(`div.li${x.you ? '.me' : ''}`, h('b.pix.lg-rank', i + 1), h('div.grow', h('b', x.name, x.you ? ' (you)' : ''), h('span.tiny.muted', ` ${x.pos} · age ${x.age}`)), h('b.pix', x.pts)))),
       r.kids.length ? null : h('p.small.muted', 'No eligible young players yet.')));
+}
+
+// ------------------------------------------------------------------ Traits
+
+export function traitsPage(app) {
+  const st = app.state;
+  const list = traitList(st);
+  const slots = equipSlots(st);
+  const eq = list.filter((t) => t.equipped);
+  const card = (t) => h(`div.trait${t.unlocked ? '' : '.locked'}${t.equipped ? '.on' : ''}`,
+    h('div.row', { style: { gap: '10px' } },
+      h('span.tr-ic', icon(t.icon)),
+      h('div.grow', h('b', t.name), h('div.tiny.muted', t.pos === 'ANY' ? 'Any position' : t.pos)),
+      t.unlocked ? h(`button.btn.small${t.equipped ? '.primary' : ''}`, { onclick: () => {
+        const r = toggleTrait(st, t.id);
+        if (!r.ok) { sfx.error?.(); return; }
+        sfx.select(); app.save(); app.render();
+      } }, t.equipped ? 'Equipped' : 'Equip') : h('span.chip.pix', 'LOCKED')),
+    h('p.small', { style: { margin: '6px 0 4px' } }, t.desc),
+    t.unlocked ? null : h('div', h('div.watch-bar', h('i', { style: { width: `${t.progress.pct * 100}%` } })), h('div.tiny.muted', `${t.goal.label}: ${t.progress.cur} / ${t.progress.n}`)));
+  return h('div.col', { style: { gap: '14px' } },
+    h('div.card',
+      h('div.card-title', h('h2', 'Traits'), h('span.chip.pix', `${eq.length} / ${slots} SLOTS`)),
+      h('p.tiny.muted', 'Unlock traits by hitting career goals, then equip them. Slots: 1 at the start, 2 at level 5, 3 at level 10.'),
+      h('div.tr-slots', [0, 1, 2].map((i) => {
+        const t = eq[i];
+        return h(`div.tr-slot${i >= slots ? '.lockedslot' : ''}`, t ? [h('span.tr-ic', icon(t.icon)), h('b.tiny', t.name)] : h('span.tiny.muted', i >= slots ? `Level ${i === 1 ? 5 : 10}` : 'Empty'));
+      }))),
+    h('div.col', { style: { gap: '8px' } }, list.sort((a, b) => (b.unlocked - a.unlocked) || (b.progress.pct - a.progress.pct)).map(card)));
 }

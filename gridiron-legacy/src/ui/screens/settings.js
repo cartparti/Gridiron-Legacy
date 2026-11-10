@@ -15,6 +15,7 @@ export function settingsScreen(app) {
       opt('Theme (menus)', 'theme', [['auto', 'Auto'], ['dark', 'Dark'], ['light', 'Light']]),
       opt('Sound effects', 'sound', [[true, 'On'], [false, 'Off']]),
       opt('Stadium music', 'music', [[true, 'On'], [false, 'Off']]),
+      opt('Game speed (plays)', 'gameSpeed', [[0.72, 'Slow'], [0.85, 'Realistic'], [1, 'Fast']]),
       opt('Reduced motion', 'reducedMotion', [[false, 'Off'], [true, 'On']]),
       opt('Blood effects', 'blood', [[true, 'On'], [false, 'Off']]),
       opt('Tutorial tips', 'tutorials', [[true, 'On'], [false, 'Off']]))),

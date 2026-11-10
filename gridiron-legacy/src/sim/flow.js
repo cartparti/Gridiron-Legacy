@@ -31,6 +31,7 @@ import { newWeek, applyPlan } from './week.js';
 import { newInjury, applyInjury, genPersonName } from './effects.js';
 import { addNews, postGamePress } from './press.js';
 import { addXp } from './progress.js';
+import { checkTraitUnlocks } from './traits.js';
 import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf, recordLeagueAwards } from './awards.js';
 import { computeLegacy } from './legacy.js';
 import { genTeammates } from './social.js';
@@ -194,7 +195,9 @@ export function finishGame(state) {
     p.rel.coach = clamp(p.rel.coach + (g.grade - 58) / 9, 0, 100);
     p.rel.teammates = clamp(p.rel.teammates + (g.won ? 2 : -1), 0, 100);
     p.mood = clamp(p.mood + (g.won ? 5 : -4) + (g.grade - 60) / 10, 0, 100);
+    g.newTraits = null;
     g.levelUps = addXp(state, Math.round(10 + g.grade * 0.55 + (g.won ? 10 : 0) + (g.playoff ? 15 : 0)));
+    g.newTraits = checkTraitUnlocks(state).map((t) => t.name);
     p.health = clamp(p.health - (4 + g.moments.length * 1.5), 0, 100);
     if (g.rivalry) p.rel.rival = clamp(p.rel.rival + 5, 0, 100);
     // Injury roll.
@@ -223,6 +226,8 @@ export function finishGame(state) {
   const press = postGamePress(state, g, `${opp.city}`, teamName(state));
   simOtherGames(state, league, sched);
   state.lastGame = {
+    newTraits: g.newTraits ?? [],
+    levelUps: g.levelUps ?? 0,
     won: g.won,
     score: { ...g.score },
     userSide: g.userSide,
