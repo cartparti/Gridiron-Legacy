@@ -264,13 +264,19 @@ function shirtMat(color, side, tie = null) {
 }
 
 function helmetMat(un, side) {
-  const key = `helm|${un.helmet}|${un.stripe}|${side}`;
+  const st = un.stripeStyle ?? 'single';
+  const key = `helm|${un.helmet}|${un.stripe}|${side}|${st}|${un.finish ?? 'gloss'}`;
   return pixMat(key, 12, 12, (g) => {
     px(g, 0, 0, un.helmet, 12, 12);
     px(g, 0, 10, shade(un.helmet, -0.2), 12, 2);
-    if (side === 'top') { px(g, 5, 0, un.stripe, 2, 12); px(g, 3, 3, shade(un.helmet, 0.35), 2, 2); }
-    if (side === 'side') { px(g, 3, 3, un.stripe, 6, 4); px(g, 4, 4, shade(un.stripe, -0.2), 4, 2); }
-    if (side === 'back') px(g, 5, 0, un.stripe, 2, 10);
+    const strip = (x, w) => px(g, x, 0, un.stripe, w, side === 'back' ? 10 : 12);
+    if (side === 'top' || side === 'back') {
+      if (st === 'single') strip(5, 2);
+      else if (st === 'double') { strip(3, 2); strip(7, 2); }
+      else if (st === 'triple') { strip(2, 1); strip(5, 2); strip(9, 1); }
+    }
+    if (side === 'top' && un.finish !== 'matte') px(g, 3, 3, shade(un.helmet, un.finish === 'chrome' ? 0.6 : 0.35), 2, 2);
+    if (side === 'side') { px(g, 3, 3, un.stripe, 6, 4); px(g, 4, 4, shade(un.stripe, -0.2), 4, 2); if (un.finish === 'chrome') px(g, 1, 1, '#ffffff', 2, 1); }
   });
 }
 
@@ -463,21 +469,41 @@ function buildRig(o) {
   return root;
 }
 
+/** Facemask bar layouts: [width, y, z] horizontals, [x, y, h] verticals. */
+const MASK_BARS = {
+  single: { h: [[0.4, -0.06, -0.235]], v: [] },
+  two: { h: [[0.4, -0.04, -0.235], [0.36, -0.12, -0.225]], v: [] },
+  three: { h: [[0.4, -0.04, -0.235], [0.36, -0.12, -0.225]], v: [[0, -0.08, 0.12]] },
+  skill: { h: [[0.4, -0.03, -0.235], [0.34, -0.11, -0.225]], v: [[-0.07, -0.07, 0.1], [0.07, -0.07, 0.1]] },
+  robot: { h: [[0.4, -0.02, -0.235], [0.36, -0.09, -0.23], [0.22, -0.15, -0.215]], v: [[0, -0.07, 0.14]] },
+  bull: { h: [[0.4, -0.02, -0.235], [0.38, -0.08, -0.235], [0.3, -0.14, -0.225]], v: [[0, -0.07, 0.14], [-0.1, -0.05, 0.1], [0.1, -0.05, 0.1]] },
+  cage: { h: [[0.4, -0.01, -0.235], [0.4, -0.06, -0.24], [0.38, -0.11, -0.235], [0.3, -0.16, -0.22]], v: [[0, -0.08, 0.17], [-0.08, -0.08, 0.16], [0.08, -0.08, 0.16]] },
+  open: { h: [[0.4, -0.08, -0.235]], v: [[-0.12, -0.05, 0.08], [0.12, -0.05, 0.08]] },
+};
+
 function addHelmet(neck, un, L, hairC) {
   const H = new THREE.Group();
   H.position.y = 0.25;
   neck.add(H);
-  const side = helmetMat(un, 'side');
+  // shell finish
+  const fin = L.helmetFinish ?? 'gloss';
+  const shellC = fin === 'matte' ? shade(un.helmet, -0.18) : fin === 'chrome' ? shade(un.helmet, 0.22) : un.helmet;
+  const stripe = L.helmetStripe ?? 'single';
+  const hu = { ...un, helmet: shellC, stripeStyle: stripe, finish: fin };
+  const side = helmetMat(hu, 'side');
+  const shell = toon(shellC);
   const add = (geom, mat, x, y, z) => { const m = new THREE.Mesh(geom, mat); m.position.set(x, y, z); H.add(m); return m; };
-  add(box(0.44, 0.1, 0.44), sixFaces(toon(un.helmet), toon(un.helmet), helmetMat(un, 'top'), toon(un.helmet), toon(un.helmet), toon(un.helmet)), 0, 0.19, 0.01);
-  add(box(0.44, 0.34, 0.08), sixFaces(toon(un.helmet), toon(un.helmet), toon(un.helmet), toon(un.helmet), helmetMat(un, 'back'), toon(un.helmet)), 0, 0.0, 0.19);
+  add(box(0.44, 0.1, 0.44), sixFaces(shell, shell, helmetMat(hu, 'top'), shell, shell, shell), 0, 0.19, 0.01);
+  add(box(0.44, 0.34, 0.08), sixFaces(shell, shell, shell, shell, helmetMat(hu, 'back'), shell), 0, 0.0, 0.19);
   add(box(0.05, 0.34, 0.4), side, -0.2, 0.0, 0.0);
   add(box(0.05, 0.34, 0.4), side, 0.2, 0.0, 0.0);
-  add(box(0.42, 0.05, 0.05), toon(un.helmet), 0, 0.14, -0.2); // brim
-  const mask = toon('#c3cad3');
-  add(box(0.4, 0.03, 0.03), mask, 0, -0.04, -0.235);
-  add(box(0.36, 0.03, 0.03), mask, 0, -0.12, -0.225);
-  add(box(0.03, 0.12, 0.03), mask, 0, -0.08, -0.235);
+  add(box(0.42, 0.05, 0.05), shell, 0, 0.14, -0.2); // brim
+  // facemask
+  const mc = L.maskColor === 'team' ? un.stripe : (L.maskColor ?? '#c3cad3');
+  const mask = toon(mc);
+  const bars = MASK_BARS[L.maskStyle] ?? MASK_BARS.three;
+  for (const [w, y, z] of bars.h) add(box(w, 0.03, 0.03), mask, 0, y, z);
+  for (const [x, y, hh] of bars.v) add(box(0.03, hh, 0.03), mask, x, y, -0.235);
   add(box(0.03, 0.1, 0.06), mask, -0.19, -0.07, -0.205);
   add(box(0.03, 0.1, 0.06), mask, 0.19, -0.07, -0.205);
   if (L.visor && L.visor !== 'none') {

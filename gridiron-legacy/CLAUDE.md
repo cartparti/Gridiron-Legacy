@@ -191,6 +191,17 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Stadium: triangle bunting and a tifo banner (big games / college / pro), `setBigGame`.
 - Week: last-5 form chips for both teams, "The Stands" fan ticker.
 
+## v0.14 changes
+- Scenery outside the stadium (`src/scenes/environment.js`, `stadium.setEnvironment(biome, seed)`): city skyline
+  with lit windows, farmland (fields, barns, silos, water tower), pines + mountains (snow caps), desert mesas +
+  cacti, coast (ocean, boats, lighthouse, palms), bayou (cypress, pools). Distance haze in `applyAtmosphere`.
+- Team culture (`src/data/culture.js`, `teamCulture(team, level)`): biome from the city name, stadium name +
+  nickname, tradition, home-field trait (loud/altitude/heat/cold/humid/wind/intimate; real effects in game.js for
+  visitors: timing, energy drain, momentum swings; home teams get +2% timing), turf color, end zone pattern,
+  crowd look (whiteout/blackout/color rush), stadium song. Shown on the pregame venue card and match header.
+- Helmets: 8 facemask styles (`MASK_BARS` in actors.js), facemask color (incl. team), stripe (single/double/
+  triple/none), shell finish (gloss/matte/chrome); Helmet tab in the editor; AI masks by position (`POS_MASK`).
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

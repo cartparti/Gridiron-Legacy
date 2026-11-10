@@ -38,8 +38,9 @@ function smoke(group, origin, n = 40) {
   };
 }
 
-const stadiumSetup = (colors, name, level = 'pro') => (r) => {
+const stadiumSetup = (colors, name, level = 'pro', culture = null) => (r) => {
   r.stadium.setLevel?.(level);
+  if (culture) r.stadium.setEnvironment?.(culture.biome, culture.seed, {});
   r.stadium.setTeams(colors, colors, name, name, colors);
   r.stadium.setYardLine(50, 10);
   r.stadium.hideLines();
@@ -100,7 +101,7 @@ export function tunnelCutscene(opts) {
       ], T);
       return T < 6.8;
     };
-  }, { setup: stadiumSetup(opts.colors, opts.teamName, opts.stage) });
+  }, { setup: stadiumSetup(opts.colors, opts.teamName, opts.stage, opts.culture) });
 }
 
 // ------------------------------------------------------------------ draft night

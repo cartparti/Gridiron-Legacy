@@ -20,6 +20,13 @@ export const TATTOOS = [{ id: 'none', label: 'None' }, { id: 'band', label: 'Ban
 export const SIDES = [{ id: 'none', label: 'None' }, { id: 'left', label: 'Left' }, { id: 'right', label: 'Right' }, { id: 'both', label: 'Both' }];
 export const VISORS = [{ id: 'none', label: 'None' }, { id: 'clear', label: 'Clear' }, { id: 'dark', label: 'Smoke' }, { id: 'gold', label: 'Gold' }, { id: 'chrome', label: 'Chrome' }, { id: 'blue', label: 'Ice blue' }, { id: 'red', label: 'Red' }, { id: 'purple', label: 'Iridescent' }, { id: 'amber', label: 'Amber' }];
 export const VISOR_TINTS = { clear: ['#cfe8ff', 0.35], dark: ['#111418', 0.85], gold: ['#e8b730', 0.85], chrome: ['#d9e1ea', 0.9], blue: ['#3fb6ff', 0.75], red: ['#e0302a', 0.75], purple: ['#8a4dff', 0.8], amber: ['#ff9a1f', 0.75] };
+export const MASKS = [{ id: 'single', label: 'Single bar' }, { id: 'two', label: 'Two-bar' }, { id: 'three', label: 'Three-bar' }, { id: 'skill', label: 'Skill' },
+  { id: 'robot', label: 'Robot' }, { id: 'bull', label: 'Bull bar' }, { id: 'cage', label: 'Cage' }, { id: 'open', label: 'Open speed' }];
+export const MASK_COLORS = ['#c3cad3', '#16181c', '#f4f4f4', 'team', '#e8b730', '#e9eef4', '#d33a2c', '#2f6fd6'];
+export const STRIPES = [{ id: 'single', label: 'Single' }, { id: 'double', label: 'Double' }, { id: 'triple', label: 'Triple' }, { id: 'none', label: 'None' }];
+export const FINISHES = [{ id: 'gloss', label: 'Gloss' }, { id: 'matte', label: 'Matte' }, { id: 'chrome', label: 'Chrome' }];
+/** Typical facemask for a position. */
+export const POS_MASK = { OL: ['cage', 'bull'], DL: ['cage', 'bull', 'robot'], LB: ['robot', 'bull', 'three'], TE: ['robot', 'three'], RB: ['robot', 'three', 'skill'], QB: ['two', 'three', 'skill'], WR: ['skill', 'two', 'open'], CB: ['skill', 'open', 'two'], S: ['skill', 'two', 'three'], DT: ['cage', 'bull', 'robot'], K: ['single'] };
 export const SPATS = [{ id: 'none', label: 'None' }, { id: 'white', label: 'White tape' }, { id: 'black', label: 'Black tape' }, { id: 'team', label: 'Team color' }];
 export const TOWELS = [{ id: 'none', label: 'None' }, { id: 'white', label: 'White' }, { id: 'black', label: 'Black' }, { id: 'team', label: 'Team color' }];
 export const CHAINS = [{ id: 'none', label: 'None' }, { id: 'gold', label: 'Gold' }, { id: 'silver', label: 'Silver' }, { id: 'ice', label: 'Iced out' }];
@@ -102,6 +109,7 @@ export function randomLook(r, opts = {}) {
     elbowPad: r() < 0.85 ? 'none' : pickR(r, SIDES.slice(1)).id, elbowColor: pickR(r, GEAR_COLORS),
     towel: r() < 0.75 ? 'none' : pickR(r, TOWELS.slice(1)).id, handWarmer: r() < 0.12, chain: r() < 0.88 ? 'none' : pickR(r, CHAINS.slice(1)).id,
     celebration: pickR(r, CELEBRATIONS).id,
+    maskStyle: pickR(r, POS_MASK[opts.position] ?? MASKS.map((m) => m.id)), maskColor: r() < 0.7 ? '#c3cad3' : pickR(r, MASK_COLORS), helmetStripe: 'single', helmetFinish: 'gloss',
     shirt: pickR(r, SHIRTS), pants: pickR(r, PANTS), shoe: pickR(r, ['#f1f1f1', '#222222', '#c0392b', '#2f6fd6']),
   };
 }
@@ -115,6 +123,7 @@ export function defaultLook(position = 'QB') {
     sleeve: 'none', sleeveColor: '#16181c', visor: 'none', eyeBlack: true, celebration: 'pump',
     cleatAccent: '#f2f2f2', spats: 'none', kneeBrace: 'none', kneeColor: '#16181c', legSleeve: 'none', legSleeveColor: '#16181c',
     elbowPad: 'none', elbowColor: '#16181c', towel: 'none', handWarmer: false, chain: 'none', suit: '#16181f', tie: '#c92a2a',
+    maskStyle: (POS_MASK[position] ?? ['three'])[0], maskColor: '#c3cad3', helmetStripe: 'single', helmetFinish: 'gloss',
     shirt: '#3a86ff', pants: '#2b2d42', shoe: '#f1f1f1',
   };
 }
@@ -122,13 +131,14 @@ export function defaultLook(position = 'QB') {
 const SWAG_DEFAULTS = {
   cleatAccent: '#f2f2f2', spats: 'none', kneeBrace: 'none', kneeColor: '#16181c', legSleeve: 'none', legSleeveColor: '#16181c',
   elbowPad: 'none', elbowColor: '#16181c', towel: 'none', handWarmer: false, chain: 'none', suit: '#16181f', tie: '#c92a2a',
+  maskStyle: 'three', maskColor: '#c3cad3', helmetStripe: 'single', helmetFinish: 'gloss',
 };
 const OLD_STYLES = ['short', 'buzz', 'bun', 'afro'];
 /** Upgrade an older save's simple look ({ skin 0-4, hair, hairStyle 0-3 }) to the full look. */
 export function normalizeLook(look, seed = 'x') {
   if (!look) return randomLook(seed);
   if (typeof look.hairStyle === 'string' && look.eyes) {
-    if (look.spats === undefined || look.suit === undefined) return { ...SWAG_DEFAULTS, ...look };
+    if (look.spats === undefined || look.suit === undefined || look.maskStyle === undefined) return { ...SWAG_DEFAULTS, ...look };
     return look;
   }
   const base = randomLook(seed);

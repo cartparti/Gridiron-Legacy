@@ -29,7 +29,7 @@ function ensure() {
     el.append(renderer.domElement);
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#5aa0d8');
-    const camera = new THREE.PerspectiveCamera(36, 1, 1, 600);
+    const camera = new THREE.PerspectiveCamera(36, 1, 1, 1100);
     const stadium = buildStadium(scene);
     // Lighting for the cel-shaded players (the field and stands use flat colors).
     scene.add(new THREE.HemisphereLight('#ffffff', '#4a6a4a', 1.5));
@@ -190,9 +190,10 @@ function applyAtmosphere(r, weather) {
   const sky = { clear: '#5aa0d8', night: '#0d1424', rain: '#4b5866', storm: '#2b3038', snow: '#9aa7b4', wind: '#6f9cc4', fog: '#aab3bb' }[weather] ?? '#5aa0d8';
   r.sky = new THREE.Color(sky);
   r.scene.background = r.sky.clone();
+  // distance haze blends the scenery outside the stadium into the sky
   r.scene.fog = weather === 'fog' ? new THREE.Fog(sky, 18, 55)
-    : weather === 'night' ? new THREE.Fog(sky, 120, 260)
-      : weather === 'rain' || weather === 'snow' || weather === 'storm' ? new THREE.Fog(sky, 50, 150) : null;
+    : weather === 'night' ? new THREE.Fog(sky, 220, 620)
+      : weather === 'rain' || weather === 'snow' || weather === 'storm' ? new THREE.Fog(sky, 70, 320) : new THREE.Fog(sky, 320, 820);
   r.stadium.setTint(weather);
   r.weather.set(weather, r.camera);
   r.lightning = weather === 'storm' ? { next: 2 + Math.random() * 4, flash: 0 } : null;
@@ -342,8 +343,9 @@ export function runMinigame(type, opts) {
     // On defense, the opponent attacks toward the far end zone (ours).
     const myName = opts.teamName ?? 'HOME';
     const oppName = opts.oppName ?? 'OPP';
-    if (m.defense) r.stadium.setTeams(opts.teamColors, opts.oppColors, myName, oppName, opts.homeColors);
-    else r.stadium.setTeams(opts.oppColors, opts.teamColors, oppName, myName, opts.homeColors);
+    if (opts.culture) r.stadium.setEnvironment?.(opts.culture.biome, opts.culture.seed, { night: m.weather === 'night' });
+    if (m.defense) r.stadium.setTeams(opts.teamColors, opts.oppColors, myName, oppName, opts.homeColors, opts.culture);
+    else r.stadium.setTeams(opts.oppColors, opts.teamColors, oppName, myName, opts.homeColors, opts.culture);
     if (opts.scoreInfo) { r.stadium.setScoreboard(opts.scoreInfo); hud.score(opts.scoreInfo); }
     if (opts.lastName) hud.tag(opts.number ?? '', opts.lastName, opts.look?.heightIn ? `${Math.floor(opts.look.heightIn / 12)}'${opts.look.heightIn % 12}" · ${opts.look.weightLb} lb` : '');
     r.stadium.setBigGame?.(opts.bigGame);

@@ -178,7 +178,7 @@ export function freePlay(ctx) {
   const crowd = (kind, userGood) => react(kind, userGood === userHome);
   const showPicker = () => {
     phase = 'pick';
-    playMusic(['hype', 'charge', 'groove'][Math.floor(Math.random() * 3)], { vol: 0.75 });
+    playMusic(opts.song ?? ['hype', 'charge', 'groove'][Math.floor(Math.random() * 3)], { vol: 0.75 });
     hud.instr(m.defense ? 'Pick a defensive call' : 'Pick a play');
     const box = document.createElement('div');
     box.className = 'fc-plays';

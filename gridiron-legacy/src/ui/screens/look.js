@@ -3,13 +3,13 @@ import { h, clear } from '../dom.js';
 import { openModal, toast } from '../components.js';
 import {
   SKIN_TONES, HAIR_COLORS, EYE_COLORS, GEAR_COLORS, HAIR_STYLES, BROWS, EYES, NOSES, MOUTHS, BEARDS, TATTOOS,
-  SIDES, VISORS, CELEBRATIONS, SPATS, TOWELS, CHAINS, normalizeLook, HEIGHT_RANGE, WEIGHT_RANGE, fmtHeight, randomLook, sizeStatMods,
+  SIDES, VISORS, CELEBRATIONS, SPATS, TOWELS, CHAINS, normalizeLook, MASKS, MASK_COLORS, STRIPES, FINISHES, HEIGHT_RANGE, WEIGHT_RANGE, fmtHeight, randomLook, sizeStatMods,
 } from '../../data/looks.js';
 import { portraitImg } from '../../scenes/portrait.js';
 import { sfx } from '../../audio/sfx.js';
 import { STAT_LABELS } from '../../data/positions.js';
 
-const TABS = [['body', 'Body'], ['hair', 'Hair'], ['face', 'Face'], ['ink', 'Ink'], ['gear', 'Gear'], ['swag', 'Swag'], ['casual', 'Casual'], ['gala', 'Gala'], ['celeb', 'Celebrate']];
+const TABS = [['body', 'Body'], ['hair', 'Hair'], ['face', 'Face'], ['ink', 'Ink'], ['helmet', 'Helmet'], ['gear', 'Gear'], ['swag', 'Swag'], ['casual', 'Casual'], ['gala', 'Gala'], ['celeb', 'Celebrate']];
 const CLOTHES = ['#f4f4f4', '#16181c', '#3a86ff', '#e63946', '#2a9d8f', '#f4a261', '#6d597a', '#ff006e', '#8ac926', '#264653', '#c8b38a', '#6c757d', '#1d3557', '#9c3d2b'];
 const SUITS = ['#16181f', '#1d2a44', '#3b3f48', '#5a1e2a', '#f2f2f2', '#2f4a3a', '#7a5a2a'];
 
@@ -71,6 +71,15 @@ export function lookEditor(opts) {
     face: () => [chips('Eyes', EYES, 'eyes'), swatches('Eye color', EYE_COLORS, 'eyeColor', { index: true }), chips('Brows', BROWS, 'brows'),
       chips('Nose', NOSES, 'nose'), chips('Mouth', MOUTHS, 'mouth'), chips('Facial hair', BEARDS, 'beard')],
     ink: () => [chips('Left arm', TATTOOS, 'tatL'), chips('Right arm', TATTOOS, 'tatR')],
+    helmet: () => [
+      chips('Facemask', MASKS, 'maskStyle'),
+      h('div.look-row', h('div.section-label', 'Facemask color'), h('div.swatch-row', MASK_COLORS.map((c) => h(`button.sw${L.maskColor === c ? '.on' : ''}`, {
+        style: { background: c === 'team' ? `linear-gradient(135deg, ${opts.uniform?.stripe ?? '#ffd43b'} 50%, ${opts.uniform?.helmet ?? '#1d3557'} 50%)` : c }, 'aria-label': c, onclick: () => set('maskColor', c) })))),
+      chips('Helmet stripe', STRIPES, 'helmetStripe'),
+      chips('Shell finish', FINISHES, 'helmetFinish'),
+      chips('Visor tint', VISORS, 'visor'),
+      h('p.tiny.muted', 'Helmet colors come from your team. The facemask, stripe and finish are yours.'),
+    ],
     gear: () => [
       swatches('Cleats', GEAR_COLORS, 'cleats'),
       swatches('Cleat stripe', GEAR_COLORS, 'cleatAccent'),
@@ -103,7 +112,7 @@ export function lookEditor(opts) {
     wrap.append(
       preview(),
       h('div.subtabs.look-tabs', TABS.map(([id, l]) =>
-        h(`button.subtab${st.tab === id ? '.on' : ''}`, { onclick: () => { sfx.click(); st.tab = id; st.helmet = id === 'gear' || id === 'swag'; draw(); } }, l))),
+        h(`button.subtab${st.tab === id ? '.on' : ''}`, { onclick: () => { sfx.click(); st.tab = id; st.helmet = id === 'gear' || id === 'swag' || id === 'helmet'; draw(); } }, l))),
       h('div.look-panel', views[st.tab]()));
   };
   draw();

@@ -10,6 +10,7 @@
 // 4th-down decisions, penalties, extra moments earned through mid-game events.
 import { PLAY_CALLS, DIFFICULTIES, WEATHER } from '../data/config.js';
 import { GAME_EVENTS } from '../data/gameEvents.js';
+import { teamCulture, TRAITS } from '../data/culture.js';
 import { clamp, fillTokens } from '../core/util.js';
 import { rand, randInt, gauss, chance, pick, weightedPick } from '../core/rng.js';
 import { gameRatings, driveOutcome, POINTS, breakTie, getTeam } from './league.js';
@@ -113,6 +114,7 @@ export function createUserGame(state, league, sched, { playoff = false, round = 
     eventsFired: [], pregameDone: false, halfDone: false, twoMinDone: false,
     // game plan, energy and live rating (shown on the match screen)
     plan: { approach: 'balanced', intensity: 'mid' },
+    homeTrait: teamCulture(getTeam(league, sched.home) ?? { id: sched.home, city: '', name: '' }, state.career.stage).traitId,
     energy: Math.round(70 + (state.week?.freshness ?? 0) * 30), rating: 6.0, ratingHist: [6.0], lastDelta: 0, chart: [],
   };
 }
@@ -283,6 +285,9 @@ export function tolerance(state, call = 'balanced', type = state.game?.pending?.
     t *= w.tol * (type && PASS_TYPES.has(type) ? w.pass : 1);
     t *= g.tolMod;
     t *= INTENSITY[g.plan?.intensity ?? 'mid'].tol;
+    // home-field: visitors feel the stadium, the home team gets a little crowd lift
+    if (g.userSide === 'away') t *= TRAITS[g.homeTrait]?.awayTol ?? 1;
+    else if (g.homeTrait) t *= 1.02;
     if ((g.energy ?? 100) < 50) t *= 0.8 + (g.energy ?? 100) / 250;
     t *= 1 + g.momentum * 0.06;
     if (g.playingHurt) t *= 0.75;
@@ -391,7 +396,7 @@ export function resolveMoment(state, result) {
   }
 
   // energy and live rating
-  g.energy = Math.max(0, (g.energy ?? 80) - INTENSITY[g.plan?.intensity ?? 'mid'].drain);
+  g.energy = Math.max(0, (g.energy ?? 80) - INTENSITY[g.plan?.intensity ?? 'mid'].drain - (g.userSide === 'away' ? TRAITS[g.homeTrait]?.awayDrain ?? 0 : 0));
   {
     const big = result.td || result.int || result.defTD || result.sack && m.defense;
     const bad = (!m.defense && (result.turnover || result.sack)) || result.tdAllowed;
@@ -521,7 +526,7 @@ export function autoDecision(state) {
 }
 
 function momentumShift(g, v) {
-  g.momentum = clamp(g.momentum + v, -1, 1);
+  g.momentum = clamp(g.momentum + v * (TRAITS[g.homeTrait]?.momentum ?? 1), -1, 1);
 }
 
 function finishDrive(state, g, d, out, momentInfo) {

@@ -2,11 +2,12 @@
 // stepped stands with an instanced crowd, light towers and goalposts.
 // Field coordinates (yards): x across (-26.65..26.65), z along. Goal lines at z = ±50.
 import * as THREE from 'three';
+import { buildEnvironment } from './environment.js';
 
 const FIELD_W = 53.3;
 const FIELD_L = 120;
 
-function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWAY') {
+function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWAY', style = null) {
   const ppy = 10; // pixels per yard: low on purpose for a chunky retro look
   const cw = Math.round(FIELD_W * ppy);
   const ch = FIELD_L * ppy;
@@ -17,7 +18,7 @@ function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWA
   
   // Grass stripes every 5 yards.
   for (let y = 0; y < FIELD_L; y += 5) {
-    g.fillStyle = Math.floor(y / 5) % 2 ? '#2f6f35' : '#377b3a';
+    g.fillStyle = Math.floor(y / 5) % 2 ? (style?.turf?.[0] ?? '#2f6f35') : (style?.turf?.[1] ?? '#377b3a');
     g.fillRect(0, y * ppy, cw, 5 * ppy);
   }
   // Pixel grass noise.
@@ -43,14 +44,26 @@ function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWA
   };
   ez(0, homeColors, homeName);
   ez(110, awayColors, awayName);
-  // diagonal pinstripes in the end zones
+  // end zone pattern: each home team paints theirs differently
+  const pat = style?.pattern ?? 'diagonal';
   g.save();
-  g.globalAlpha = 0.14;
+  g.globalAlpha = 0.16;
   g.fillStyle = '#ffffff';
   for (const y0 of [0, 110]) {
     g.save();
     g.beginPath(); g.rect(0, y0 * ppy, cw, 10 * ppy); g.clip();
-    for (let x = -ch; x < cw + ch; x += 18) { g.beginPath(); g.moveTo(x, y0 * ppy); g.lineTo(x + 8, y0 * ppy); g.lineTo(x + 8 - 10 * ppy, (y0 + 10) * ppy); g.lineTo(x - 10 * ppy, (y0 + 10) * ppy); g.fill(); }
+    if (pat === 'diagonal' || pat === 'stripes') {
+      for (let x = -ch; x < cw + ch; x += 18) {
+        g.beginPath();
+        if (pat === 'diagonal') { g.moveTo(x, y0 * ppy); g.lineTo(x + 8, y0 * ppy); g.lineTo(x + 8 - 10 * ppy, (y0 + 10) * ppy); g.lineTo(x - 10 * ppy, (y0 + 10) * ppy); }
+        else g.rect(x, y0 * ppy, 8, 10 * ppy);
+        g.fill();
+      }
+    } else if (pat === 'checker') {
+      for (let yy = 0; yy < 10; yy += 2.5) for (let x = 0; x < cw; x += 2.5 * ppy) if ((Math.round(x / (2.5 * ppy)) + Math.round(yy / 2.5)) % 2) g.fillRect(x, (y0 + yy) * ppy, 2.5 * ppy, 2.5 * ppy);
+    } else if (pat === 'diamond') {
+      for (let x = ppy * 3; x < cw; x += ppy * 6) { g.beginPath(); g.moveTo(x, (y0 + 1) * ppy); g.lineTo(x + 2.5 * ppy, (y0 + 5) * ppy); g.lineTo(x, (y0 + 9) * ppy); g.lineTo(x - 2.5 * ppy, (y0 + 5) * ppy); g.fill(); }
+    }
     g.restore();
   }
   g.restore();
@@ -443,6 +456,9 @@ export function buildStadium(scene) {
   press.position.set(FIELD_W / 2 + 18, 7.5, 0);
   world.add(press); hsParts.push(press);
 
+  const env = buildEnvironment(world);
+  env.set('plains', 1);
+
   // Light towers.
   const poleMat = lambert('#9aa3ad');
   const lampMat = new THREE.MeshBasicMaterial({ color: '#fffbe6' });
@@ -488,12 +504,16 @@ export function buildStadium(scene) {
     world,
     crowd,
     /** Re-paint the field and crowd. far = end zone the offense attacks (-z), near = behind the offense. */
-    setTeams(farColors, nearColors, farName, nearName, crowdColors = nearColors) {
+    setTeams(farColors, nearColors, farName, nearName, crowdColors = nearColors, style = null) {
       fieldMat.map.dispose();
-      fieldMat.map = fieldTexture(farColors, nearColors, farName, nearName);
+      fieldMat.map = fieldTexture(farColors, nearColors, farName, nearName, style);
       border.material.color.set(crowdColors[0]).multiplyScalar(0.55);
       fieldMat.needsUpdate = true;
-      const palette = [crowdColors[0], crowdColors[1], crowdColors[0], farColors[0], '#d9d9d9', '#6c757d', crowdColors[0]].map((c) => new THREE.Color(c));
+      // fan culture: whiteouts, blackouts and color rushes
+      const look = style?.crowd ?? 'normal';
+      const base = look === 'whiteout' ? ['#f4f4f4', '#f4f4f4', '#f4f4f4', crowdColors[0]] : look === 'blackout' ? ['#16181c', '#16181c', '#26292f', crowdColors[0]]
+        : look === 'colorrush' ? [crowdColors[0], crowdColors[0], crowdColors[0], crowdColors[1]] : [crowdColors[0], crowdColors[1], crowdColors[0], farColors[0], '#d9d9d9', '#6c757d', crowdColors[0]];
+      const palette = base.map((c) => new THREE.Color(c));
       for (let i = 0; i < crowd.count; i++) crowd.setColorAt(i, crowdMeta[i]?.band && this.level === 'college' ? new THREE.Color(i % 2 ? '#f4f4f4' : crowdColors[0]) : palette[Math.floor(Math.random() * palette.length)]);
       crowd.instanceColor.needsUpdate = true;
       const skinsA = ['#f7dcc0', '#e0ab7f', '#cc9260', '#b07646', '#8f5a34', '#6e4126'].map((cc) => new THREE.Color(cc));
@@ -538,6 +558,8 @@ export function buildStadium(scene) {
       heads.material.color.copy(crowd.material.color);
     },
     /** Make the crowd bounce (excitement 0..1). */
+    /** Scenery outside the stadium for the home team's city. */
+    setEnvironment(biome, seed, opts) { if (this._env !== `${biome}:${seed}:${opts?.night}`) { this._env = `${biome}:${seed}:${opts?.night}`; env.set(biome, seed, opts); } },
     /** Big games (playoffs, rivalries) bring out the tifo even in high school. */
     setBigGame(on) { this.bigGame = !!on; tifo.visible = this.level !== 'hs' || this.bigGame; },
     /** Match the venue to the level: 'hs' bleachers, 'college' bowl + band, 'pro' upper deck + roof. */

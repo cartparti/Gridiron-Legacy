@@ -878,3 +878,6 @@ body.replaying .hud-tag, body.replaying .hud-score { opacity: 0; }
 @keyframes st-scroll { to { transform: translateX(-100%); } }
 .lu-card.sm { transform: translate(-50%, -20%) scale(0.82); }
 .rp-controls { bottom: calc(11vh + 10px) !important; }
+.venue-card { margin-top: 12px; padding: 10px; border-radius: 6px; border: 2px solid #07080a; background: rgba(0,0,0,0.25); text-align: left; }
+.vc-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
+.vc-head b { font-size: 0.8rem; }

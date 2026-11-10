@@ -8,6 +8,7 @@ import {
   resolveGameEvent, autoGameEvent, MOMENT_NAMES, setGamePlan,
 } from '../../sim/game.js';
 import { crest } from '../crest.js';
+import { teamCulture, BIOME_INFO } from '../../data/culture.js';
 import * as flow from '../../sim/flow.js';
 import { teamBadge, changeChips } from '../components.js';
 import { sfx } from '../../audio/sfx.js';
@@ -75,6 +76,7 @@ export function gamedayScreen(app) {
   const away = getTeam(league, g.awayId);
   const defense = st.player.position === 'CB' || st.player.position === 'DT';
   const root = h('div');
+  const culture = teamCulture(home, st.career.stage);
   const gid = `${g.homeId}-${g.awayId}-${g.week}`;
   const ui = app.ui.game && app.ui.game.id === gid ? app.ui.game
     : (app.ui.game = { id: gid, shown: g.log.length, started: g.log.length > 0 || !!g.pending || g.pregameDone, busy: false });
@@ -88,7 +90,7 @@ export function gamedayScreen(app) {
   const chart = h('canvas.mh-chart', { width: 600, height: 120 });
   const momPct = h('div.mh-mompct');
   root.append(h('div.match-head',
-    h('div.mh-top', h('span.pix', league.kind === 'pro' ? 'PRO LEAGUE' : league.kind === 'college' ? 'COLLEGE' : 'HIGH SCHOOL'), h('span.tiny', `${home.city} Field · Wk ${(g.week ?? 0) + 1}`)),
+    h('div.mh-top', h('span.pix', league.kind === 'pro' ? 'PRO LEAGUE' : league.kind === 'college' ? 'COLLEGE' : 'HIGH SCHOOL'), h('span.tiny', `${culture.stadium} · Wk ${(g.week ?? 0) + 1}`)),
     h('div.mh-row', sideEl(away, false, g.userSide === 'away'), h('div.mh-score', ptsAway, h('div.mh-mid', h('span.mh-live', '● LIVE'), clock), ptsHome), sideEl(home, true, g.userSide === 'home'))),
     h('div.mh-chartbox', momPct, chart, h('div.mh-axis', h('span', 'Q1'), h('span', 'Q2'), h('span', 'Q3'), h('span', 'Q4'))));
   const myColor = getTeam(league, st.career.teamId).colors[0];
@@ -350,6 +352,8 @@ export function gamedayScreen(app) {
       lastName: st.player.last,
       userHome: g.userSide === 'home',
       stage: st.career.stage,
+      culture,
+      song: culture.song,
       bigGame: !!(g.playoff || g.rivalry),
       teamName: me.name,
       oppName: opp.name,
@@ -442,6 +446,13 @@ export function gamedayScreen(app) {
         g.rivalry ? h('span.chip.bad', icon('flame'), `Rivalry vs ${opp.name}`) : null,
         g.isTitle ? h('span.chip.gold', icon('trophy'), g.roundName) : g.playoff ? h('span.chip.info', g.roundName) : null),
       w.desc ? h('p.center.tiny.muted', { style: { marginTop: '8px' } }, w.desc) : null,
+      h('div.venue-card',
+        h('div.vc-head', h('b.pix', culture.stadium), h('span.tiny.muted', `"${culture.nickname}" · ${BIOME_INFO[culture.biome].label}`)),
+        h('p.tiny', culture.tradition),
+        h('div.row.wrap', { style: { gap: '6px', marginTop: '6px' } },
+          h(`span.chip.pix${g.userSide === 'away' ? '.bad' : '.good'}`, `HOME FIELD: ${culture.trait.label.toUpperCase()}`),
+          h('span.tiny.muted', g.userSide === 'away' ? culture.trait.desc : 'Your crowd gives you a small lift.')),
+        culture.crowd !== 'normal' ? h('p.tiny', { style: { marginTop: '6px' } }, `Fans are doing a ${culture.crowd === 'whiteout' ? 'WHITEOUT' : culture.crowd === 'blackout' ? 'BLACKOUT' : 'COLOR RUSH'} tonight.`) : null),
       h('p.center.small.muted', { style: { marginTop: '10px' } }, g.sitOut ? 'You are sitting out this one.'
         : `${g.drives.filter((d) => d.moment).length}+ ${defense ? 'defensive snaps' : 'key moments'} expected · freshness ${Math.round((st.week.freshness ?? 0) * 100)}%`),
       g.sitOut ? null : kitPicker(),
@@ -453,7 +464,7 @@ export function gamedayScreen(app) {
           app.save();
           const me = getTeam(league, st.career.teamId);
           const { mine } = gameKits(st, me, getTeam(league, g.oppId));
-          await tunnelCutscene({ stage, colors: me.colors, uniform: kitUniform(mine), look: st.player.look, number: st.player.number, teamName: me.name,
+          await tunnelCutscene({ stage, culture: teamCulture(me, stage), colors: me.colors, uniform: kitUniform(mine), look: st.player.look, number: st.player.number, teamName: me.name,
             title: { hs: 'Friday Night Lights', college: 'Welcome to College Football', pro: 'Welcome to the League' }[stage] ?? 'Game Time', sub: `${me.city} ${me.name} take the field` });
         }
         sfx.whistle(); ui.started = true; clear(momentSlot); controls.append(simRestBtn()); advance();

@@ -56,3 +56,20 @@ test('game plan intensity changes the timing window', () => {
   st.game.energy = 20;
   assert.ok(tolerance(st, 'balanced', 'qb_throw') < mid * 1.07);
 });
+
+test('every team has a stable, varied culture (biome, stadium, trait)', async () => {
+  const { teamCulture, biomeFor, TRAITS } = await import('../src/data/culture.js');
+  const { HS_TEAMS } = await import('../src/data/teams.js');
+  const biomes = new Set();
+  const stadiums = new Set();
+  for (const t of HS_TEAMS) {
+    const a = teamCulture(t, 'hs');
+    assert.deepEqual(a, teamCulture(t, 'hs'));
+    assert.ok(TRAITS[a.traitId]);
+    biomes.add(biomeFor(t));
+    stadiums.add(a.stadium);
+  }
+  assert.ok(biomes.size >= 2 && stadiums.size >= 5);
+  assert.equal(biomeFor({ city: 'Palm Shores', name: 'Sharks' }), 'coast');
+  assert.equal(biomeFor({ city: 'Red Mesa', name: 'Scorpions' }), 'desert');
+});
