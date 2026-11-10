@@ -139,7 +139,7 @@ gridiron-legacy/
 - All teams, players, leagues, brands and trophies are fictional. See `ASSETS.md`.
 
 ## Play it on your phone (installable app)
-The game is published with GitHub Pages at https://cartparti.github.io/Star-wars-blaster-battle/
+The game is published with GitHub Pages at https://cartparti.github.io/gridiron-legacy/
 - iPhone: open it in **Safari** → Share → **Add to Home Screen**. Always launch it from the icon.
 - Android: open it in **Chrome** → ⋮ menu → **Install app** (or Add to Home screen).
 Saves stay on the phone; updates load automatically the next time you open the app.
