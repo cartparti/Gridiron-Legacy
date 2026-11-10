@@ -2,7 +2,7 @@
 import { h, clear } from '../dom.js';
 import { openModal, toast } from '../components.js';
 import { runWorld, stopWorld } from '../../scenes/director.js';
-import { PLACES } from '../../data/places.js';
+import { placeFor } from '../../data/places.js';
 import { DAYS } from '../../data/config.js';
 import { ACTIVITY_BY_ID, isAvailable, maxEnergy, planCost } from '../../sim/week.js';
 import { people, findPerson } from '../../sim/social.js';
@@ -16,10 +16,16 @@ import { fmtMoney } from '../../core/util.js';
 export const PLACE_LIST = ['home', 'park', 'stadium', 'downtown'];
 
 /** Place picker cards (used on the hub and in the world's map). */
+const PLACE_BLURBS = {
+  hs: { home: 'Your room, the kitchen, family and the garage gym', park: 'Pickup hoops, drills, food truck', stadium: 'Locker room, weights, film, coach', downtown: 'Main Street shops, diner, part-time job' },
+  college: { home: 'Your dorm room, roommate and the common lounge', park: 'The quad: drills, hoops, campus life', stadium: 'Athletic center: lift, film, recovery, media', downtown: 'College town: coffee, arcade, nightlife' },
+  pro: { home: 'Penthouse: home gym, chef kitchen, pool deck', park: 'Waterfront: runs, courts, food trucks', stadium: 'Team facility: performance, recovery, press', downtown: 'City center: luxury shops, dealers, dinners' },
+};
 export function placeCards(app, onPick) {
-  return h('div.place-grid', PLACE_LIST.map((id) => h('button.place-card', { onclick: () => { sfx.select(); onPick(id); } },
-    icon(PLACES[id].icon), h('b', PLACES[id].name),
-    h('span.tiny.muted', { home: 'Rest, study, game, hang with family', park: 'Run, drills, fans, food truck', stadium: 'Lift, film, coach, teammates', downtown: 'Shops, dealers, dates, nightlife' }[id]))));
+  const stage = app.state?.career?.stage ?? 'hs';
+  const blurbs = PLACE_BLURBS[stage] ?? PLACE_BLURBS.pro;
+  return h('div.place-grid', PLACE_LIST.map((id) => { const pl = placeFor(id, stage); return h('button.place-card', { onclick: () => { sfx.select(); onPick(id); } },
+    icon(pl.icon), h('b', pl.name), h('span.tiny.muted', blurbs[id])); }));
 }
 
 export function enterWorld(app, placeId) {
@@ -71,7 +77,7 @@ export function worldScreen(app) {
     for (let i = 0; i < max; i++) pips.push(h(`span.pip${i >= left ? '.used' : ''}`));
     const days = st.week.plan.map((e, i) => h('span', { title: DAYS[i], style: { display: 'inline-block', width: '10px', height: '10px', borderRadius: '3px', marginRight: '3px', background: e ? 'var(--good)' : 'rgba(255,255,255,0.25)' } }));
     top.append(
-      h('div.world-pill', h('div', PLACES[placeId].name), h('div', { style: { marginTop: '6px' } }, days), h('div.pips', pips)),
+      h('div.world-pill', h('div', placeFor(placeId, st.career.stage).name), h('div', { style: { marginTop: '6px' } }, days), h('div.pips', pips)),
       h('div.world-places',
         h('button.world-btn', { onclick: () => openMap() }, icon('calendar'), ' Map'),
         h('button.world-btn', { onclick: () => exit() }, 'Week ▸')));
@@ -241,7 +247,7 @@ export function worldScreen(app) {
 
   const start = (id) => {
     world = runWorld(id, {
-      state: st, lookFor, nameFor, check, weather: st.week.forecast,
+      state: st, stage: st.career.stage, lookFor, nameFor, check, weather: st.week.forecast,
       onFocus: (f) => { focus = f; drawPrompt(); },
     });
     if (!world) {

@@ -305,6 +305,25 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   `--pixel` (Silkscreen no longer used).
 - Next stages: stadium/crowd/sideline/mascots smooth (still blocky), then menus.
 
+## v0.21: human bodies + places overhaul
+- Bodies: `headShape` (oval/round/square/long/wide/heart via `headGeo`: proportions + jaw taper) and `bodyType`
+  (lean/athletic/muscular/stocky/lanky: torso width/depth, limb thickness, belly, lanky height). Joint blending
+  spheres (hips, knees, deltoids, elbows) + trapezius and belly volumes so the rig reads as one body. Body tab chips.
+  Random NPCs get position-appropriate body types.
+- Places (`src/data/places.js` is generated from `scratchpad gen_places.py`-style data: PLACE_DEFS with `variants`
+  per stage, `placeFor(id, stage)`): Home = Family Home / Dorm / Penthouse; Stadium = School Athletics / Athletic
+  Center / Team Facility; Park = Town Park / Campus Quad / Waterfront Park; Downtown = Main Street / College Town /
+  City Center. Organized rooms with floor labels (`rooms`), floor characters `FLOOR_CHARS`, `span` props.
+- `src/scenes/props.js`: rounded, lit furniture/street props (bed, bunk, desk+chair+monitor, bookshelf, counters with
+  sink/stove, fridge, island+stools, dining table+chairs, TV wall with live screen, film screen+seats, sectional with
+  coffee table, power rack, treadmill, lockers+bench, trainer table, cold tub, sled, press podium, vending, plants,
+  trees, campus buildings, shopfronts with awnings/signs, facades, hedges, lampposts, food truck, gelato cart, booth,
+  hoop, fountain, dog). World engine (`src/scenes/world.js`) rewritten: painted high-res floors (wood, vinyl, marble,
+  tile, concrete, polished, rubber, turf, court, grass, path, pavers, road w/ center line, boardwalk, rugs with
+  borders), thin cutaway walls (back 3.0, interior 1.15, in front of you 0.28) with baseboards + back-wall windows,
+  props turned to face the room (couches face the TV), near-side shops cut low with floating name boards, skyline /
+  tree backdrops, soft shadow-mapped key light (renderer.shadowMap on; only world lights cast).
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

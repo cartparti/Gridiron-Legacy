@@ -35,6 +35,8 @@ export const CLEAT_DESIGNS = [{ id: 'stripe', label: 'Stripe' }, { id: 'solid', 
   { id: 'checker', label: 'Checker' }, { id: 'flames', label: 'Flames' }, { id: 'bolt', label: 'Lightning' }, { id: 'speckle', label: 'Speckle' }];
 export const CLEAT_CUTS = [{ id: 'low', label: 'Low' }, { id: 'mid', label: 'Mid' }, { id: 'high', label: 'High top' }];
 export const GLOVE_DESIGNS = [{ id: 'solid', label: 'Solid' }, { id: 'palm', label: 'Two-tone palm' }, { id: 'stripe', label: 'Wrist stripe' }];
+export const HEAD_SHAPES = [{ id: 'oval', label: 'Oval' }, { id: 'round', label: 'Round' }, { id: 'square', label: 'Square jaw' }, { id: 'long', label: 'Long' }, { id: 'wide', label: 'Wide' }, { id: 'heart', label: 'Narrow chin' }];
+export const BODY_TYPES = [{ id: 'lean', label: 'Lean' }, { id: 'athletic', label: 'Athletic' }, { id: 'muscular', label: 'Muscular' }, { id: 'stocky', label: 'Stocky' }, { id: 'lanky', label: 'Lanky' }];
 export const SIDES = [{ id: 'none', label: 'None' }, { id: 'left', label: 'Left' }, { id: 'right', label: 'Right' }, { id: 'both', label: 'Both' }];
 export const VISORS = [{ id: 'none', label: 'None' }, { id: 'clear', label: 'Clear' }, { id: 'dark', label: 'Smoke' }, { id: 'gold', label: 'Gold' }, { id: 'chrome', label: 'Chrome' }, { id: 'blue', label: 'Ice blue' }, { id: 'red', label: 'Red' }, { id: 'purple', label: 'Iridescent' }, { id: 'amber', label: 'Amber' }];
 export const VISOR_TINTS = { clear: ['#cfe8ff', 0.35], dark: ['#111418', 0.85], gold: ['#e8b730', 0.85], chrome: ['#d9e1ea', 0.9], blue: ['#3fb6ff', 0.75], red: ['#e0302a', 0.75], purple: ['#8a4dff', 0.8], amber: ['#ff9a1f', 0.75] };
@@ -127,6 +129,7 @@ export function randomLook(r, opts = {}) {
     elbowPad: r() < 0.85 ? 'none' : pickR(r, SIDES.slice(1)).id, elbowColor: pickR(r, GEAR_COLORS),
     towel: r() < 0.75 ? 'none' : pickR(r, TOWELS.slice(1)).id, handWarmer: r() < 0.12, chain: r() < 0.88 ? 'none' : pickR(r, CHAINS.slice(1)).id,
     celebration: pickR(r, CELEBRATIONS).id,
+    headShape: pickR(r, HEAD_SHAPES).id, bodyType: randomBodyType(r, opts.position),
     ...randomJersey(r, opts.position), tatNeck: r() < 0.9 ? 'none' : pickR(r, NECK_TATTOOS.slice(1)).id,
     cleatDesign: pickR(r, CLEAT_DESIGNS).id, cleatCut: r() < 0.6 ? 'low' : r() < 0.75 ? 'mid' : 'high',
     gloveDesign: pickR(r, GLOVE_DESIGNS).id, gloveAccent: pickR(r, GEAR_COLORS),
@@ -136,6 +139,12 @@ export function randomLook(r, opts = {}) {
 }
 
 const BIG_POS = new Set(['OL', 'DL', 'DT', 'TE', 'LB']);
+function randomBodyType(r, pos) {
+  if (pos === 'OL' || pos === 'DL' || pos === 'DT') return r() < 0.7 ? 'stocky' : 'muscular';
+  if (pos === 'LB' || pos === 'TE' || pos === 'RB') return r() < 0.55 ? 'muscular' : 'athletic';
+  if (pos === 'WR' || pos === 'CB' || pos === 'S') return r() < 0.45 ? 'lean' : r() < 0.75 ? 'athletic' : 'lanky';
+  return pickR(r, BODY_TYPES).id;
+}
 const SKILL_POS = new Set(['WR', 'CB', 'S', 'RB']);
 /** Jersey style that fits the position (linemen: big pads + neck rolls, skill players: small pads, crop tops). */
 function randomJersey(r, pos) {
@@ -170,6 +179,7 @@ export function defaultLook(position = 'QB') {
 
 /** New customization fields (older saves get these). */
 export const JERSEY_DEFAULTS = {
+  headShape: 'oval', bodyType: 'athletic',
   jSleeve: 'short', jLength: 'normal', jFit: 'normal', padSize: 'normal', backplate: 'none', neckRoll: 'none', underColor: '#16181c',
   sockStyle: 'team', mouthguard: 'none', tatNeck: 'none', cleatDesign: 'stripe', cleatCut: 'low', gloveDesign: 'solid', gloveAccent: '#f2f2f2',
 };

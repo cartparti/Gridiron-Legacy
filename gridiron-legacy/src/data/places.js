@@ -1,199 +1,25 @@
-// Walkable places, drawn as text maps. One character = one tile (2 yards).
-//
-//   #  wall          .  floor (place default)     ,  grass       :  path / sidewalk
-//   =  road          ~  water (solid)             _  turf / court
-//   Any other character is looked up in the place's `legend` (and then the shared LEGEND).
-//
-// Legend entries:
-//   floor:  floor color under the object
-//   solid:  blocks walking
-//   prop:   what to draw (box, bed, tv, couch, counter, table, tree, bench, locker, desk, rack,
-//           treadmill, hoop, fountain, truck, booth, shopfront, sign, mat, pool, plant, trophy, door, car)
-//   act:    what happens when you interact:
-//           { kind: 'activity', id }        does a weekly activity (uses a day slot + energy)
-//           { kind: 'person', key }         talk to someone (coach, mate0, family, partner, agent, rival, fan)
-//           { kind: 'shop', cat, name }     opens a store section
-//           { kind: 'page', tab, sub, name } jumps to a hub page (housing & cars, investments)
-//           { kind: 'snack', name, price, mood }  small purchase with an instant mood boost
-//           { kind: 'travel' }              opens the map to go somewhere else
-//           { kind: 'info', text }          just a line of flavor text
-//   needs:  only appears if this is true: { item, flag, partner, stage, housing }
-//   npc:    spawns a person here instead of a prop: { key, wander, look? }
+// Walkable places, one layout per level of play (high school / college / pro). Generated layout data:
+// each map is a text grid, one character = one 2-yard tile.
+//   #  wall        .  room floor (variant floor)   :  tile (indoors) / path (outdoors)   ;  rug
+//   -  rubber gym floor   _  turf   ^  court   ,  grass   =  road   ~  water / pool (solid)   +  pavers
+//   %  boardwalk   E  exit
+// Other characters are looked up in the place legend (props, people, activities). Legend entries:
+//   prop (what to draw), span (one prop across a run of the same character), floor (floor under it), solid,
+//   act ({ kind: activity | person | shop | page | snack | travel | info, ... }), label, needs (+ alt), npc.
 
-export const LEGEND = {
-  E: { floor: 'door', prop: 'door', act: { kind: 'travel' }, label: 'Leave' },
-};
+export const LEGEND = { E: { floor: 'door', prop: null, act: { kind: 'travel' }, label: 'Leave' } };
 
-export const PLACES = {
-  home: {
-    name: 'Home',
-    icon: 'home',
-    floor: '#b98b5b',
-    floorAlt: '#a87a4c',
-    wall: '#e9dcc7',
-    wallTop: '#cdbb9f',
-    outdoor: false,
-    start: 'E',
-    map: [
-      '################',
-      '#BB..#....TT....#',
-      '#....#..........#',
-      '#.d..:...CC.....#',
-      '#....#......a...#',
-      '##:###..........#',
-      '#kkk.#....y.....#',
-      '#....:..........#',
-      '#.tt.#..g...p...#',
-      '#..m.#..........#',
-      '#######E#########',
-    ],
-    legend: {
-      ':': { floor: 'floor', prop: null },
-      B: { solid: true, prop: 'bed', act: { kind: 'activity', id: 'recovery' }, label: 'Sleep in & recover' },
-      d: { solid: true, prop: 'desk', act: { kind: 'activity', id: 'classes' }, label: 'Study', needs: { stage: ['hs', 'college'] }, alt: { solid: true, prop: 'desk', act: { kind: 'activity', id: 'media' }, label: 'Post on socials' } },
-      T: { solid: true, prop: 'tv', act: { kind: 'activity', id: 'gaming' }, label: 'Play video games' },
-      C: { solid: true, prop: 'couch', act: { kind: 'activity', id: 'film' }, label: 'Watch game film' },
-      k: { solid: true, prop: 'counter', act: { kind: 'snack', name: 'Cook a healthy meal', price: 15, mood: 2, health: 3 }, label: 'Cook a meal' },
-      t: { solid: true, prop: 'table', act: { kind: 'person', key: 'family' }, label: 'Call home' },
-      y: { prop: 'mat', act: { kind: 'activity', id: 'yoga' }, label: 'Yoga & stretching' },
-      g: { solid: true, prop: 'rack', act: { kind: 'activity', id: 'weights' }, label: 'Lift in your home gym', needs: { item: 'homegym' }, alt: { solid: true, prop: 'plant' } },
-      a: { npc: { key: 'pet', wander: 3 }, needs: { flag: 'has_dog' } },
-      p: { npc: { key: 'partner', wander: 2 }, needs: { partner: true } },
-      m: { npc: { key: 'family', wander: 1 }, needs: { housing: ['parents'] } },
-    },
-  },
-  park: {
-    name: 'Riverside Park',
-    icon: 'leaf',
-    floor: '#56b04d',
-    floorAlt: '#4ea446',
-    outdoor: true,
-    start: 'E',
-    map: [
-      'RRRRRRRRRRRRRRRRRRRRRR',
-      'R,,,,,,,,,,,,,,,,,,,,R',
-      'R,,J::::::::::::,,R,,R',
-      'R,,:,,,,,,,,,,,:,,,,,R',
-      'R,f:,,,,FF,,,,,:,,b,,R',
-      'R,,:,,,,FF,,,,,:,,,,,R',
-      'R,,:,,,,,,,,,,,:,n,,,R',
-      'R,,::::::::::::::,,,,R',
-      'R,,,,,,,,,,,,,,,,,,c,R',
-      'R,n,,,__H__,,,,OOOO,,R',
-      'R,,,,,__m__,,v,OOOO,,R',
-      'R,,,,,_____,,,,OOOO,,R',
-      'R,R,,,,,,,,,,,,,,,,R,R',
-      'RRRRRRRRRRE:RRRRRRRRRR',
-    ],
-    legend: {
-      R: { solid: true, prop: 'tree', floor: 'grass' },
-      J: { floor: 'path', prop: 'sign', act: { kind: 'activity', id: 'sprints' }, label: 'Run hill sprints' },
-      f: { solid: true, prop: 'truck', act: { kind: 'snack', name: 'Food truck tacos', price: 12, mood: 3 }, label: 'Food truck' },
-      F: { solid: true, prop: 'fountain' },
-      b: { solid: true, prop: 'bench', act: { kind: 'activity', id: 'gaming' }, label: 'Relax on the bench' },
-      n: { npc: { key: 'fan', wander: 4 } },
-      c: { solid: true, prop: 'booth', act: { kind: 'activity', id: 'charity' }, label: 'Volunteer at the booth' },
-      H: { solid: true, prop: 'hoop', floor: 'court', act: { kind: 'activity', id: 'hangout' }, label: 'Pickup game with friends' },
-      m: { npc: { key: 'mate1', wander: 2 }, floor: 'court' },
-      O: { floor: 'turf', prop: null, act: { kind: 'activity', id: 'drills' }, label: 'Run position drills' },
-      v: { npc: { key: 'pet', wander: 3 }, needs: { flag: 'has_dog' } },
-    },
-  },
-  stadium: {
-    name: 'The Stadium',
-    icon: 'ball',
-    floor: '#9aa3ad',
-    floorAlt: '#8f98a3',
-    wall: '#34495e',
-    wallTop: '#3f4c5c',
-    outdoor: false,
-    start: 'E',
-    map: [
-      '####################',
-      '#LLLLL#ooo#rrr..www#',
-      '#.....#.c.#........#',
-      '#.0.1.:...:..WW....#',
-      '#.....#####........#',
-      '#.2...#VVV#####:####',
-      '##:####.v.#ttt.....#',
-      '#_____:...:........#',
-      '#_____#####...y....#',
-      '#__D__#mmm#........#',
-      '#_____#.M.:........#',
-      '#_____#####........#',
-      '#######E############',
-    ],
-    legend: {
-      L: { solid: true, prop: 'locker' },
-      0: { npc: { key: 'mate0', wander: 1.5 } },
-      1: { npc: { key: 'mate1', wander: 1.5 } },
-      2: { npc: { key: 'mate2', wander: 1.5 } },
-      o: { solid: true, prop: 'desk' },
-      c: { npc: { key: 'coach', wander: 0.5 } },
-      r: { solid: true, prop: 'rack', act: { kind: 'activity', id: 'weights' }, label: 'Weight room' },
-      w: { solid: true, prop: 'rack', act: { kind: 'activity', id: 'doubles' }, label: 'Two-a-days' },
-      W: { solid: true, prop: 'treadmill', act: { kind: 'activity', id: 'sprints' }, label: 'Speed training' },
-      V: { solid: true, prop: 'tv', act: { kind: 'activity', id: 'film' }, label: 'Film room' },
-      v: { prop: null, act: { kind: 'activity', id: 'meetcoach' }, label: 'Meet with coach' },
-      t: { solid: true, prop: 'table', act: { kind: 'activity', id: 'recovery' }, label: 'Training room: ice & treatment' },
-      y: { prop: 'mat', act: { kind: 'activity', id: 'rehab' }, label: 'Rehab session', needs: { injured: true }, alt: { prop: 'mat', act: { kind: 'activity', id: 'yoga' }, label: 'Mobility work' } },
-      _: { floor: 'turf' },
-      D: { floor: 'turf', prop: 'cone', act: { kind: 'activity', id: 'drills' }, label: 'Position drills on the field' },
-      m: { solid: true, prop: 'desk' },
-      M: { prop: 'mic', act: { kind: 'activity', id: 'media' }, label: 'Press conference' },
-    },
-  },
-  downtown: {
-    name: 'Downtown',
-    icon: 'briefcase',
-    ground: 'path',
-    floor: '#9aa0a6',
-    floorAlt: '#8f959b',
-    outdoor: true,
-    start: 'E',
-    map: [
-      '########################',
-      '#GG#SS#HH#PP#XX#QQ#BB#ff#',
-      '#::::::::::::::::::::::#',
-      '#::n::::::a::::::n:::::#',
-      '#======================#',
-      '#======================#',
-      '#::::::::::::::::::::::#',
-      '#::n:::::::::::r::::n::#',
-      '#CC#RR#$$#UU#JJ#ZZ#II#hh#',
-      '###########E############',
-    ],
-    legend: {
-      G: { solid: true, prop: 'shopfront', color: '#e63946', act: { kind: 'shop', cat: 'gear', name: 'Gear Shop' }, label: 'Gear Shop' },
-      S: { solid: true, prop: 'shopfront', color: '#9b5de5', act: { kind: 'shop', cat: 'style', name: 'Boutique' }, label: 'Fashion Boutique' },
-      H: { solid: true, prop: 'shopfront', color: '#f4a261', act: { kind: 'shop', cat: 'home', name: 'Home Store' }, label: 'Home Store' },
-      P: { solid: true, prop: 'shopfront', color: '#2a9d8f', act: { kind: 'shop', cat: 'pets', name: 'Pet Shop' }, label: 'Pet Shop' },
-      X: { solid: true, prop: 'shopfront', color: '#ffd166', act: { kind: 'shop', cat: 'toys', name: 'Luxury Toys' }, label: 'Luxury Toys' },
-      Q: { solid: true, prop: 'shopfront', color: '#ff70a6', act: { kind: 'shop', cat: 'gifts', name: 'Gift Shop' }, label: 'Gift Shop' },
-      B: { solid: true, prop: 'shopfront', color: '#3a86ff', act: { kind: 'page', tab: 'life', sub: 'invest', name: 'Bank' }, label: 'Bank: investments' },
-      f: { solid: true, prop: 'shopfront', color: '#06d6a0', act: { kind: 'activity', id: 'parttime' }, label: 'Part-time job', needs: { stage: ['hs', 'college'] }, alt: { solid: true, prop: 'shopfront', color: '#06d6a0', act: { kind: 'snack', name: 'Coffee & pastry', price: 8, mood: 2 }, label: 'Coffee shop' } },
-      C: { solid: true, prop: 'shopfront', color: '#adb5bd', act: { kind: 'page', tab: 'life', sub: 'lifestyle', name: 'Car Dealer' }, label: 'Car dealer & realtor' },
-      R: { solid: true, prop: 'shopfront', color: '#d62828', act: { kind: 'activity', id: 'date' }, label: 'Restaurant: date night', needs: { partner: true }, alt: { solid: true, prop: 'shopfront', color: '#d62828', act: { kind: 'snack', name: 'Steakhouse dinner', price: 90, mood: 4 }, label: 'Steakhouse' } },
-      $: { solid: true, prop: 'shopfront', color: '#118ab2', act: { kind: 'activity', id: 'agentcall' }, label: "Agent's office", needs: { agent: true }, alt: { solid: true, prop: 'shopfront', color: '#118ab2', act: { kind: 'info', text: 'A sports agency. They do not take walk-ins... yet.' }, label: 'Sports agency' } },
-      U: { solid: true, prop: 'shopfront', color: '#7209b7', act: { kind: 'activity', id: 'nightout' }, label: 'Nightclub' },
-      J: { solid: true, prop: 'shopfront', color: '#fb8500', act: { kind: 'activity', id: 'charity' }, label: 'Youth center: volunteer' },
-      Z: { solid: true, prop: 'shopfront', color: '#4361ee', act: { kind: 'activity', id: 'business' }, label: 'Your business', needs: { flag: 'has_business' }, alt: { solid: true, prop: 'shopfront', color: '#4361ee', act: { kind: 'info', text: 'An empty storefront. Maybe someday it is yours.' }, label: 'For lease' } },
-      I: { solid: true, prop: 'shopfront', color: '#ef476f', act: { kind: 'activity', id: 'hangout' }, label: 'Arcade with teammates' },
-      h: { solid: true, prop: 'shopfront', color: '#8ecae6', act: { kind: 'activity', id: 'yoga' }, label: 'Yoga studio' },
-      n: { npc: { key: 'fan', wander: 5 } },
-      a: { npc: { key: 'agent', wander: 2 }, needs: { agent: true } },
-      r: { npc: { key: 'rival', wander: 3 } },
-    },
-  },
-};
+// Floor characters -> floor kind (see the floor painter in scenes/world.js).
+export const FLOOR_CHARS = { ':': 'alt', ';': 'rug', '-': 'rubber', '_': 'turf', '^': 'court', ',': 'grass', '=': 'road', '~': 'water', '+': 'pavers', '%': 'boardwalk', E: 'door' };
 
-export const FLOOR_COLORS = {
-  floor: null, // place default
-  grass: ['#56b04d', '#4ea446'],
-  path: ['#c9b48a', '#bea97f'],
-  court: ['#c2703d', '#b8683a'],
-  turf: ['#3f9a3c', '#4aab44'],
-  road: ['#3d4248', '#373c41'],
-  water: ['#3a86ff', '#2f75e6'],
-  door: ['#6b4423', '#5e3b1e'],
-};
+export const PLACE_DEFS = {"home": {"icon": "home", "legend": {"B": {"solid": true, "prop": "bed", "span": true, "act": {"kind": "activity", "id": "recovery"}, "label": "Sleep in & recover"}, "q": {"solid": true, "prop": "bunk", "span": true}, "b": {"solid": true, "prop": "bookshelf"}, "e": {"solid": true, "prop": "desk"}, "d": {"solid": true, "prop": "desk", "act": {"kind": "activity", "id": "classes"}, "label": "Study", "needs": {"stage": ["hs", "college"]}, "alt": {"solid": true, "prop": "desk", "act": {"kind": "activity", "id": "media"}, "label": "Post on socials"}}, "k": {"solid": true, "prop": "counter", "floor": "tile", "act": {"kind": "snack", "name": "Cook a healthy meal", "price": 15, "mood": 2, "health": 3}, "label": "Cook a meal"}, "F": {"solid": true, "prop": "fridge", "floor": "tile"}, "x": {"solid": true, "prop": "minifridge", "act": {"kind": "snack", "name": "Grab a snack", "price": 4, "mood": 1}, "label": "Mini fridge: snack"}, "i": {"solid": true, "prop": "island", "floor": "tile", "span": true, "act": {"kind": "snack", "name": "Private chef dinner", "price": 60, "mood": 3, "health": 4}, "label": "Kitchen island: chef dinner"}, "t": {"solid": true, "prop": "table", "span": true, "act": {"kind": "person", "key": "family"}, "label": "Call home"}, "T": {"solid": true, "prop": "tv", "span": true, "act": {"kind": "activity", "id": "gaming"}, "label": "Play video games"}, "V": {"solid": true, "prop": "tv", "span": true, "act": {"kind": "activity", "id": "film"}, "label": "Watch game film"}, "C": {"solid": true, "prop": "couch", "span": true, "act": {"kind": "activity", "id": "gaming"}, "label": "Kick back on the couch"}, "y": {"prop": "mat", "act": {"kind": "activity", "id": "yoga"}, "label": "Yoga & stretching"}, "g": {"solid": true, "prop": "rack", "floor": "rubber", "span": true, "act": {"kind": "activity", "id": "weights"}, "label": "Lift in your home gym", "needs": {"item": "homegym"}, "alt": {"solid": true, "prop": "bench_press", "floor": "rubber"}}, "s": {"solid": true, "prop": "vending", "span": true, "act": {"kind": "snack", "name": "Vending machine snack", "price": 3, "mood": 1}, "label": "Vending machine"}, "h": {"solid": true, "prop": "plant"}, "0": {"npc": {"key": "mate0", "wander": 1.5}}, "m": {"npc": {"key": "family", "wander": 1}, "floor": "tile", "needs": {"housing": ["parents"]}}, "p": {"npc": {"key": "partner", "wander": 2}, "needs": {"partner": true}}, "a": {"npc": {"key": "pet", "wander": 3}, "needs": {"flag": "has_dog"}}}, "variants": {"hs": {"name": "Family Home", "floor": "wood", "wall": "#efe6d6", "accent": "#7a8f6a", "rooms": [["Bedroom", 4, 3], ["Kitchen", 5, 9], ["Living room", 5, 15], ["Hallway & garage gym", 10, 10]], "map": ["####################", "#BB.b.#kkkF#TTT....#", "#.....#::::#.......#", "#.;;..#:tt:#..CCC..#", "#.;;.d#:m.:#..;;;..#", "#.....#::::#.....y.#", "###.######:####.####", "#..................#", "#..g.....p....a....#", "#.----.........h.h.#", "#.----.............#", "#########E##########"]}, "college": {"name": "Dorm", "floor": "vinyl", "wall": "#e8edf2", "accent": "#5b7ca0", "rooms": [["Your room", 2, 3], ["Roommate", 2, 9], ["Kitchenette", 4, 15], ["Common lounge", 6, 9]], "map": ["##################", "#BB..d#qq..e#kkx.#", "#.....#.....#....#", "#.;;..#.;;..#.tt.#", "#..T..#..0..#....#", "###.#######.###.##", "#................#", "#.CCC....ss..y...#", "#.;;;.....p......#", "#.VVV........hh..#", "########E#########"]}, "pro": {"name": "Penthouse", "floor": "marble", "wall": "#f4f1ec", "accent": "#2f3b45", "rooms": [["Master suite", 4, 3], ["Kitchen", 2, 11], ["Living room", 5, 18], ["Home gym", 10, 5], ["Pool deck", 7, 15]], "map": ["######################", "#BBB..d#kkkkkF#VVVV..#", "#......#::::::#......#", "#.;;;..#::ii::#.CCCC.#", "#.;;;..#::::::#.;;;;.#", "#...a..#.tttt.#......#", "###.########.####.####", "#--------#...........#", "#-gg--y--#..p....hh..#", "#--------#.....~~~~~.#", "#--------#.....~~~~~.#", "##########E###########"]}}}, "stadium": {"icon": "ball", "legend": {"L": {"solid": true, "prop": "locker"}, "o": {"solid": true, "prop": "desk"}, "c": {"npc": {"key": "coach", "wander": 0.5}}, "0": {"npc": {"key": "mate0", "wander": 1.5}}, "1": {"npc": {"key": "mate1", "wander": 1.5}}, "2": {"npc": {"key": "mate2", "wander": 1.5}}, "r": {"solid": true, "prop": "rack", "floor": "rubber", "act": {"kind": "activity", "id": "weights"}, "label": "Weight room"}, "W": {"solid": true, "prop": "treadmill", "floor": "rubber", "act": {"kind": "activity", "id": "sprints"}, "label": "Speed training"}, "V": {"solid": true, "prop": "screen", "span": true, "act": {"kind": "activity", "id": "film"}, "label": "Film room"}, "v": {"prop": null, "act": {"kind": "activity", "id": "meetcoach"}, "label": "Meet with coach"}, "t": {"solid": true, "prop": "trainertable", "act": {"kind": "activity", "id": "recovery"}, "label": "Training room: treatment"}, "u": {"solid": true, "prop": "coldtub", "act": {"kind": "activity", "id": "recovery"}, "label": "Cold tub & recovery"}, "y": {"prop": "mat", "act": {"kind": "activity", "id": "rehab"}, "label": "Rehab session", "needs": {"injured": true}, "alt": {"prop": "mat", "act": {"kind": "activity", "id": "yoga"}, "label": "Mobility work"}}, "D": {"floor": "turf", "prop": "sled", "act": {"kind": "activity", "id": "drills"}, "label": "Position drills"}, "M": {"solid": true, "prop": "podium", "span": true, "act": {"kind": "activity", "id": "media"}, "label": "Press conference"}, "k": {"solid": true, "prop": "counter", "span": false, "act": {"kind": "snack", "name": "Team nutrition bar", "price": 0, "mood": 1, "health": 2}, "label": "Nutrition bar"}}, "variants": {"hs": {"name": "School Athletics", "floor": "concrete", "wall": "#cfd6dd", "accent": "#33475b", "rooms": [["Locker room", 4, 3], ["Coach", 3, 9], ["Weight room", 5, 15], ["Practice field", 10, 3], ["Film", 9, 9], ["Trainer", 9, 15]], "map": ["####################", "#LLLLLL#ooo#rr..WW.#", "#......#.c.#.......#", "#.0.1..#...#..----.#", "#..2...##:##..----.#", "###.####...:.......#", "#______#VVV####:####", "#______#.v.#t..y...#", "#__D___#;;;#t......#", "#______:;;;:.......#", "#______#####.......#", "#######E############"]}, "college": {"name": "Athletic Center", "floor": "concrete", "wall": "#d7dde4", "accent": "#1f3a5f", "rooms": [["Locker room", 4, 4], ["Coach", 3, 11], ["Performance center", 5, 19], ["Indoor field", 11, 4], ["Film room", 9, 11], ["Recovery", 9, 19], ["Press room", 11, 19]], "map": ["#########################", "#LLLLLLLL#oooo#rrrr..WWW#", "#........#.c..#.........#", "#.0..1...#....#.-------.#", "#....2...##:###.-------.#", "###.######...:..........#", "#________#VVVV####:######", "#________#.v..#tt..uu..y#", "#___D____#;;;;#.........#", "#________:;;;;:.........#", "#________###:###MMM.....#", "#________#......M.......#", "##########E##############"]}, "pro": {"name": "Team Facility", "floor": "polished", "wall": "#e3e7ec", "accent": "#111820", "rooms": [["Locker room", 4, 5], ["Head coach", 3, 13], ["Performance center", 5, 21], ["Indoor field", 11, 5], ["Film room", 9, 13], ["Recovery", 9, 21], ["Press room", 11, 22]], "map": ["###########################", "#LLLLLLLLL#ooooo#rrrrr.WWW#", "#.........#..c..#.........#", "#.0..1..2.#.....#.-------.#", "#.........##:####.-------.#", "###.#######...:...........#", "#_________#VVVVV####:######", "#_________#..v..#ttt.uuu.y#", "#____D____#;;;;;#.........#", "#_________:;;;;;:.........#", "#_________####:##MMMM.....#", "#_________#..kk...M.......#", "###########E###############"]}}}, "park": {"icon": "leaf", "legend": {"R": {"solid": true, "prop": "tree", "floor": "grass"}, "Y": {"solid": true, "prop": "campus", "floor": "grass"}, "J": {"floor": "path", "prop": "sign", "act": {"kind": "activity", "id": "sprints"}, "label": "Run hill sprints"}, "f": {"solid": true, "prop": "truck", "act": {"kind": "snack", "name": "Food truck tacos", "price": 12, "mood": 3}, "label": "Food truck"}, "2": {"solid": true, "prop": "cart", "act": {"kind": "snack", "name": "Gelato cart", "price": 6, "mood": 2}, "label": "Gelato cart"}, "F": {"solid": true, "prop": "fountain", "span": true}, "b": {"solid": true, "prop": "bench", "act": {"kind": "activity", "id": "gaming"}, "label": "Relax on the bench"}, "n": {"npc": {"key": "fan", "wander": 4}}, "c": {"solid": true, "prop": "booth", "act": {"kind": "activity", "id": "charity"}, "label": "Volunteer at the booth"}, "H": {"solid": true, "prop": "hoop", "floor": "court", "act": {"kind": "activity", "id": "hangout"}, "label": "Pickup game with friends"}, "m": {"npc": {"key": "mate1", "wander": 2}, "floor": "court"}, "O": {"floor": "turf", "prop": null, "act": {"kind": "activity", "id": "drills"}, "label": "Run position drills"}, "v": {"npc": {"key": "pet", "wander": 3}, "needs": {"flag": "has_dog"}}, "l": {"solid": true, "prop": "lamppost", "floor": "boardwalk"}}, "outdoor": true, "variants": {"hs": {"name": "Town Park", "floor": "grass", "alt": "path", "sky": "#9fd2f5", "map": ["RRRRRRRRRRRRRRRRRRRRRR", "R,,,,,,,,,,,,,,,,,,,,R", "R,J::::::::::::::,,,,R", "R,,:,,,,,,,,,,,,:,b,,R", "R,f:,,,,,FF,,,,,:,,,,R", "R,,:,,,,,FF,,,,,:,n,,R", "R,,::::::::::::::,,,,R", "R,,,,,,,,,,,,,,,,,,c,R", "R,n,,^^H^^,,,,OOOOO,,R", "R,,,,^^m^^,,v,OOOOO,,R", "R,,,,^^^^^,,,,OOOOO,,R", "RRRRRRRRRRE:RRRRRRRRRR"]}, "college": {"name": "Campus Quad", "floor": "grass", "alt": "path", "sky": "#a9d6f2", "map": ["YYYYYYYYYYYYYYYYYYYYYYYY", "Y,,,,,,,,,,:,,,,,,,,,,,Y", "Y,b,,,,,,,,:,,,,,,,,b,,Y", "Y::::::::::::::::::::::Y", "Y,,,,,,,,,,:,,,,,,,,,,,Y", "Y,n,,,FF,,,:,,,,n,,,,c,Y", "Y,,,,,FF,,,:,,,,,,,,,,,Y", "Y,f,,,,,,,,:,,,,,,,,,,,Y", "Y,,,,^^H^^,:,,OOOOOO,,,Y", "Y,,,,^^m^^,:,,OOOOOO,v,Y", "Y,,,,^^^^^,:,,OOOOOO,,,Y", "RRRRRRRRRRRERRRRRRRRRRRR"]}, "pro": {"name": "Waterfront Park", "floor": "grass", "alt": "path", "sky": "#8fc8f0", "map": ["~~~~~~~~~~~~~~~~~~~~~~~~", "~~~~~~~~~~~~~~~~~~~~~~~~", "%%%%%%%%%%%%%%%%%%%%%%%%", "%%l%%%%%l%%%%%%l%%%%%l%%", ",,,,,,,,,,,:,,,,,,,,,,,,", ",f,,b,,,,,,:,,,,,b,,,f2,", ",,,,,,,,,,,:,,,,,,,,,,,,", ",n,,,,FF,,,:,,,n,,,,,c,,", ",,,,,,FF,,,:,,,,,,,,,,,,", ",,,,^^H^^,,:,,OOOOOO,,v,", ",,,,^^m^^,,:,,OOOOOO,,,,", "RRRRRRRRRRRERRRRRRRRRRRR"]}}}, "downtown": {"icon": "briefcase", "legend": {"G": {"solid": true, "prop": "shopfront", "span": true, "color": "#c0392b", "act": {"kind": "shop", "cat": "gear", "name": "Gear Shop"}, "label": "Gear Shop"}, "S": {"solid": true, "prop": "shopfront", "span": true, "color": "#8e44ad", "act": {"kind": "shop", "cat": "style", "name": "Boutique"}, "label": "Fashion Boutique"}, "H": {"solid": true, "prop": "shopfront", "span": true, "color": "#d35400", "act": {"kind": "shop", "cat": "home", "name": "Home Store"}, "label": "Home Store"}, "P": {"solid": true, "prop": "shopfront", "span": true, "color": "#16a085", "act": {"kind": "shop", "cat": "pets", "name": "Pet Shop"}, "label": "Pet Shop"}, "X": {"solid": true, "prop": "shopfront", "span": true, "color": "#b7950b", "act": {"kind": "shop", "cat": "toys", "name": "Luxury Toys"}, "label": "Luxury Toys"}, "Q": {"solid": true, "prop": "shopfront", "span": true, "color": "#c2185b", "act": {"kind": "shop", "cat": "gifts", "name": "Gift Shop"}, "label": "Gift Shop"}, "B": {"solid": true, "prop": "shopfront", "span": true, "color": "#1f5fa8", "act": {"kind": "page", "tab": "life", "sub": "invest", "name": "Bank"}, "label": "Bank: investments"}, "f": {"solid": true, "prop": "shopfront", "span": true, "color": "#0e8a6a", "act": {"kind": "activity", "id": "parttime"}, "label": "Part-time job", "needs": {"stage": ["hs", "college"]}, "alt": {"solid": true, "prop": "shopfront", "span": true, "color": "#0e8a6a", "act": {"kind": "snack", "name": "Coffee & pastry", "price": 8, "mood": 2}, "label": "Coffee shop"}}, "C": {"solid": true, "prop": "shopfront", "span": true, "color": "#5d6d7e", "act": {"kind": "page", "tab": "life", "sub": "lifestyle", "name": "Car Dealer"}, "label": "Car dealer & realtor"}, "R": {"solid": true, "prop": "shopfront", "span": true, "color": "#a93226", "act": {"kind": "activity", "id": "date"}, "label": "Restaurant: date night", "needs": {"partner": true}, "alt": {"solid": true, "prop": "shopfront", "span": true, "color": "#a93226", "act": {"kind": "snack", "name": "Dinner out", "price": 30, "mood": 3}, "label": "Restaurant"}}, "$": {"solid": true, "prop": "shopfront", "span": true, "color": "#1a5276", "act": {"kind": "activity", "id": "agentcall"}, "label": "Agent's office", "needs": {"agent": true}, "alt": {"solid": true, "prop": "shopfront", "span": true, "color": "#1a5276", "act": {"kind": "info", "text": "A sports agency. They do not take walk-ins... yet."}, "label": "Sports agency"}}, "U": {"solid": true, "prop": "shopfront", "span": true, "color": "#5b2c6f", "act": {"kind": "activity", "id": "nightout"}, "label": "Nightclub", "needs": {"stage": ["college", "pro"]}, "alt": {"solid": true, "prop": "shopfront", "span": true, "color": "#5b2c6f", "act": {"kind": "snack", "name": "Milkshake at the diner", "price": 6, "mood": 2}, "label": "Diner"}}, "J": {"solid": true, "prop": "shopfront", "span": true, "color": "#ca6f1e", "act": {"kind": "activity", "id": "charity"}, "label": "Youth center: volunteer"}, "Z": {"solid": true, "prop": "shopfront", "span": true, "color": "#2e4053", "act": {"kind": "activity", "id": "business"}, "label": "Your business", "needs": {"flag": "has_business"}, "alt": {"solid": true, "prop": "shopfront", "span": true, "color": "#2e4053", "act": {"kind": "info", "text": "An empty storefront. Maybe someday it is yours."}, "label": "For lease"}}, "I": {"solid": true, "prop": "shopfront", "span": true, "color": "#cb4335", "act": {"kind": "activity", "id": "hangout"}, "label": "Arcade with teammates"}, "h": {"solid": true, "prop": "shopfront", "span": true, "color": "#2e86c1", "act": {"kind": "activity", "id": "yoga"}, "label": "Yoga studio"}, "n": {"npc": {"key": "fan", "wander": 5}}, "a": {"npc": {"key": "agent", "wander": 2}, "needs": {"agent": true}}, "r": {"npc": {"key": "rival", "wander": 3}}, "l": {"solid": true, "prop": "lamppost", "floor": "pavers"}}, "outdoor": true, "variants": {"hs": {"name": "Main Street", "floor": "pavers", "alt": "pavers", "sky": "#a4d3f2", "skyline": "town", "map": ["####################", "#GG#PP#QQ#ff#BB#II##", "#++++++++++++++++++#", "#+n++++++++++++++n+#", "#==================#", "#==================#", "#++++++++++++++++++#", "#+++l++++l++++l++r+#", "#RR#JJ#HH#$$#CC#ZZ##", "#########E##########"]}, "college": {"name": "College Town", "floor": "pavers", "alt": "pavers", "sky": "#a4d3f2", "skyline": "college", "map": ["##########################", "#GG#SS#ff#UU#II#BB#hh#QQ##", "#++++++++++++++++++++++++#", "#+n++++++++++a++++++++n++#", "#========================#", "#========================#", "#++++++++++++++++++++++++#", "#+++l+++++l++++++l+++++r+#", "#RR#JJ#PP#$$#CC#ZZ#HH#XX##", "###########E##############"]}, "pro": {"name": "City Center", "floor": "pavers", "alt": "pavers", "sky": "#9cc9ee", "skyline": "city", "map": ["##############################", "#GG#SS#HH#PP#XX#QQ#BB#ff#UU###", "#++++++++++++++++++++++++++++#", "#+n+++++++++a+++++++++++++n++#", "#============================#", "#============================#", "#++++++++++++++++++++++++++++#", "#+++l++++++l+++++++l++++++r++#", "#CC#RR#$$#UU#JJ#ZZ#II#hh#QQ###", "#############E################"]}}}};
+
+/** The layout of a place for your level of play (falls back to pro). */
+export function placeFor(id, stage = "pro") {
+  const d = PLACE_DEFS[id];
+  const v = d.variants[stage] ?? d.variants[stage === 'retired' ? 'pro' : 'hs'] ?? d.variants.pro;
+  return { id, icon: d.icon, outdoor: !!d.outdoor, legend: d.legend, start: "E", ...v };
+}
+
+/** Back-compat: PLACES[id] gives the pro layout (names, icons). */
+export const PLACES = Object.fromEntries(Object.keys(PLACE_DEFS).map((id) => [id, placeFor(id, "pro")]));

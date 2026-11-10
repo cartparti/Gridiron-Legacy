@@ -28,6 +28,8 @@ function ensure() {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = true; // only the walkable places use a shadow-casting light
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     el.append(renderer.domElement);
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#5aa0d8');
@@ -541,8 +543,10 @@ export function runWorld(placeId, ctx) {
   const outdoor = ['park', 'downtown'].includes(placeId);
   const wx = outdoor ? ctx.weather ?? 'clear' : 'clear';
   const sky = { rain: '#7d8a99', storm: '#4a525c', snow: '#c4ccd4', fog: '#c0c6cc', night: '#8fd0f2' }[wx] ?? '#8fd0f2';
-  scene.background = new THREE.Color(outdoor ? sky : '#14181d');
-  if (outdoor) scene.fog = new THREE.Fog(sky, wx === 'fog' ? 14 : 60, wx === 'fog' ? 50 : 140);
+  scene.background = new THREE.Color(outdoor ? sky : '#1a1d22');
+  if (outdoor) scene.fog = new THREE.Fog(sky, wx === 'fog' ? 14 : 70, wx === 'fog' ? 50 : 170);
+  scene.environment = r.scene.environment; // same soft image lighting as the stadium
+  scene.environmentIntensity = outdoor ? 0.6 : 0.45;
   R.active = scene;
   world = buildWorld(placeId, { ...ctx, scene, camera: r.camera });
   const particles = outdoor ? makeWeather(scene) : null;

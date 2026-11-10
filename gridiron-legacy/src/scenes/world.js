@@ -1,10 +1,14 @@
-// Walkable world engine: builds a place from a text map, then lets the player walk around
-// (touch joystick or WASD/arrows) and interact with people and objects.
+// Walkable world engine: builds a place (layout depends on your level of play) from a text map, then lets the
+// player walk around (touch joystick or WASD/arrows) and interact with people and objects.
+// Graphics: smooth painted floors (wood, marble, tile, rugs, rubber, turf, court, grass, pavers...), thin walls
+// with baseboards and windows, rounded furniture turned to face the room, room labels, soft shadows.
 import * as THREE from 'three';
-import { PLACES, LEGEND, FLOOR_COLORS } from '../data/places.js';
+import { placeFor, LEGEND, FLOOR_CHARS } from '../data/places.js';
 import { makePerson, animateRun, faceToward, setPose, playAction, makeLabel } from './actors.js';
+import { makeProp, M } from './props.js';
 
 const S = 2; // tile size in world units
+const PX = 48; // floor texture pixels per tile
 
 function hexShade(hex, amt) {
   const c = new THREE.Color(hex);
@@ -19,105 +23,106 @@ function resolveEntry(entry, check) {
   return entry;
 }
 
-// ------------------------------------------------------------------ props
+// Floor palettes per kind (base, alt)
+const FLOOR = {
+  wood: ['#a9784f', '#93633f'], vinyl: ['#c9bba6', '#bcae98'], marble: ['#eeebe6', '#d9d5cf'], tile: ['#e4e1dc', '#d2cec8'],
+  concrete: ['#9ea4a9', '#8f959a'], polished: ['#b9bec3', '#a9aeb3'], rubber: ['#2a2d31', '#33373c'], turf: ['#3a8a3d', '#43974a'],
+  court: ['#d29a5f', '#c68d52'], grass: ['#5aa04c', '#4f9343'], path: ['#cdb68c', '#bfa87e'], pavers: ['#a9a49c', '#9a958d'],
+  road: ['#3a3e43', '#33373b'], water: ['#3e8fd0', '#2f7cbf'], boardwalk: ['#8a6a4c', '#7a5c40'], door: ['#5a4634', '#4c3b2c'], rug: null,
+};
 
-const matCache = new Map();
-function mat(color) {
-  if (!matCache.has(color)) matCache.set(color, new THREE.MeshLambertMaterial({ color, flatShading: true }));
-  return matCache.get(color);
-}
-function box(w, h, d, color, x = 0, y = 0, z = 0) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color));
-  m.position.set(x, y + h / 2, z);
-  return m;
-}
-function cyl(r, h, color, x = 0, y = 0, z = 0, seg = 8) {
-  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), mat(color));
-  m.position.set(x, y + h / 2, z);
-  return m;
-}
+const nz = (x, y) => { const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return v - Math.floor(v); };
 
-/** Build a little low-poly prop. Returns a Group sitting on the ground, centered in its tile. */
-export function makeProp(type, opts = {}) {
-  const g = new THREE.Group();
-  const add = (...ms) => ms.forEach((m) => g.add(m));
-  switch (type) {
-    case 'bed': add(box(1.8, 0.45, 1.9, '#6b4423'), box(1.7, 0.25, 1.8, '#f1f1f1', 0, 0.45), box(1.7, 0.2, 1.1, opts.color ?? '#3a86ff', 0, 0.62, 0.35), box(0.7, 0.18, 0.4, '#ffffff', -0.45, 0.7, -0.6), box(0.7, 0.18, 0.4, '#ffffff', 0.45, 0.7, -0.6)); break;
-    case 'desk': add(box(1.7, 0.75, 0.9, '#8d6748'), box(0.6, 0.4, 0.05, '#222831', 0, 0.75, -0.2), box(0.55, 0.32, 0.02, '#4da3ff', 0, 0.79, -0.17), box(0.5, 0.5, 0.5, '#2b2d42', 0.2, 0, 0.7)); break;
-    case 'tv': add(box(1.8, 0.5, 0.6, '#3d2b1f'), box(1.6, 0.9, 0.08, '#111111', 0, 0.5, 0), box(1.45, 0.75, 0.02, '#2ec4b6', 0, 0.58, 0.05)); break;
-    case 'couch': add(box(1.9, 0.45, 0.9, opts.color ?? '#6d597a'), box(1.9, 0.5, 0.25, hexShade(opts.color ?? '#6d597a', -0.08), 0, 0.45, -0.32), box(0.25, 0.3, 0.9, hexShade(opts.color ?? '#6d597a', -0.05), -0.85, 0.45), box(0.25, 0.3, 0.9, hexShade(opts.color ?? '#6d597a', -0.05), 0.85, 0.45)); break;
-    case 'counter': add(box(1.95, 0.9, 0.9, '#f1f1f1'), box(1.95, 0.08, 0.95, '#495057', 0, 0.9), box(0.4, 0.15, 0.3, '#adb5bd', 0.4, 0.98)); break;
-    case 'table': add(box(1.6, 0.08, 1.2, '#a0714f', 0, 0.7), cyl(0.07, 0.7, '#6b4423', -0.65, 0, -0.45), cyl(0.07, 0.7, '#6b4423', 0.65, 0, -0.45), cyl(0.07, 0.7, '#6b4423', -0.65, 0, 0.45), cyl(0.07, 0.7, '#6b4423', 0.65, 0, 0.45)); break;
-    case 'mat': add(box(1.4, 0.04, 1.8, opts.color ?? '#7b2cbf')); break;
-    case 'rack': add(box(1.8, 0.1, 0.5, '#343a40', 0, 1.0), box(0.1, 1.1, 0.5, '#495057', -0.85), box(0.1, 1.1, 0.5, '#495057', 0.85), cyl(0.3, 0.1, '#212529', -0.6, 1.05, 0), cyl(0.3, 0.1, '#212529', 0.6, 1.05, 0), box(1.0, 0.25, 0.6, '#c1121f', 0, 0, 0.6)); g.children[3].rotation.z = Math.PI / 2; g.children[4].rotation.z = Math.PI / 2; break;
-    case 'treadmill': add(box(0.9, 0.2, 1.8, '#343a40'), box(0.8, 0.04, 1.6, '#111', 0, 0.2), box(0.1, 1.2, 0.1, '#495057', -0.4, 0, -0.8), box(0.1, 1.2, 0.1, '#495057', 0.4, 0, -0.8), box(0.9, 0.3, 0.2, '#4da3ff', 0, 1.1, -0.8)); break;
-    case 'locker': add(box(1.9, 2.0, 0.6, '#3a506b'), box(0.04, 1.8, 0.02, '#1c2541', -0.32, 0.1, 0.31), box(0.04, 1.8, 0.02, '#1c2541', 0.32, 0.1, 0.31), box(1.9, 0.08, 0.62, '#5bc0be', 0, 1.6)); break;
-    case 'tree': {
-      const leaf = opts.color ?? '#2d6a4f';
-      add(box(0.36, 1.5, 0.36, '#6b4423'), box(1.9, 1.0, 1.9, leaf, 0, 1.4), box(1.4, 0.8, 1.4, hexShade(leaf, 0.05), 0.1, 2.35, -0.1),
-        box(0.8, 0.5, 0.8, hexShade(leaf, 0.1), -0.1, 3.1, 0.1), box(0.5, 0.4, 0.5, hexShade(leaf, -0.06), 0.85, 1.1, 0.6));
+/** Paint one tile of floor at (X0, Y0) in the floor canvas. */
+function paintTile(g, kind, X0, Y0, r, c, ctx) {
+  const P = PX;
+  const [a, b] = FLOOR[kind] ?? FLOOR.concrete;
+  const rect = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(X0 + x, Y0 + y, w, h); };
+  switch (kind) {
+    case 'wood': case 'vinyl': case 'boardwalk': {
+      const n = kind === 'boardwalk' ? 3 : 4; const bh = P / n;
+      for (let i = 0; i < n; i++) {
+        const row = r * n + i;
+        const off = (nz(row, 3) * P * 3) | 0;
+        for (let x = -off; x < P; x += P * 1.5) {
+          const shadeK = (nz(row, Math.floor((c * P + x) / (P * 1.5))) - 0.5) * 0.08;
+          rect(Math.max(0, x), i * bh, P * 1.5, bh, hexShade(a, shadeK));
+          rect(Math.max(0, x), i * bh, 1, bh, 'rgba(0,0,0,0.25)');
+        }
+        rect(0, i * bh + bh - 1, P, 1, 'rgba(0,0,0,0.22)');
+        g.globalAlpha = 0.08; for (let k = 0; k < 3; k++) rect(0, i * bh + 2 + k * (bh / 3), P, 1, '#3a2414'); g.globalAlpha = 1;
+      }
       break;
     }
-    case 'bench': add(box(1.8, 0.1, 0.5, '#a0714f', 0, 0.45), box(1.8, 0.4, 0.1, '#a0714f', 0, 0.55, -0.22), box(0.1, 0.45, 0.4, '#343a40', -0.75), box(0.1, 0.45, 0.4, '#343a40', 0.75)); break;
-    case 'hoop': add(cyl(0.08, 2.6, '#adb5bd'), box(1.1, 0.7, 0.06, '#ffffff', 0, 2.5, 0.25)); { const r = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.03, 4, 10), mat('#e85d04')); r.rotation.x = Math.PI / 2; r.position.set(0, 2.55, 0.55); add(r); } break;
-    case 'fountain': add(cyl(1.6, 0.5, '#adb5bd', 0, 0, 0, 10), cyl(1.35, 0.06, '#4cc9f0', 0, 0.45, 0, 10), cyl(0.2, 1.2, '#ced4da', 0, 0.4), cyl(0.5, 0.12, '#adb5bd', 0, 1.5, 0, 8)); break;
-    case 'truck': add(box(1.9, 1.3, 1.4, '#ffd166', 0, 0.3), box(1.9, 0.5, 1.4, '#ef476f', 0, 1.6), box(1.2, 0.5, 0.05, '#222', 0, 0.9, 0.71), cyl(0.25, 0.2, '#111', -0.6, 0, 0.6), cyl(0.25, 0.2, '#111', 0.6, 0, 0.6)); break;
-    case 'booth': add(box(1.8, 1.0, 0.8, '#ffffff'), box(1.9, 0.1, 1.0, '#fb8500', 0, 1.8), box(0.08, 0.8, 0.08, '#adb5bd', -0.85, 1.0, 0.3), box(0.08, 0.8, 0.08, '#adb5bd', 0.85, 1.0, 0.3), box(1.2, 0.3, 0.02, '#fb8500', 0, 0.55, 0.41)); break;
-    case 'shopfront': {
-      const c = opts.color ?? '#3a86ff';
-      add(box(1.98, 2.6, 1.9, '#e9ecef'), box(1.98, 0.5, 0.2, c, 0, 2.1, 0.96), box(0.9, 1.5, 0.06, '#1b263b', 0, 0, 0.96), box(0.7, 1.0, 0.03, '#a9d6e5', 0, 0.6, 0.99));
-      const aw = new THREE.Mesh(new THREE.BoxGeometry(1.98, 0.08, 0.7), mat(hexShade(c, 0.1)));
-      aw.position.set(0, 1.85, 1.25); aw.rotation.x = 0.3; add(aw);
+    case 'marble': {
+      rect(0, 0, P, P, a);
+      g.strokeStyle = 'rgba(120,115,110,0.25)'; g.lineWidth = 1.2;
+      g.beginPath(); g.moveTo(X0, Y0 + nz(r, c) * P); g.bezierCurveTo(X0 + P * 0.3, Y0 + nz(c, r) * P, X0 + P * 0.7, Y0 + nz(r + 1, c) * P, X0 + P, Y0 + nz(r, c + 1) * P); g.stroke();
+      rect(0, 0, P, 1, 'rgba(0,0,0,0.08)'); rect(0, 0, 1, P, 'rgba(0,0,0,0.08)');
       break;
     }
-    case 'sign': add(cyl(0.06, 1.2, '#6b4423'), box(0.9, 0.5, 0.06, '#ffd166', 0, 1.1)); break;
-    case 'plant': add(box(0.55, 0.45, 0.55, '#bc6c25'), box(0.7, 0.45, 0.7, '#40916c', 0, 0.45), box(0.4, 0.35, 0.4, '#52b788', 0.05, 0.9, 0)); break;
-    case 'door': add(box(1.4, 0.04, 0.8, '#6b4423')); break;
-    case 'cone': add(new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.6, 6), mat('#fb8500'))); g.children[0].position.y = 0.3; break;
-    case 'mic': add(cyl(0.05, 1.3, '#adb5bd'), new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 4), mat('#212529')), box(1.8, 0.8, 0.6, '#1d3557', 0, 0, -0.7)); g.children[1].position.y = 1.35; break;
-    case 'dog': {
-      const c = opts.color ?? '#c68642';
-      add(box(0.9, 0.4, 0.4, c, 0, 0.3), box(0.4, 0.35, 0.35, c, 0.55, 0.55), box(0.12, 0.3, 0.12, hexShade(c, -0.1), -0.3, 0), box(0.12, 0.3, 0.12, hexShade(c, -0.1), 0.3, 0), box(0.3, 0.08, 0.08, c, -0.55, 0.55), box(0.1, 0.1, 0.1, '#111', 0.78, 0.65));
+    case 'tile': for (const [x, y] of [[0, 0], [P / 2, 0], [0, P / 2], [P / 2, P / 2]]) { rect(x, y, P / 2, P / 2, hexShade(a, (nz(X0 + x, Y0 + y) - 0.5) * 0.03)); rect(x, y, P / 2, 1.5, 'rgba(0,0,0,0.12)'); rect(x, y, 1.5, P / 2, 'rgba(0,0,0,0.12)'); } break;
+    case 'concrete': case 'polished': {
+      rect(0, 0, P, P, a);
+      for (let i = 0; i < 40; i++) rect(nz(i, r * 31 + c) * P, nz(c * 17 + i, r) * P, 2, 2, nz(i, c) < 0.5 ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)');
+      if (kind === 'polished') { const gr = g.createLinearGradient(X0, Y0, X0 + P, Y0 + P); gr.addColorStop(0, 'rgba(255,255,255,0.07)'); gr.addColorStop(1, 'rgba(0,0,0,0.04)'); g.fillStyle = gr; g.fillRect(X0, Y0, P, P); }
+      if (c % 3 === 0) rect(0, 0, 1, P, 'rgba(0,0,0,0.1)'); if (r % 3 === 0) rect(0, 0, P, 1, 'rgba(0,0,0,0.1)');
       break;
     }
-    default: break;
+    case 'rubber': rect(0, 0, P, P, a); g.globalAlpha = 0.35; for (let i = 0; i < 26; i++) rect(nz(i, r * 13 + c) * P, nz(c * 7 + i, r) * P, 1.2, 1.2, ['#8a3b33', '#3a6a8f', '#6b7378'][i % 3]); g.globalAlpha = 1; rect(0, 0, P, 1, 'rgba(0,0,0,0.35)'); rect(0, 0, 1, P, 'rgba(0,0,0,0.35)'); break;
+    case 'turf': rect(0, 0, P, P, (c % 2) ? a : b); if (c % 5 === 0) rect(0, 0, 3, P, 'rgba(255,255,255,0.85)'); for (let i = 0; i < 60; i++) rect(nz(i, r + c * 3) * P, nz(i * 3, c + r) * P, 1, 2, 'rgba(0,0,0,0.12)'); break;
+    case 'court': for (let i = 0; i < 6; i++) rect(0, i * (P / 6), P, P / 6 - 1, hexShade(a, (nz(r * 6 + i, c) - 0.5) * 0.05)); break;
+    case 'grass': case 'path': case 'pavers': case 'road': case 'water': case 'door': {
+      rect(0, 0, P, P, a);
+      if (kind === 'grass') for (let i = 0; i < 90; i++) rect(nz(i, r * 9 + c) * P, nz(c * 5 + i, r) * P, 1, 3, nz(i, r) < 0.5 ? 'rgba(0,0,0,0.08)' : 'rgba(230,255,200,0.08)');
+      if (kind === 'path') for (let i = 0; i < 60; i++) rect(nz(i, r * 9 + c) * P, nz(c * 5 + i, r) * P, 2, 2, 'rgba(0,0,0,0.08)');
+      if (kind === 'pavers') for (let y = 0; y < P; y += P / 4) for (let x = ((y / (P / 4)) % 2) * (P / 4); x < P; x += P / 2) { rect(x, y, P / 2, P / 4, hexShade(a, (nz(X0 + x, Y0 + y) - 0.5) * 0.06)); rect(x, y, P / 2, 1, 'rgba(0,0,0,0.15)'); rect(x, y, 1, P / 4, 'rgba(0,0,0,0.15)'); }
+      if (kind === 'road') { for (let i = 0; i < 80; i++) rect(nz(i, r * 9 + c) * P, nz(c * 5 + i, r) * P, 1.5, 1.5, 'rgba(255,255,255,0.05)'); if (ctx.roadCenter === r && c % 2 === 0) rect(4, P - 2, P - 8, 4, '#f2c94c'); }
+      if (kind === 'water') { const gr = g.createLinearGradient(X0, Y0, X0, Y0 + P); gr.addColorStop(0, a); gr.addColorStop(1, b); g.fillStyle = gr; g.fillRect(X0, Y0, P, P); }
+      if (kind === 'door') { rect(P * 0.1, P * 0.25, P * 0.8, P * 0.5, '#3b2f25'); rect(P * 0.14, P * 0.29, P * 0.72, P * 0.42, '#4d3d2f'); }
+      break;
+    }
+    default: rect(0, 0, P, P, a);
   }
-  return g;
 }
 
-/** Pixel-font sign that always faces the camera. */
-function textSprite(text, color) {
-  const c = document.createElement('canvas');
+/** Floating name board (always faces the camera). */
+function nameSign(text, color) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 112;
   const g = c.getContext('2d');
-  g.font = '800 10px Inter, sans-serif';
-  const w = Math.ceil(g.measureText(text.toUpperCase()).width) + 8;
-  c.width = w;
-  c.height = 14;
-  g.fillStyle = '#0e1116';
-  g.fillRect(0, 0, w, 14);
-  g.fillStyle = color;
-  g.fillRect(1, 1, w - 2, 12);
-  g.font = '800 10px Inter, sans-serif';
-  g.fillStyle = '#ffffff';
-  g.textBaseline = 'middle';
-  g.fillText(text.toUpperCase(), 4, 7.5);
-  const tex = new THREE.CanvasTexture(c);
-  tex.magFilter = THREE.NearestFilter;
-  tex.minFilter = THREE.NearestFilter;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
-  s.scale.set(w * 0.05, 14 * 0.05, 1);
-  return s;
+  g.fillStyle = color; g.beginPath(); g.roundRect?.(4, 4, 504, 104, 22); if (!g.roundRect) g.rect(4, 4, 504, 104); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 5; g.stroke();
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  let size = 56; g.font = `800 ${size}px Inter, sans-serif`;
+  while (g.measureText(text.toUpperCase()).width > 460 && size > 20) { size -= 2; g.font = `800 ${size}px Inter, sans-serif`; }
+  g.fillText(text.toUpperCase(), 256, 58);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, toneMapped: false }));
+  sp.scale.set(3.2, 0.7, 1);
+  return sp;
+}
+
+/** Big world-space room label lying on the floor. */
+function floorLabel(text) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 96;
+  const g = c.getContext('2d');
+  g.font = '800 54px Inter, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = 'rgba(255,255,255,0.55)'; g.fillText(text.toUpperCase(), 256, 50);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 0.83), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2;
+  m.position.y = 0.02;
+  return m;
 }
 
 // ------------------------------------------------------------------ world
 
 /**
- * Build a place. ctx: { scene, camera, state, lookFor(key), nameFor(key), check(needs) }
- * Returns { update(dt), interactables, player, spawn(), setInput(vec), tryInteract(), dispose() }.
+ * Build a place. ctx: { scene, camera, state, stage, lookFor(key), nameFor(key), check(needs) }
+ * Returns { update(dt), place, setInput(vec), focus(), emote(kind), dispose() }.
  */
 export function buildWorld(placeId, ctx) {
-  const place = PLACES[placeId];
+  const place = placeFor(placeId, ctx.stage ?? ctx.state?.career?.stage ?? 'pro');
   const rows = place.map;
   const W = Math.max(...rows.map((r) => r.length));
   const H = rows.length;
@@ -129,147 +134,165 @@ export function buildWorld(placeId, ctx) {
   const interactables = [];
   const npcs = [];
   const charAt = (r, c) => (rows[r]?.[c] ?? '#');
+  const entryAt = (r, c) => { const ch = charAt(r, c); return resolveEntry(place.legend[ch] ?? LEGEND[ch], ctx.check); };
+  const isWall = (r, c) => charAt(r, c) === '#';
+  const outdoor = place.outdoor;
 
-  // Floor texture: one pixel-art canvas for the whole map.
-  const PX = 16;
-  const cv = document.createElement('canvas');
-  cv.width = W * PX;
-  cv.height = H * PX;
-  const g2 = cv.getContext('2d');
-  const floorColors = (kind) => (kind && kind !== 'floor' && FLOOR_COLORS[kind]) || [place.floor, place.floorAlt];
-  const kindFor = (ch, entry) => {
-    if (entry?.floor) return entry.floor;
-    if (ch === ',') return 'grass';
-    if (ch === ':') return place.outdoor ? 'path' : 'floor';
-    if (ch === '=') return 'road';
-    if (ch === '~') return 'water';
-    if (ch === '_') return 'turf';
-    if (ch === 'E') return 'door';
-    return place.ground ?? (place.outdoor ? 'grass' : 'floor');
+  // ---- floor kinds per tile
+  const baseKind = place.floor ?? (outdoor ? 'grass' : 'wood');
+  const altKind = place.alt ?? (outdoor ? 'path' : 'tile');
+  const kindOf = (r, c) => {
+    const ch = charAt(r, c);
+    if (ch === '#') return outdoor ? 'pavers' : baseKind;
+    const fc = FLOOR_CHARS[ch];
+    if (fc === 'alt') return altKind;
+    if (fc) return fc;
+    const e = entryAt(r, c);
+    if (e?.floor) return e.floor === 'floor' ? baseKind : e.floor;
+    // props inherit the floor of a non-prop neighbour (so a couch on a rug sits on the rug)
+    for (const [dr, dc] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const n = charAt(r + dr, c + dc); const k = FLOOR_CHARS[n]; if (k && k !== 'door' && k !== 'water') return k === 'alt' ? altKind : k; }
+    return baseKind;
   };
-  // deterministic per-pixel noise
-  const nz = (x, y) => { const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return v - Math.floor(v); };
-  const dot = (x, y, col) => { g2.fillStyle = col; g2.fillRect(x, y, 1, 1); };
+  // the road's middle row gets the dashed center line
+  const roadRows = rows.map((row, r) => (row.includes('=') ? r : -1)).filter((r) => r >= 0);
+  const roadCenter = roadRows.length ? roadRows[Math.floor(roadRows.length / 2) - (roadRows.length % 2 ? 0 : 1)] : -1;
+
+  const cv = document.createElement('canvas');
+  cv.width = W * PX; cv.height = H * PX;
+  const g2 = cv.getContext('2d');
   let startTile = null;
-  const tufts = [];
   for (let r = 0; r < H; r++) {
     solid.push([]);
     for (let c = 0; c < W; c++) {
       const ch = charAt(r, c);
-      const entry = resolveEntry(place.legend[ch] ?? LEGEND[ch], ctx.check);
-      const isWall = ch === '#';
-      const kind = isWall ? 'floor' : kindFor(ch, entry);
-      const [a, b] = floorColors(place.outdoor && kind === 'floor' ? 'path' : kind);
-      const X0 = c * PX;
-      const Y0 = r * PX;
-      g2.fillStyle = kind === 'grass' || kind === 'road' || kind === 'water' || kind === 'path' ? a : (r + c) % 2 ? a : b;
-      g2.fillRect(X0, Y0, PX, PX);
-      // pixel texture details per surface
-      for (let y = 0; y < PX; y++) {
-        for (let x = 0; x < PX; x++) {
-          const n = nz(X0 + x, Y0 + y);
-          if (kind === 'grass') { if (n < 0.1) dot(X0 + x, Y0 + y, hexShade(a, -0.07)); else if (n > 0.93) dot(X0 + x, Y0 + y, hexShade(a, 0.06)); }
-          else if (kind === 'path') { if (n < 0.08) dot(X0 + x, Y0 + y, hexShade(a, -0.09)); else if (n > 0.95) dot(X0 + x, Y0 + y, hexShade(a, 0.07)); }
-          else if (kind === 'road') { if (n < 0.12) dot(X0 + x, Y0 + y, hexShade(a, 0.04)); else if (n > 0.96) dot(X0 + x, Y0 + y, hexShade(a, -0.05)); }
-          else if (kind === 'water') { if ((y + Math.floor(x / 4) + r) % 6 === 0 && n > 0.4) dot(X0 + x, Y0 + y, hexShade(a, 0.12)); }
-          else if (kind === 'floor' && !place.outdoor) {
-            // wood planks: 4 planks per tile, staggered seams, a little grain
-            if (y % 4 === 3) dot(X0 + x, Y0 + y, hexShade(a, -0.08));
-            else if ((x + (Math.floor((Y0 + y) / 4) % 2) * 8 + c * 5) % 16 === 0) dot(X0 + x, Y0 + y, hexShade(a, -0.07));
-            else if (n < 0.06) dot(X0 + x, Y0 + y, hexShade(a, -0.03));
-          }
-        }
-      }
-      if (kind === 'road' && r % 2 === 0 && c % 3 === 0) { g2.fillStyle = '#ffd166'; g2.fillRect(X0 + 2, Y0 + PX - 2, 10, 2); }
-      if (kind === 'turf') { g2.fillStyle = 'rgba(255,255,255,0.9)'; if (c % 3 === 0) g2.fillRect(X0, Y0, 2, PX); }
-      if (kind === 'court') { g2.fillStyle = '#ffffff'; if (r % 3 === 0) g2.fillRect(X0, Y0, PX, 2); }
-      if (kind === 'door') { g2.fillStyle = hexShade(a, -0.12); g2.fillRect(X0, Y0 + 7, PX, 2); }
-      if (kind === 'grass' && !entry && nz(r * 3.1, c * 7.7) > 0.72) tufts.push({ x: toX(c) + (nz(c, r) - 0.5) * 1.4, z: toZ(r) + (nz(r, c) - 0.5) * 1.4, flower: nz(c * 2, r * 5) > 0.7 });
-      solid[r][c] = isWall || ch === '~' || !!entry?.solid;
+      const kind = kindOf(r, c);
+      if (kind === 'rug') {
+        // rugs: accent colour with a border, drawn over the room floor
+        paintTile(g2, baseKind, c * PX, r * PX, r, c, { roadCenter });
+        const acc = place.accent ?? '#5b7ca0';
+        g2.fillStyle = acc; g2.fillRect(c * PX, r * PX, PX, PX);
+        g2.fillStyle = hexShade(acc, 0.12);
+        const edge = (dr, dc) => charAt(r + dr, c + dc) !== ';';
+        if (edge(-1, 0)) g2.fillRect(c * PX, r * PX + 4, PX, 3);
+        if (edge(1, 0)) g2.fillRect(c * PX, r * PX + PX - 7, PX, 3);
+        if (edge(0, -1)) g2.fillRect(c * PX + 4, r * PX, 3, PX);
+        if (edge(0, 1)) g2.fillRect(c * PX + PX - 7, r * PX, 3, PX);
+        for (let i = 0; i < 50; i++) { g2.fillStyle = 'rgba(0,0,0,0.06)'; g2.fillRect(c * PX + nz(i, r) * PX, r * PX + nz(c, i) * PX, 1, 1); }
+      } else paintTile(g2, kind, c * PX, r * PX, r, c, { roadCenter });
+      const e = entryAt(r, c);
+      solid[r][c] = ch === '#' || ch === '~' || !!e?.solid;
       if (ch === place.start && !startTile) startTile = { r, c };
     }
   }
   const tex = new THREE.CanvasTexture(cv);
-  tex.magFilter = THREE.NearestFilter;
-  tex.minFilter = THREE.NearestFilter;
   tex.colorSpace = THREE.SRGBColorSpace;
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * S, H * S), new THREE.MeshLambertMaterial({ map: tex }));
+  tex.anisotropy = 8;
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * S, H * S), new THREE.MeshStandardMaterial({ map: tex, roughness: baseKind === 'marble' || baseKind === 'polished' ? 0.35 : 0.85 }));
   floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
   root.add(floor);
-  // Big ground around outdoor places.
-  if (place.outdoor) {
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(W * S + 80, H * S + 80), new THREE.MeshLambertMaterial({ color: placeId === 'downtown' ? '#6c757d' : '#3d8b37' }));
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.02;
+  // water surfaces (pool / harbor) sit a little lower and shine
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (charAt(r, c) === '~') {
+    const wm = new THREE.Mesh(new THREE.PlaneGeometry(S, S), M('#3c94d6', 0.08, 0.3));
+    wm.rotation.x = -Math.PI / 2; wm.position.set(toX(c), 0.03, toZ(r)); root.add(wm);
+  }
+  {
+    // what's around the building / park: lawn for the family home, hallway for the dorm, terrace stone for the penthouse
+    const around = outdoor ? (placeId === 'downtown' ? '#7d8288' : '#4c8f42')
+      : ({ home: { hs: '#5d8f4a', college: '#7b8088', pro: '#3a3f46' }, stadium: { hs: '#6f7a62', college: '#5c636b', pro: '#454b52' } }[placeId]?.[ctx.stage ?? 'pro'] ?? '#444a50');
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(W * S + 140, H * S + 140), M(around, 0.95));
+    ground.rotation.x = -Math.PI / 2; ground.position.y = -0.02; ground.receiveShadow = true;
     root.add(ground);
   }
 
-  // Walls (instanced so they can be cut away near the camera).
-  const wallCells = [];
-  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (charAt(r, c) === '#') wallCells.push({ r, c });
-  // Interior walls stay low (cutaway view) so you can see into every room; the back wall is tall.
-  const wallH = place.outdoor ? 1.2 : 1.1;
-  const wallCol = place.wall ?? '#7f8c8d';
-  const wallSide = (() => {
-    const c = document.createElement('canvas');
-    c.width = 16; c.height = 16;
+  // ---- walls: thin segments along the wall lines (indoors), building fronts / hedges (outdoors)
+  const wallCol = place.wall ?? '#e3ded6';
+  const wallMat = (() => {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 128;
     const g = c.getContext('2d');
-    g.fillStyle = wallCol; g.fillRect(0, 0, 16, 16);
-    if (place.outdoor) { // brick
-      g.fillStyle = hexShade(wallCol, -0.08);
-      for (let y = 0; y < 16; y += 4) { g.fillRect(0, y + 3, 16, 1); for (let x = (y / 4) % 2 ? 0 : 4; x < 16; x += 8) g.fillRect(x, y, 1, 3); }
-    } else { // painted wall with a baseboard and trim
-      g.fillStyle = hexShade(wallCol, 0.06); g.fillRect(0, 0, 16, 2);
-      g.fillStyle = hexShade(wallCol, -0.18); g.fillRect(0, 13, 16, 3);
-    }
-    const t = new THREE.CanvasTexture(c);
-    t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace;
-    return new THREE.MeshLambertMaterial({ map: t });
+    const gr = g.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, hexShade(wallCol, 0.03)); gr.addColorStop(1, hexShade(wallCol, -0.04));
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 128);
+    g.fillStyle = hexShade(wallCol, -0.25); g.fillRect(0, 116, 64, 12); // baseboard
+    g.fillStyle = hexShade(wallCol, 0.06); g.fillRect(0, 0, 64, 4);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 });
   })();
-  const wallTop = new THREE.MeshLambertMaterial({ color: hexShade(wallCol, 0.14) });
-  const walls = new THREE.InstancedMesh(new THREE.BoxGeometry(S, 1, S), [wallSide, wallSide, wallTop, wallTop, wallSide, wallSide], Math.max(1, wallCells.length));
+  const capMat = M(hexShade(wallCol, -0.12), 0.8);
+  const segs = [];
+  const THK = 0.24;
+  if (!outdoor) {
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+      if (!isWall(r, c)) continue;
+      const hz = isWall(r, c - 1) || isWall(r, c + 1);
+      const vt = isWall(r - 1, c) || isWall(r + 1, c);
+      const x = toX(c); const z = toZ(r);
+      if (hz || !vt) segs.push({ r, x, z, sx: S, sz: THK });
+      if (vt && r !== H - 1) segs.push({ r, x, z, sx: THK, sz: S, v: true }); // no stubs along the cut-away front edge
+    }
+  }
+  const walls = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), [wallMat, wallMat, capMat, capMat, wallMat, wallMat], Math.max(1, segs.length));
+  walls.castShadow = true; walls.receiveShadow = true;
   const dummy = new THREE.Object3D();
   const placeWalls = (playerRow) => {
-    wallCells.forEach((w, i) => {
-      // Walls in front of the player (closer to the camera) drop low so you can always see yourself.
-      const h = w.r === 0 ? (place.outdoor ? 1.2 : 2.6) : w.r > playerRow || w.r === H - 1 ? 0.3 : wallH;
-      dummy.position.set(toX(w.c), h / 2, toZ(w.r));
-      dummy.scale.set(1, h, 1);
+    segs.forEach((w, i) => {
+      // tall at the back, low in front of the player so you can always see yourself
+      const h = w.r === 0 ? 3.0 : w.r > playerRow || w.r === H - 1 ? 0.28 : 1.15;
+      dummy.position.set(w.x, h / 2, w.z);
+      dummy.scale.set(w.sx, h, w.sz);
       dummy.updateMatrix();
       walls.setMatrixAt(i, dummy.matrix);
     });
     walls.instanceMatrix.needsUpdate = true;
   };
-  walls.count = wallCells.length;
+  walls.count = segs.length;
   root.add(walls);
-
-  // Grass tufts and little flowers (instanced voxels).
-  if (tufts.length) {
-    const tg = new THREE.BoxGeometry(0.12, 0.22, 0.12);
-    tg.translate(0, 0.11, 0);
-    const tm = new THREE.InstancedMesh(tg, new THREE.MeshLambertMaterial({ color: '#ffffff' }), tufts.length * 3);
-    const flowerCols = ['#ffd166', '#ef476f', '#ffffff', '#9b5de5'].map((x) => new THREE.Color(x));
-    const grassCol = new THREE.Color(hexShade(FLOOR_COLORS.grass[0], -0.1));
-    let k = 0;
-    for (const t of tufts) {
-      for (let j = 0; j < 3; j++) {
-        dummy.position.set(t.x + (j - 1) * 0.14, 0, t.z + ((j * 7) % 3 - 1) * 0.1);
-        dummy.scale.set(1, j === 1 ? 1.4 : 1, 1);
-        dummy.updateMatrix();
-        tm.setMatrixAt(k, dummy.matrix);
-        tm.setColorAt(k, t.flower && j === 1 ? flowerCols[k % 4] : grassCol);
-        k++;
-      }
+  // windows along the back wall (indoors)
+  if (!outdoor) {
+    for (let c = 2; c < W - 2; c += 4) if (isWall(0, c) && !isWall(1, c)) {
+      const win = new THREE.Group();
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.1, 0.06), M('#f4f4f2', 0.5));
+      const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.95), new THREE.MeshBasicMaterial({ color: place.id === 'home' && ctx.stage === 'pro' ? '#9fc6ea' : '#bcdcf5', toneMapped: false }));
+      glass.position.z = 0.035; win.add(frame, glass);
+      win.position.set(toX(c), 1.75, toZ(0) + THK / 2 + 0.02);
+      root.add(win);
     }
-    dummy.scale.set(1, 1, 1);
-    root.add(tm);
+  } else {
+    // outdoors: '#' tiles are building fronts next to shops and hedges elsewhere
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (isWall(r, c)) {
+      const nearShop = ['G', 'S', 'H', 'P', 'X', 'Q', 'B', 'f', 'C', 'R', '$', 'U', 'J', 'Z', 'I', 'h'].some((k) => charAt(r, c - 1) === k || charAt(r, c + 1) === k) || r === 0 || r === H - 1;
+      const p = nearShop && placeId === 'downtown' ? makeProp('facade', { color: ['#b7ad9f', '#a7a19a', '#c4b7a3'][(r + c) % 3], h: r === 0 || r === H - 1 ? 4.6 : 4.6 }) : makeProp('hedge');
+      p.position.set(toX(c), 0, toZ(r));
+      if (r === H - 1) p.rotation.y = Math.PI;
+      if (r > H / 2 && placeId === 'downtown') p.scale.y = r === H - 1 ? 0.18 : 0.3; // keep the street visible
+      root.add(p);
+    }
   }
 
-  // Props, NPCs and interactables.
+  // ---- skyline / backdrop outdoors
+  if (outdoor) {
+    const back = new THREE.Group();
+    const kind = place.skyline ?? (placeId === 'park' ? 'trees' : 'town');
+    for (let i = -14; i <= 14; i++) {
+      const x = i * 5 + (nz(i, 2) - 0.5) * 2;
+      if (kind === 'city' || kind === 'college' || kind === 'town') {
+        const h = kind === 'city' ? 10 + nz(i, 5) * 28 : kind === 'college' ? 5 + nz(i, 5) * 8 : 3.5 + nz(i, 5) * 3;
+        const b = new THREE.Mesh(new THREE.BoxGeometry(4.2, h, 4), M(['#9aa5b1', '#b4aa9b', '#8a96a3', '#c0b5a5', '#7d8894'][(i + 20) % 5], 0.8, kind === 'city' ? 0.25 : 0));
+        b.position.set(x, h / 2, toZ(0) - 9 - nz(i, 9) * 6); back.add(b);
+      } else {
+        const t = makeProp('tree', { seed: i + 30 }); t.position.set(x, 0, toZ(0) - 5 - nz(i, 4) * 6); t.scale.setScalar(1.2 + nz(i, 7) * 0.6); back.add(t);
+      }
+    }
+    root.add(back);
+  }
+
+  // ---- props, NPCs and interactables
+  const tvSpots = [];
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) { const e = entryAt(r, c); if (e?.prop === 'tv' || e?.prop === 'screen') tvSpots.push({ x: toX(c), z: toZ(r) }); }
+  const done = new Set();
   for (let r = 0; r < H; r++) {
     for (let c = 0; c < W; c++) {
       const ch = charAt(r, c);
-      const entry = resolveEntry(place.legend[ch] ?? LEGEND[ch], ctx.check);
+      const entry = entryAt(r, c);
       if (!entry) continue;
       const x = toX(c);
       const z = toZ(r);
@@ -279,6 +302,7 @@ export function buildWorld(placeId, ctx) {
         if (key === 'pet') mesh = makeProp('dog');
         else mesh = makePerson(ctx.lookFor(key) ?? { shirt: '#888', pants: '#333', skin: 1, hair: 1, hairStyle: 0 });
         mesh.position.set(x, 0, z);
+        mesh.traverse((o) => { if (o.isMesh) o.castShadow = true; });
         root.add(mesh);
         const npc = { key, mesh, home: { x, z }, wander: entry.npc.wander ?? 0, target: null, wait: Math.random() * 2, pet: key === 'pet' };
         npcs.push(npc);
@@ -286,37 +310,77 @@ export function buildWorld(placeId, ctx) {
         else interactables.push({ x, z, r: 1.8, label: key === 'fan' ? 'Talk to fan' : `Talk to ${ctx.nameFor(key)}`, act: { kind: 'person', key }, npc });
         continue;
       }
+      if (done.has(`${r},${c}`)) continue;
+      // footprint: a run of the same character (span props are built once across it)
+      let w = 1; let d = 1;
+      if (entry.span) {
+        while (charAt(r, c + w) === ch) w++;
+        while (charAt(r + d, c) === ch) d++;
+        for (let rr = 0; rr < d; rr++) for (let cc = 0; cc < w; cc++) done.add(`${r + rr},${c + cc}`);
+      }
+      const cx = x + (w - 1) * S / 2;
+      const cz = z + (d - 1) * S / 2;
       if (entry.prop) {
-        const prop = makeProp(entry.prop, { color: entry.color });
-        prop.position.set(x, 0, z);
-        root.add(prop);
-        if (entry.prop === 'shopfront' && entry.label && charAt(r, c - 1) !== ch) {
-          const sign = textSprite(entry.label.split(':')[0], entry.color ?? '#3a86ff');
-          sign.position.set(x + (charAt(r, c + 1) === ch ? S / 2 : 0), 3.3, z + 0.6);
+        const prop = makeProp(entry.prop, { w, d, color: entry.color, accent: place.accent, label: entry.label, seed: r * 31 + c });
+        // face the room: back against the nearest wall; couches face the TV
+        let rot = 0;
+        if (entry.prop === 'couch' && tvSpots.length) {
+          const tv = tvSpots.reduce((best, t) => (Math.hypot(t.x - cx, t.z - cz) < Math.hypot(best.x - cx, best.z - cz) ? t : best));
+          rot = Math.atan2(cx - tv.x, cz - tv.z) + Math.PI;
+          rot = Math.round(rot / (Math.PI / 2)) * (Math.PI / 2);
+        } else {
+          const wallN = [...Array(w)].some((_, k) => isWall(r - 1, c + k) || (outdoor && r === 1));
+          const wallS = [...Array(w)].some((_, k) => isWall(r + d, c + k));
+          const wallW = [...Array(d)].some((_, k) => isWall(r + k, c - 1));
+          const wallE = [...Array(d)].some((_, k) => isWall(r + k, c + w));
+          if (wallN) rot = 0; else if (wallS) rot = Math.PI; else if (wallW && w === 1) rot = -Math.PI / 2; else if (wallE && w === 1) rot = Math.PI / 2;
+          if (outdoor && entry.prop === 'shopfront' && r > H / 2) rot = Math.PI;
+        }
+        prop.rotation.y = rot;
+        prop.position.set(cx, 0, cz);
+        // buildings on the near side of the street face away from the camera: cut them down low and float a sign
+        if (outdoor && entry.prop === 'shopfront' && r > H / 2) {
+          prop.scale.y = 0.3;
+          const sign = nameSign((entry.label ?? '').split(':')[0], entry.color ?? '#3a86ff');
+          sign.position.set(cx, 2.2, cz);
           root.add(sign);
         }
+        if (outdoor && entry.prop === 'tree' && r === H - 1) prop.scale.setScalar(0.7);
+        root.add(prop);
       }
       if (entry.act && !(ch === place.start && interactables.some((i) => i.act.kind === 'travel'))) {
-        interactables.push({ x, z, r: entry.solid ? 2.0 : 1.4, label: entry.label ?? entry.act.name ?? '', act: entry.act });
+        interactables.push({ x: cx, z: cz, r: (entry.solid ? 2.0 : 1.4) + (Math.max(w, d) - 1) * 0.9, label: entry.label ?? entry.act.name ?? '', act: entry.act });
       }
     }
   }
+  // room labels
+  for (const [text, r, c] of place.rooms ?? []) {
+    const l = floorLabel(text);
+    l.position.x = toX(c); l.position.z = toZ(r);
+    root.add(l);
+  }
 
-  // Lights.
-  const hemi = new THREE.HemisphereLight('#ffffff', '#666666', 2.0);
-  const sun = new THREE.DirectionalLight('#fff4e0', 1.6);
-  sun.position.set(-10, 25, 15);
-  root.add(hemi, sun);
+  // ---- lights (soft shadows from the key light)
+  const hemi = new THREE.HemisphereLight(outdoor ? '#dceaff' : '#fff6ea', outdoor ? '#4c6a42' : '#6a5a4a', outdoor ? 1.0 : 0.85);
+  const sun = new THREE.DirectionalLight(outdoor ? '#fff2dc' : '#fff1e0', outdoor ? 2.6 : 1.8);
+  sun.position.set(-W * 0.6, 30, H * 0.8);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  const half = Math.max(W, H) * S * 0.62;
+  Object.assign(sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half, near: 1, far: 90 });
+  sun.shadow.bias = -0.0006;
+  sun.shadow.normalBias = 0.02;
+  root.add(hemi, sun, sun.target);
 
-  // Player.
+  // ---- player
   const look = ctx.lookFor('self');
   const player = makePerson(look, { highlight: true });
-  // Spawn on the nearest open tile next to the entrance (search outward from the door).
+  player.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   const sr0 = startTile ?? { r: H - 2, c: Math.floor(W / 2) };
   let sr = { r: sr0.r - 1, c: sr0.c };
-  outer: for (let d = 1; d < 6; d++) {
-    for (let dc = -d; dc <= d; dc++) {
-      const r = sr0.r - d;
+  outer: for (let dd = 1; dd < 6; dd++) {
+    for (let dc = -dd; dc <= dd; dc++) {
+      const r = sr0.r - dd;
       const c = sr0.c + dc;
       if (r >= 0 && c >= 0 && c < W && !solid[r][c]) { sr = { r, c }; break outer; }
     }
@@ -337,35 +401,35 @@ export function buildWorld(placeId, ctx) {
     return solid[r][c];
   };
   const canStand = (x, z) => {
-    const rad = 0.45;
+    const rad = 0.4;
     return !blocked(x - rad, z - rad) && !blocked(x + rad, z - rad) && !blocked(x - rad, z + rad) && !blocked(x + rad, z + rad);
   };
 
   let input = { x: 0, z: 0 };
   let focus = null;
   let lastRow = -1;
-  const zoom = place.outdoor ? 1.15 : 1.0;
-  ctx.camera.position.set(pos.x, 15 * zoom, pos.z + 12 * zoom);
+  const zoom = outdoor ? 1.15 : 1.0;
+  ctx.camera.position.set(pos.x, 14 * zoom, pos.z + 11 * zoom);
   ctx.camera.lookAt(pos.x, 0, pos.z - 1);
 
   const update = (dt) => {
-    // Move.
+    // move
     const len = Math.hypot(input.x, input.z);
     let speed = 0;
     if (len > 0.08) {
       const k = Math.min(1, len);
-      const vx = (input.x / len) * k * 6.5;
-      const vz = (input.z / len) * k * 6.5;
+      const vx = (input.x / len) * k * 5.2;
+      const vz = (input.z / len) * k * 5.2;
       const nx = pos.x + vx * dt;
-      const nz = pos.z + vz * dt;
+      const nzz = pos.z + vz * dt;
       if (canStand(nx, pos.z)) pos.x = nx;
-      if (canStand(pos.x, nz)) pos.z = nz;
-      speed = 6.5 * k;
+      if (canStand(pos.x, nzz)) pos.z = nzz;
+      speed = 5.2 * k;
       faceToward(player, pos.x + vx, pos.z + vz);
     }
     player.position.set(pos.x, 0, pos.z);
     animateRun(player, dt, speed);
-    // NPCs idle and wander.
+    // NPCs idle and wander
     for (const n of npcs) {
       n.wait -= dt;
       if (n.wander > 0 && n.wait <= 0 && !n.target) {
@@ -382,20 +446,19 @@ export function buildWorld(placeId, ctx) {
         const d = Math.hypot(dx, dz);
         if (d < 0.1) n.target = null;
         else {
-          sp = n.pet ? 3 : 1.6;
+          sp = n.pet ? 3 : 1.4;
           n.mesh.position.x += (dx / d) * sp * dt;
           n.mesh.position.z += (dz / d) * sp * dt;
           if (n.pet) n.mesh.rotation.y = Math.atan2(-dz, dx);
           else faceToward(n.mesh, n.mesh.position.x + dx, n.mesh.position.z + dz);
         }
       } else if (!n.pet) {
-        // Face the player when nearby.
         const dp = Math.hypot(n.mesh.position.x - pos.x, n.mesh.position.z - pos.z);
         if (dp < 4) faceToward(n.mesh, pos.x, pos.z);
       }
       if (!n.pet) animateRun(n.mesh, dt, sp);
     }
-    // Interactable focus.
+    // interactable focus
     let best = null;
     let bd = Infinity;
     for (const it of interactables) {
@@ -412,18 +475,18 @@ export function buildWorld(placeId, ctx) {
     if (focus) {
       const ix = focus.npc ? focus.npc.mesh.position.x : focus.x;
       const iz = focus.npc ? focus.npc.mesh.position.z : focus.z;
-      marker.position.set(ix, 3.6 + Math.sin(performance.now() / 200) * 0.15, iz);
+      marker.position.set(ix, 3.4 + Math.sin(performance.now() / 200) * 0.15, iz);
     }
-    // Walls cut away in front of the player.
+    // walls cut away in front of the player
     const row = Math.floor((pos.z + (H * S) / 2) / S);
     if (row !== lastRow) { placeWalls(row); lastRow = row; }
-    // Camera follow.
+    // camera follow
     const a = 1 - Math.exp(-5 * dt);
     const cam = ctx.camera;
     cam.position.x += (pos.x - cam.position.x) * a;
-    cam.position.y += (15 * zoom - cam.position.y) * a;
-    cam.position.z += (pos.z + 12 * zoom - cam.position.z) * a;
-    cam.lookAt(cam.position.x, 0, cam.position.z - 12 * zoom - 1);
+    cam.position.y += (14 * zoom - cam.position.y) * a;
+    cam.position.z += (pos.z + 11 * zoom - cam.position.z) * a;
+    cam.lookAt(cam.position.x, 0, cam.position.z - 11 * zoom - 1);
   };
 
   return {
@@ -440,4 +503,4 @@ export function buildWorld(placeId, ctx) {
   };
 }
 
-export { setPose };
+export { setPose, makeProp };

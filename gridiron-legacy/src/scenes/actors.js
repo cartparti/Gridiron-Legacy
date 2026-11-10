@@ -121,13 +121,38 @@ function geo() {
   G.fore = limb(0.12, 0.31, 0.12, -0.15, 0.8);
   G.hand = box(0.1, 0.12, 0.11, 0, 0.45, 3);
   G.band = box(0.135, 0.06, 0.135, 0, 0.45, 3);
-  G.head = softBox(0.33, 0.38, 0.36, 0.15, 6);
+  G.head = headGeo('oval');
   G.headScale = 0.86;
+  G.joint = new THREE.SphereGeometry(1, 16, 12);
   G.ball = new THREE.SphereGeometry(0.11, 8, 6);
   G.shadow = new THREE.CircleGeometry(0.5, 14);
   return G;
 }
 // soft contact shadow under each player (radial gradient), cheaper than real shadow maps
+/** Head shapes: proportions + jaw taper (lower half narrower or squarer). Keeps the six face groups. */
+const HEAD_DIMS = { oval: [0.33, 0.39, 0.36, 0.15, 0.84], round: [0.37, 0.36, 0.37, 0.18, 0.95], square: [0.36, 0.38, 0.35, 0.075, 1.04],
+  long: [0.31, 0.43, 0.35, 0.13, 0.84], wide: [0.39, 0.36, 0.36, 0.13, 0.97], heart: [0.35, 0.39, 0.35, 0.15, 0.66] };
+const headCache = {};
+function headGeo(shape = 'oval') {
+  if (headCache[shape]) return headCache[shape];
+  const [w, h, d, r, jaw] = HEAD_DIMS[shape] ?? HEAD_DIMS.oval;
+  const b = softBox(w, h, d, r, 6);
+  const pos = b.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i) / (h / 2); // -1 chin .. 1 crown
+    if (y < 0.1) { const k = 1 - (1 - jaw) * Math.min(1, (0.1 - y) / 1.1); pos.setX(i, pos.getX(i) * k); }
+    if (y < -0.3) pos.setZ(i, pos.getZ(i) * (1 - (-0.3 - y) * 0.12)); // chin a touch forward/narrower front to back
+  }
+  headCache[shape] = b;
+  return b;
+}
+/** Body types: overall build multipliers + limb thickness. */
+const BODY_TYPES = {
+  lean: { torso: 0.92, depth: 0.92, arm: 0.88, leg: 0.9 }, athletic: { torso: 1, depth: 1, arm: 1, leg: 1 },
+  muscular: { torso: 1.08, depth: 1.06, arm: 1.16, leg: 1.1 }, stocky: { torso: 1.12, depth: 1.18, arm: 1.1, leg: 1.14, belly: true },
+  lanky: { torso: 0.9, depth: 0.9, arm: 0.86, leg: 0.88, tall: 1.04 },
+};
+
 const shadowMat = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 64;
   const g = c.getContext('2d');
@@ -466,7 +491,9 @@ function buildRig(o) {
   const body = new THREE.Group();
   root.add(body);
   const sc = bodyScale(L);
-  body.scale.set(sc.build, sc.height, Math.min(1.15, 0.5 + sc.build * 0.5));
+  const bt = BODY_TYPES[L.bodyType] ?? BODY_TYPES.athletic;
+  body.scale.set(sc.build, sc.height * (bt.tall ?? 1), Math.min(1.15, 0.5 + sc.build * 0.5));
+  const joint = (r, mat, x = 0, y = 0, z = 0, sy = 1) => { const m = new THREE.Mesh(g.joint, mat); m.scale.set(r, r * sy, r); m.position.set(x, y, z); return m; };
   const skinC = SKIN_TONES[L.skin % SKIN_TONES.length];
   const hairC = HAIR_COLORS[(L.hairColor ?? 0) % HAIR_COLORS.length];
   const skin = toon(skinC);
@@ -501,13 +528,16 @@ function buildRig(o) {
   const mkLeg = (side) => {
     const hip = new THREE.Group();
     hip.position.set(side * 0.1, -0.04, 0);
-    hip.add(new THREE.Mesh(g.thigh, pants));
+    const th = new THREE.Mesh(g.thigh, pants); th.scale.set(bt.leg, 1, bt.leg); hip.add(th);
+    hip.add(joint(0.098 * bt.leg, pants, 0, -0.02, 0)); // hip joint blends thigh into hips
     const knee = new THREE.Group();
     knee.position.y = -0.48;
     hip.add(knee);
     const legSleeve = football && onSide(L.legSleeve, side);
     const shin = new THREE.Mesh(g.shin, legSleeve ? toon(L.legSleeveColor ?? '#16181c') : football ? sock : pants);
+    shin.scale.set(bt.leg, 1, bt.leg);
     knee.add(shin);
+    knee.add(joint(0.082 * bt.leg, legSleeve ? toon(L.legSleeveColor ?? '#16181c') : football ? pants : pants, 0, 0.01, 0)); // knee
     if (football && !legSleeve) { const sk = new THREE.Mesh(box(0.15, 0.05, 0.155), toon(un.trim)); sk.position.y = -0.1; knee.add(sk); }
     if (football && onSide(L.kneeBrace, side)) {
       const kb = new THREE.Mesh(box(0.19, 0.16, 0.2), braceTex(L.kneeColor ?? '#16181c'));
@@ -543,7 +573,10 @@ function buildRig(o) {
   torso.position.y = -0.02;
   spine.add(torso);
   const fitK = football ? ({ tight: 0.92, loose: 1.09 }[L.jFit] ?? 1) : 1;
-  torso.scale.set(fitK, 1, fitK);
+  torso.scale.set(fitK * bt.torso, 1, fitK * bt.depth);
+  if (bt.belly) { const belly = joint(0.17, football ? toon(un.jersey) : toon(shirtC), 0, 0.12, -0.07, 0.85); belly.scale.z *= 0.75; spine.add(belly); }
+  // trapezius: slopes the neck down into the shoulders so the head doesn't sit on a flat shelf
+  const traps = joint(0.15, football ? toon(un.jersey) : (o.tie ? toon(shirtC) : toon(shirtC)), 0, 0.5, 0.02, 0.45); traps.scale.x *= 1.25; spine.add(traps);
   if (football && L.jLength === 'crop') {
     // cropped jersey: shorter, showing a band of undershirt (or skin) above the pants
     torso.scale.y = 0.8;
@@ -591,7 +624,7 @@ function buildRig(o) {
   neckBox.position.y = 0.035;
   neck.add(neckBox);
   const helmetOn = football && o.helmet !== false;
-  const head = new THREE.Mesh(g.head, sixFaces(
+  const head = new THREE.Mesh(headGeo(L.headShape), sixFaces(
     sideMat(L, hairC, false), sideMat(L, hairC, true), topMat(L, hairC), skin, backMat(L, hairC),
     faceMat(L, hairC, { eyeBlack: helmetOn && L.eyeBlack }),
   ));
@@ -624,11 +657,15 @@ function buildRig(o) {
     const rows = football && L.jSleeve === 'cutoff' ? 3 : 7;
     const upper = new THREE.Mesh(g.upper, armMat(skinC, shirtC, football ? un.trim : null, tat, 'upper', armSleeve, rows));
     if (football && L.jFit === 'tight') upper.scale.set(0.94, 1, 0.94);
+    upper.scale.x *= bt.arm; upper.scale.z *= bt.arm;
     sh.add(upper);
+    // deltoid blends shoulder into arm (sleeve colour on players, shirt/skin on people)
+    sh.add(joint(0.085 * bt.arm, football ? (rows <= 3 ? skin : toon(shirtC)) : (o.tie ? toon(shirtC) : toon(shirtC)), 0, -0.02, 0, 1.05));
     const el = new THREE.Group();
     el.position.y = -0.31;
     sh.add(el);
-    el.add(new THREE.Mesh(g.fore, armMat(skinC, shirtC, null, tat, 'fore', armSleeve)));
+    const fore = new THREE.Mesh(g.fore, armMat(skinC, shirtC, null, tat, 'fore', armSleeve)); fore.scale.set(bt.arm, 1, bt.arm); el.add(fore);
+    el.add(joint(0.066 * bt.arm, armSleeve ? toon(armSleeve) : skin, 0, 0.005, 0)); // elbow
     if (football && onSide(L.elbowPad, side)) { const ep = new THREE.Mesh(box(0.145, 0.09, 0.145), toon(L.elbowColor ?? '#16181c')); ep.position.y = -0.02; el.add(ep); }
     const wrist = football && (L.wristband === 'both' || L.wristband === (side < 0 ? 'left' : 'right'));
     if (wrist) { const b = new THREE.Mesh(g.band, toon(L.wristColor ?? '#f2f2f2')); b.position.y = -0.25; el.add(b); }
