@@ -3,13 +3,14 @@ import { h, clear } from '../dom.js';
 import { openModal, toast } from '../components.js';
 import {
   SKIN_TONES, HAIR_COLORS, EYE_COLORS, GEAR_COLORS, HAIR_STYLES, BROWS, EYES, NOSES, MOUTHS, BEARDS, TATTOOS,
-  SIDES, VISORS, CELEBRATIONS, SPATS, TOWELS, CHAINS, normalizeLook, MASKS, MASK_COLORS, STRIPES, FINISHES, HEIGHT_RANGE, WEIGHT_RANGE, fmtHeight, randomLook, sizeStatMods,
+  SIDES, VISORS, CELEBRATIONS, SPATS, TOWELS, CHAINS, normalizeLook,
+  NECK_TATTOOS, JERSEY_SLEEVES, JERSEY_LENGTHS, JERSEY_FITS, PAD_SIZES, PAD_EXTRAS, SOCKS, MOUTHGUARDS, CLEAT_DESIGNS, CLEAT_CUTS, GLOVE_DESIGNS, MASKS, MASK_COLORS, STRIPES, FINISHES, HEIGHT_RANGE, WEIGHT_RANGE, fmtHeight, randomLook, sizeStatMods,
 } from '../../data/looks.js';
 import { portraitImg } from '../../scenes/portrait.js';
 import { sfx } from '../../audio/sfx.js';
 import { STAT_LABELS } from '../../data/positions.js';
 
-const TABS = [['body', 'Body'], ['hair', 'Hair'], ['face', 'Face'], ['ink', 'Ink'], ['helmet', 'Helmet'], ['gear', 'Gear'], ['swag', 'Swag'], ['casual', 'Casual'], ['gala', 'Gala'], ['celeb', 'Celebrate']];
+const TABS = [['body', 'Body'], ['hair', 'Hair'], ['face', 'Face'], ['ink', 'Ink'], ['jersey', 'Jersey'], ['helmet', 'Helmet'], ['gear', 'Gear'], ['swag', 'Swag'], ['casual', 'Casual'], ['gala', 'Gala'], ['celeb', 'Celebrate']];
 const CLOTHES = ['#f4f4f4', '#16181c', '#3a86ff', '#e63946', '#2a9d8f', '#f4a261', '#6d597a', '#ff006e', '#8ac926', '#264653', '#c8b38a', '#6c757d', '#1d3557', '#9c3d2b'];
 const SUITS = ['#16181f', '#1d2a44', '#3b3f48', '#5a1e2a', '#f2f2f2', '#2f4a3a', '#7a5a2a'];
 
@@ -70,7 +71,21 @@ export function lookEditor(opts) {
     hair: () => [chips('Style', HAIR_STYLES, 'hairStyle'), swatches('Color', HAIR_COLORS, 'hairColor', { index: true })],
     face: () => [chips('Eyes', EYES, 'eyes'), swatches('Eye color', EYE_COLORS, 'eyeColor', { index: true }), chips('Brows', BROWS, 'brows'),
       chips('Nose', NOSES, 'nose'), chips('Mouth', MOUTHS, 'mouth'), chips('Facial hair', BEARDS, 'beard')],
-    ink: () => [chips('Left arm', TATTOOS, 'tatL'), chips('Right arm', TATTOOS, 'tatR')],
+    ink: () => [chips('Left arm', TATTOOS, 'tatL'), chips('Right arm', TATTOOS, 'tatR'), chips('Neck', NECK_TATTOOS, 'tatNeck')],
+    jersey: () => [
+      chips('Sleeves', JERSEY_SLEEVES, 'jSleeve'),
+      chips('Length', JERSEY_LENGTHS, 'jLength'),
+      chips('Fit', JERSEY_FITS, 'jFit'),
+      h('div.look-row', h('div.section-label', L.jLength === 'crop' ? 'Undershirt / belly' : 'Undershirt'), h('div.swatch-row',
+        [['team', `linear-gradient(135deg, ${opts.uniform?.jersey ?? '#1d3557'} 50%, ${opts.uniform?.trim ?? '#ffd43b'} 50%)`], ['skin', SKIN_TONES[L.skin % SKIN_TONES.length]], ...GEAR_COLORS.map((c) => [c, c])].map(([v, bg]) =>
+          h(`button.sw${L.underColor === v ? '.on' : ''}`, { style: { background: bg }, 'aria-label': v, title: v === 'skin' ? 'No undershirt' : v === 'team' ? 'Team color' : v, onclick: () => set('underColor', v) })))),
+      chips('Shoulder pads', PAD_SIZES, 'padSize'),
+      chips('Back plate', PAD_EXTRAS, 'backplate'),
+      chips('Horse collar (neck roll)', PAD_EXTRAS, 'neckRoll'),
+      chips('Socks', SOCKS, 'sockStyle'),
+      chips('Mouthguard', MOUTHGUARDS, 'mouthguard'),
+      h('p.tiny.muted', 'Jersey colors come from your team. How you wear it is up to you.'),
+    ],
     helmet: () => [
       chips('Facemask', MASKS, 'maskStyle'),
       h('div.look-row', h('div.section-label', 'Facemask color'), h('div.swatch-row', MASK_COLORS.map((c) => h(`button.sw${L.maskColor === c ? '.on' : ''}`, {
@@ -82,9 +97,13 @@ export function lookEditor(opts) {
     ],
     gear: () => [
       swatches('Cleats', GEAR_COLORS, 'cleats'),
-      swatches('Cleat stripe', GEAR_COLORS, 'cleatAccent'),
+      chips('Cleat design', CLEAT_DESIGNS, 'cleatDesign'),
+      L.cleatDesign !== 'solid' ? swatches('Cleat accent', GEAR_COLORS, 'cleatAccent') : null,
+      chips('Cleat cut', CLEAT_CUTS, 'cleatCut'),
       chips('Spats / tape', SPATS, 'spats'),
       swatches('Gloves', GEAR_COLORS, 'gloves', { none: true }),
+      L.gloves ? chips('Glove design', GLOVE_DESIGNS, 'gloveDesign') : null,
+      L.gloves && L.gloveDesign !== 'solid' ? swatches('Glove accent', GEAR_COLORS, 'gloveAccent') : null,
       chips('Visor tint', VISORS, 'visor'),
       h('div.look-row', h('div.section-label', 'Eye black'), h('div.chip-row',
         h(`button.opt${L.eyeBlack ? '.on' : ''}`, { onclick: () => set('eyeBlack', true) }, 'On'),
@@ -112,7 +131,7 @@ export function lookEditor(opts) {
     wrap.append(
       preview(),
       h('div.subtabs.look-tabs', TABS.map(([id, l]) =>
-        h(`button.subtab${st.tab === id ? '.on' : ''}`, { onclick: () => { sfx.click(); st.tab = id; st.helmet = id === 'gear' || id === 'swag' || id === 'helmet'; draw(); } }, l))),
+        h(`button.subtab${st.tab === id ? '.on' : ''}`, { onclick: () => { sfx.click(); st.tab = id; st.helmet = id === 'gear' || id === 'swag' || id === 'helmet' || id === 'jersey'; draw(); } }, l))),
       h('div.look-panel', views[st.tab]()));
   };
   draw();

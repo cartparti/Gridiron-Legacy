@@ -84,3 +84,17 @@ test('penalty yards move the ball and can give a first down, without counting in
   assert.equal(st.game.userStats.rushYds, before + 2);
   assert.ok(res.outcome);
 });
+
+test('older looks pick up the new jersey/cleat/hair options; random looks fit the position', async () => {
+  const L = await import('../src/data/looks.js');
+  const old = { ...L.defaultLook('QB') };
+  for (const k of Object.keys(L.JERSEY_DEFAULTS)) delete old[k];
+  const n = L.normalizeLook(old);
+  assert.equal(n.jSleeve, 'short');
+  assert.equal(n.cleatDesign, 'stripe');
+  assert.equal(n.padSize, 'normal');
+  let big = 0;
+  for (let i = 0; i < 40; i++) if (L.randomLook(`ol${i}`, { position: 'OL' }).padSize === 'big') big++;
+  assert.ok(big > 10, `linemen with big pads: ${big}`);
+  assert.ok(L.HAIR_STYLES.length >= 21 && L.BEARDS.length >= 12 && L.TATTOOS.length >= 14);
+});

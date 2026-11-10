@@ -272,6 +272,18 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   random "slow" defender now and then, bigger cushion floor (1.4 + skill), no longer outrun receivers. Probe: one
   receiver usually 3+ yd open at 1.8 s; throwing to the most open man completes ~5/6 for 3-8 yd.
 
+## v0.18: more customization
+- Jersey tab (looks.js JERSEY_* lists, `JERSEY_DEFAULTS` merged into old saves): sleeves (standard / cut-off / long
+  undershirt), length (full / cropped with undershirt or bare band), fit (tight / normal / loose = torso + arm
+  scale), shoulder pad size (scales pads + shoulder width), back plate, horse collar (neck roll), undershirt color,
+  socks (team / white / black / striped), mouthguard (hangs off the facemask).
+- Gear: 8 cleat designs (`cleatDesignTex`), low / mid / high cuts, glove designs + accent color.
+- Hair: twists, cornrows, undercut, pompadour, spiky, ponytail, waves, frohawk, slicked back. Facial hair: boxed,
+  long (hanging volume), mutton chops, handlebar, Van Dyke, soul patch. Tattoos: flames, skull, wings, rose,
+  numbers, geometric, koi, plus a neck tattoo (`neckMat`).
+- Random NPC looks use the new options, matched to position (linemen big pads/neck rolls, skill players small pads,
+  tight fits, crop tops).
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).
