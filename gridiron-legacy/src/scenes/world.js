@@ -89,7 +89,7 @@ export function makeProp(type, opts = {}) {
 function textSprite(text, color) {
   const c = document.createElement('canvas');
   const g = c.getContext('2d');
-  g.font = '700 10px Silkscreen, monospace';
+  g.font = '800 10px Inter, sans-serif';
   const w = Math.ceil(g.measureText(text.toUpperCase()).width) + 8;
   c.width = w;
   c.height = 14;
@@ -97,7 +97,7 @@ function textSprite(text, color) {
   g.fillRect(0, 0, w, 14);
   g.fillStyle = color;
   g.fillRect(1, 1, w - 2, 12);
-  g.font = '700 10px Silkscreen, monospace';
+  g.font = '800 10px Inter, sans-serif';
   g.fillStyle = '#ffffff';
   g.textBaseline = 'middle';
   g.fillText(text.toUpperCase(), 4, 7.5);

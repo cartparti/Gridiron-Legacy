@@ -23,28 +23,46 @@ function ensure() {
   if (failed) return null;
   try {
     const el = document.getElementById('stage');
-    // Retro pixel look: render at a low internal resolution and scale it up with crisp pixels.
-    const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
-    renderer.domElement.style.imageRendering = 'pixelated';
+    // Smooth, realistic rendering: antialiased, full resolution (capped for phones), filmic tone mapping.
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
     el.append(renderer.domElement);
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#5aa0d8');
     const camera = new THREE.PerspectiveCamera(36, 1, 1, 1100);
     const stadium = buildStadium(scene);
-    // Lighting for the cel-shaded players (the field and stands use flat colors).
-    scene.add(new THREE.HemisphereLight('#ffffff', '#4a6a4a', 1.5));
-    const sun = new THREE.DirectionalLight('#fff3dc', 1.9);
+    // Lighting: sky/ground fill, a warm key light and a soft image-based environment for realistic shading.
+    scene.add(new THREE.HemisphereLight('#dbe9ff', '#3f5a3f', 0.9));
+    const sun = new THREE.DirectionalLight('#fff1dc', 2.4);
     sun.position.set(-20, 40, 25);
     scene.add(sun);
+    const rim = new THREE.DirectionalLight('#cfe0ff', 0.7);
+    rim.position.set(25, 18, -30);
+    scene.add(rim);
+    try {
+      // tiny gradient "sky dome" baked into an environment map (no image files needed)
+      const envScene = new THREE.Scene();
+      const sky = new THREE.Mesh(new THREE.SphereGeometry(10, 24, 12), new THREE.MeshBasicMaterial({ side: THREE.BackSide, vertexColors: true }));
+      const cols = []; const pa = sky.geometry.attributes.position;
+      const top = new THREE.Color('#9ec9ff'); const mid = new THREE.Color('#f2f4f8'); const bot = new THREE.Color('#3d5a3b');
+      for (let i = 0; i < pa.count; i++) { const y = pa.getY(i) / 10; const c = y > 0 ? mid.clone().lerp(top, y) : mid.clone().lerp(bot, -y * 1.4); cols.push(c.r, c.g, c.b); }
+      sky.geometry.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+      envScene.add(sky);
+      const pm = new THREE.PMREMGenerator(renderer);
+      scene.environment = pm.fromScene(envScene, 0.04).texture;
+      scene.environmentIntensity = 0.55;
+      pm.dispose();
+    } catch { /* environment lighting is optional */ }
     const clock = new THREE.Clock();
     const weather = makeWeather(scene);
     R = { renderer, scene, camera, stadium, clock, el, weather };
     const resize = () => {
       const w = window.innerWidth;
       const h = window.innerHeight;
-      // ~560 pixel rows tall regardless of screen size, so pixels read as chunky but detailed.
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Math.max(0.35, 560 / h)));
+      // full resolution, capped so big phones don't overheat
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
       renderer.setSize(w, h, false);
       renderer.domElement.style.width = '100%';
       renderer.domElement.style.height = '100%';

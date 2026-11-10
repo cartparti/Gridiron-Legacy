@@ -11,7 +11,7 @@ window.addEventListener('error', (e) => console.error('Gridiron Legacy error:', 
 
 // Load the pixel font first so canvas-drawn field text uses it (max 1.5s wait).
 const fontsReady = Promise.race([
-  Promise.all([document.fonts?.load('700 16px Silkscreen'), document.fonts?.load('16px Inter')]).catch(() => null),
+  Promise.all([document.fonts?.load('16px Inter')]).catch(() => null),
   new Promise((r) => setTimeout(r, 1500)),
 ]);
 fontsReady.then(() => {

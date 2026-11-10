@@ -6,8 +6,8 @@ Read this every session. Run instructions are in README.md.
 An American football career and life-sim browser game. One athlete, high school to the Hall of Fame.
 Like New Star Soccer in mechanics only: the player controls key moments (throw, cut, catch, later
 tackle/kick); everything else is simulated. Around it: weekly schedule, relationships, money, fame,
-health and branching events. Look: retro voxel/pixel athletes on a 3D field with an angled camera (see v0.6). Clean and
-distinctive, not realistic. Do not copy any other game's look, art or assets.
+health and branching events. Look (since v0.20): smooth, realistic-leaning 3D athletes with human proportions, real
+lighting and a modern UI (the old retro voxel/pixel style was retired at the owner's request). Clean and distinctive. Do not copy any other game's look, art or assets.
 
 ## Tech rules
 - Browser, mobile-first (portrait, touch, big tap targets), also mouse + keyboard.
@@ -291,6 +291,19 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Hosting: `.github/workflows/pages.yml` deploys gridiron-legacy/ to GitHub Pages on pushes to the dev branch and
   main. Live app: https://cartparti.github.io/Gridiron-Legacy/ (repo renamed from Star-wars-blaster-battle). Saves stay in localStorage on that address, so never change the Pages URL without telling the owner
   (Export/Import save moves careers).
+
+## v0.20: realistic art direction, stage 1 (players, rendering, field, type)
+- Renderer: antialiased full resolution (DPR cap 1.75), ACES tone mapping, hemisphere + key + rim lights and a baked
+  gradient environment map (PMREM). No CRT scanlines / RGB-split text. Portraits render at 2x with the same look.
+- Characters keep the same rig/animation/material system but use `softBox` (rounded box that preserves face groups/UVs)
+  and `limb` (tapered capsule-like) geometry; smaller head (headScale 0.86), V-taper torso, thicker neck.
+  `toon()` now returns MeshStandardMaterial (name kept); `shiny()` for helmets/masks/chains. `pixMat` draws on the
+  same logical grid but renders at TEX_SCALE (crisp) or upscaled-smooth (`soft`) with linear filtering; materials
+  store `userData.logical` (stains use it). New hand-drawn smooth face (`face2` keys). Helmet = one rounded shell with
+  an invisible front face group, gloss/matte/chrome roughness, round bars. Soft radial contact shadows.
+- Field: 16 px/yd mowed turf with gradients, cross-mow, patches, blade noise, crisp lines. UI font: Inter 800 via
+  `--pixel` (Silkscreen no longer used).
+- Next stages: stadium/crowd/sideline/mascots smooth (still blocky), then menus.
 
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.

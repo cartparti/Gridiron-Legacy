@@ -36,7 +36,7 @@ export function kitIcon(kit, number = '') {
   rect(3, 7, 3, 1, kit.trim); rect(18, 7, 3, 1, kit.trim);
   rect(10, 3, 4, 2, '#0b0d10');
   const t = document.createElementNS(NS, 'text');
-  Object.entries({ x: 12, y: 16, 'text-anchor': 'middle', 'font-size': 8, 'font-family': 'Silkscreen, monospace', fill: kit.numbers }).forEach(([k, v]) => t.setAttribute(k, v));
+  Object.entries({ x: 12, y: 16, 'text-anchor': 'middle', 'font-size': 8, 'font-family': 'Inter, sans-serif', 'font-weight': 800, fill: kit.numbers }).forEach(([k, v]) => t.setAttribute(k, v));
   t.textContent = number;
   svg.append(t);
   return svg;

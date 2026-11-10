@@ -917,3 +917,12 @@ body.replaying .hud-tag, body.replaying .hud-score { opacity: 0; }
 .hud-pclock b { font-size: 1.2rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .hud-pclock.low b { color: #ff5d5d; animation: rp-blink 0.5s steps(2) infinite; }
 body.cine .hud-pclock { opacity: 0; }
+
+/* v0.20 realistic look: no CRT scanlines or RGB-split text */
+body::after { display: none; }
+h1, h2, .display { text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35); }
+
+/* modern type instead of the pixel font (keeps the --pixel hook so every component switches at once) */
+:root { --pixel: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+.pix, h1, h2, h3, .btn, .hud, .subtab, .tab, .chip, .kicker, .section-label, .card-title, .mh-pts, .mh-clock, .sb-mid, .sb-team,
+.hud-big, .hud-comm, .hud-instr, .fc-btn, .fc-play, .hud-pill, .tr-slots, .drill-grade { font-weight: 800; letter-spacing: 0.02em; }

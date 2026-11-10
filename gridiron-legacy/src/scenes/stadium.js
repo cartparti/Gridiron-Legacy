@@ -9,8 +9,10 @@ import { buildFieldWear } from './fieldwear.js';
 const FIELD_W = 53.3;
 const FIELD_L = 120;
 
+const shadeHex = (hex, k) => { const c = new THREE.Color(hex); if (k > 0) c.lerp(new THREE.Color('#ffffff'), k); else c.multiplyScalar(1 + k); return `#${c.getHexString()}`; };
+
 function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWAY', style = null) {
-  const ppy = 10; // pixels per yard: low on purpose for a chunky retro look
+  const ppy = 16; // pixels per yard: sharp, realistic turf
   const cw = Math.round(FIELD_W * ppy);
   const ch = FIELD_L * ppy;
   const c = document.createElement('canvas');
@@ -18,17 +20,27 @@ function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWA
   c.height = ch;
   const g = c.getContext('2d');
   
-  // Grass stripes every 5 yards.
+  // Mowed grass: alternating 5-yard bands with soft edges, a cross-mow sheen, blotches and fine blade noise.
+  const tA = style?.turf?.[0] ?? '#2c6b33'; const tB = style?.turf?.[1] ?? '#367a3b';
   for (let y = 0; y < FIELD_L; y += 5) {
-    g.fillStyle = Math.floor(y / 5) % 2 ? (style?.turf?.[0] ?? '#2f6f35') : (style?.turf?.[1] ?? '#377b3a');
-    g.fillRect(0, y * ppy, cw, 5 * ppy);
+    const gr = g.createLinearGradient(0, y * ppy, 0, (y + 5) * ppy);
+    const c0 = Math.floor(y / 5) % 2 ? tA : tB;
+    gr.addColorStop(0, c0); gr.addColorStop(0.5, Math.floor(y / 5) % 2 ? shadeHex(c0, 0.03) : shadeHex(c0, -0.02)); gr.addColorStop(1, c0);
+    g.fillStyle = gr; g.fillRect(0, y * ppy, cw, 5 * ppy);
   }
-  // Pixel grass noise.
-  for (let i = 0; i < cw * ch * 0.05; i++) {
-    const x = Math.floor(Math.random() * cw);
-    const y = Math.floor(Math.random() * ch);
-    g.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.05)';
-    g.fillRect(x, y, 1, 1);
+  g.globalAlpha = 0.05; // cross-mow (faint lengthwise bands)
+  for (let x = 0; x < cw; x += 6 * ppy) { g.fillStyle = (x / (6 * ppy)) % 2 ? '#ffffff' : '#000000'; g.fillRect(x, 0, 3 * ppy, ch); }
+  g.globalAlpha = 1;
+  for (let i = 0; i < 260; i++) { // uneven patches
+    const x = Math.random() * cw; const y = Math.random() * ch; const r = (1 + Math.random() * 3) * ppy;
+    const gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, Math.random() < 0.5 ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,200,0.05)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  for (let i = 0; i < cw * ch * 0.06; i++) { // blades
+    const x = Math.random() * cw; const y = Math.random() * ch;
+    g.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,0.08)' : 'rgba(210,255,190,0.06)';
+    g.fillRect(x, y, 1, 2);
   }
   // End zones.
   const ez = (y0, col, txt) => {
@@ -36,7 +48,7 @@ function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWA
     g.fillRect(0, y0 * ppy, cw, 10 * ppy);
     g.save();
     g.fillStyle = col[1];
-    g.font = `900 ${5 * ppy}px "Silkscreen", "Courier New", monospace`;
+    g.font = `900 ${5 * ppy}px "Arial Black", Impact, "Inter", sans-serif`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.translate(cw / 2, (y0 + 5) * ppy);
@@ -70,15 +82,15 @@ function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWA
   }
   g.restore();
   // Lines.
-  g.fillStyle = '#ffffff';
-  g.fillRect(0, 0, cw, 2); g.fillRect(0, ch - 2, cw, 2); g.fillRect(0, 0, 2, ch); g.fillRect(cw - 2, 0, 2, ch);
-  for (let y = 10; y <= 110; y += 5) g.fillRect(0, Math.round(y * ppy) - 1, cw, y === 10 || y === 110 ? 3 : 1);
+  g.fillStyle = 'rgba(250,250,245,0.92)';
+  g.fillRect(0, 0, cw, 4); g.fillRect(0, ch - 4, cw, 4); g.fillRect(0, 0, 4, ch); g.fillRect(cw - 4, 0, 4, ch);
+  for (let y = 10; y <= 110; y += 5) g.fillRect(0, Math.round(y * ppy) - 1.5, cw, y === 10 || y === 110 ? 5 : 3);
   // Hash marks.
   for (let y = 11; y < 110; y++) {
-    for (const hx of [1, 18.4, FIELD_W - 18.4 - 1, FIELD_W - 2]) g.fillRect(Math.round(hx * ppy), Math.round(y * ppy), 3, 1);
+    for (const hx of [1, 18.4, FIELD_W - 18.4 - 1, FIELD_W - 2]) g.fillRect(Math.round(hx * ppy), Math.round(y * ppy) - 1, 0.9 * ppy, 2);
   }
   // Numbers.
-  g.font = `bold ${Math.round(2.6 * ppy)}px "Silkscreen", "Courier New", monospace`;
+  g.font = `bold ${Math.round(2.6 * ppy)}px "Arial Black", Impact, "Inter", sans-serif`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   for (let y = 20; y <= 100; y += 10) {
@@ -102,14 +114,13 @@ function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWA
   g.strokeStyle = homeColors[1];
   g.stroke();
   g.fillStyle = homeColors[1];
-  g.font = `bold ${Math.round(3.2 * ppy)}px "Silkscreen", "Courier New", monospace`;
+  g.font = `bold ${Math.round(3.2 * ppy)}px "Arial Black", Impact, "Inter", sans-serif`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.fillText(String(homeName).slice(0, 3).toUpperCase(), cw / 2, 60 * ppy + 2);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.magFilter = THREE.NearestFilter;
-  tex.anisotropy = 4;
+  tex.anisotropy = 8;
   return tex;
 }
 

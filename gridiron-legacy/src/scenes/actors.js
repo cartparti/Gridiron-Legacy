@@ -27,55 +27,116 @@ function toonGradient() {
   return gradient;
 }
 const matCache = new Map();
-export function toon(color) {
-  const key = String(color);
-  if (!matCache.has(key)) matCache.set(key, new THREE.MeshToonMaterial({ color, gradientMap: toonGradient() }));
+/** Shaded material for a flat color (name kept from the cel-shaded days). Realistic, slightly soft fabric/skin. */
+export function toon(color, rough = 0.72) {
+  const key = `${color}|${rough}`;
+  if (!matCache.has(key)) matCache.set(key, new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0 }));
+  return matCache.get(key);
+}
+/** Shiny / metallic variants (helmets, facemasks, chains). */
+export function shiny(color, { rough = 0.28, metal = 0 } = {}) {
+  const key = `shiny|${color}|${rough}|${metal}`;
+  if (!matCache.has(key)) matCache.set(key, new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal }));
   return matCache.get(key);
 }
 
 const texCache = new Map();
 /** Pixel texture: draw(g, w, h) on a tiny canvas; cached by key. Returns a toon material. */
-function pixMat(key, w, h, draw, { transparent = false } = {}) {
+// Textures are drawn on a small logical grid (w x h) and then rendered smooth:
+//   crisp (default): drawn at TEX_SCALE x, so stripes and numbers have clean, sharp edges;
+//   soft: drawn small then upscaled with smoothing (hair, skin, tattoos look organic, not blocky).
+const TEX_SCALE = 6;
+function pixMat(key, w, h, draw, { transparent = false, soft = false, rough = 0.72, metal = 0 } = {}) {
   if (texCache.has(key)) return texCache.get(key);
   const c = document.createElement('canvas');
-  c.width = w;
-  c.height = h;
+  c.width = w * TEX_SCALE;
+  c.height = h * TEX_SCALE;
   const g = c.getContext('2d');
-  g.imageSmoothingEnabled = false;
-  draw(g, w, h);
+  if (soft) {
+    const small = document.createElement('canvas');
+    small.width = w; small.height = h;
+    const sg = small.getContext('2d');
+    draw(sg, w, h);
+    g.imageSmoothingEnabled = true;
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(small, 0, 0, c.width, c.height);
+  } else {
+    g.scale(TEX_SCALE, TEX_SCALE);
+    draw(g, w, h);
+  }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
-  t.magFilter = THREE.NearestFilter;
-  t.minFilter = THREE.NearestFilter;
-  t.generateMipmaps = false;
-  const m = new THREE.MeshToonMaterial({ map: t, gradientMap: toonGradient(), transparent, alphaTest: transparent ? 0.5 : 0 });
+  t.anisotropy = 4;
+  const m = new THREE.MeshStandardMaterial({ map: t, roughness: rough, metalness: metal, transparent, alphaTest: transparent ? 0.5 : 0 });
   m.userData.key = key;
+  m.userData.logical = [w, h];
   texCache.set(key, m);
   return m;
 }
 const px = (g, x, y, c, w = 1, h = 1) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
 
 const G = {};
-const box = (w, h, d, py = 0) => { const b = new THREE.BoxGeometry(w, h, d); if (py) b.translate(0, py, 0); return b; };
+/**
+ * A box with rounded edges (radius r) that keeps the six face groups and UVs of a BoxGeometry, so the per-face
+ * materials (jersey front/back, face, hair) still map. Normals point out of the rounding: smooth shading.
+ */
+function softBox(w, h, d, r = Math.min(w, h, d) * 0.3, seg = 3) {
+  const geo = new THREE.BoxGeometry(w, h, d, seg, seg, seg);
+  const pos = geo.attributes.position;
+  const nor = geo.attributes.normal;
+  r = Math.min(r, w / 2, h / 2, d / 2);
+  const hx = w / 2 - r, hy = h / 2 - r, hz = d / 2 - r;
+  const p = new THREE.Vector3(); const inner = new THREE.Vector3(); const n = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    p.fromBufferAttribute(pos, i);
+    inner.set(Math.max(-hx, Math.min(hx, p.x)), Math.max(-hy, Math.min(hy, p.y)), Math.max(-hz, Math.min(hz, p.z)));
+    n.subVectors(p, inner);
+    if (n.lengthSq() < 1e-12) n.fromBufferAttribute(nor, i); else n.normalize();
+    pos.setXYZ(i, inner.x + n.x * r, inner.y + n.y * r, inner.z + n.z * r);
+    nor.setXYZ(i, n.x, n.y, n.z);
+  }
+  pos.needsUpdate = true; nor.needsUpdate = true;
+  return geo;
+}
+const box = (w, h, d, py = 0, round = 0.32, seg = 2) => { const b = softBox(w, h, d, Math.min(w, h, d) * round, seg); if (py) b.translate(0, py, 0); return b; };
+/** Limb: almost capsule-like (big rounding) and a touch of taper read as muscle. */
+const limb = (w, h, d, py, taper = 0.9) => {
+  const b = softBox(w, h, d, Math.min(w, d) * 0.48, 4);
+  const pos = b.attributes.position;
+  for (let i = 0; i < pos.count; i++) { const k = 1 + (pos.getY(i) / h) * (1 - taper); pos.setX(i, pos.getX(i) * k); pos.setZ(i, pos.getZ(i) * k); }
+  if (py) b.translate(0, py, 0);
+  b.computeBoundingBox();
+  return b;
+};
 function geo() {
   if (G.thigh) return G;
-  G.thigh = box(0.17, 0.48, 0.18, -0.24);
-  G.shin = box(0.145, 0.44, 0.15, -0.22);
-  G.shoe = box(0.16, 0.1, 0.28);
-  G.hips = box(0.38, 0.2, 0.24);
-  G.torso = box(0.44, 0.52, 0.26, 0.26);
-  G.pads = box(0.64, 0.17, 0.34);
-  G.upper = box(0.14, 0.33, 0.14, -0.15);
-  G.fore = box(0.125, 0.3, 0.125, -0.15);
-  G.hand = box(0.12, 0.11, 0.12);
-  G.band = box(0.14, 0.06, 0.14);
-  G.head = box(0.36, 0.36, 0.34);
-  G.headScale = 1.14;
+  // human proportions: smaller head, tapered limbs, rounded torso and pads
+  G.thigh = limb(0.175, 0.5, 0.19, -0.24, 0.82);
+  G.shin = limb(0.14, 0.45, 0.15, -0.22, 0.78);
+  G.shoe = box(0.15, 0.09, 0.29, 0, 0.45, 3);
+  G.hips = box(0.37, 0.21, 0.24, 0, 0.42, 3);
+  G.torso = (() => { const b = softBox(0.44, 0.54, 0.27, 0.11, 5); const pos = b.attributes.position; for (let i = 0; i < pos.count; i++) { const y = pos.getY(i); pos.setX(i, pos.getX(i) * (0.86 + (y + 0.27) * 0.3)); } b.translate(0, 0.26, 0); return b; })(); // V-taper
+  G.pads = softBox(0.64, 0.18, 0.35, 0.085, 4);
+  G.upper = limb(0.14, 0.34, 0.14, -0.15, 0.82);
+  G.fore = limb(0.12, 0.31, 0.12, -0.15, 0.8);
+  G.hand = box(0.1, 0.12, 0.11, 0, 0.45, 3);
+  G.band = box(0.135, 0.06, 0.135, 0, 0.45, 3);
+  G.head = softBox(0.33, 0.38, 0.36, 0.15, 6);
+  G.headScale = 0.86;
   G.ball = new THREE.SphereGeometry(0.11, 8, 6);
   G.shadow = new THREE.CircleGeometry(0.5, 14);
   return G;
 }
-const shadowMat = new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.3, depthWrite: false });
+// soft contact shadow under each player (radial gradient), cheaper than real shadow maps
+const shadowMat = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(32, 32, 2, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(0,0,0,0.55)'); gr.addColorStop(0.55, 'rgba(0,0,0,0.25)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c);
+  return new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false });
+})();
 
 // ---- legacy palettes (kept for older callers)
 export const SKINS = SKIN_TONES;
@@ -118,69 +179,85 @@ const HAIR_FRONT = { bald: 0, buzz: 1, short: 2, fade: 2, flattop: 2, curly: 3, 
 const HAIR_BACK = { bald: 0, buzz: 6, short: 7, fade: 5, flattop: 6, curly: 8, afro: 10, mohawk: 0, dreads: 12, braids: 12, long: 12, bun: 8, twists: 9, cornrows: 7, undercut: 4, pompadour: 6, spiky: 6, ponytail: 7, waves: 5, frohawk: 0, slick: 8 };
 
 function faceMat(L, hc, { eyeBlack = false } = {}) {
-  const key = `face|${L.skin}|${L.hairStyle}|${L.hairColor}|${L.eyeColor}|${L.eyes}|${L.brows}|${L.nose}|${L.mouth}|${L.beard}|${eyeBlack}`;
+  const key = `face2|${L.skin}|${L.hairStyle}|${L.hairColor}|${L.eyeColor}|${L.eyes}|${L.brows}|${L.nose}|${L.mouth}|${L.beard}|${eyeBlack}`;
+  // Drawn with smooth shapes on a 12x12 logical grid (rendered at 72x72): shading, real eyes, nose, lips.
   return pixMat(key, 12, 12, (g) => {
     const sk = SKIN_TONES[L.skin % SKIN_TONES.length];
-    const dk = shade(sk, -0.18);
-    const dk2 = shade(sk, -0.38);
-    px(g, 0, 0, sk, 12, 12);
-    px(g, 0, 11, shade(sk, -0.08), 12, 1);
-    // hair fringe
+    const dk = shade(sk, -0.16);
+    const dk2 = shade(sk, -0.32);
+    const ell = (x, y, rx, ry, col, rot = 0) => { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); g.fill(); };
+    // skin with soft shading (cheeks lit, jaw and temples darker)
+    const base = g.createRadialGradient(6, 5.2, 1, 6, 6, 8.5);
+    base.addColorStop(0, shade(sk, 0.06)); base.addColorStop(0.65, sk); base.addColorStop(1, shade(sk, -0.12));
+    g.fillStyle = base; g.fillRect(0, 0, 12, 12);
+    g.globalAlpha = 0.18; ell(3.2, 8, 1.6, 1.1, '#e07a6a'); ell(8.8, 8, 1.6, 1.1, '#e07a6a'); g.globalAlpha = 1; // a bit of colour in the cheeks
+    // hairline / fringe
     const fr = HAIR_FRONT[L.hairStyle] ?? 2;
     const hcol = L.hairStyle === 'buzz' ? shade(hc, 0.15) : hc;
-    if (fr) px(g, 0, 0, hcol, 12, fr);
-    if (L.hairStyle === 'fade' || L.hairStyle === 'short') { px(g, 0, 2, hcol, 1, 2); px(g, 11, 2, hcol, 1, 2); }
-    if (L.hairStyle === 'curly' || L.hairStyle === 'afro') { px(g, 1, 3, hcol); px(g, 4, 3, hcol); px(g, 7, 3, hcol); px(g, 10, 3, hcol); px(g, 0, 3, hcol, 1, 3); px(g, 11, 3, hcol, 1, 3); }
-    if (L.hairStyle === 'long' || L.hairStyle === 'dreads' || L.hairStyle === 'braids') { px(g, 0, 0, hcol, 2, 10); px(g, 10, 0, hcol, 2, 10); }
-    if (L.hairStyle === 'dreads') { px(g, 2, 3, hcol); px(g, 9, 3, hcol); px(g, 5, 3, hcol, 2, 1); }
-    if (L.hairStyle === 'mohawk') { px(g, 5, 0, hc, 2, 2); px(g, 0, 0, shade(sk, -0.1), 4, 1); px(g, 8, 0, shade(sk, -0.1), 4, 1); }
-    if (L.hairStyle === 'frohawk') { px(g, 3, 0, hc, 6, 2); px(g, 0, 0, shade(sk, -0.1), 3, 1); px(g, 9, 0, shade(sk, -0.1), 3, 1); }
-    if (L.hairStyle === 'twists') for (let x = 0; x < 12; x += 2) px(g, x, 3, hcol);
-    if (L.hairStyle === 'spiky') for (let x = 0; x < 12; x += 3) px(g, x + 1, 2, hcol);
-    if (L.hairStyle === 'cornrows') for (let x = 1; x < 12; x += 2) px(g, x, 0, shade(hc, -0.3));
-    // brows (row 4, or 3 when raised)
-    const bc = (L.hairColor ?? 0) > 8 ? '#2a1a12' : shade(hc, -0.1);
-    const by = L.brows === 'raised' ? 3 : 4;
-    if (L.brows === 'thick') { px(g, 2, 3, bc, 3, 2); px(g, 7, 3, bc, 3, 2); }
-    else if (L.brows === 'thin') { px(g, 3, by, bc, 2, 1); px(g, 7, by, bc, 2, 1); }
-    else if (L.brows === 'angry') { px(g, 2, 3, bc); px(g, 3, 3, bc); px(g, 4, 4, bc); px(g, 9, 3, bc); px(g, 8, 3, bc); px(g, 7, 4, bc); }
-    else { px(g, 2, by, bc, 3, 1); px(g, 7, by, bc, 3, 1); }
-    // eyes (rows 5-6)
+    if (fr) {
+      g.fillStyle = hcol; g.beginPath(); g.moveTo(0, 0); g.lineTo(12, 0); g.lineTo(12, fr + 0.4);
+      g.quadraticCurveTo(9, fr - 0.4, 6, fr + 0.3); g.quadraticCurveTo(3, fr - 0.4, 0, fr + 0.4); g.closePath(); g.fill();
+      if (L.hairStyle === 'buzz') { g.globalAlpha = 0.5; g.fillStyle = sk; g.fillRect(0, 0, 12, fr); g.globalAlpha = 1; }
+    }
+    if (['long', 'dreads', 'braids'].includes(L.hairStyle)) { g.fillStyle = hcol; g.fillRect(0, 0, 1.6, 10); g.fillRect(10.4, 0, 1.6, 10); }
+    if (L.hairStyle === 'mohawk' || L.hairStyle === 'frohawk') { g.fillStyle = shade(sk, -0.08); g.fillRect(0, 0, 12, 1); g.fillStyle = hc; g.fillRect(L.hairStyle === 'mohawk' ? 5 : 3.5, 0, L.hairStyle === 'mohawk' ? 2 : 5, 1.6); }
+    // brows
+    const bc = (L.hairColor ?? 0) > 8 ? '#2a1a12' : shade(hc, -0.12);
+    g.strokeStyle = bc; g.lineCap = 'round';
+    const by = L.brows === 'raised' ? 3.6 : 4.2;
+    g.lineWidth = L.brows === 'thick' ? 0.9 : L.brows === 'thin' ? 0.35 : 0.6;
+    const brow = (x0, x1, tilt) => { g.beginPath(); g.moveTo(x0, by + tilt); g.quadraticCurveTo((x0 + x1) / 2, by - 0.5, x1, by - tilt); g.stroke(); };
+    if (L.brows === 'angry') { brow(2, 4.8, -0.5); brow(9.9, 7.2, -0.5); } else { brow(2, 4.9, 0); brow(7.1, 10, 0); }
+    // eyes: white, iris, pupil, a highlight, lid line
     const ec = EYE_COLORS[L.eyeColor % EYE_COLORS.length];
-    const eye = (x, inner) => {
-      if (L.eyes === 'narrow') { px(g, x, 6, '#fafafa', 2, 1); px(g, inner, 6, ec); }
-      else if (L.eyes === 'sleepy') { px(g, x, 5, dk, 2, 1); px(g, x, 6, '#fafafa', 2, 1); px(g, inner, 6, ec); }
-      else if (L.eyes === 'wide') { px(g, x, 5, '#fafafa', 2, 2); px(g, inner, 5, ec, 1, 2); px(g, inner, 5, '#0d0d0d'); }
-      else { px(g, x, 5, '#fafafa', 2, 2); px(g, inner, 5, ec, 1, 2); }
-    };
-    eye(2, 3); eye(8, 8);
-    if (eyeBlack) { px(g, 2, 7, '#111111', 3, 1); px(g, 7, 7, '#111111', 3, 1); }
-    // nose
-    if (L.nose === 'wide') px(g, 4, 7, dk, 4, 1);
-    else if (L.nose === 'long') { px(g, 5, 6, dk, 2, 2); px(g, 5, 7, dk2, 2, 1); }
-    else px(g, 5, 7, dk, 2, 1);
-    // beard
+    const ry = L.eyes === 'narrow' ? 0.38 : L.eyes === 'wide' ? 0.75 : L.eyes === 'sleepy' ? 0.45 : 0.6;
+    for (const cx of [3.5, 8.5]) {
+      g.fillStyle = dk; g.globalAlpha = 0.35; ell(cx, 5.7, 1.45, ry + 0.35, dk); g.globalAlpha = 1; // eye socket shade
+      ell(cx, 5.7, 1.25, ry, '#f4f1ec');
+      ell(cx, 5.75, 0.55, Math.min(0.55, ry), ec);
+      ell(cx, 5.75, 0.25, Math.min(0.25, ry), '#0d0d0d');
+      ell(cx + 0.18, 5.55, 0.1, 0.1, '#ffffff');
+      g.strokeStyle = shade(sk, -0.45); g.lineWidth = L.eyes === 'sleepy' ? 0.45 : 0.25;
+      g.beginPath(); g.ellipse(cx, 5.7, 1.25, ry, 0, Math.PI, 0); g.stroke();
+    }
+    if (eyeBlack) { g.globalAlpha = 0.9; ell(3.4, 7.15, 1.2, 0.38, '#111111'); ell(8.6, 7.15, 1.2, 0.38, '#111111'); g.globalAlpha = 1; }
+    // nose: side shadow + nostrils
+    const nw = L.nose === 'wide' ? 1.5 : L.nose === 'long' ? 0.9 : 1.1;
+    const nb = L.nose === 'long' ? 7.9 : 7.6;
+    g.fillStyle = dk; g.globalAlpha = 0.55; g.beginPath(); g.moveTo(6.1, 5.4); g.quadraticCurveTo(6.9, 6.8, 6 + nw, nb); g.lineTo(6, nb + 0.2); g.closePath(); g.fill(); g.globalAlpha = 1;
+    ell(6 - nw * 0.45, nb, 0.28, 0.16, dk2); ell(6 + nw * 0.45, nb, 0.28, 0.16, dk2);
+    // facial hair
     const natural = (L.hairColor ?? 0) <= 8 ? hc : HAIR_COLORS[1];
     const bh = shade(natural, -0.05);
-    if (L.beard === 'stubble') { for (let y = 8; y < 12; y++) for (let x = 1; x < 11; x++) if ((x + y) % 2 === 0) px(g, x, y, shade(sk, -0.22)); }
-    if (L.beard === 'full') { px(g, 0, 7, bh, 1, 5); px(g, 11, 7, bh, 1, 5); px(g, 1, 8, bh, 10, 4); }
-    if (L.beard === 'chinstrap') { px(g, 0, 6, bh, 1, 6); px(g, 11, 6, bh, 1, 6); px(g, 1, 10, bh, 10, 2); }
-    if (L.beard === 'goatee') px(g, 4, 10, bh, 4, 2);
-    if (L.beard === 'boxed') { px(g, 0, 6, bh, 1, 4); px(g, 11, 6, bh, 1, 4); px(g, 1, 9, bh, 10, 3); }
-    if (L.beard === 'long') { px(g, 0, 6, bh, 1, 6); px(g, 11, 6, bh, 1, 6); px(g, 1, 8, bh, 10, 4); px(g, 3, 11, shade(bh, -0.15), 6, 1); }
-    if (L.beard === 'muttonchops') { px(g, 0, 4, bh, 2, 7); px(g, 10, 4, bh, 2, 7); px(g, 2, 9, bh, 1, 2); px(g, 9, 9, bh, 1, 2); }
-    if (L.beard === 'handlebar') { px(g, 2, 8, bh, 8, 1); px(g, 2, 7, bh); px(g, 9, 7, bh); }
-    if (L.beard === 'vandyke') { px(g, 5, 10, bh, 2, 2); px(g, 4, 10, bh, 4, 1); }
-    if (L.beard === 'soulpatch') px(g, 5, 10, bh, 2, 1);
-    if (L.beard === 'mustache' || L.beard === 'goatee' || L.beard === 'full' || L.beard === 'boxed' || L.beard === 'long' || L.beard === 'vandyke') px(g, 3, 8, bh, 6, 1);
-    // mouth (row 9)
-    const lip = shade(sk, -0.45);
-    if (L.mouth === 'smile') { px(g, 4, 9, lip, 4, 1); px(g, 3, 8, lip); px(g, 8, 8, lip); }
-    else if (L.mouth === 'grin') { px(g, 4, 9, '#f6f6f6', 4, 1); px(g, 3, 9, lip); px(g, 8, 9, lip); px(g, 4, 10, lip, 4, 1); }
-    else if (L.mouth === 'smirk') { px(g, 5, 9, lip, 3, 1); px(g, 8, 8, lip); }
-    else if (L.mouth === 'serious') px(g, 4, 9, shade(sk, -0.3), 4, 1);
-    else px(g, 4, 9, lip, 4, 1);
-  });
+    const beardArea = (yTop, sides = true) => {
+      g.fillStyle = bh; g.beginPath(); g.moveTo(0, yTop);
+      if (sides) { g.lineTo(1.6, yTop); g.quadraticCurveTo(2.2, 9.6, 4.2, 9.2); g.lineTo(7.8, 9.2); g.quadraticCurveTo(9.8, 9.6, 10.4, yTop); }
+      g.lineTo(12, yTop); g.lineTo(12, 12); g.lineTo(0, 12); g.closePath(); g.fill();
+    };
+    if (L.beard === 'stubble') { g.globalAlpha = 0.28; beardArea(6.8); g.globalAlpha = 1; }
+    if (L.beard === 'full' || L.beard === 'long') beardArea(6.2);
+    if (L.beard === 'boxed') beardArea(6.8);
+    if (L.beard === 'chinstrap') { g.strokeStyle = bh; g.lineWidth = 0.8; g.beginPath(); g.moveTo(0.4, 5.6); g.quadraticCurveTo(1, 11.3, 6, 11.4); g.quadraticCurveTo(11, 11.3, 11.6, 5.6); g.stroke(); }
+    if (L.beard === 'muttonchops') { ell(0.9, 7.6, 1.1, 2.6, bh); ell(11.1, 7.6, 1.1, 2.6, bh); }
+    if (L.beard === 'goatee' || L.beard === 'vandyke') ell(6, 10.6, L.beard === 'vandyke' ? 0.9 : 1.6, 1.1, bh);
+    if (L.beard === 'soulpatch') ell(6, 10.3, 0.5, 0.35, bh);
+    if (['mustache', 'goatee', 'full', 'boxed', 'long', 'vandyke', 'handlebar'].includes(L.beard)) {
+      g.fillStyle = bh; g.beginPath(); g.moveTo(3.6, 8.75); g.quadraticCurveTo(6, 7.9, 8.4, 8.75); g.quadraticCurveTo(6, 8.5, 3.6, 8.75); g.fill();
+      ell(6, 8.45, 2.1, 0.4, bh);
+      if (L.beard === 'handlebar') { g.strokeStyle = bh; g.lineWidth = 0.35; g.beginPath(); g.moveTo(3.9, 8.6); g.quadraticCurveTo(3, 8.8, 2.9, 8); g.moveTo(8.1, 8.6); g.quadraticCurveTo(9, 8.8, 9.1, 8); g.stroke(); }
+    }
+    // mouth
+    const lip = shade(sk, -0.35);
+    g.strokeStyle = shade(sk, -0.5); g.lineWidth = 0.32; g.lineCap = 'round';
+    g.beginPath();
+    if (L.mouth === 'smile') { g.moveTo(4.5, 9.2); g.quadraticCurveTo(6, 10.1, 7.5, 9.2); }
+    else if (L.mouth === 'grin') { g.fillStyle = '#f7f4ef'; g.moveTo(4.4, 9.2); g.quadraticCurveTo(6, 10.5, 7.6, 9.2); g.closePath(); g.fill(); g.moveTo(4.4, 9.2); g.quadraticCurveTo(6, 10.5, 7.6, 9.2); }
+    else if (L.mouth === 'smirk') { g.moveTo(4.8, 9.5); g.quadraticCurveTo(6.5, 9.6, 7.6, 9); }
+    else if (L.mouth === 'serious') { g.moveTo(4.7, 9.5); g.lineTo(7.3, 9.5); }
+    else { g.moveTo(4.6, 9.4); g.quadraticCurveTo(6, 9.7, 7.4, 9.4); }
+    g.stroke();
+    g.globalAlpha = 0.35; ell(6, 9.95, 1.1, 0.25, lip); g.globalAlpha = 1; // lower lip
+  }, { rough: 0.6 });
 }
 
 function sideMat(L, hc, flip) {
@@ -219,7 +296,7 @@ function backMat(L, hc) {
     if (L.hairStyle === 'cornrows' || L.hairStyle === 'waves') for (let x = 1; x < 12; x += 2) px(g, x, 0, shade(hc, -0.3), 1, L.hairStyle === 'waves' ? 5 : 7);
     if (L.hairStyle === 'twists') for (let x = 0; x < 12; x += 2) px(g, x, 1, shade(hc, -0.25), 1, 8);
     if (L.hairStyle === 'undercut') px(g, 0, 3, shade(sk, -0.12), 12, 2);
-  });
+  }, { soft: true });
 }
 
 function topMat(L, hc) {
@@ -238,7 +315,7 @@ function topMat(L, hc) {
     if (L.hairStyle === 'twists') for (let y = 0; y < 12; y += 2) for (let x = (y / 2) % 2; x < 12; x += 2) px(g, x, y, shade(hc, -0.22));
     if (L.hairStyle === 'slick') for (let x = 0; x < 12; x += 3) px(g, x, 0, shade(hc, 0.22), 1, 12);
     if (L.hairStyle === 'undercut') { px(g, 0, 0, shade(sk, -0.12), 2, 12); px(g, 10, 0, shade(sk, -0.12), 2, 12); }
-  });
+  }, { soft: true });
 }
 
 /** Arm texture: 8x16. top rows = sleeve (jersey/shirt) unless bare, rest skin + tattoo or arm sleeve. */
@@ -255,7 +332,7 @@ function armMat(skin, sleeveCol, trim, tattoo, part, armSleeve, rows = 7) {
       drawTattoo(g, tattoo, 0, 1, 8, 13);
       if (armSleeve) px(g, 0, 0, armSleeve, 8, 15);
     }
-  });
+  }, { soft: true });
 }
 
 /** Jersey torso texture with stripes and a big blocky number. */
@@ -263,11 +340,14 @@ function jerseyMat(un, number, side) {
   const key = `jersey|${un.jersey}|${un.trim}|${un.numbers}|${number}|${side}`;
   return pixMat(key, 22, 26, (g) => {
     px(g, 0, 0, un.jersey, 22, 26);
+    g.globalAlpha = 0.06; for (let y = 0; y < 26; y += 0.5) px(g, 0, y, y % 1 ? '#000' : '#fff', 22, 0.25); g.globalAlpha = 1; // mesh fabric
+    const fold = g.createLinearGradient(0, 0, 22, 0); fold.addColorStop(0, 'rgba(0,0,0,0.18)'); fold.addColorStop(0.5, 'rgba(255,255,255,0.06)'); fold.addColorStop(1, 'rgba(0,0,0,0.18)');
+    g.fillStyle = fold; g.fillRect(0, 0, 22, 26);
     px(g, 0, 22, shade(un.jersey, -0.15), 22, 4);
     if (side === 'front') { px(g, 8, 0, shade(un.jersey, -0.25), 6, 2); px(g, 9, 2, shade(un.jersey, -0.25), 4, 1); }
     if (number === undefined || side === 'side') { px(g, 0, 3, un.trim, 22, 1); return; }
     const s = String(number);
-    g.font = side === 'front' ? 'bold 13px monospace' : 'bold 17px monospace';
+    g.font = side === 'front' ? 'bold 12px "Arial Black", Impact, sans-serif' : 'bold 16px "Arial Black", Impact, sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     const y = side === 'front' ? 10 : 12;
@@ -276,11 +356,6 @@ function jerseyMat(un, number, side) {
     for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) g.fillText(s, 11 + dx, y + dy);
     g.fillStyle = un.numbers;
     g.fillText(s, 11, y);
-    // harden anti-aliasing into pixels
-    const img = g.getImageData(0, 0, 22, 26);
-    const d = img.data;
-    for (let i = 3; i < d.length; i += 4) d[i] = 255;
-    g.putImageData(img, 0, 0);
   });
 }
 
@@ -499,7 +574,7 @@ function buildRig(o) {
   }
 
   if (L.chain && L.chain !== 'none') {
-    const cm = toon({ gold: '#e6b422', silver: '#d6dbe2', ice: '#eaf6ff' }[L.chain]);
+    const cm = shiny({ gold: '#e6b422', silver: '#d6dbe2', ice: '#eaf6ff' }[L.chain], { rough: 0.2, metal: 0.9 });
     const z = -0.142;
     const y0 = football ? -0.13 : -0.02;
     for (const sd of [-1, 1]) { const link = new THREE.Mesh(box(0.11, 0.025, 0.02), cm); link.position.set(sd * 0.05, y0 - 0.03, z); link.rotation.z = -sd * 0.6; chest.add(link); }
@@ -512,8 +587,8 @@ function buildRig(o) {
   chest.add(neck);
   // counter the body's width scale so heads stay square
   neck.scale.set(1 / sc.build, 1 / sc.height * 0.96 + 0.04, 1 / body.scale.z);
-  const neckBox = new THREE.Mesh(box(0.14, 0.08, 0.14), L.tatNeck && L.tatNeck !== 'none' ? neckMat(skinC, L.tatNeck) : skin);
-  neckBox.position.y = 0.02;
+  const neckBox = new THREE.Mesh(limb(0.17, 0.13, 0.16, 0, 0.92), L.tatNeck && L.tatNeck !== 'none' ? neckMat(skinC, L.tatNeck) : skin);
+  neckBox.position.y = 0.035;
   neck.add(neckBox);
   const helmetOn = football && o.helmet !== false;
   const head = new THREE.Mesh(g.head, sixFaces(
@@ -531,7 +606,7 @@ function buildRig(o) {
   else addHairVolume(headGroup, L, hairC);
   if (!helmetOn && L.beard === 'long') { // a beard that hangs below the chin
     const bm = toon(shade((L.hairColor ?? 0) <= 8 ? hairC : HAIR_COLORS[1], -0.05));
-    const lb = new THREE.Mesh(box(0.24, 0.1, 0.08), bm); lb.position.set(0, 0.02, -0.15); headGroup.add(lb);
+    const lb = new THREE.Mesh(box(0.22, 0.12, 0.1, 0, 0.45, 3), bm); lb.position.set(0, 0.05, -0.12); headGroup.add(lb);
   }
   if (helmetOn && L.mouthguard && L.mouthguard !== 'none') { // mouthguard hanging off the facemask
     const mg = toon(L.mouthguard === 'team' ? un.trim : MOUTHGUARD_COLORS[L.mouthguard] ?? '#dfe8ee');
@@ -608,10 +683,9 @@ function stainedMat(base, part, w, variant) {
   const key = `${baseKey}|wear|${part}|${lv}|${wetB}|${w.snow ? 1 : 0}|${w.mud ? 1 : 0}|${bl}|${variant}`;
   if (texCache.has(key)) return texCache.get(key);
   const src = base.map?.image;
-  const W = src?.width ?? 8;
-  const H = src?.height ?? 12;
+  const [W, H] = base.userData.logical ?? [8, 12];
   return pixMat(key, W, H, (g) => {
-    if (src) g.drawImage(src, 0, 0); else px(g, 0, 0, `#${base.color.getHexString()}`, W, H);
+    if (src) g.drawImage(src, 0, 0, W, H); else px(g, 0, 0, `#${base.color.getHexString()}`, W, H);
     let seed = (variant + 1) * 9301 + lv * 49297 + W * 7 + (part === 'helmet' ? 17 : part === 'pants' ? 3 : 0);
     const r = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
     if (wetB) {
@@ -642,11 +716,7 @@ function stainedMat(base, part, w, variant) {
       const n = bl === 2 ? 7 : 3;
       for (let i = 0; i < n; i++) { const x = Math.floor(r() * W), y = Math.floor(H * (0.1 + r() * 0.6)); px(g, x, y, STAIN.blood[Math.floor(r() * 3)], 1 + Math.floor(r() * 2), 1); if (r() < 0.5) px(g, x, y + 1, STAIN.blood[2], 1, 1 + Math.floor(r() * 2)); }
     }
-    // keep it pixel-crisp (no soft alpha left over)
-    const img = g.getImageData(0, 0, W, H); const d = img.data;
-    for (let i = 3; i < d.length; i += 4) d[i] = 255;
-    g.putImageData(img, 0, 0);
-  });
+  }, { rough: wetB ? 0.32 : 0.75 });
 }
 
 /** Dirty up a football player's uniform and helmet for the current game situation. */
@@ -700,25 +770,31 @@ function addHelmet(neck, un, L, hairC) {
   const shellC = fin === 'matte' ? shade(un.helmet, -0.18) : fin === 'chrome' ? shade(un.helmet, 0.22) : un.helmet;
   const stripe = L.helmetStripe ?? 'single';
   const hu = { ...un, helmet: shellC, stripeStyle: stripe, finish: fin };
-  const side = helmetMat(hu, 'side');
-  const shell = toon(shellC);
+  const rough = fin === 'matte' ? 0.75 : fin === 'chrome' ? 0.18 : 0.3;
+  const metal = fin === 'chrome' ? 0.85 : 0;
+  const shellMat = (m) => { const c = m.clone(); c.roughness = rough; c.metalness = metal; c.side = THREE.DoubleSide; return c; };
+  const shell = shiny(shellC, { rough, metal });
   const add = (geom, mat, x, y, z) => { const m = new THREE.Mesh(geom, mat); m.position.set(x, y, z); H.add(m); return m; };
-  add(box(0.44, 0.1, 0.44), sixFaces(shell, shell, helmetMat(hu, 'top'), shell, shell, shell), 0, 0.19, 0.01);
-  add(box(0.44, 0.34, 0.08), sixFaces(shell, shell, shell, shell, helmetMat(hu, 'back'), shell), 0, 0.0, 0.19);
-  add(box(0.05, 0.34, 0.4), side, -0.2, 0.0, 0.0);
-  add(box(0.05, 0.34, 0.4), side, 0.2, 0.0, 0.0);
-  add(box(0.42, 0.05, 0.05), shell, 0, 0.14, -0.2); // brim
+  const open = new THREE.MeshBasicMaterial({ visible: false });
+  const shellGeo = softBox(0.44, 0.43, 0.47, 0.2, 6);
+  const sideM = shellMat(helmetMat(hu, 'side'));
+  const dome = add(shellGeo, [sideM, sideM, shellMat(helmetMat(hu, 'top')), shellMat(shell), shellMat(helmetMat(hu, 'back')), open], 0, 0.01, 0.01);
+  dome.scale.set(1, 1, 1);
+  add(box(0.4, 0.05, 0.06, 0, 0.45, 3), shell, 0, 0.15, -0.205); // brim
+  // jaw pads
+  add(box(0.05, 0.14, 0.16, 0, 0.45, 3), shell, -0.2, -0.08, -0.12);
+  add(box(0.05, 0.14, 0.16, 0, 0.45, 3), shell, 0.2, -0.08, -0.12);
   // facemask
   const mc = L.maskColor === 'team' ? un.stripe : (L.maskColor ?? '#c3cad3');
-  const mask = toon(mc);
+  const mask = shiny(mc, { rough: 0.35, metal: 0.4 });
   const bars = MASK_BARS[L.maskStyle] ?? MASK_BARS.three;
-  for (const [w, y, z] of bars.h) add(box(w, 0.03, 0.03), mask, 0, y, z);
-  for (const [x, y, hh] of bars.v) add(box(0.03, hh, 0.03), mask, x, y, -0.235);
+  for (const [w, y, z] of bars.h) add(box(w, 0.026, 0.026, 0, 0.5, 2), mask, 0, y, z);
+  for (const [x, y, hh] of bars.v) add(box(0.026, hh, 0.026, 0, 0.5, 2), mask, x, y, -0.235);
   add(box(0.03, 0.1, 0.06), mask, -0.19, -0.07, -0.205);
   add(box(0.03, 0.1, 0.06), mask, 0.19, -0.07, -0.205);
   if (L.visor && L.visor !== 'none') {
     const [col, op] = VISOR_TINTS[L.visor] ?? VISOR_TINTS.dark;
-    const v = new THREE.Mesh(box(0.36, 0.09, 0.01), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op }));
+    const v = new THREE.Mesh(box(0.36, 0.09, 0.012, 0, 0.3, 2), new THREE.MeshStandardMaterial({ color: col, transparent: true, opacity: op, roughness: 0.08, metalness: 0.6 }));
     v.position.set(0, 0.05, -0.2);
     H.add(v);
   }
@@ -731,8 +807,10 @@ function addHelmet(neck, un, L, hairC) {
 }
 
 function addHairVolume(neck, L, hairC) {
-  const hm = toon(hairC);
-  const add = (w, h, d, x, y, z, m = hm) => { const mesh = new THREE.Mesh(box(w, h, d), m); mesh.position.set(x, y, z); neck.add(mesh); return mesh; };
+  const hm = toon(hairC, 0.85);
+  // hair hugs the (smaller, rounder) head: pulled down and in a little, with soft rounded clumps
+  const hg = new THREE.Group(); hg.position.y = -0.045; hg.scale.set(0.9, 1, 0.94); neck.add(hg);
+  const add = (w, h, d, x, y, z, m = hm) => { const mesh = new THREE.Mesh(box(w, h, d, 0, 0.48, 3), m); mesh.position.set(x, y, z); hg.add(mesh); return mesh; };
   const top = 0.23 + 0.18;
   switch (L.hairStyle) {
     case 'afro': add(0.46, 0.22, 0.44, 0, top + 0.06, 0.02); add(0.44, 0.16, 0.2, 0, top - 0.08, 0.13); break;
