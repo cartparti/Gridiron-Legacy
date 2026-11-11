@@ -359,6 +359,18 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   whistle), out of bounds (offense keeps it), or YOU scoop it (`e.scoop` → SCOOP AND SCORE / FUMBLE RECOVERY).
   Incompletions/PDs/batted balls bounce away. Test hook: `globalThis.__forceFumble`.
 
+## v0.24: human skulls, faces and necks
+- `headGeo(shape, seg, sex)`: real proportions (taller/deeper than wide), skull sculpt (occiput, sloped forehead,
+  temples, the nape tucked in behind the jaw, male jaw angle) + face sculpt placed by the face texture's own UVs
+  (brow ridge, eye sockets, nose bridge/tip/nostrils, cheekbones, muzzle, lips, chin; softer for girls). Seams share
+  displacement/normals (`smoothSeams`). seg 30 bare heads, 12 under helmets. Painted nose cone removed.
+- Measured texture->head mapping (Y: crown +1, chin -0.83): nose tip -0.27, under nose -0.40, mouth -0.56, lower lip
+  -0.62, chin -0.78; mouth corners X +-0.19. `BEARD_MASK` uses these.
+- `neckGeo` lathe neck (wider into the traps, thicker for players, slimmer for girls) + Adam's apple for guys; head
+  sits higher (headGroup y 0.035) so the neck shows. `earGeo` shell ears set back at eye level.
+- Beards are 3D (`addBeard`, curl texture) with a cheek line sloping to the sideburns and the back edge following the
+  jaw; the face texture only keeps a soft shadow under them. Side/back/top head textures are plain skin now.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).
