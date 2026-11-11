@@ -379,6 +379,17 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   chin -> neck (no double chin); jaw width spans cheek to ear; vee taper to the chin. Hair shells and beards use the
   same fp so they fit. Tests: `tests/round9.test.js`.
 
+## v0.26: living skin, 3D eyes, cleaner faces
+- `skinMat`/`skinPhys`: MeshPhysicalMaterial with warm sheen, light clearcoat and a touch of warm emissive (matte
+  skin read as clay). `pixMat(..., { skin: true, scale })` gives textured skin (face, head sides, neck, arms) the same.
+- Face texture painted at 24x (288 px) with tapered arched brows, natural lip tint, soft blush, a nose-bridge
+  highlight; painted eyeballs removed. `EYE_COLS = [3.1, 8.9]` (eyes set wider); sockets, brows and anchors use it.
+- `makeEyes`: glossy eyeballs (iris texture faces -z at u=0.75), skin-coloured upper/lower lid caps (`EYE_OPEN` per
+  eye style), lash line (thicker + wing for girls); `blink()` in animateRun tips the upper lids. Anchors come from
+  `headGeo(...).userData.eyes`. Bare heads seg 40.
+- Shading lessons: a steep nose underside, cheek hollows at nose height, or a drooping "long" nose all cast a band
+  under the nose that reads as a mustache. Keep the nose easing into the lip and the hollows low/out toward the jaw.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).
