@@ -1,5 +1,10 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.36', date: 'Nov 11', title: 'Faces from real proportions', items: [
+    'Almond-shaped eyes with low, straight brows instead of round, wide-open doll eyes.',
+    'A real neck: about two-thirds the width of the head, rising from behind the jaw and leaning forward, with the back of the head behind it.',
+    'Heads are less deep front to back, chins stand out more, noses are less pointy, and guys\' jaws taper to the chin.',
+  ] },
   { v: '0.35', date: 'Nov 11', title: 'More defined faces', items: [
     'Faces are less round and pudgy: heads are a little shorter and less balloon-shaped.',
     'Guys get a real jaw angle: the sides of the face come straight down and then turn in to the chin.',

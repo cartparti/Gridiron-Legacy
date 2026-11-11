@@ -459,3 +459,7 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - v0.34: look editor preview follows the change: `TAB_VIEW` (default per tab) + `KEY_VIEW` (per option) in look.js, helmet
   forced on for `HELMET_KEYS`; Face/Upper/Full/Legs picker; `portraitURL(..., { view })` ('face'|'upper'|'full'|'legs');
   portraits look at the camera (no idle glance). `.screen .look-sticky` sits under the pinned screen header.
+- v0.35-0.36 (owner's head-drawing references): shorter, shallower heads (HEAD_DIMS h ~0.375, d ~0.335, smaller rounding),
+  male jaw straight down to an angle then a V to the chin, almond `EYE_OPEN`, low straight male brows, projecting chin,
+  smaller nose tip, neck ~2/3 head width (neckK m 1.22 / f 1.06 / players 1.32) set back (z 0.035) and leaning forward
+  (rotation.x -0.16). Check faces front, 3/4 AND profile.

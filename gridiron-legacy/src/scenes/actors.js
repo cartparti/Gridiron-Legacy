@@ -171,8 +171,8 @@ function geo() {
 // soft contact shadow under each player (radial gradient), cheaper than real shadow maps
 /** Head shapes: proportions (w, h, d), corner rounding, jaw taper. Real heads are taller and deeper than wide. */
 // (v0.35: a little shorter and less rounded: tall, soft heads read as pudgy balloons)
-const HEAD_DIMS = { oval: [0.3, 0.375, 0.36, 0.1, 0.74], round: [0.315, 0.36, 0.36, 0.12, 0.84], square: [0.31, 0.375, 0.355, 0.08, 0.92],
-  long: [0.29, 0.405, 0.355, 0.095, 0.74], wide: [0.325, 0.36, 0.36, 0.095, 0.86], heart: [0.305, 0.375, 0.355, 0.1, 0.62] };
+const HEAD_DIMS = { oval: [0.3, 0.375, 0.335, 0.1, 0.74], round: [0.315, 0.36, 0.34, 0.12, 0.84], square: [0.31, 0.375, 0.33, 0.08, 0.92],
+  long: [0.29, 0.405, 0.33, 0.095, 0.74], wide: [0.325, 0.36, 0.34, 0.095, 0.86], heart: [0.305, 0.375, 0.33, 0.1, 0.62] };
 const headCache = {};
 const EYE_COLS = [3.1, 8.9]; // eye centres on the 12-wide face texture (wider set than before: features were bunched up)
 const gss = (dx, dy, sx, sy) => Math.exp(-(dx * dx) / (2 * sx * sx) - (dy * dy) / (2 * sy * sy));
@@ -243,7 +243,7 @@ function headGeo(shape = 'oval', seg = 6, sex = 'm', fp = FP0) {
     // way down made a soft, round lower face)
     if (y < 0.1) {
       const lin = Math.min(1, (0.1 - y) / 1.1);
-      const t = fem ? lin : 0.45 * lin + 0.55 * sst(-0.4, -1.0, y);
+      const t = fem ? lin : 0.4 * lin + 0.75 * sst(-0.42, -1.0, y);
       x *= 1 - (1 - jaw) * t;
     }
     if (y < -0.3) z *= 1 - (-0.3 - y) * 0.12;
@@ -284,13 +284,13 @@ function headGeo(shape = 'oval', seg = 6, sex = 'm', fp = FP0) {
   for (let i = 5 * n; i < 6 * n; i++) {
     const cx = uv.getX(i) * 12, cy = (1 - uv.getY(i)) * 12;
     let f = 0;
-    f += sw(gss(cx - 6, cy - 4.6 - BROW, 3.0, 0.5), 0.013, 0.006); // brow ridge
+    f += sw(gss(cx - 6, cy - 4.75 - BROW, 3.0, 0.5), 0.015, 0.006); // brow ridge
     f += 0.004 * gss(cx - 6, cy - 3.2, 3.6, 1.2); // forehead
     for (const ex of EC) f -= 0.017 * gss(cx - ex, cy - 5.75, 1.55, 0.85); // eye sockets
     // nose: bridge widening to a tip, nostril wings, a dip under it
     const along = sst(4.9, 7.5, cy) * (1 - sst(7.6 + (NK.len - 1) * 0.25, 9.0 + (NK.len - 1) * 0.25, cy)); // eases into the lip (a steep underside cast a mustache-like shadow)
     f += sw(along * gss(cx - 6, 0, (0.45 + (cy - 5) * 0.15) * NK.wide, 1), 0.035, 0.027) * (0.85 + 0.15 * NK.len);
-    f += sw(gss(cx - 6, cy - 7.55 - (NK.len - 1) * 0.2, 0.62 * NK.wide, cy > 7.55 ? 0.75 : 0.52), 0.016, 0.013) * NK.tip;
+    f += sw(gss(cx - 6, cy - 7.55 - (NK.len - 1) * 0.2, 0.62 * NK.wide, cy > 7.55 ? 0.75 : 0.52), 0.012, 0.01) * NK.tip;
     for (const sd of [-1, 1]) f += 0.006 * NK.wide * gss(cx - 6 - sd * 0.62 * NK.wide, cy - 7.75 - (NK.len - 1) * 0.2, 0.42, 0.35);
     for (const sd of [-1, 1]) f += sw(gss(cx - 6 - sd * 3.4, cy - CK.y, 1.3, 0.8), 0.012, 0.011) * CK.bone; // cheekbones
     for (const sd of [-1, 1]) f -= (fem ? 0.004 : 0.008) * CK.hollow * gss(cx - 6 - sd * 3.9, cy - 9.3, 0.85, 1.0); // hollows under them, out toward the jaw
@@ -299,7 +299,7 @@ function headGeo(shape = 'oval', seg = 6, sex = 'm', fp = FP0) {
     f += sw(gss(cx - 6, cy - 9.8, 1.3, 0.3), 0.01, 0.012) * LIP; // lower lip
     f -= 0.004 * gss(cx - 6, cy - 9.45, 1.7, 0.1); // the line between them
     f -= 0.0022 * gss(cx - 6, cy - 10.4, 1.3, 0.4); // a soft dip above the chin (a narrow one read as a crease)
-    f += sw(gss(cx - 6, cy - 11.2 - CH.down * 20, 1.35 * CH.wide, 0.8), 0.016, 0.01) * CH.size; // chin
+    f += sw(gss(cx - 6, cy - 11.1 - CH.down * 20, 1.35 * CH.wide, 0.85), 0.024, 0.014) * CH.size; // chin (projects forward: a receding chin read as weak and soft)
     disp[i] = f;
   }
   // coincident vertices (box-face seams) share the front face's value so nothing cracks
@@ -534,10 +534,10 @@ function faceMat(L, hc, { eyeBlack = false } = {}) {
     // brows
     const bc = (L.hairColor ?? 0) > 8 ? '#2a1a12' : shade(hc, -0.12);
     // brows: tapered (full at the inner end, fine at the tail) and arched
-    const by = (L.brows === 'raised' ? 3.75 : 4.3) - 0.45 * fs.browH;
+    const by = (L.brows === 'raised' ? 3.95 : fem ? 4.35 : 4.6) - 0.45 * fs.browH;
     const th = fem ? 0.36 : L.brows === 'thick' ? 0.75 : L.brows === 'thin' ? 0.3 : 0.5;
     const brow = (xIn, xOut, tilt) => {
-      const mid = (xIn + xOut) / 2, arch = fem ? 0.55 : 0.4;
+      const mid = (xIn + xOut) / 2, arch = fem ? 0.5 : 0.22;
       g.fillStyle = bc; g.globalAlpha = 0.92; g.beginPath();
       g.moveTo(xIn, by + tilt - th / 2);
       g.quadraticCurveTo(mid + (xOut - xIn) * 0.1, by - arch - th * 0.5, xOut, by + 0.15 - th * 0.15);
@@ -933,10 +933,10 @@ function buildRig(o) {
   // counter the body's width scale so heads stay square
   neck.scale.set(1 / sc.build, 1 / sc.height * 0.96 + 0.04, 1 / body.scale.z);
   // a real neck: wider at the base where it meets the traps, sitting a touch behind the jaw
-  const neckK = (football ? 1.14 : L.gender === 'f' ? 0.97 : 1.08) * (1 + 0.12 * fsOf(L).neck);
+  const neckK = (football ? 1.32 : L.gender === 'f' ? 1.06 : 1.22) * (1 + 0.12 * fsOf(L).neck); // a real neck is ~2/3 of the head's width
   const neckBox = new THREE.Mesh(neckGeo(neckK), L.tatNeck && L.tatNeck !== 'none' ? neckMat(skinC, L.tatNeck) : skin);
-  neckBox.position.set(0, 0.2, 0.018);
-  neckBox.rotation.x = 0.08;
+  neckBox.position.set(0, 0.2, 0.035); // rises from behind the jaw, leaning forward (not under the middle like a stick)
+  neckBox.rotation.x = -0.16;
   neck.add(neckBox);
   if (L.gender !== 'f') { const apple = new THREE.Mesh(G.joint, skin); apple.scale.set(0.016, 0.022, 0.014); apple.position.set(0, 0.105, 0.024 - 0.054 * neckK); neck.add(apple); }
   const helmetOn = football && o.helmet !== false;
@@ -959,7 +959,7 @@ function buildRig(o) {
   // Big chunky heads: everything above the neck lives in a scaled group.
   const headGroup = new THREE.Group();
   headGroup.scale.setScalar(g.headScale * 1.05);
-  headGroup.position.y = -0.014; // sits down onto the neck (a long thin neck looked like a mannequin)
+  headGroup.position.y = -0.002; // sits down onto the neck (a long thin neck looked like a mannequin)
   neck.add(headGroup);
   headGroup.add(head);
   const eyes = makeEyes(head.geometry.userData.eyes ?? [[-0.072, 0.012, -0.17], [0.072, 0.012, -0.17]], L, skin, head.position.y);
@@ -1476,7 +1476,7 @@ function eyeMat(color) {
   return (irisCache[color] = new THREE.MeshPhysicalMaterial({ map: t, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.04, metalness: 0 }));
 }
 const EYE_R = 0.031; // a natural eye is about a fifth of the face's width (smaller read as beady)
-const EYE_OPEN = { round: [1.06, 2.12], wide: [0.96, 2.2], narrow: [1.2, 2.0], sleepy: [1.3, 2.08] };
+const EYE_OPEN = { round: [1.2, 2.04], wide: [1.1, 2.1], narrow: [1.32, 1.98], sleepy: [1.42, 2.02] }; // almond, not round
 const eyeGeoCache = {};
 function lidGeo(top, edge) {
   const key = `${top}|${edge}`;
