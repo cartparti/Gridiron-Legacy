@@ -13,6 +13,7 @@ import {
   SKIN_TONES, HAIR_COLORS, EYE_COLORS, VISOR_TINTS, MOUTHGUARD_COLORS, bodyScale, randomLook, normalizeLook, masculinize,
 } from '../data/looks.js';
 import { shade } from '../data/kits.js';
+import { mhHeadGeo, mhShell, SKULL, MH_LANDMARKS } from './mhhead.js';
 
 // ------------------------------------------------------------------ materials & textures
 
@@ -451,6 +452,63 @@ function faceMat(L, hc, { eyeBlack = false } = {}) {
   }, { rough: 0.6, skin: true, scale: 24 });
 }
 
+function faceMatMH(L, hc, { eyeBlack = false } = {}) {
+  const fem = L.gender === 'f';
+  const key = `mhface2|${L.skin}|${L.hairColor}|${L.brows}|${L.beard}|${eyeBlack}|${L.gender}|${L.lips}`;
+  return pixMat(key, 12, 12, (g) => {
+    const sk = SKIN_TONES[L.skin % SKIN_TONES.length];
+    const ell = (x, y, rx, ry, col) => { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); g.fill(); };
+    // flat skin (it has to match the unpainted rest of the head exactly at the edges)
+    g.fillStyle = sk; g.fillRect(0, 0, 12, 12);
+    for (const bx of [3.0, 9.0]) { const bg = g.createRadialGradient(bx, 7.4, 0.2, bx, 7.4, 2.0); bg.addColorStop(0, `rgba(224,122,106,${fem ? 0.14 : 0.08})`); bg.addColorStop(1, 'rgba(224,122,106,0)'); g.fillStyle = bg; g.fillRect(0, 0, 12, 12); }
+    // brows: tapered and arched, over the real brow ridge
+    const bc = (L.hairColor ?? 0) > 8 ? '#2a1a12' : shade(hc, -0.12);
+    const by = L.brows === 'raised' ? 4.05 : 4.45;
+    const th = fem ? 0.3 : L.brows === 'thick' ? 0.62 : L.brows === 'thin' ? 0.26 : 0.42;
+    const brow = (xIn, xOut, tilt) => {
+      const mid = (xIn + xOut) / 2, arch = fem ? 0.5 : 0.35;
+      g.fillStyle = bc; g.globalAlpha = 0.9; g.beginPath();
+      g.moveTo(xIn, by + tilt - th / 2);
+      g.quadraticCurveTo(mid + (xOut - xIn) * 0.1, by - arch - th * 0.5, xOut, by + 0.2 - th * 0.15);
+      g.quadraticCurveTo(mid + (xOut - xIn) * 0.1, by - arch + th * 0.35, xIn, by + tilt + th / 2);
+      g.closePath(); g.fill(); g.globalAlpha = 1;
+    };
+    const [eL, eR] = EYE_COLS;
+    const tilt = L.brows === 'angry' ? 0.3 : 0;
+    brow(eL + 1.2, eL - 1.55, tilt); brow(eR - 1.2, eR + 1.55, tilt);
+    // lash line on the upper lids (fuller on girls) and a hint of liner
+    g.strokeStyle = '#1a1210'; g.lineCap = 'round';
+    for (const cx of EYE_COLS) {
+      if (!fem) continue; // guys: the real lids are enough
+      g.globalAlpha = 0.6; g.lineWidth = 0.13;
+      g.beginPath(); g.ellipse(cx, 5.82, 0.95, 0.3, 0, Math.PI * 1.1, Math.PI * 1.9); g.stroke();
+      { const out = cx < 6 ? -1 : 1; g.beginPath(); g.moveTo(cx + out * 0.92, 5.72); g.lineTo(cx + out * 1.18, 5.55); g.stroke(); }
+      g.globalAlpha = 1;
+    }
+    if (eyeBlack) { g.globalAlpha = 0.9; ell(EYE_COLS[0], 7.0, 1.2, 0.36, '#111111'); ell(EYE_COLS[1], 7.0, 1.2, 0.36, '#111111'); g.globalAlpha = 1; }
+    // beard shadow under the 3D beard / stubble
+    const natural = (L.hairColor ?? 0) <= 8 ? hc : HAIR_COLORS[1];
+    const bh = shade(natural, -0.05);
+    const stubble = (yTop, a) => {
+      g.save(); g.globalAlpha = a;
+      const gr = g.createLinearGradient(0, 0, 12, 0); gr.addColorStop(0, sk); gr.addColorStop(0.2, bh); gr.addColorStop(0.8, bh); gr.addColorStop(1, sk);
+      g.fillStyle = gr; g.beginPath(); g.moveTo(0.8, yTop); g.quadraticCurveTo(2.4, 9.8, 4.3, 9.9); g.lineTo(7.7, 9.9); g.quadraticCurveTo(9.6, 9.8, 11.2, yTop);
+      g.lineTo(11.2, 12); g.lineTo(0.8, 12); g.closePath(); g.fill();
+      g.beginPath(); g.ellipse(6, 8.55, 2.3, 0.38, 0, 0, Math.PI * 2); g.fill(); // over the lip
+      g.restore();
+    };
+    if (L.beard === 'stubble') stubble(7.0, 0.3);
+    else if (L.beard && L.beard !== 'none') stubble(7.4, ['mustache', 'handlebar', 'soulpatch'].includes(L.beard) ? 0.12 : 0.25);
+    // lips: natural colour on the real lips (cupid's bow on top, fuller below); lipstick for some girls
+    const lipC = fem && L.lips && L.lips !== 'none' ? L.lips : shade(sk, -0.18);
+    const lipA = fem && L.lips && L.lips !== 'none' ? 0.85 : 0.45;
+    g.save(); g.globalAlpha = lipA;
+    ell(6, 9.05, 1.95, 0.3, lipC); ell(6, 9.62, 1.7, 0.36, lipC);
+    g.globalAlpha = lipA * 0.5; ell(6, 9.36, 2.2, 0.08, shade(lipC, -0.35));
+    g.restore();
+    if (!fem || !L.lips || L.lips === 'none') { g.save(); g.globalAlpha = 0.18; ell(6, 9.3, 2.0, 0.55, '#c26a64'); g.restore(); }
+  }, { rough: 0.6, skin: true, scale: 24 });
+}
 function sideMat(L, hc, flip) {
   // plain skin with a little shading: the 3D hair, beard and ears do the rest (painted hair showed as blocks)
   const key = `side4|${L.skin}|${flip}`;
@@ -765,34 +823,22 @@ function buildRig(o) {
   const sex = L.gender === 'f' ? 'f' : 'm';
   const fp = faceParams(L);
 
-  const head = new THREE.Mesh(headGeo(L.headShape, helmetOn ? 12 : 40, sex, fp), sixFaces(
-    sideMat(L, hairC, false), sideMat(L, hairC, true), topMat(L, hairC), skin, backMat(L, hairC),
-    faceMat(L, hairC, { eyeBlack: helmetOn && L.eyeBlack }),
-  ));
-  head.position.y = 0.23;
-  // the nose, brow, cheekbones and chin are sculpted into the head; ears sit level with the eyes, set back
-  const hd = HEAD_DIMS[L.headShape] ?? HEAD_DIMS.oval;
-  const ears = [];
-  for (const sd of [-1, 1]) {
-    const e = new THREE.Mesh(earGeo(), skin);
-    e.position.set(sd * (hd[0] / 2 * (FACEW_K[fp.faceW] ?? 1) - 0.008), 0.215, 0.025); e.rotation.y = sd * 0.35; e.scale.x = sd;
-    ears.push(e);
-  }
+  // an artist-made human head (MakeHuman base mesh, CC0) shaped by this person's look; real nose, lips, lids, ears
+  const head = new THREE.Mesh(mhHeadGeo(L, fp, football), [skin, faceMatMH(L, hairC, { eyeBlack: helmetOn && L.eyeBlack })]);
   // Big chunky heads: everything above the neck lives in a scaled group.
   const headGroup = new THREE.Group();
   headGroup.scale.setScalar(g.headScale);
   headGroup.position.y = 0.02;
   neck.add(headGroup);
   headGroup.add(head);
-  const eyes = makeEyes(head.geometry.userData.eyes ?? [[-0.072, 0.012, -0.17], [0.072, 0.012, -0.17]], L, skin, head.position.y);
+  const eyes = makeEyes(head.geometry.userData.eyes.map(([x, y, z]) => [x, y, z - 0.003]), L, skin, 0, { exact: true, R: head.geometry.userData.eyeR * 1.04 });
   headGroup.add(eyes.group);
-  if (!(football && o.helmet !== false)) headGroup.add(...ears);
   if (helmetOn) addHelmet(headGroup, un, L, hairC);
-  else { addHairVolume(headGroup, L, hairC); addBeard(headGroup, L, hairC); }
+  else { addHairVolume(headGroup, L, hairC, head.geometry); addBeard(headGroup, L, hairC, head.geometry); }
   if (!helmetOn && L.earrings && L.earrings !== 'none') {
     const gold = shiny(L.earrings === 'studs' ? '#e9eef4' : '#e6b422', { rough: 0.2, metal: 0.9 });
     for (const sd of [-1, 1]) {
-      const x = sd * 0.172; const y = 0.15; const z = 0.0;
+      const x = sd * 0.137; const y = 0.162; const z = 0.012; // the ear lobes
       if (L.earrings === 'hoops') { const r = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.007, 6, 16), gold); r.position.set(x, y - 0.03, z); r.rotation.y = Math.PI / 2; headGroup.add(r); }
       else if (L.earrings === 'drops') { const d = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 6), gold); d.position.set(x, y - 0.045, z); headGroup.add(d); const st2 = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.03, 4), gold); st2.position.set(x, y - 0.02, z); headGroup.add(st2); }
       else { const d = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), gold); d.position.set(x, y, z); headGroup.add(d); }
@@ -1071,13 +1117,15 @@ function hairMat(color, kind = 'strand', rough = 0.6) {
   const key = `hair2|${color}|${kind}|${rough}`;
   if (!matCache.has(key)) {
     const t = hairTex(kind);
-    matCache.set(key, new THREE.MeshStandardMaterial({ color, map: t.map, bumpMap: t.bump, bumpScale: 1.4, roughness: rough, metalness: 0, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
+    matCache.set(key, new THREE.MeshStandardMaterial({ color, map: t.map, bumpMap: t.bump, bumpScale: 1.4, roughness: rough, metalness: 0 }));
   }
   return matCache.get(key);
 }
 const top = (ny) => Math.max(0, ny);
 const front = (nz) => Math.max(0, -nz);
 // F/S/B: hairline as a polar angle from the crown (radians) at the front, sides and back.
+// a crest runs from the forehead hairline over the crown to the nape (never down the face)
+const crestLine = (th, az) => { const c = Math.cos(az); const lim = c >= 0 ? 1.5 + (0.8 - 1.5) * c : 1.5 + (1.95 - 1.5) * -c; return sstep(lim + 0.08, lim - 0.08, th); };
 const HAIR_SPEC = {
   buzz: { F: 0.95, S: 1.45, B: 1.9, thick: () => 0.005, kind: 'curl', rough: 0.9 },
   short: { F: 0.95, S: 1.45, B: 1.95, thick: (nx, ny, nz) => 0.009 + 0.016 * top(ny) + 0.008 * front(nz) * top(ny) },
@@ -1087,8 +1135,8 @@ const HAIR_SPEC = {
   flattop: { F: 0.95, S: 1.45, B: 1.85, thick: (nx, ny, nz) => 0.005 + 0.12 * sstep(0.2, 0.85, ny) * (1 - 0.6 * front(nz)), flat: 0.06, kind: 'curl', rough: 0.8 },
   curly: { F: 1.05, S: 1.5, B: 2.0, thick: (nx, ny) => 0.03 + 0.03 * top(ny), noise: 0.012, kind: 'curl', rough: 0.8 },
   afro: { F: 1.1, S: 1.65, B: 2.05, thick: (nx, ny) => 0.075 + 0.075 * top(ny) + 0.02 * Math.abs(nx), noise: 0.014, kind: 'curl', rough: 0.85 },
-  mohawk: { mask: (nx, ny, nz, th) => sstep(0.26, 0.16, Math.abs(nx)) * sstep(2.0, 1.85, th), thick: () => 0.008, ridge: { w: 0.35, r: 0.06 } },
-  frohawk: { mask: (nx, ny, nz, th) => sstep(0.45, 0.32, Math.abs(nx)) * sstep(2.0, 1.85, th), thick: () => 0.02, ridge: { w: 0.6, r: 0.07 }, kind: 'curl', rough: 0.85 },
+  mohawk: { mask: (nx, ny, nz, th, az) => sstep(0.26, 0.16, Math.abs(nx)) * crestLine(th, az), thick: () => 0.008, ridge: { w: 0.35, r: 0.06 } },
+  frohawk: { mask: (nx, ny, nz, th, az) => sstep(0.45, 0.32, Math.abs(nx)) * crestLine(th, az), thick: () => 0.02, ridge: { w: 0.6, r: 0.07 }, kind: 'curl', rough: 0.85 },
   undercut: { F: 0.92, S: 0.98, B: 1.05, thick: (nx, ny, nz) => 0.03 + 0.025 * front(nz) },
   pompadour: { F: 0.95, S: 1.45, B: 1.9, thick: (nx, ny, nz) => 0.014 + 0.018 * top(ny) + 0.08 * front(nz) * sstep(0.15, 0.8, ny), rough: 0.4 },
   spiky: { F: 0.95, S: 1.45, B: 1.9, thick: (nx, ny) => 0.018 + 0.012 * top(ny) },
@@ -1101,6 +1149,18 @@ const HAIR_SPEC = {
   twists: { F: 1.0, S: 1.5, B: 1.95, thick: () => 0.026, kind: 'curl', rough: 0.8 },
 };
 const hairGeoCache = {};
+/** Hair shell on the MakeHuman head: same hairline rules (F/S/B or a mask) and thickness as before. */
+function mhHairShell(headG, spec) {
+  const mask = spec.mask ? (nx, ny, nz, th, az) => spec.mask(nx, ny, nz, th, az) : (nx, ny, nz, th, az) => {
+    const c = Math.cos(az);
+    const lim = c >= 0 ? spec.S + (spec.F - spec.S) * c : spec.S + (spec.B - spec.S) * -c;
+    return sstep(lim + 0.08, lim - 0.08, th + (spec.noTemple ? 0 : 0.14 * Math.exp(-((Math.abs(az) - 0.8) ** 2) / 0.06)));
+  };
+  const thick = (nx, ny, nz, th, az) => spec.thick(nx, ny, nz, th, az) + (spec.noise ? spec.noise * Math.sin(17 * nx + 3.1) * Math.sin(19 * ny + 1.3) * Math.sin(23 * nz + 2.2) : 0);
+  const g = mhShell(headG, mask, thick);
+  if (spec.flat !== undefined) { const p = g.attributes.position; const top = SKULL.c[1] + SKULL.r[1] + spec.flat; for (let i = 0; i < p.count; i++) if (p.getY(i) > top) p.setY(i, top); g.computeVertexNormals(); }
+  return g;
+}
 function hairShellGeo(shape, style, spec) {
   const [w0, h, d] = HEAD_DIMS[shape] ?? HEAD_DIMS.oval;
   const w = w0 * (FACEW_K[spec.fp?.faceW] ?? 1);
@@ -1166,8 +1226,8 @@ function lockGeo(points, prof, { bumps = 0, amp = 0, squash = 1, seg = 22, radia
   return g;
 }
 const SPH = new THREE.SphereGeometry(1, 20, 14);
-function hairExtras(shape, style, spec, fw = 1) {
-  const [w0, h, d] = HEAD_DIMS[shape] ?? HEAD_DIMS.oval;
+function hairExtras(shape, style, spec, fw = 1, skull = null) {
+  const [w0, h, d] = skull ? skull.r.map((r) => r * 2) : HEAD_DIMS[shape] ?? HEAD_DIMS.oval;
   const w = w0 * fw;
   const hw = w / 2, hh = h / 2, hd = d / 2, cy = 0.23;
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -1293,7 +1353,7 @@ function lidGeo(top, edge) {
   return (eyeGeoCache[key] = g);
 }
 /** Two eyes for a head; returns { group, lids } (lids blink in animateRun). */
-function makeEyes(anchors, L, skin, headY) {
+function makeEyes(anchors, L, skin, headY, { exact = false, R: RR = EYE_R } = {}) {
   const fem = L.gender === 'f';
   const [up, low] = EYE_OPEN[L.eyes] ?? EYE_OPEN.round;
   const ball = eyeGeoCache.ball ??= new THREE.SphereGeometry(EYE_R, 24, 16);
@@ -1303,9 +1363,15 @@ function makeEyes(anchors, L, skin, headY) {
   anchors.forEach(([x, y, z], i) => {
     const sd = i === 0 ? -1 : 1;
     const e = new THREE.Group();
-    e.position.set(x, headY + y + 0.003, z + EYE_R * 0.7);
+    if (exact) e.position.set(x, headY + y, z); else e.position.set(x, headY + y + 0.003, z + EYE_R * 0.7);
+    e.scale.setScalar(RR / EYE_R);
     const b = new THREE.Mesh(ball, eyeMat(EYE_COLORS[(L.eyeColor ?? 0) % EYE_COLORS.length]));
     e.add(b);
+    if (exact) {
+      // the head has real eyelids; this lid only shows when blinking (tucked up under the real one otherwise)
+      const blinkLid = new THREE.Mesh(lidGeo(true, 0.55), skin); e.add(blinkLid); blinkLid.userData.blinkK = 1.5;
+      lids.push(blinkLid); group.add(e); return;
+    }
     const lidsG = new THREE.Group(); lidsG.rotation.set(0, sd * 0.18, sd * -0.07); e.add(lidsG); // follow the face's curve, outer corner up
     const upper = new THREE.Mesh(lidGeo(true, up), skin); lidsG.add(upper);
     const lower = new THREE.Mesh(lidGeo(false, low), skin); lidsG.add(lower);
@@ -1326,7 +1392,7 @@ function blink(p, u, dt) {
   u.blinkT = (u.blinkT ?? 1 + Math.random() * 3) - dt;
   let k = 0;
   if (u.blinkT < 0) { const t = -u.blinkT; k = t < 0.07 ? t / 0.07 : t < 0.16 ? 1 - (t - 0.07) / 0.09 : 0; if (t > 0.16) u.blinkT = 2 + Math.random() * 4; }
-  for (const l of lids) l.rotation.x = -0.95 * k;
+  for (const l of lids) l.rotation.x = -0.95 * k * (l.userData.blinkK ?? 1);
 }
 /** Neck: sternocleidomastoid taper, flaring into the traps at the base. k = thickness. */
 const neckCache = {};
@@ -1369,7 +1435,38 @@ const BEARD_MASK = {
   soulpatch: (X, Y, Z) => sst(0.09, 0.05, Math.abs(X)) * sst(-0.64, -0.67, Y) * sst(-0.73, -0.7, Y) * sst(-0.5, -0.8, Z),
 };
 const beardCache = {};
-function addBeard(neck, L, hairC) {
+// beard regions on the MakeHuman head, in skull space (X: +-1 at the temples, Y: crown +1 .. chin -1, Z: face -1)
+const mhLip = (X, Y) => sst(0.38, 0.28, Math.abs(X)) * sst(-0.48, -0.52, Y) * sst(-0.68, -0.63, Y);
+const mhMus = (X, Y, Z) => sst(0.42, 0.3, Math.abs(X)) * sst(-0.38, -0.43, Y) * sst(-0.55, -0.5, Y) * sst(-0.55, -0.8, Z);
+const mhArea = (X, Y, Z, center, side, burn) => {
+  const front = center + (side - center) * sst(0.3, 0.75, Math.abs(X));
+  const top = front + (burn - front) * sst(-0.85, 0.1, Z);
+  const backZ = 0.25 + 0.3 * Math.min(0, Y);
+  return sst(top + 0.07, top - 0.07, Y) * sst(backZ + 0.12, backZ - 0.12, Z) * sst(-1.32, -1.15, Y);
+};
+const MH_BEARD = {
+  full: (X, Y, Z) => mhArea(X, Y, Z, -0.42, -0.15, 0.0) * (1 - mhLip(X, Y)),
+  long: (X, Y, Z) => mhArea(X, Y, Z, -0.42, -0.15, 0.0) * (1 - mhLip(X, Y)),
+  boxed: (X, Y, Z) => Math.max(mhArea(X, Y, Z, -0.55, -0.35, -0.2), mhMus(X, Y, Z)) * (1 - mhLip(X, Y)),
+  chinstrap: (X, Y, Z) => mhArea(X, Y, Z, -0.7, -0.25, -0.05) * Math.max(sst(-0.88, -0.96, Y), sst(0.62, 0.78, Math.abs(X)), sst(-0.35, -0.1, Z)),
+  muttonchops: (X, Y, Z) => mhArea(X, Y, Z, -0.55, -0.15, 0.03) * Math.max(sst(0.45, 0.75, Math.abs(X)), sst(-0.5, -0.1, Z)) * sst(-0.95, -0.6, Y),
+  goatee: (X, Y, Z) => Math.max(sst(0.36, 0.26, Math.abs(X)) * sst(-0.66, -0.72, Y) * sst(-1.12, -1.02, Y) * sst(-0.4, -0.7, Z), mhMus(X, Y, Z)) * (1 - mhLip(X, Y)),
+  vandyke: (X, Y, Z) => Math.max(sst(0.2, 0.12, Math.abs(X)) * sst(-0.7, -0.76, Y) * sst(-1.12, -1.02, Y) * sst(-0.4, -0.7, Z), mhMus(X, Y, Z)) * (1 - mhLip(X, Y)),
+  mustache: (X, Y, Z) => mhMus(X, Y, Z),
+  handlebar: (X, Y, Z) => mhMus(X, Y, Z),
+  soulpatch: (X, Y, Z) => sst(0.1, 0.05, Math.abs(X)) * sst(-0.66, -0.7, Y) * sst(-0.78, -0.74, Y) * sst(-0.5, -0.8, Z),
+};
+function addBeard(neck, L, hairC, headG) {
+  const mask = MH_BEARD[L.beard];
+  if (!mask) return;
+  const thickB = L.beard === 'long' ? 0.02 : L.beard === 'full' ? 0.014 : L.beard === 'boxed' ? 0.011 : L.beard === 'muttonchops' ? 0.006 : 0.008;
+  const geo = (beardCache[`mh|${L.beard}|${headG.userData.key}`] ??= mhShell(headG, (nx, ny, nz, th, az, X, Y, Z) => mask(X, Y, Z),
+    (nx, ny, nz, th, az, X, Y, Z) => thickB + (L.beard === 'long' ? 0.03 * sst(-0.75, -1.1, Y) * sst(0.5, 0, Math.abs(X)) : 0), { sag: L.beard === 'long' ? 0.8 : 0 }));
+  const natural0 = (L.hairColor ?? 0) <= 8 ? hairC : HAIR_COLORS[1];
+  const bcol0 = (L.hairColor ?? 0) <= 1 ? shade(natural0, 0.22) : shade(natural0, -0.05);
+  neck.add(new THREE.Mesh(geo, hairMat(bcol0, 'curl', 0.62)));
+}
+function addBeardOld(neck, L, hairC) {
   const mask = BEARD_MASK[L.beard];
   if (!mask) return;
   const shape = L.headShape ?? 'oval';
@@ -1398,15 +1495,13 @@ function addBeard(neck, L, hairC) {
   const bcol = (L.hairColor ?? 0) <= 1 ? shade(natural, 0.22) : shade(natural, -0.05);
   neck.add(new THREE.Mesh(geo, hairMat(bcol, 'curl', 0.62)));
 }
-function addHairVolume(neck, L, hairC) {
+function addHairVolume(neck, L, hairC, headG) {
   const style = L.hairStyle;
   const spec = HAIR_SPEC[style];
   if (!spec) return; // bald
   const shape = L.headShape ?? 'oval';
-  const sex = L.gender === 'f' ? 'f' : 'm';
-  const fp = faceParams(L);
-  const key = `${shape}|${style}|${sex}|${fpKey(fp)}`;
-  const cached = (hairGeoCache[key] ??= { shell: hairShellGeo(shape, style, { ...spec, sex, fp }), extras: hairExtras(shape, style, spec, FACEW_K[fp.faceW] ?? 1) });
+  const key = `mh|${style}|${headG.userData.key}`;
+  const cached = (hairGeoCache[key] ??= { shell: mhHairShell(headG, spec), extras: hairExtras(shape, style, spec, 1, SKULL) });
   const mat = hairMat(hairC, spec.kind ?? 'strand', spec.rough ?? 0.6);
   const lockMat = style === 'dreads' || style === 'twists' || style === 'curly' ? hairMat(hairC, 'curl', 0.85) : hairMat(hairC, 'strand', spec.rough ?? 0.55);
   const tieMat = shiny(L.gender === 'f' ? '#c2185b' : '#1b1b1b', { rough: 0.5 });

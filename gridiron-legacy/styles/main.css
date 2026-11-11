@@ -490,6 +490,8 @@ input[type='text'], input[type='number'] { border-radius: 5px !important; border
   box-shadow: inset 0 -16px 24px rgba(0, 0, 0, 0.35);
 }
 .look-stage img { height: 200px !important; width: 160px !important; }
+.look-face img { height: 200px !important; width: 150px !important; object-fit: cover; border-radius: 12px; }
+.look-stage:has(.look-face) { gap: 6px; }
 .look-tabs { margin-top: 2px; }
 .look-panel { display: flex; flex-direction: column; gap: 12px; }
 .look-row { display: flex; flex-direction: column; gap: 8px; }
