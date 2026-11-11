@@ -1,5 +1,10 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.37', date: 'Nov 11', title: 'Better noses', items: [
+    'Noses rebuilt: a straight bridge from between the brows down to a rounded tip, with defined sides, nose wings and nostrils.',
+    'From the side the nose now flows up into the brow instead of poking out of the middle of the face.',
+    'The Nose width and Nose length sliders shape the whole nose, painted details included.',
+  ] },
   { v: '0.36', date: 'Nov 11', title: 'Faces from real proportions', items: [
     'Almond-shaped eyes with low, straight brows instead of round, wide-open doll eyes.',
     'A real neck: about two-thirds the width of the head, rising from behind the jaw and leaning forward, with the back of the head behind it.',

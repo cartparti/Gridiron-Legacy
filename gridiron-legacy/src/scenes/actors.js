@@ -287,11 +287,19 @@ function headGeo(shape = 'oval', seg = 6, sex = 'm', fp = FP0) {
     f += sw(gss(cx - 6, cy - 4.75 - BROW, 3.0, 0.5), 0.015, 0.006); // brow ridge
     f += 0.004 * gss(cx - 6, cy - 3.2, 3.6, 1.2); // forehead
     for (const ex of EC) f -= 0.017 * gss(cx - ex, cy - 5.75, 1.55, 0.85); // eye sockets
-    // nose: bridge widening to a tip, nostril wings, a dip under it
-    const along = sst(4.9, 7.5, cy) * (1 - sst(7.6 + (NK.len - 1) * 0.25, 9.0 + (NK.len - 1) * 0.25, cy)); // eases into the lip (a steep underside cast a mustache-like shadow)
-    f += sw(along * gss(cx - 6, 0, (0.45 + (cy - 5) * 0.15) * NK.wide, 1), 0.035, 0.027) * (0.85 + 0.15 * NK.len);
-    f += sw(gss(cx - 6, cy - 7.55 - (NK.len - 1) * 0.2, 0.62 * NK.wide, cy > 7.55 ? 0.75 : 0.52), 0.012, 0.01) * NK.tip;
-    for (const sd of [-1, 1]) f += 0.006 * NK.wide * gss(cx - 6 - sd * 0.62 * NK.wide, cy - 7.75 - (NK.len - 1) * 0.2, 0.42, 0.35);
+    // nose (from the head references): a straight bridge from between the eyes down to a rounded tip, sides that read
+    // as planes (not a soft bump), wings at the base, and an underside that tucks back to the lip
+    {
+      const tipY = 7.5 + 0.35 * (NK.len - 1), rootY = 4.75;
+      const t = Math.max(0, Math.min(1, (cy - rootY) / (tipY - rootY)));
+      const proj = (fem ? 0.029 : 0.036) * (0.45 + 0.55 * Math.pow(t, 1.25)) * (0.9 + 0.1 * NK.tip); // the root sits out level with the brow, so the bridge runs straight up into it
+      const W = (0.4 + 0.42 * t) * NK.wide, dx = Math.abs(cx - 6);
+      const ridge = sst(W, W * 0.2, dx);
+      const top = sst(4.2, 4.8, cy), under = 1 - sst(tipY - 0.2, tipY + 0.75, cy);
+      f += proj * ridge * top * under;
+      f += (fem ? 0.008 : 0.01) * NK.tip * gss(cx - 6, cy - tipY, 0.52 * NK.wide, 0.55); // the ball of the tip (rounded, not a point)
+      for (const sd of [-1, 1]) f += (fem ? 0.01 : 0.013) * NK.wide * gss(cx - 6 - sd * 0.82 * NK.wide, cy - tipY - 0.28, 0.36 * NK.wide, 0.34); // wings
+    }
     for (const sd of [-1, 1]) f += sw(gss(cx - 6 - sd * 3.4, cy - CK.y, 1.3, 0.8), 0.012, 0.011) * CK.bone; // cheekbones
     for (const sd of [-1, 1]) f -= (fem ? 0.004 : 0.008) * CK.hollow * gss(cx - 6 - sd * 3.9, cy - 9.3, 0.85, 1.0); // hollows under them, out toward the jaw
     f += 0.006 * gss(cx - 6, cy - 9.3, 1.9, 0.9); // muzzle
@@ -507,7 +515,7 @@ const HAIR_BACK = { bald: 0, buzz: 6, short: 7, fade: 5, flattop: 6, curly: 8, a
 function faceMat(L, hc, { eyeBlack = false } = {}) {
   const fem = L.gender === 'f';
   const fs = fsOf(L), EC = eyeCols(fs);
-  const key = `face6|${fs.browH}|${fs.eyeSpace}|${fs.lips}|${L.skin}|${L.hairStyle}|${L.hairColor}|${L.eyeColor}|${L.eyes}|${L.brows}|${L.nose}|${L.mouth}|${L.beard}|${eyeBlack}|${L.gender}|${L.lips}`;
+  const key = `face7|${fs.noseL}|${fs.noseW}|${fs.browH}|${fs.eyeSpace}|${fs.lips}|${L.skin}|${L.hairStyle}|${L.hairColor}|${L.eyeColor}|${L.eyes}|${L.brows}|${L.nose}|${L.mouth}|${L.beard}|${eyeBlack}|${L.gender}|${L.lips}`;
   // Drawn with smooth shapes on a 12x12 logical grid (rendered at 72x72): shading, real eyes, nose, lips.
   return pixMat(key, 12, 12, (g) => {
     const sk = SKIN_TONES[L.skin % SKIN_TONES.length];
@@ -554,17 +562,24 @@ function faceMat(L, hc, { eyeBlack = false } = {}) {
       g.beginPath(); g.ellipse(cx, 5.5, 1.4, 0.8, 0, Math.PI * 1.08, Math.PI * 1.92); g.stroke(); g.globalAlpha = 1;
     }
     if (eyeBlack) { g.globalAlpha = 0.9; ell(3.4, 7.15, 1.2, 0.38, '#111111'); ell(8.6, 7.15, 1.2, 0.38, '#111111'); g.globalAlpha = 1; }
-    // nose: a soft highlight down the bridge and a little lift under the tip, so the nose reads as a nose instead
-    // of just the shadow it casts (which looked like a mustache)
-    { const hl = shade(sk, 0.16);
-      const bg = g.createLinearGradient(6, 5.2, 6, 7.8); bg.addColorStop(0, 'rgba(255,255,255,0)'); bg.addColorStop(0.5, hl); bg.addColorStop(1, 'rgba(255,255,255,0)');
-      g.save(); g.globalAlpha = 0.35; g.fillStyle = bg; g.beginPath(); g.ellipse(6, 6.6, 0.32, 1.25, 0, 0, Math.PI * 2); g.fill(); g.restore();
-      g.save(); g.globalAlpha = 0.28; ell(6, 8.25, 1.35, 0.32, shade(sk, 0.12)); g.restore(); }
-    // nose: side shadow + nostrils
-    const nw = L.nose === 'wide' ? 1.5 : L.nose === 'long' ? 0.9 : 1.1;
-    const nb = L.nose === 'long' ? 7.9 : 7.6;
-    g.fillStyle = dk; g.globalAlpha = 0.1; g.beginPath(); g.moveTo(6.1, 5.4); g.quadraticCurveTo(6.9, 6.8, 6 + nw, nb); g.lineTo(6, nb + 0.2); g.closePath(); g.fill(); g.globalAlpha = 1;
-    g.globalAlpha = 0.5; ell(6 - nw * 0.5, nb + 0.15, 0.2, 0.11, dk2); ell(6 + nw * 0.5, nb + 0.15, 0.2, 0.11, dk2); g.globalAlpha = 1;
+    // nose, painted to match the sculpt: highlight down the bridge, a soft crease around the wings, nostrils under the tip
+    {
+      const N0 = NOSE_K[L.nose] ?? NOSE_K.small;
+      const nl = N0.len * (1 + 0.25 * fs.noseL), nwd = N0.wide * (1 + 0.25 * fs.noseW);
+      const tipY = 7.5 + 0.35 * (nl - 1);
+      const hl = shade(sk, 0.16);
+      const bg = g.createLinearGradient(6, 5.0, 6, tipY + 0.2); bg.addColorStop(0, 'rgba(255,255,255,0)'); bg.addColorStop(0.55, hl); bg.addColorStop(1, 'rgba(255,255,255,0)');
+      g.save(); g.globalAlpha = 0.3; g.fillStyle = bg; g.beginPath(); g.ellipse(6, (5.0 + tipY) / 2 + 0.2, 0.26, (tipY - 5.0) / 2 + 0.2, 0, 0, Math.PI * 2); g.fill(); g.restore();
+      // wing creases
+      g.save(); g.strokeStyle = shade(sk, -0.35); g.globalAlpha = 0.32; g.lineWidth = 0.09; g.lineCap = 'round';
+      for (const sd of [-1, 1]) { const wx = 6 + sd * 0.82 * nwd; g.beginPath(); g.moveTo(wx - sd * 0.12, tipY - 0.15); g.quadraticCurveTo(wx + sd * 0.42 * nwd, tipY + 0.05, wx + sd * 0.12, tipY + 0.55); g.stroke(); }
+      g.restore();
+      // nostrils: small dark teardrops angled in under the tip
+      g.save(); g.globalAlpha = 0.6;
+      for (const sd of [-1, 1]) ell(6 + sd * 0.42 * nwd, tipY + 0.48, 0.24 * nwd, 0.11, dk2, sd * 0.35);
+      g.globalAlpha = 0.22; ell(6, tipY + 0.62, 0.55 * nwd, 0.12, dk); // a little shade where the tip tucks back
+      g.restore();
+    }
     // facial hair
     const natural = (L.hairColor ?? 0) <= 8 ? hc : HAIR_COLORS[1];
     const bh = shade(natural, -0.05);

@@ -463,3 +463,6 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   male jaw straight down to an angle then a V to the chin, almond `EYE_OPEN`, low straight male brows, projecting chin,
   smaller nose tip, neck ~2/3 head width (neckK m 1.22 / f 1.06 / players 1.32) set back (z 0.035) and leaning forward
   (rotation.x -0.16). Check faces front, 3/4 AND profile.
+- v0.37 nose: headGeo nose = straight wedge from rootY 4.75 (projects ~45% at the root, level with the brow) to tipY
+  7.5 + 0.35*(len-1), sharp-sided ridge (`sst(W, 0.2W, dx)`), rounded tip ball, wing lobes; faceMat paints a matching bridge
+  highlight, wing creases and angled nostrils from the same NOSE_K + fs values.
