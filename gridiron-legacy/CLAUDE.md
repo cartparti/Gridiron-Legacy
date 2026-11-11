@@ -466,3 +466,6 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - v0.37 nose: headGeo nose = straight wedge from rootY 4.75 (projects ~45% at the root, level with the brow) to tipY
   7.5 + 0.35*(len-1), sharp-sided ridge (`sst(W, 0.2W, dx)`), rounded tip ball, wing lobes; faceMat paints a matching bridge
   highlight, wing creases and angled nostrils from the same NOSE_K + fs values.
+- v0.38 profile fix: jaw floor = near-level chin -> jaw angle at Zn -0.05, then steep ramus up to the skull base (was one
+  chin->occiput slope = insect look); front wrap is cylindrical (x/z only) so the chin keeps its place; upper-lip mass and
+  cheek fill beside the mouth; chin 0.03; bigger visible ears (scale 1.15-1.2, y 0.2); eyes set back (EYE_R*0.8), EYE_R 0.033.

@@ -250,16 +250,22 @@ function headGeo(shape = 'oval', seg = 6, sex = 'm', fp = FP0) {
     // round the cranium toward an ellipsoid (back and top); the face stays flatter for the features
     const back = z > 0 ? Math.min(1, z / hd) : 0;
     // the face wraps around too (a flat front read as a mask strapped to an egg); the centre stays put
-    const fwrap = z < 0 ? 0.3 * Math.min(1, -z / hd) : 0;
-    const k = Math.min(1, back * 0.7 + Math.max(0, y) * 0.5 + fwrap);
+    // ...but only side to side (a cylinder), so the chin and mouth keep their place in profile instead of being
+    // pulled back toward the middle of the head (that receding chin made a beak-like muzzle)
+    const fwrap = z < 0 ? 0.18 * Math.min(1, -z / hd) : 0;
+    const k = Math.min(1, back * 0.7 + Math.max(0, y) * 0.5 * (z > 0 ? 1 : 0.6));
     if (k > 0) {
       const ex = x / hw, ey = yy / hh, ez = z / hd; const len = Math.hypot(ex, ey, ez) || 1;
       x += (ex / len * hw - x) * k * 0.6; yy += (ey / len * hh - yy) * k * 0.35; z += (ez / len * hd - z) * k * 0.6;
     }
+    if (fwrap > 0) {
+      const ex = x / hw, ez = z / hd; const l2 = Math.hypot(ex, ez) || 1;
+      x += (ex / l2 * hw - x) * fwrap; z += (ez / l2 * hd - z) * fwrap;
+    }
     // ---- skull
     const X = x / hw, Y = yy / hh, Z = z / hd;
     const lowBack = sst(-0.15, 0.75, Z) * sst(0.05, -0.85, Y);
-    z -= lowBack * hd * 0.34; yy += lowBack * hh * 0.08; // the nape tucks in: room for the neck behind the jaw
+    z -= lowBack * hd * 0.2; yy += lowBack * hh * 0.05; // the nape tucks in: room for the neck behind the jaw
     z += sst(0.25, 1, Z) * Math.exp(-((Y - 0.2) ** 2) / 0.16) * hd * 0.08; // occiput
     z += sst(0.25, 1, Y) * sst(0, -1, Z) * hd * 0.07; // forehead slopes back to the crown
     x *= 1 - 0.07 * Math.exp(-((Y - 0.28) ** 2) / 0.05) * sst(0.3, -0.7, Z); // temples
@@ -269,7 +275,9 @@ function headGeo(shape = 'oval', seg = 6, sex = 'm', fp = FP0) {
     {
       const Zn = z / hd, Yn = yy / hh;
       if (Yn < 0 && Zn > -0.95) {
-        const floor = -1 + (J.steep + 1) * sst(-0.85, 0.45, Zn);
+        // human profile: the jawline runs nearly level from the chin back to a jaw angle under the ear, then the back
+        // of the jaw rises steeply to the skull base (one long slope from chin to occiput read as an insect's head)
+        const floor = -1 + 0.2 * sst(-0.85, -0.05, Zn) + (0.5 + 0.15 * (J.steep + 0.42)) * sst(-0.05, 0.38, Zn);
         if (Yn < floor) yy += (floor - Yn) * hh * J.lift;
       }
     }
@@ -284,9 +292,9 @@ function headGeo(shape = 'oval', seg = 6, sex = 'm', fp = FP0) {
   for (let i = 5 * n; i < 6 * n; i++) {
     const cx = uv.getX(i) * 12, cy = (1 - uv.getY(i)) * 12;
     let f = 0;
-    f += sw(gss(cx - 6, cy - 4.75 - BROW, 3.0, 0.5), 0.015, 0.006); // brow ridge
+    f += sw(gss(cx - 6, cy - 4.75 - BROW, 3.0, 0.5), 0.018, 0.008); // brow ridge
     f += 0.004 * gss(cx - 6, cy - 3.2, 3.6, 1.2); // forehead
-    for (const ex of EC) f -= 0.017 * gss(cx - ex, cy - 5.75, 1.55, 0.85); // eye sockets
+    for (const ex of EC) f -= 0.014 * gss(cx - ex, cy - 5.75, 1.55, 0.85); // eye sockets
     // nose (from the head references): a straight bridge from between the eyes down to a rounded tip, sides that read
     // as planes (not a soft bump), wings at the base, and an underside that tucks back to the lip
     {
@@ -303,11 +311,13 @@ function headGeo(shape = 'oval', seg = 6, sex = 'm', fp = FP0) {
     for (const sd of [-1, 1]) f += sw(gss(cx - 6 - sd * 3.4, cy - CK.y, 1.3, 0.8), 0.012, 0.011) * CK.bone; // cheekbones
     for (const sd of [-1, 1]) f -= (fem ? 0.004 : 0.008) * CK.hollow * gss(cx - 6 - sd * 3.9, cy - 9.3, 0.85, 1.0); // hollows under them, out toward the jaw
     f += 0.006 * gss(cx - 6, cy - 9.3, 1.9, 0.9); // muzzle
+    f += sw(gss(cx - 6, cy - 8.65, 1.5, 0.75), 0.013, 0.011); // the upper-lip area between nose and mouth (no deep notch under the nose)
+    for (const sd of [-1, 1]) f += 0.006 * gss(cx - 6 - sd * 2.6, cy - 8.4, 1.1, 1.3); // cheeks come forward beside the mouth, so the middle doesn't jut out alone
     f += sw(gss(cx - 6, cy - 9.12, 1.55, 0.26), 0.008, 0.01) * LIP; // upper lip
     f += sw(gss(cx - 6, cy - 9.8, 1.3, 0.3), 0.01, 0.012) * LIP; // lower lip
     f -= 0.004 * gss(cx - 6, cy - 9.45, 1.7, 0.1); // the line between them
     f -= 0.0022 * gss(cx - 6, cy - 10.4, 1.3, 0.4); // a soft dip above the chin (a narrow one read as a crease)
-    f += sw(gss(cx - 6, cy - 11.1 - CH.down * 20, 1.35 * CH.wide, 0.85), 0.024, 0.014) * CH.size; // chin (projects forward: a receding chin read as weak and soft)
+    f += sw(gss(cx - 6, cy - 11.0 - CH.down * 20, 1.45 * CH.wide, 0.95), 0.03, 0.017) * CH.size; // chin (projects forward: a receding chin read as weak and soft)
     disp[i] = f;
   }
   // coincident vertices (box-face seams) share the front face's value so nothing cracks
@@ -968,7 +978,7 @@ function buildRig(o) {
   const ears = [];
   for (const sd of [-1, 1]) {
     const e = new THREE.Mesh(earGeo(), skin);
-    e.position.set(sd * (hd[0] / 2 * (FACEW_K[fp.faceW] ?? 1) - 0.008), 0.215, 0.025); e.rotation.y = sd * 0.35; e.scale.x = sd;
+    e.position.set(sd * (hd[0] / 2 * (FACEW_K[fp.faceW] ?? 1) - 0.002), 0.2, 0.03); e.rotation.y = sd * 0.4; e.scale.set(sd * 1.15, 1.2, 1.2); // a clear ear: the landmark that makes a profile read as human
     ears.push(e);
   }
   // Big chunky heads: everything above the neck lives in a scaled group.
@@ -1490,8 +1500,8 @@ function eyeMat(color) {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
   return (irisCache[color] = new THREE.MeshPhysicalMaterial({ map: t, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.04, metalness: 0 }));
 }
-const EYE_R = 0.031; // a natural eye is about a fifth of the face's width (smaller read as beady)
-const EYE_OPEN = { round: [1.2, 2.04], wide: [1.1, 2.1], narrow: [1.32, 1.98], sleepy: [1.42, 2.02] }; // almond, not round
+const EYE_R = 0.033; // a natural eye is about a fifth of the face's width (smaller read as beady)
+const EYE_OPEN = { round: [1.2, 2.04], wide: [1.1, 2.1], narrow: [1.27, 2.0], sleepy: [1.34, 2.05] }; // almond, not round
 const eyeGeoCache = {};
 function lidGeo(top, edge) {
   const key = `${top}|${edge}`;
@@ -1512,7 +1522,7 @@ function makeEyes(anchors, L, skin, headY) {
     const sd = i === 0 ? -1 : 1;
     const e = new THREE.Group();
     const fs = fsOf(L);
-    e.position.set(x, headY + y + 0.003, z + EYE_R * 0.7);
+    e.position.set(x, headY + y + 0.003, z + EYE_R * 0.8); // set back under the brow (a bulging eyeball looked bug-like in profile)
     e.scale.setScalar(1 + 0.16 * fs.eyeSize);
     const b = new THREE.Mesh(ball, eyeMat(EYE_COLORS[(L.eyeColor ?? 0) % EYE_COLORS.length]));
     e.add(b);

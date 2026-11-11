@@ -1,5 +1,10 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.38', date: 'Nov 11', title: 'Human profiles', items: [
+    'Side views look human now: the jaw runs back to a corner under the ear, then up to the ear, instead of one long slope to the back of the head.',
+    'Ears are clearly visible. The chin and mouth line up under the nose instead of making a beak.',
+    'Eyes sit back under the brow, and the cheeks come forward beside the mouth.',
+  ] },
   { v: '0.37', date: 'Nov 11', title: 'Better noses', items: [
     'Noses rebuilt: a straight bridge from between the brows down to a rounded tip, with defined sides, nose wings and nostrils.',
     'From the side the nose now flows up into the brow instead of poking out of the middle of the face.',
