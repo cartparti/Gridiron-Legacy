@@ -444,3 +444,15 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Events: 125 written; brief asks for hundreds. Add more, especially multi-step storylines.
 - AI pro rosters are simple (no depth charts or AI trades); the player's team role is always starter.
 - No music yet. No iOS wrap yet.
+
+## v0.33: natural faces + face sliders and presets
+- Faces: front of the head wraps toward the ellipsoid (`fwrap` in headGeo), EYE_R 0.031, softer nose, head 5% bigger and
+  sitting lower on a fuller neck. Mouth is painted as real lips (cupid's bow, parting line, expression via corner lift).
+  Painted fringe is only a soft hairline shadow; no painted side strips. Skin has a shared pore bump map (`skinDetailTex`).
+- Hair: `long` is one double-sided curtain mesh; mohawk/frohawk masks stop at the hairline (`hawkLim`). Shells use seg 24.
+- Face sliders: `look.fs` {browH, eyeSize, eyeSpace, eyeTilt, noseW, noseL, lips, jawW, cheekS, chinS, neck} in -1..1
+  (`FACE_SLIDERS`/`fsOf` in actors.js, `FACE_SLIDER_DEFS` in looks.js; missing = 0). They feed headGeo (part of fpKey),
+  faceMat (brows, eye columns via `eyeCols`, lips), makeEyes (size, tilt) and the neck. `FACE_PRESETS` (12, face fields
+  only) in the Face tab, which now also holds Face shape. randomLook adds random sliders (computed last).
+- Portraits: front key light; `portraitURL(spec, { face: true })` close-up (uses `rig.headG`), used by the editor on the
+  Face/Hair tabs. Tests: `tests/round11.test.js`.

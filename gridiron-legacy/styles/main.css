@@ -1072,3 +1072,5 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
   width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line2);
   background: var(--card2); color: var(--text); font-size: 1.3rem; line-height: 1; cursor: pointer;
 }
+.face-slider .fs-end { flex: none; width: 50px; }
+.face-slider .fs-end.r { text-align: right; }

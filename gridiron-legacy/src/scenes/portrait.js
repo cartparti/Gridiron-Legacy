@@ -22,6 +22,10 @@ function ensure() {
     const rim = new THREE.DirectionalLight('#cfe0ff', 1.2);
     rim.position.set(3, 2, 4);
     scene.add(rim);
+    // soft key light from the front so faces are lit (the sun sits behind the model)
+    const key = new THREE.DirectionalLight('#fff4ea', 1.5);
+    key.position.set(-1.4, 2.2, 4);
+    scene.add(key);
     const camera = new THREE.PerspectiveCamera(30, 80 / 100, 0.1, 50);
     R = { renderer, scene, camera };
   } catch {
@@ -35,8 +39,8 @@ function ensure() {
  * { colors, uniform, look, number, helmet } (helmet defaults to off so the face shows).
  * opts: { full: full body, yaw: turn, big: render at 2x resolution }
  */
-export function portraitURL(spec, { full = false, yaw = 0.35, big = false } = {}) {
-  const key = JSON.stringify(spec) + (full ? 'F' : '') + yaw + big;
+export function portraitURL(spec, { full = false, face = false, yaw = 0.35, big = false } = {}) {
+  const key = JSON.stringify(spec) + (full ? 'F' : face ? 'C' : '') + yaw + big;
   if (cache.has(key)) return cache.get(key);
   const r = ensure();
   if (!r) return null;
@@ -51,6 +55,11 @@ export function portraitURL(spec, { full = false, yaw = 0.35, big = false } = {}
   r.scene.add(model);
   const hs = model.userData.rig.body.scale.y;
   if (full) { r.camera.position.set(0, 1.12 * hs, 4.0); r.camera.lookAt(0, 1.02 * hs, 0); }
+  else if (face) { // close-up for face editing: find the head and frame it
+    model.updateMatrixWorld(true);
+    const hp = new THREE.Vector3(); (model.userData.rig.headG ?? model).getWorldPosition(hp); hp.y += 0.2;
+    r.camera.position.set(0, hp.y + 0.03, 1.12); r.camera.lookAt(0, hp.y - 0.005, 0);
+  }
   else { r.camera.position.set(0, 1.72 * hs, 1.75); r.camera.lookAt(0, 1.63 * hs, 0); }
   r.renderer.setClearColor(0x000000, 0);
   r.renderer.render(r.scene, r.camera);

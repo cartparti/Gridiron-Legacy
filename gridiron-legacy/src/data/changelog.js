@@ -1,5 +1,13 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.33', date: 'Nov 11', title: 'New faces', items: [
+    'More natural faces for everyone: bigger eyes, real lips, softer noses, faces that wrap around the head, and fuller necks.',
+    'Skin looks like skin now: soft and matte with fine texture, not plastic or clay.',
+    'Long hair falls as one smooth sheet. Mohawks no longer run down over the face, and the painted "wig" bangs are gone.',
+    'Face tab: 12 starting faces (Classic, Leading man, Baby face, Bruiser, Model and more) to pick from and tweak.',
+    'Fine-tune sliders: brow height, eye size, spacing and tilt, nose width and length, lips, jaw width, cheekbones, chin and neck.',
+    'The preview zooms in on your face while you edit your face or hair.',
+  ] },
   { v: '0.32', date: 'Nov 11', title: 'Easier buttons', items: [
     'Done and Back buttons no longer hide under your phone\'s clock and battery bar, and they stay at the top while you scroll.',
     'Menus keep their Done, Save and Cancel buttons pinned at the bottom, so you never have to scroll to find them.',

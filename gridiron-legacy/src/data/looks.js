@@ -45,6 +45,28 @@ export const JAWS = [{ id: 'defined', label: 'Defined' }, { id: 'sharp', label: 
 export const CHEEKS = [{ id: 'normal', label: 'Normal' }, { id: 'high', label: 'High' }, { id: 'chiseled', label: 'Chiseled' }];
 export const CHINS = [{ id: 'normal', label: 'Normal' }, { id: 'strong', label: 'Strong' }, { id: 'pointed', label: 'Pointed' }, { id: 'small', label: 'Small' }];
 export const FACE_WIDTHS = [{ id: 'narrow', label: 'Narrow' }, { id: 'normal', label: 'Normal' }, { id: 'broad', label: 'Broad' }];
+// Face sliders (-1..1) and their ends, for the Face tab's "Fine tune" section.
+export const FACE_SLIDER_DEFS = [
+  ['browH', 'Brow height', 'Low', 'High'], ['eyeSize', 'Eye size', 'Small', 'Big'], ['eyeSpace', 'Eye spacing', 'Close', 'Wide'],
+  ['eyeTilt', 'Eye tilt', 'Down', 'Up'], ['noseW', 'Nose width', 'Narrow', 'Wide'], ['noseL', 'Nose length', 'Short', 'Long'],
+  ['lips', 'Lips', 'Thin', 'Full'], ['jawW', 'Jaw width', 'Narrow', 'Wide'], ['cheekS', 'Cheekbones', 'Soft', 'Strong'],
+  ['chinS', 'Chin', 'Small', 'Big'], ['neck', 'Neck', 'Slim', 'Thick'],
+];
+// Starting faces: a good-looking base to tweak (face only; skin, hair and beard stay yours).
+export const FACE_PRESETS = [
+  { id: 'classic', label: 'Classic', f: { headShape: 'oval', jaw: 'defined', cheek: 'high', chin: 'strong', faceW: 'normal', nose: 'small', eyes: 'round', brows: 'normal', fs: {} } },
+  { id: 'chiseled', label: 'Leading man', f: { headShape: 'square', jaw: 'square', cheek: 'chiseled', chin: 'strong', faceW: 'normal', nose: 'long', eyes: 'narrow', brows: 'thick', fs: { cheekS: 0.4, jawW: 0.3, lips: -0.2 } } },
+  { id: 'babyface', label: 'Baby face', f: { headShape: 'round', jaw: 'soft', cheek: 'normal', chin: 'small', faceW: 'normal', nose: 'small', eyes: 'wide', brows: 'thin', fs: { eyeSize: 0.4, noseL: -0.4, lips: 0.3 } } },
+  { id: 'sharp', label: 'Sharp', f: { headShape: 'heart', jaw: 'sharp', cheek: 'high', chin: 'pointed', faceW: 'narrow', nose: 'small', eyes: 'narrow', brows: 'angry', fs: { eyeTilt: 0.4, cheekS: 0.3, jawW: -0.3 } } },
+  { id: 'bruiser', label: 'Bruiser', f: { headShape: 'wide', jaw: 'square', cheek: 'normal', chin: 'strong', faceW: 'broad', nose: 'wide', eyes: 'sleepy', brows: 'thick', fs: { noseW: 0.4, browH: -0.4, neck: 0.8, jawW: 0.4 } } },
+  { id: 'model', label: 'Model', f: { headShape: 'oval', jaw: 'sharp', cheek: 'chiseled', chin: 'normal', faceW: 'narrow', nose: 'small', eyes: 'round', brows: 'normal', fs: { cheekS: 0.6, lips: 0.4, eyeTilt: 0.2, noseW: -0.3 } } },
+  { id: 'nextdoor', label: 'Next door', f: { headShape: 'oval', jaw: 'defined', cheek: 'normal', chin: 'normal', faceW: 'normal', nose: 'small', eyes: 'round', brows: 'raised', fs: { eyeSize: 0.2, lips: 0.1 } } },
+  { id: 'veteran', label: 'Veteran', f: { headShape: 'long', jaw: 'defined', cheek: 'chiseled', chin: 'strong', faceW: 'normal', nose: 'long', eyes: 'narrow', brows: 'thick', fs: { browH: -0.3, noseL: 0.3, eyeSize: -0.2 } } },
+  { id: 'gentle', label: 'Gentle giant', f: { headShape: 'round', jaw: 'soft', cheek: 'normal', chin: 'normal', faceW: 'broad', nose: 'wide', eyes: 'sleepy', brows: 'normal', fs: { neck: 0.6, lips: 0.3, eyeTilt: -0.3 } } },
+  { id: 'intense', label: 'Intense', f: { headShape: 'square', jaw: 'defined', cheek: 'high', chin: 'strong', faceW: 'normal', nose: 'small', eyes: 'narrow', brows: 'angry', fs: { browH: -0.5, eyeSpace: -0.3, cheekS: 0.3 } } },
+  { id: 'charmer', label: 'Charmer', f: { headShape: 'heart', jaw: 'defined', cheek: 'high', chin: 'normal', faceW: 'normal', nose: 'small', eyes: 'wide', brows: 'raised', fs: { eyeTilt: 0.3, lips: 0.4, eyeSize: 0.2 } } },
+  { id: 'rugged', label: 'Rugged', f: { headShape: 'long', jaw: 'square', cheek: 'normal', chin: 'strong', faceW: 'broad', nose: 'wide', eyes: 'sleepy', brows: 'thick', fs: { jawW: 0.5, noseL: 0.2, chinS: 0.4 } } },
+];
 export const BODY_TYPES = [{ id: 'lean', label: 'Lean' }, { id: 'athletic', label: 'Athletic' }, { id: 'muscular', label: 'Muscular' }, { id: 'stocky', label: 'Stocky' }, { id: 'lanky', label: 'Lanky' }];
 export const SIDES = [{ id: 'none', label: 'None' }, { id: 'left', label: 'Left' }, { id: 'right', label: 'Right' }, { id: 'both', label: 'Both' }];
 export const VISORS = [{ id: 'none', label: 'None' }, { id: 'clear', label: 'Clear' }, { id: 'dark', label: 'Smoke' }, { id: 'gold', label: 'Gold' }, { id: 'chrome', label: 'Chrome' }, { id: 'blue', label: 'Ice blue' }, { id: 'red', label: 'Red' }, { id: 'purple', label: 'Iridescent' }, { id: 'amber', label: 'Amber' }];
@@ -154,6 +176,7 @@ export function randomLook(r, opts = {}) {
     gloveDesign: pickR(r, GLOVE_DESIGNS).id, gloveAccent: pickR(r, GEAR_COLORS),
     maskStyle: pickR(r, POS_MASK[opts.position] ?? MASKS.map((m) => m.id)), maskColor: r() < 0.7 ? '#c3cad3' : pickR(r, MASK_COLORS), helmetStripe: 'single', helmetFinish: 'gloss',
     shirt: pickR(r, SHIRTS), pants: pickR(r, PANTS), shoe: pickR(r, ['#f1f1f1', '#222222', '#c0392b', '#2f6fd6']),
+    fs: Object.fromEntries(FACE_SLIDER_DEFS.map(([k]) => [k, Math.round((r() + r() - 1) * 7) / 10])),
   };
 }
 

@@ -4,7 +4,7 @@ import { openModal, toast } from '../components.js';
 import {
   SKIN_TONES, HAIR_COLORS, EYE_COLORS, GEAR_COLORS, HAIR_STYLES, BROWS, EYES, NOSES, MOUTHS, BEARDS, TATTOOS,
   SIDES, VISORS, CELEBRATIONS, SPATS, TOWELS, CHAINS, normalizeLook,
-  HEAD_SHAPES, JAWS, CHEEKS, CHINS, FACE_WIDTHS, BODY_TYPES, NECK_TATTOOS, JERSEY_SLEEVES, JERSEY_LENGTHS, JERSEY_FITS, PAD_SIZES, PAD_EXTRAS, SOCKS, MOUTHGUARDS, CLEAT_DESIGNS, CLEAT_CUTS, GLOVE_DESIGNS, MASKS, MASK_COLORS, STRIPES, FINISHES, HEIGHT_RANGE, WEIGHT_RANGE, fmtHeight, randomLook, sizeStatMods,
+  HEAD_SHAPES, JAWS, CHEEKS, CHINS, FACE_WIDTHS, BODY_TYPES, NECK_TATTOOS, JERSEY_SLEEVES, JERSEY_LENGTHS, JERSEY_FITS, PAD_SIZES, PAD_EXTRAS, SOCKS, MOUTHGUARDS, CLEAT_DESIGNS, CLEAT_CUTS, GLOVE_DESIGNS, MASKS, MASK_COLORS, STRIPES, FINISHES, HEIGHT_RANGE, WEIGHT_RANGE, fmtHeight, randomLook, sizeStatMods, FACE_SLIDER_DEFS, FACE_PRESETS,
 } from '../../data/looks.js';
 import { portraitImg } from '../../scenes/portrait.js';
 import { sfx } from '../../audio/sfx.js';
@@ -44,16 +44,28 @@ export function lookEditor(opts) {
   const slider = (label, key, [a, b], fmt) => h('div.look-row', h('div.row.between', h('div.section-label', label), h('b.pix', fmt(L[key]))),
     h('input.slider', { type: 'range', min: a, max: b, value: L[key], oninput: (e) => { L[key] = Number(e.target.value); opts.onChange?.(L); draw(); } }));
 
+  // face sliders: -10..10 on screen, -1..1 in the look. The label updates while dragging; the preview on release.
+  const faceSlider = (k, label, lo, hi) => {
+    const v = Math.round((L.fs?.[k] ?? 0) * 10);
+    const val = h('b.pix', v > 0 ? `+${v}` : `${v}`);
+    return h('div.look-row.face-slider', h('div.row.between', h('div.section-label', label), val),
+      h('div.row', { style: { gap: '8px', alignItems: 'center' } }, h('span.tiny.muted.fs-end', lo),
+        h('input.slider.grow', { type: 'range', min: -10, max: 10, step: 1, value: v, 'aria-label': label,
+          oninput: (e) => { const n = Number(e.target.value); val.textContent = n > 0 ? `+${n}` : `${n}`; },
+          onchange: (e) => { L.fs = { ...(L.fs ?? {}), [k]: Number(e.target.value) / 10 }; changed(); } }),
+        h('span.tiny.muted.fs-end.r', hi)));
+  };
   // a titled group of options
   const sec = (title, ...rows) => h('section.look-sec', h('div.look-sec-title', title), h('div.look-sec-body', rows.flat().filter(Boolean)));
   const toggle = (label, key) => h('div.look-row', h('div.section-label', label), h('div.chip-row',
     h(`button.opt${L[key] ? '.on' : ''}`, { onclick: () => set(key, true) }, 'On'),
     h(`button.opt${!L[key] ? '.on' : ''}`, { onclick: () => set(key, false) }, 'Off')));
 
+  const closeUp = () => (st.tab === 'face' || st.tab === 'hair') && !st.helmet;
   const preview = () => {
     const spec = st.tab === 'casual' ? { ...L, outfit: 'casual' } : st.tab === 'gala' ? { ...L, outfit: 'gala' } : { uniform: opts.uniform, look: { ...L }, number: opts.number ?? 1, helmet: st.helmet };
     return h('div.look-preview',
-      h('div.look-stage', portraitImg(spec, 200, { full: true, big: true, yaw: st.yaw })),
+      h('div.look-stage', portraitImg(spec, 200, { full: !closeUp(), face: closeUp(), big: true, yaw: st.yaw })),
       h('div.row', { style: { justifyContent: 'center', gap: '6px' } },
         h('button.btn.small', { 'aria-label': 'Turn left', onclick: () => { st.yaw -= 0.8; draw(); } }, '⟲'),
         h(`button.btn.small${st.helmet ? '.primary' : ''}`, { onclick: () => { st.helmet = !st.helmet; draw(); } }, st.helmet ? 'Helmet on' : 'Helmet off'),
@@ -71,7 +83,6 @@ export function lookEditor(opts) {
     const modTxt = Object.entries(mods).filter(([, v]) => v).map(([k, v]) => `${STAT_LABELS[k]} ${v > 0 ? '+' : ''}${v}`).join(' · ');
     return [
       sec('Skin', swatches('Skin tone', SKIN_TONES, 'skin', { index: true })),
-      sec('Face shape', chips('Head shape', HEAD_SHAPES, 'headShape'), chips('Jaw', JAWS, 'jaw'), chips('Cheekbones', CHEEKS, 'cheek'), chips('Chin', CHINS, 'chin'), chips('Face width', FACE_WIDTHS, 'faceW')),
       sec('Build', chips('Body type', BODY_TYPES, 'bodyType'),
         opts.lockBody ? h('p.small.muted', `${fmtHeight(L.heightIn)} · ${L.weightLb} lb (set at creation)`) : [
           slider('Height', 'heightIn', HEIGHT_RANGE, fmtHeight),
@@ -84,6 +95,11 @@ export function lookEditor(opts) {
     body,
     hair: () => [sec('Hairstyle', chips('Style', HAIR_STYLES, 'hairStyle')), sec('Color', swatches('Hair color', HAIR_COLORS, 'hairColor', { index: true }))],
     face: () => [
+      sec('Starting face', h('div.chip-row', FACE_PRESETS.map((pr) => h(`button.opt${L.facePreset === pr.id ? '.on' : ''}`, { onclick: () => { sfx.click(); Object.assign(L, pr.f, { fs: { ...pr.f.fs }, facePreset: pr.id }); changed(); } }, pr.label))),
+        h('p.tiny.muted', 'Pick a base face, then fine-tune it below. Your skin, hair and beard stay the same.')),
+      sec('Face shape', chips('Head shape', HEAD_SHAPES, 'headShape'), chips('Jaw', JAWS, 'jaw'), chips('Cheekbones', CHEEKS, 'cheek'), chips('Chin', CHINS, 'chin'), chips('Face width', FACE_WIDTHS, 'faceW')),
+      sec('Fine tune', FACE_SLIDER_DEFS.map(([k, label, lo, hi]) => faceSlider(k, label, lo, hi)),
+        h('button.btn.small.ghost', { onclick: () => { sfx.click(); L.fs = {}; changed(); } }, 'Reset sliders')),
       sec('Eyes', chips('Eye shape', EYES, 'eyes'), swatches('Eye color', EYE_COLORS, 'eyeColor', { index: true }), chips('Brows', BROWS, 'brows')),
       sec('Nose & mouth', chips('Nose', NOSES, 'nose'), chips('Mouth', MOUTHS, 'mouth')),
       sec('Facial hair', chips('Style', BEARDS, 'beard')),
