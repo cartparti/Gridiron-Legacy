@@ -473,3 +473,13 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   slider products clamped (jaw angle 0.88-1.2, cheek bone <=1.9 / hollow <=2.3, chin size <=1.7, down <=0.025); toned-down
   CHIN_K/CHEEK_K extremes; bigger eyes sink instead of bulging; face texture base = the side texture's gradient (no seam).
   Stress test: every head shape with extreme sliders, front / 3/4 / profile.
+
+## v0.40: team identities on uniforms
+- `teamIdentity(team)` in kits.js (stable hash of id+name): glyph (`mascotKind`, now in `src/data/mascots.js` with `GLYPHS`;
+  horse before cat), logo glyph|letter (shield teams use the letter), helmet stripe/finish/mask, jersey pattern, number font,
+  sleeve stripe count, pants stripe, collar, chestLogo. Stored as `kit.style` (throwback third kit overrides) and copied by
+  `kitUniform`. Uniforms without a style (uniformFrom) render the old plain way.
+- actors.js: `drawLogo` (glyph cells with outline / letter), `jerseyMat` (patterns, collars, chest logo, `NUM_FONTS`, stroked
+  outlines; scale 9), `helmetMat` (logo on both sides, mirrored glyph on the left; stripes incl. wide/tri; scale 16),
+  `pantsStripeMat` on thighs (lathe u 0.25/0.75), armMat sleeve stripes. Helmet stripe/finish come from the team (removed from
+  the Helmet tab); facemask = team color unless the player picked a non-default one. Back plate moved to the jersey hem.

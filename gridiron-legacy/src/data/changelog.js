@@ -1,5 +1,13 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.40', date: 'Nov 11', title: 'Every team has its own look', items: [
+    'Helmets wear the team logo: its mascot (wildcat, wolf, eagle, horse, bear, shark, flame, skull, crown and more) or its letter.',
+    'Each team has its own helmet stripe (single, double, triple, wide, tri-color or none), shell finish (gloss, matte, satin, metallic or chrome) and facemask color.',
+    'Jerseys get a team pattern: shoulder bands, chest bands, side panels, yokes, pinstripes, fades, claw marks or TV stripes, plus V-neck or round collars and a chest logo for some teams.',
+    'Numbers in the team font: block, varsity (double outline), rounded, serif, italic or stencil.',
+    'Sleeve stripes and pants stripes in team colors. Throwback kits go old school with serif numbers and a matte shell.',
+    'Back plates sit at the bottom of the jersey instead of covering the number. Stallions finally have a horse logo.',
+  ] },
   { v: '0.39', date: 'Nov 11', title: 'Faces that always work', items: [
     'Every face option and slider now blends into one smooth, natural face from the front, side and any angle in between.',
     'No more broken extremes: maxed-out chins, cheekbones, jaws and eyes stay human (no spiky chins, pitted cheeks or bulging eyes).',

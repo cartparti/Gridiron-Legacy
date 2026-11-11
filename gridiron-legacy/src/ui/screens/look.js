@@ -134,9 +134,9 @@ export function lookEditor(opts) {
       chips('Facemask', MASKS, 'maskStyle'),
       h('div.look-row', h('div.section-label', 'Facemask color'), h('div.swatch-row', MASK_COLORS.map((c) => h(`button.sw${L.maskColor === c ? '.on' : ''}`, {
         style: { background: c === 'team' ? `linear-gradient(135deg, ${opts.uniform?.stripe ?? '#ffd43b'} 50%, ${opts.uniform?.helmet ?? '#1d3557'} 50%)` : c }, 'aria-label': c, onclick: () => set('maskColor', c) }))))),
-      sec('Shell', chips('Helmet stripe', STRIPES, 'helmetStripe'), chips('Shell finish', FINISHES, 'helmetFinish')),
+
       sec('Visor', chips('Visor tint', VISORS, 'visor')),
-      h('p.tiny.muted', 'Helmet colors come from your team. The facemask, stripe and finish are yours.'),
+      h('p.tiny.muted', 'Your team\'s helmet: its colors, logo, stripe and shell finish come with the team. The facemask style is yours, and the team color is the default for the facemask.'),
     ],
     gear: () => [
       sec('Cleats', swatches('Cleat color', GEAR_COLORS, 'cleats'), chips('Cleat design', CLEAT_DESIGNS, 'cleatDesign'),

@@ -12,7 +12,8 @@ import * as THREE from 'three';
 import {
   SKIN_TONES, HAIR_COLORS, EYE_COLORS, VISOR_TINTS, MOUTHGUARD_COLORS, bodyScale, randomLook, normalizeLook, masculinize,
 } from '../data/looks.js';
-import { shade, mix } from '../data/kits.js';
+import { shade, mix, colorDist, luma } from '../data/kits.js';
+import { GLYPHS } from '../data/mascots.js';
 
 // ------------------------------------------------------------------ materials & textures
 
@@ -701,15 +702,15 @@ function topMat(L, hc) {
 }
 
 /** Arm texture: 8x16. top rows = sleeve (jersey/shirt) unless bare, rest skin + tattoo or arm sleeve. */
-function armMat(skin, sleeveCol, trim, tattoo, part, armSleeve, rows = 7) {
-  const key = `arm2|${skin}|${sleeveCol}|${trim}|${tattoo}|${part}|${armSleeve}|${rows}`;
+function armMat(skin, sleeveCol, trim, tattoo, part, armSleeve, rows = 7, stripes = 1) {
+  const key = `arm2|${skin}|${sleeveCol}|${trim}|${tattoo}|${part}|${armSleeve}|${rows}|${stripes}`;
   return pixMat(key, 8, 16, (g) => {
     px(g, 0, 0, skin, 8, 16);
     if (part === 'upper') {
       drawTattoo(g, tattoo, 0, rows, 8, 16 - rows, { aspect: 2.6, seed: rows, skin });
       if (armSleeve) px(g, 0, rows - 1, armSleeve, 8, 17 - rows);
       px(g, 0, 0, sleeveCol, 8, rows);
-      if (trim && rows > 3) px(g, 0, rows - 2, trim, 8, 1);
+      if (trim && rows > 3) { if (stripes === 1) px(g, 0, rows - 2, trim, 8, 1); else for (let i = 0; i < stripes; i++) px(g, 0, rows - 1.6 - i * 1.1, trim, 8, 0.6); }
     } else {
       drawTattoo(g, tattoo, 0, 1.2, 8, 12.4, { aspect: 2.2, seed: 3, skin });
       if (armSleeve) px(g, 0, 0, armSleeve, 8, 15);
@@ -717,28 +718,77 @@ function armMat(skin, sleeveCol, trim, tattoo, part, armSleeve, rows = 7) {
   }, { skin: true, scale: 24 });
 }
 
-/** Jersey torso texture with stripes and a big blocky number. */
+/** Team logo: the mascot glyph (smoothly drawn cells with an outline) or the team letter. */
+function drawLogo(g, st, cx, cy, size, main, hi, { mirror = false, outline = '#0b0d10' } = {}) {
+  if (!st) return;
+  if (st.logo === 'letter' || !GLYPHS[st.glyph]) {
+    g.save(); g.font = `900 ${size}px "Arial Black", Impact, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineJoin = 'round'; g.strokeStyle = outline; g.lineWidth = size * 0.16; g.strokeText(st.letter ?? '?', cx, cy + size * 0.05);
+    g.fillStyle = main; g.fillText(st.letter ?? '?', cx, cy + size * 0.05); g.restore();
+    return;
+  }
+  const rows = GLYPHS[st.glyph]; const c = size / 16;
+  const at = (x, y) => rows[y]?.[mirror ? 15 - x : x] ?? '.';
+  const cell = (x, y, col, grow = 0) => { g.fillStyle = col; g.fillRect(cx - size / 2 + x * c - grow, cy - size / 2 + y * c - grow, c + grow * 2, c + grow * 2); };
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (at(x, y) !== '.') cell(x, y, outline, c * 0.55);
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const ch = at(x, y); if (ch === '#') cell(x, y, main, 0.02); else if (ch === '+') cell(x, y, hi, 0.02); else if (ch === 'o') cell(x, y, outline, 0.02); }
+}
+const logoColors = (bg, un) => {
+  const main = Math.abs(luma(un.trim) - luma(bg)) > 0.22 ? un.trim : luma(bg) > 0.5 ? '#14171c' : '#ffffff';
+  return [main, main === '#ffffff' ? '#ffd43b' : '#ffffff'];
+};
+const NUM_FONTS = {
+  block: (px) => `900 ${px}px "Arial Black", Impact, sans-serif`, varsity: (px) => `900 ${px}px "Arial Black", Impact, sans-serif`,
+  rounded: (px) => `bold ${px}px "Trebuchet MS", Verdana, sans-serif`, serif: (px) => `bold ${px}px Georgia, "Times New Roman", serif`,
+  italic: (px) => `italic 900 ${px}px "Arial Black", Impact, sans-serif`, stencil: (px) => `${px}px Impact, "Arial Black", sans-serif`,
+};
+/** Jersey torso texture: the team's pattern, collar, chest logo and numbers in the team's font. */
 function jerseyMat(un, number, side) {
-  const key = `jersey|${un.jersey}|${un.trim}|${un.numbers}|${number}|${side}`;
+  const st = un.style;
+  const key = `jersey3|${un.jersey}|${un.trim}|${un.numbers}|${number}|${side}|${st ? `${st.pattern}|${st.font}|${st.collar}|${st.chestLogo}|${st.glyph}|${st.logo}` : ''}`;
   return pixMat(key, 22, 26, (g) => {
-    px(g, 0, 0, un.jersey, 22, 26);
-    g.globalAlpha = 0.06; for (let y = 0; y < 26; y += 0.5) px(g, 0, y, y % 1 ? '#000' : '#fff', 22, 0.25); g.globalAlpha = 1; // mesh fabric
-    const fold = g.createLinearGradient(0, 0, 22, 0); fold.addColorStop(0, 'rgba(0,0,0,0.18)'); fold.addColorStop(0.5, 'rgba(255,255,255,0.06)'); fold.addColorStop(1, 'rgba(0,0,0,0.18)');
+    const J = un.jersey, T = un.trim;
+    px(g, 0, 0, J, 22, 26);
+    const P = st?.pattern ?? 'plain';
+    const band = colorDist(un.numbers, T) < 0.25 ? shade(J, luma(J) > 0.5 ? -0.25 : 0.25) : T;
+    const poly = (pts, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(...pts[0]); for (const q of pts.slice(1)) g.lineTo(...q); g.closePath(); g.fill(); };
+    if (side === 'side') {
+      if (P === 'sidePanels' || P === 'claws') px(g, 7, 0, T, 8, 26);
+      if (P === 'shoulders' || P === 'yoke') px(g, 0, 0, T, 22, 4);
+      if (P === 'tvStripe') { px(g, 0, 18, T, 22, 1.2); px(g, 0, 20, T, 22, 1.2); }
+      if (P === 'claws') for (let i = 0; i < 3; i++) poly([[2 + i * 2.2, 10], [3 + i * 2.2, 10], [7 + i * 2.2, 22], [6 + i * 2.2, 22]], shade(J, -0.3));
+    } else {
+      if (P === 'shoulders') { px(g, 0, 0, T, 22, 4); px(g, 0, 4, shade(J, -0.3), 22, 0.4); }
+      if (P === 'yoke') poly([[0, 0], [22, 0], [22, 3.5], [11, 8], [0, 3.5]], T);
+      if (P === 'chestBand') { px(g, 0, 6.2, band, 22, 7.6); px(g, 0, 6.2, shade(band, -0.25), 22, 0.4); px(g, 0, 13.4, shade(band, -0.25), 22, 0.4); }
+      if (P === 'sidePanels') { poly([[0, 3], [3, 3], [2, 26], [0, 26]], T); poly([[22, 3], [19, 3], [20, 26], [22, 26]], T); }
+      if (P === 'pinstripe') { g.globalAlpha = 0.35; for (let x = 1; x < 22; x += 1.8) px(g, x, 0, T, 0.18, 26); g.globalAlpha = 1; }
+      if (P === 'fade') { const fg = g.createLinearGradient(0, 11, 0, 26); fg.addColorStop(0, 'rgba(0,0,0,0)'); fg.addColorStop(1, T); g.globalAlpha = 0.75; g.fillStyle = fg; g.fillRect(0, 11, 22, 15); g.globalAlpha = 1; }
+      if (P === 'tvStripe') { px(g, 0, 19, T, 22, 1.1); px(g, 0, 21, T, 22, 1.1); }
+      if (P === 'claws') for (let i = 0; i < 3; i++) poly([[1 + i * 1.6, 15], [1.8 + i * 1.6, 15], [4 + i * 1.6, 25], [3.2 + i * 1.6, 25]], T);
+      // collar
+      if (side === 'front') {
+        if (st?.collar === 'round') { g.fillStyle = shade(J, -0.3); g.beginPath(); g.ellipse(11, 0, 3.6, 2.4, 0, 0, Math.PI); g.fill(); g.strokeStyle = T; g.lineWidth = 0.5; g.beginPath(); g.ellipse(11, 0, 3.8, 2.6, 0, 0, Math.PI); g.stroke(); }
+        else { poly([[7.4, 0], [14.6, 0], [11, 3.6]], shade(J, -0.3)); g.strokeStyle = T; g.lineWidth = 0.55; g.beginPath(); g.moveTo(7, 0); g.lineTo(11, 4); g.lineTo(15, 0); g.stroke(); }
+      } else { g.strokeStyle = T; g.lineWidth = 0.5; g.beginPath(); g.moveTo(7.5, 0.3); g.quadraticCurveTo(11, 1.4, 14.5, 0.3); g.stroke(); }
+    }
+    // mesh fabric + folds + hem
+    g.globalAlpha = 0.05; for (let y = 0; y < 26; y += 0.5) px(g, 0, y, y % 1 ? '#000' : '#fff', 22, 0.25); g.globalAlpha = 1;
+    const fold = g.createLinearGradient(0, 0, 22, 0); fold.addColorStop(0, 'rgba(0,0,0,0.16)'); fold.addColorStop(0.5, 'rgba(255,255,255,0.05)'); fold.addColorStop(1, 'rgba(0,0,0,0.16)');
     g.fillStyle = fold; g.fillRect(0, 0, 22, 26);
-    px(g, 0, 22, shade(un.jersey, -0.15), 22, 4);
-    if (side === 'front') { px(g, 8, 0, shade(un.jersey, -0.25), 6, 2); px(g, 9, 2, shade(un.jersey, -0.25), 4, 1); }
-    if (number === undefined || side === 'side') { px(g, 0, 3, un.trim, 22, 1); return; }
-    const s = String(number);
-    g.font = side === 'front' ? 'bold 12px "Arial Black", Impact, sans-serif' : 'bold 16px "Arial Black", Impact, sans-serif';
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    const y = side === 'front' ? 10 : 12;
-    // pixel outline
-    g.fillStyle = un.trim === un.numbers ? shade(un.jersey, -0.4) : un.trim;
-    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) g.fillText(s, 11 + dx, y + dy);
-    g.fillStyle = un.numbers;
-    g.fillText(s, 11, y);
-  });
+    px(g, 0, 24.5, shade(J, -0.15), 22, 1.5);
+    if (side === 'front' && st?.chestLogo && number !== undefined) { const [m, h2] = logoColors(J, un); drawLogo(g, st, 18, 4.6, 3.2, m, h2); }
+    if (number === undefined || side === 'side') return;
+    // numbers in the team's font, with a smooth outline (two outlines for varsity)
+    const sNum = String(number); const font = NUM_FONTS[st?.font ?? 'block'] ?? NUM_FONTS.block;
+    const fpx = side === 'front' ? 11 : 15; const y = side === 'front' ? 10.3 : 12.3;
+    g.font = font(fpx); g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+    const outline = T === un.numbers ? shade(J, -0.4) : T;
+    if (st?.font === 'varsity') { g.strokeStyle = shade(J, luma(J) > 0.5 ? -0.5 : -0.6); g.lineWidth = 2.6; g.strokeText(sNum, 11, y); }
+    g.strokeStyle = outline; g.lineWidth = st?.font === 'varsity' ? 1.4 : 1.1; g.strokeText(sNum, 11, y);
+    g.fillStyle = un.numbers; g.fillText(sNum, 11, y);
+    if (st?.font === 'stencil') { g.fillStyle = J; px(g, 0, y - 0.25, J, 22, 0.5); }
+  }, { scale: 9 });
 }
 
 function padsMat(un) {
@@ -766,20 +816,43 @@ function shirtMat(color, side, tie = null) {
 }
 
 function helmetMat(un, side) {
-  const st = un.stripeStyle ?? 'single';
-  const key = `helm|${un.helmet}|${un.stripe}|${side}|${st}|${un.finish ?? 'gloss'}`;
+  const st = un.stripeStyle ?? 'single'; const ts = un.style;
+  const key = `helm3|${un.helmet}|${un.stripe}|${un.trim}|${side}|${st}|${un.finish ?? 'gloss'}|${ts ? `${ts.glyph}|${ts.logo}|${ts.letter}` : ''}`;
   return pixMat(key, 12, 12, (g) => {
     px(g, 0, 0, un.helmet, 12, 12);
-    px(g, 0, 10, shade(un.helmet, -0.2), 12, 2);
-    const strip = (x, w) => px(g, x, 0, un.stripe, w, side === 'back' ? 10 : 12);
+    const dk = shade(un.helmet, -0.2);
+    px(g, 0, 10.5, dk, 12, 1.5);
+    const strip = (x, w, col = un.stripe) => px(g, x, 0, col, w, side === 'back' ? 10.5 : 12);
     if (side === 'top' || side === 'back') {
+      const edge = luma(un.stripe) > 0.6 ? shade(un.stripe, -0.5) : '#ffffff';
       if (st === 'single') strip(5, 2);
-      else if (st === 'double') { strip(3, 2); strip(7, 2); }
-      else if (st === 'triple') { strip(2, 1); strip(5, 2); strip(9, 1); }
+      else if (st === 'double') { strip(3.6, 1.4); strip(7, 1.4); }
+      else if (st === 'triple') { strip(2.6, 0.8); strip(5, 2); strip(8.6, 0.8); }
+      else if (st === 'wide') { strip(3.5, 5, edge); strip(4, 4); }
+      else if (st === 'tri') { strip(4, 4, edge); strip(4.6, 2.8, un.stripe); strip(5.5, 1, edge); }
     }
-    if (side === 'top' && un.finish !== 'matte') px(g, 3, 3, shade(un.helmet, un.finish === 'chrome' ? 0.6 : 0.35), 2, 2);
-    if (side === 'side') { px(g, 3, 3, un.stripe, 6, 4); px(g, 4, 4, shade(un.stripe, -0.2), 4, 2); if (un.finish === 'chrome') px(g, 1, 1, '#ffffff', 2, 1); }
-  });
+    if (side === 'top' && un.finish !== 'matte') { g.globalAlpha = 0.5; px(g, 3, 3, shade(un.helmet, un.finish === 'chrome' ? 0.6 : 0.35), 2, 2); g.globalAlpha = 1; }
+    if (side === 'side' || side === 'sideL') {
+      if (ts) { const [m, h2] = logoColors(un.helmet, un); drawLogo(g, ts, 6.3, 5.4, 7.2, m, h2, { mirror: side === 'sideL' && ts.logo !== 'letter' }); }
+      else { px(g, 3, 3, un.stripe, 6, 4); px(g, 4, 4, shade(un.stripe, -0.2), 4, 2); }
+      if (un.finish === 'chrome') { g.globalAlpha = 0.6; px(g, 1, 1, '#ffffff', 2, 0.6); g.globalAlpha = 1; }
+    }
+  }, { scale: 16 });
+}
+
+/** Pants with the team's stripe down the outside of the thigh (lathe UVs: u 0.25 / 0.75 are the outsides). */
+function pantsStripeMat(un) {
+  const kind = un.style?.pants ?? 'none';
+  const key = `pstripe|${un.pants}|${un.trim}|${un.jersey}|${kind}`;
+  return pixMat(key, 32, 8, (g) => {
+    px(g, 0, 0, un.pants, 32, 8);
+    const T = colorDist(un.trim, un.pants) < 0.2 ? un.jersey : un.trim;
+    for (const cx of [8, 24]) {
+      if (kind === 'single') px(g, cx - 0.7, 0, T, 1.4, 8);
+      else if (kind === 'double') { px(g, cx - 1.3, 0, T, 0.8, 8); px(g, cx + 0.5, 0, T, 0.8, 8); }
+      else if (kind === 'tri') { px(g, cx - 1.6, 0, T, 0.6, 8); px(g, cx - 0.6, 0, un.jersey === un.pants ? '#ffffff' : un.jersey, 1.2, 8); px(g, cx + 1, 0, T, 0.6, 8); }
+    }
+  }, { rough: 0.72 });
 }
 
 function cleatTex(base, accent) {
@@ -893,7 +966,7 @@ function buildRig(o) {
   const mkLeg = (side) => {
     const hip = new THREE.Group();
     hip.position.set(side * 0.1, -0.04, 0);
-    const th = new THREE.Mesh(g.thigh, pants); th.scale.set(bt.leg, 1, bt.leg); hip.add(th);
+    const th = new THREE.Mesh(g.thigh, football && un.style && un.style.pants !== 'none' ? pantsStripeMat(un) : pants); th.scale.set(bt.leg, 1, bt.leg); hip.add(th);
     hip.add(joint(0.098 * bt.leg, pants, 0, -0.02, 0)); // hip joint blends thigh into hips
     const knee = new THREE.Group();
     knee.position.y = -0.48;
@@ -960,8 +1033,9 @@ function buildRig(o) {
     pads.scale.set(padK, padK > 1 ? 1.15 : padK < 1 ? 0.9 : 1, Math.min(1.12, padK));
     chest.add(pads);
     if (L.backplate && L.backplate !== 'none') { // back plate below the shoulder pads
-      const bp = new THREE.Mesh(box(0.3, 0.16, 0.04), toon(teamCol(L.backplate)));
-      bp.position.set(0, -0.2, 0.155 * fitK);
+      // a lower-back protector peeking out at the bottom of the jersey (it used to sit over the number)
+      const bp = new THREE.Mesh(box(0.26, 0.085, 0.035, 0, 0.45, 2), toon(teamCol(L.backplate)));
+      bp.position.set(0, -0.4, 0.14 * fitK);
       chest.add(bp);
     }
     if (L.neckRoll && L.neckRoll !== 'none') { // horse collar / neck roll
@@ -1047,7 +1121,7 @@ function buildRig(o) {
     const longSleeve = football && L.jSleeve === 'long';
     const armSleeve = sleeveOn ? L.sleeveColor : longSleeve && underC !== 'skin' ? underC : o.tie ? shirtC : null; // suits have long sleeves
     const rows = football && L.jSleeve === 'cutoff' ? 3 : 7;
-    const upper = new THREE.Mesh(g.upper, armMat(skinC, shirtC, football ? un.trim : null, tat, 'upper', armSleeve, rows));
+    const upper = new THREE.Mesh(g.upper, armMat(skinC, shirtC, football ? un.trim : null, tat, 'upper', armSleeve, rows, football ? (un.style?.sleeve ?? 1) : 1));
     if (football && L.jFit === 'tight') upper.scale.set(0.94, 1, 0.94);
     upper.scale.x *= bt.arm; upper.scale.z *= bt.arm;
     sh.add(upper);
@@ -1164,7 +1238,7 @@ export function applyWear(root, w) {
     const swap = (m) => {
       if (!m) return m;
       const k = m.userData?.key ?? '';
-      const part = k.startsWith('jersey|') || k.startsWith('pads|') ? 'jersey' : k.startsWith('helm|') ? 'helmet' : m === ud.pantsMat ? 'pants' : null;
+      const part = k.startsWith('jersey') || k.startsWith('pads|') ? 'jersey' : k.startsWith('helm') ? 'helmet' : m === ud.pantsMat || k.startsWith('pstripe|') ? 'pants' : null;
       if (!part) return m;
       if (w.level <= 0.05 && w.wet <= 0.3 && !w.snow && w.blood <= 0.15) return m;
       return stainedMat(m, part, w, v);
@@ -1229,26 +1303,30 @@ function addHelmet(neck, un, L, hairC) {
   H.position.y = 0.25;
   neck.add(H);
   // shell finish
-  const fin = L.helmetFinish ?? 'gloss';
-  const shellC = fin === 'matte' ? shade(un.helmet, -0.18) : fin === 'chrome' ? shade(un.helmet, 0.22) : un.helmet;
-  const stripe = L.helmetStripe ?? 'single';
+  // the team decides the shell, stripe, finish and logo (a uniform without a team style falls back to the look)
+  const ts = un.style;
+  const fin = ts?.finish ?? L.helmetFinish ?? 'gloss';
+  const shellC = fin === 'matte' ? shade(un.helmet, -0.18) : fin === 'chrome' ? shade(un.helmet, 0.22) : fin === 'metallic' ? shade(un.helmet, 0.06) : un.helmet;
+  const stripe = ts?.stripe ?? L.helmetStripe ?? 'single';
   const hu = { ...un, helmet: shellC, stripeStyle: stripe, finish: fin };
-  const rough = fin === 'matte' ? 0.75 : fin === 'chrome' ? 0.18 : 0.3;
-  const metal = fin === 'chrome' ? 0.85 : 0;
+  const rough = fin === 'matte' ? 0.75 : fin === 'chrome' ? 0.18 : fin === 'satin' ? 0.5 : fin === 'metallic' ? 0.26 : 0.3;
+  const metal = fin === 'chrome' ? 0.85 : fin === 'metallic' ? 0.5 : fin === 'satin' ? 0.1 : 0;
   const shellMat = (m) => { const c = m.clone(); c.roughness = rough; c.metalness = metal; c.side = THREE.DoubleSide; return c; };
   const shell = shiny(shellC, { rough, metal });
   const add = (geom, mat, x, y, z) => { const m = new THREE.Mesh(geom, mat); m.position.set(x, y, z); H.add(m); return m; };
   const open = new THREE.MeshBasicMaterial({ visible: false });
   const shellGeo = softBox(0.44, 0.43, 0.47, 0.2, 6);
-  const sideM = shellMat(helmetMat(hu, 'side'));
-  const dome = add(shellGeo, [sideM, sideM, shellMat(helmetMat(hu, 'top')), shellMat(shell), shellMat(helmetMat(hu, 'back')), open], 0, 0.01, 0.01);
+  const sideM = shellMat(helmetMat(hu, 'side')), sideL = shellMat(helmetMat(hu, 'sideL'));
+  const dome = add(shellGeo, [sideM, sideL, shellMat(helmetMat(hu, 'top')), shellMat(shell), shellMat(helmetMat(hu, 'back')), open], 0, 0.01, 0.01);
   dome.scale.set(1, 1, 1);
   add(box(0.4, 0.05, 0.06, 0, 0.45, 3), shell, 0, 0.15, -0.205); // brim
   // jaw pads
   add(box(0.05, 0.14, 0.16, 0, 0.45, 3), shell, -0.2, -0.08, -0.12);
   add(box(0.05, 0.14, 0.16, 0, 0.45, 3), shell, 0.2, -0.08, -0.12);
   // facemask
-  const mc = L.maskColor === 'team' ? un.stripe : (L.maskColor ?? '#c3cad3');
+  const teamMask = ts ? ({ gray: '#c3cad3', trim: un.stripe, dark: '#16181c', white: '#f4f4f4', shell: shade(un.helmet, -0.1) }[ts.mask] ?? '#c3cad3') : un.stripe;
+  // the team's facemask color unless you picked your own
+  const mc = !L.maskColor || L.maskColor === 'team' || (ts && L.maskColor === '#c3cad3') ? teamMask : L.maskColor;
   const mask = shiny(mc, { rough: 0.35, metal: 0.4 });
   const bars = MASK_BARS[L.maskStyle] ?? MASK_BARS.three;
   for (const [w, y, z] of bars.h) add(box(w, 0.026, 0.026, 0, 0.5, 2), mask, 0, y, z);

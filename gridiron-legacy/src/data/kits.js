@@ -9,7 +9,32 @@ export const mix = (a, b, t) => { const A = rgb(a); const B = rgb(b); return toH
 export const shade = (c, t) => (t < 0 ? mix(c, '#000000', -t) : mix(c, '#ffffff', t));
 export function colorDist(a, b) { const A = rgb(a); const B = rgb(b); return Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2]) / 441; }
 
+import { mascotKind } from './mascots.js';
+
 const ALT_STYLES = ['black', 'secondary', 'gray', 'cream', 'dark'];
+
+// Team identity: every team gets its own uniform design (same on all three kits, colors change), picked from its id
+// so it never changes: helmet logo / stripe / finish / facemask, jersey pattern, number font, sleeve and pants stripes.
+export const JERSEY_PATTERNS = ['plain', 'shoulders', 'chestBand', 'sidePanels', 'yoke', 'pinstripe', 'fade', 'claws', 'tvStripe'];
+export const NUMBER_FONTS = ['block', 'varsity', 'rounded', 'serif', 'italic', 'stencil'];
+export const HELMET_STRIPES = ['single', 'double', 'triple', 'wide', 'none', 'tri'];
+export const HELMET_FINISHES = ['gloss', 'gloss', 'matte', 'metallic', 'chrome', 'satin'];
+export function teamIdentity(team) {
+  let seed = hashId(`${team.id}|${team.name}`) || 1;
+  const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const pick = (a) => a[Math.floor(r() * a.length)];
+  const glyph = mascotKind(team);
+  return {
+    glyph,
+    // generic-shield teams wear their letter
+    logo: glyph !== 'shield' && r() < 0.72 ? 'glyph' : 'letter', letter: (team.name || team.city || '?').trim()[0].toUpperCase(),
+    stripe: pick(HELMET_STRIPES), finish: pick(HELMET_FINISHES),
+    mask: pick(['gray', 'gray', 'trim', 'dark', 'white', 'shell']),
+    pattern: pick(JERSEY_PATTERNS), font: pick(NUMBER_FONTS),
+    sleeve: pick([0, 2, 2, 3, 1]), pants: pick(['single', 'double', 'tri', 'none', 'single']),
+    collar: pick(['v', 'round', 'v']), chestLogo: r() < 0.5,
+  };
+}
 function hashId(id) { let h = 0; for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; }
 
 /** The three kits for a team ({ id, colors: [primary, secondary] }). */
@@ -33,6 +58,10 @@ export function teamKits(team) {
   else if (style === 'cream') alt = { jersey: '#efe3c8', trim: p, numbers: p, pants: '#efe3c8', helmet: shade(p, -0.2), stripe: '#efe3c8', socks: p };
   else alt = { jersey: shade(p, -0.5), trim: s, numbers: contrast(shade(p, -0.5), s), pants: shade(p, -0.5), helmet: shade(p, -0.5), stripe: s, socks: shade(p, -0.5) };
   const third = { id: 'third', label: style === 'cream' ? 'Throwback' : style === 'black' ? 'Blackout' : 'Alternate', ...alt };
+  const id = teamIdentity(team);
+  // throwbacks go old school: serif numbers, sleeve stripes, no fancy pattern, a plain matte shell
+  const tid = style === 'cream' ? { ...id, pattern: 'plain', font: 'serif', sleeve: 3, finish: 'matte', stripe: 'single', logo: 'letter' } : style === 'black' ? { ...id, finish: 'matte' } : id;
+  home.style = id; away.style = id; third.style = tid;
   return { home, away, third };
 }
 
@@ -50,5 +79,5 @@ export function oppKitFor(myKit, oppTeam, isOppHome) {
 
 /** Uniform object for the 3D model. */
 export function kitUniform(kit) {
-  return { jersey: kit.jersey, trim: kit.trim, numbers: kit.numbers, pants: kit.pants, helmet: kit.helmet, stripe: kit.stripe, socks: kit.socks };
+  return { jersey: kit.jersey, trim: kit.trim, numbers: kit.numbers, pants: kit.pants, helmet: kit.helmet, stripe: kit.stripe, socks: kit.socks, style: kit.style };
 }
