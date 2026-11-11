@@ -41,10 +41,7 @@ export function lookEditor(opts) {
   const preview = () => {
     const spec = st.tab === 'casual' ? { ...L, outfit: 'casual' } : st.tab === 'gala' ? { ...L, outfit: 'gala' } : { uniform: opts.uniform, look: { ...L }, number: opts.number ?? 1, helmet: st.helmet };
     return h('div.look-preview',
-      h('div.look-stage',
-        portraitImg(spec, 200, { full: true, big: true, yaw: st.yaw }),
-        // a close-up of the face while you shape it (jaw, cheekbones, chin, eyes, brows, nose, hair)
-        ['body', 'hair', 'face', 'ink'].includes(st.tab) && !st.helmet ? h('div.look-face', portraitImg({ ...L, outfit: 'casual' }, 200, { big: true, yaw: st.yaw * 0.6 })) : null),
+      h('div.look-stage', portraitImg(spec, 200, { full: true, big: true, yaw: st.yaw })),
       h('div.row', { style: { justifyContent: 'center', gap: '6px' } },
         h('button.btn.small', { 'aria-label': 'Turn left', onclick: () => { st.yaw -= 0.8; draw(); } }, '⟲'),
         h(`button.btn.small${st.helmet ? '.primary' : ''}`, { onclick: () => { st.helmet = !st.helmet; draw(); } }, st.helmet ? 'Helmet on' : 'Helmet off'),

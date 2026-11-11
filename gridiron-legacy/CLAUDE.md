@@ -390,19 +390,6 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Shading lessons: a steep nose underside, cheek hollows at nose height, or a drooping "long" nose all cast a band
   under the nose that reads as a mustache. Keep the nose easing into the lip and the hollows low/out toward the jaw.
 
-## v0.27: artist-made heads (MakeHuman, CC0)
-- Heads are the MakeHuman base mesh (CC0 1.0 Universal; license text in tools/head/src/LICENSE.md), cut at the neck by
-  `tools/head/build.py` (run `tools/head/fetch.sh` first; raw sources are git-ignored) into `src/data/mhhead.js`:
-  positions/uv/index (group 0 skin, group 1 painted face), ear flags, eye-socket rings, chin/crown indices and 74
-  int16-packed targets (l/r pairs merged; gender = even blend of the three regional young male/female macros).
-- `src/scenes/mhhead.js`: `mhWeights(L, fp, football)` maps the look (gender, headShape, jaw/cheek/chin/faceW, nose, eyes,
-  brows + hash jitter) to target weights; `mhHeadGeo` morphs, refits chin->crown to 0.40, tracks the eyes from the
-  socket rings; `mhShell` grows hair/beards (skull space `SKULL`, ears excluded, only growing triangles kept).
-- actors: head = `mhHeadGeo` with [skinMat, `faceMatMH`] (brows, female liner, lip colour/lipstick, blush, eye black,
-  stubble; layout eyes cols 3.1/8.9 row 5.75, mouth row 9.3). Eyeballs sit in the real sockets (hidden blink lid only).
-  Hair `mhHairShell`, beards `MH_BEARD` masks. Old box-head code (`headGeo`, `hairShellGeo`, `addBeardOld`) is unused.
-- Look editor shows a face close-up beside the full body on Body/Hair/Face/Ink.
-
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

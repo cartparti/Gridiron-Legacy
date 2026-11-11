@@ -1,6 +1,1 @@
 gridiron-legacy.zip
-
-# MakeHuman source files (re-downloaded by tools/head/fetch.sh; only the built src/data/mhhead.js ships)
-gridiron-legacy/tools/head/src/base.obj
-gridiron-legacy/tools/head/src/targets/
-gridiron-legacy/tools/head/src/modeling_modifiers.json
