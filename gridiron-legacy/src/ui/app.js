@@ -1,10 +1,11 @@
 // App controller: owns the current game state, routes to screens, autosaves.
 import { clear } from './dom.js';
+import { setVoiceEnabled } from '../audio/voice.js';
 import { showWhatsNew } from './whatsnew.js';
 import { closeAllModals, toast } from './components.js';
 import * as storage from '../core/storage.js';
 import { setSoundEnabled } from '../audio/sfx.js';
-import { setMusicEnabled } from '../audio/stadium.js';
+import { setMusicEnabled, playMusic, stopMusic, currentSong } from '../audio/stadium.js';
 import { getTeam } from '../sim/league.js';
 import { titleScreen } from './screens/title.js';
 import { slotsScreen } from './screens/slots.js';
@@ -14,7 +15,7 @@ import { settingsScreen } from './screens/settings.js';
 import { hubScreen } from './screens/hub.js';
 import { gamedayScreen } from './screens/gameday.js';
 import { postgameScreen, reviewScreen } from './screens/results.js';
-import { campScreen, recruitingScreen, declareScreen, draftScreen, contractScreen } from './screens/offseason.js';
+import { campScreen, recruitingScreen, declareScreen, draftScreen, contractScreen, combineScreen } from './screens/offseason.js';
 import { legacyScreen } from './screens/legacy.js';
 import { worldScreen } from './screens/world.js';
 import { stopBackdrop } from '../scenes/director.js';
@@ -32,6 +33,17 @@ export const app = {
     this.render();
     // what's new: every time the game opens
     setTimeout(() => showWhatsNew(), 350);
+    storage.requestPersist();
+  },
+
+  /** Soft menu music on the title and setup screens; quiet inside a career (games bring their own). */
+  menuMusic() {
+    const onMenu = !this.state && this.screen !== 'practice';
+    const want = onMenu && this.settings.menuMusic !== false && this.settings.music !== false;
+    if (want && currentSong() !== 'menu') {
+      if (this.audioReady) playMusic('menu', { vol: 0.35 });
+      else if (!this.waitingAudio) { this.waitingAudio = true; window.addEventListener('pointerdown', () => { this.audioReady = true; this.menuMusic(); }, { once: true }); }
+    } else if (!want && currentSong() === 'menu') stopMusic();
   },
 
   applySettings() {
@@ -42,6 +54,7 @@ export const app = {
     document.body.classList.toggle('reduce-motion', !!s.reducedMotion);
     setSoundEnabled(!!s.sound);
     setMusicEnabled(s.music !== false);
+    setVoiceEnabled(!!s.voice);
   },
 
   saveSettings() {
@@ -60,6 +73,7 @@ export const app = {
   },
 
   startCareer(state, slot) {
+    state.playStyle = this.settings.playStyle ?? state.playStyle ?? 'moments';
     this.state = state;
     this.slot = slot;
     this.hubTab = 'week';
@@ -122,6 +136,7 @@ export const app = {
     clear(root);
     root.className = '';
     this.setTeamColors();
+    this.menuMusic();
     let view;
     if (this.screen === 'settings') view = settingsScreen(this);
     else if (!this.state) {
@@ -142,6 +157,7 @@ export const app = {
         case 'camp': view = campScreen(this); break;
         case 'recruiting': view = recruitingScreen(this); break;
         case 'declare': view = declareScreen(this); break;
+        case 'combine': view = combineScreen(this); break;
         case 'draft': view = draftScreen(this); break;
         case 'contract': view = contractScreen(this); break;
         case 'retired': view = legacyScreen(this); break;

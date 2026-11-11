@@ -1,5 +1,7 @@
 // Main career hub: top bar with meters, bottom tabs, and the five tab views.
 import { h, clear } from '../dom.js';
+import { maybeTour } from '../onboarding.js';
+import { seasonStakes, awardRace, depthScore } from '../../sim/career.js';
 import { STAGES, DAYS, WEATHER } from '../../data/config.js';
 import { POSITIONS } from '../../data/positions.js';
 import { HOUSING, CARS, PERKS, INVESTMENTS } from '../../data/lifestyle.js';
@@ -72,6 +74,7 @@ export function topBar(app) {
 }
 
 export function hubScreen(app) {
+  setTimeout(() => { if (app.state?.phase === 'plan' && !app.ui.world) maybeTour(app); }, 500);
   const st = app.state;
   const wrap = h('div');
   wrap.append(topBar(app));
@@ -189,6 +192,9 @@ function weekView(app) {
       forecastRow(st)));
   }
 
+  // Season stakes: your role on the depth chart, the playoff race and the award race
+  container.append(seasonCard(st));
+
   // Walkable places: doing things there fills your days.
   container.append(h('div.card',
     h('div.card-title', h('h3', 'Go somewhere'), h('span.tiny.muted', 'Activities there fill your days')),
@@ -290,6 +296,24 @@ function weekView(app) {
 }
 
 // ------------------------------------------------------------------ TEAM
+
+function seasonCard(st) {
+  const p = st.player;
+  const d = p.depth;
+  const sk = seasonStakes(st);
+  const race = awardRace(st).slice(0, 5);
+  const myRank = awardRace(st).findIndex((r) => r.you) + 1;
+  const prog = d ? Math.max(0, Math.min(100, 50 + (depthScore(st) - d.rival.ovr) * 10)) : 0;
+  return h('div.card.season-card',
+    h('div.card-title', h('h3', 'Your Season'), sk ? h('span.chip.pix', sk.record) : null),
+    d ? h('div.depth-box',
+      h('div.row.between', h('b', d.role === 'starter' ? `Starting ${p.position}` : `Backup ${p.position}`), h('span.tiny.muted', d.role === 'starter' ? `Holding off ${d.rival.name} (${Math.round(d.rival.ovr)})` : `Behind ${d.rival.name} (${Math.round(d.rival.ovr)})`)),
+      h('div.depth-bar', h('i', { style: { width: `${prog}%`, background: d.role === 'starter' ? 'var(--good)' : 'var(--accent)' } }), h('span.mark')),
+      h('p.tiny.muted', d.role === 'starter' ? 'Keep playing well to keep the job. A few bad weeks and coach could make a change.' : 'Win the job: train hard, play well when you get your snaps, and keep coach happy. Backups only get a couple of late snaps.')) : null,
+    sk ? h('div.stakes', h('div', h('b', `#${sk.rank}`), h('span', sk.conf ? `${sk.conf} Conf.` : 'League')), h('div', h('b', sk.left), h('span', 'Games left')), h('div.wide', h('b.small', sk.status), h('span', 'Playoff race'))) : null,
+    h('div.race', h('div.row.between', h('span.section-label', 'Award race'), h('span.tiny.muted', myRank ? `You: #${myRank}` : '')),
+      race.map((r, i) => h(`div.race-row${r.you ? '.me' : ''}`, h('span.rk', i + 1), h('span.grow', r.name, h('span.tiny.muted', ` · ${r.team}`)), h('span.pts', r.perf ? Math.round(r.perf) : '—')))));
+}
 
 function teamView(app) {
   const st = app.state;

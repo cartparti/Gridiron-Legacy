@@ -127,6 +127,8 @@ const SONGS = {
   charge: { bpm: 132, bass: [36, 36, 43, 43, 48, 48, 43, 43], lead: [60, 64, 67, 72, 0, 67, 72, 0], drums: ['k', 'h', 's', 'h', 'k', 'h', 's', 'h'] },
   // Bouncy big-play groove.
   groove: { bpm: 124, bass: [41, 0, 41, 44, 46, 0, 44, 41], lead: [68, 0, 70, 72, 0, 70, 68, 65], drums: ['k', 'h', 's', 'h', 'k', 'k', 's', 'h'] },
+  // Laid-back menu loop: soft bass, gentle keys, light beat.
+  menu: { bpm: 92, bass: [38, 0, 0, 38, 41, 0, 43, 0], lead: [62, 0, 65, 0, 69, 0, 67, 65], drums: ['k', 0, 'h', 0, 's', 0, 'h', 'h'] },
   // Big brassy anthem for cutscenes.
   anthem: { bpm: 96, bass: [36, 36, 41, 41, 43, 43, 36, 36], lead: [60, 64, 67, 72, 71, 67, 64, 67], drums: ['k', 0, 's', 0, 'k', 'k', 's', 0] },
 };
@@ -140,6 +142,7 @@ export function playMusic(name = 'hype', { vol = 1, bars = 0 } = {}) {
   const step = 60 / song.bpm / 2;
   let i = 0;
   const m = { gain: vol, alive: true };
+  m.name = name;
   music = m;
   const tick = () => {
     if (!m.alive) return;
@@ -159,6 +162,8 @@ export function playMusic(name = 'hype', { vol = 1, bars = 0 } = {}) {
   tick();
 }
 
+/** Which song is playing (null when quiet). */
+export const currentSong = () => (music ? music.name ?? 'song' : null);
 export function stopMusic() {
   if (!music) return;
   music.alive = false;

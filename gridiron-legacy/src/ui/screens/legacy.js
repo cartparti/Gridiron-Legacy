@@ -7,6 +7,11 @@ import { sfx } from '../../audio/sfx.js';
 import { statLine } from './results.js';
 import { icon } from '../icons.js';
 import { hofCutscene } from '../../scenes/cutscenes.js';
+import { POST_CAREER, nextGenerationOpts } from '../../sim/career.js';
+import { choosePostCareer, newCareer } from '../../sim/flow.js';
+import { hometownSchools } from '../../data/hometown.js';
+import { CITIES } from '../../data/teams.js';
+import { defaultLook } from '../../data/looks.js';
 
 const REASONS = {
   age: 'Father Time remains undefeated.',
@@ -44,6 +49,23 @@ export function legacyScreen(app) {
       h('p.small.muted', { style: { marginTop: '8px' } }, `${p.proCareerStats.games} pro games · ${p.titles.filter((t) => t.stage === 'pro').length} titles · career earnings banked: ${fmtMoney(p.money)}`)),
     Object.keys(awardCounts).length ? h('div.card', h('h3', 'Trophy Case'), h('div.row.wrap', Object.entries(awardCounts).map(([n, c]) => h('span.chip.gold', icon('trophy'), `${c > 1 ? `${c}× ` : ''}${n}`)))) : null,
     h('div.card', h('h3', 'Overall by Season'), ratingChart(p.history)),
-    h('button.btn.primary.block', { onclick: () => { app.ui.newCareer = true; app.state = null; app.go('slots'); } }, 'Start a New Career'),
+    // life after football
+    h('div.card', h('h3', 'Life After Football'),
+      L.post ? h('p', POST_CAREER.find((x) => x.id === L.post).epilogue(p))
+        : [h('p.small.muted', 'What comes next?'), h('div.post-grid', POST_CAREER.map((x) => h('button.pick-card', { onclick: () => { sfx.select(); choosePostCareer(st, x.id); app.save(); app.render(); } }, h('b', x.label), h('span.lbl', x.desc))))]),
+    // the next generation: play as your kid
+    h('div.card.nextgen', h('h3', 'The Next Generation'),
+      h('p.small.muted', `Years later, a kid with the ${p.last} name on their back steps onto the field in ${p.hometown}. Play as your child, with a head start from your legacy.`),
+      h('button.btn.primary.block', { onclick: () => {
+        sfx.levelUp();
+        const o = nextGenerationOpts(st);
+        const town = o.customTown;
+        o.hsTeamId = town ? hometownSchools(town)[0].id : (CITIES.find((c) => c.name === o.hometown) ?? CITIES[0]).schools[0].id;
+        if (!town && !CITIES.find((c) => c.name === o.hometown)) o.hometown = CITIES[0].name;
+        o.look = { ...defaultLook(o.position), skin: p.look?.skin ?? 2, hairColor: p.look?.hairColor ?? 2, eyeColor: p.look?.eyeColor ?? 0 };
+        o.playStyle = app.settings.playStyle ?? 'moments';
+        app.startCareer(newCareer(o), app.slot);
+      } }, `Play as ${p.last} Jr.`)),
+    h('button.btn.block', { onclick: () => { app.ui.newCareer = true; app.state = null; app.go('slots'); } }, 'Start a New Career'),
     h('button.btn.block', { onclick: () => app.quitToTitle() }, 'Title Screen'));
 }

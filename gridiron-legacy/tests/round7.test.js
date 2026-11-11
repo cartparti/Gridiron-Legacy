@@ -74,6 +74,7 @@ test('playing a stronger opponent makes the timing window smaller', async () => 
 
 test('penalty yards move the ball and can give a first down, without counting in stats', () => {
   const st = career('RB', 8);
+  st.player.depth.role = 'starter'; // a starter's game (backups only get late snaps)
   while (st.phase === 'event') flow.resolveEvent(st, 0);
   flow.submitPlan(st, [null, null, null, null, null]);
   let r;

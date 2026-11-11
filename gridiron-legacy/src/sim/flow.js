@@ -36,6 +36,7 @@ import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seaso
 import { computeLegacy } from './legacy.js';
 import { genTeammates } from './social.js';
 import { postGameTexts, weeklyTexts, textFrom } from './phone.js';
+import { initDepth, weeklyDepth, depthAfterGame, initRace, awardRace, runCombine } from './career.js';
 
 // ---------------------------------------------------------------- new career
 
@@ -62,7 +63,18 @@ export function newCareer(opts) {
   if (!getTeam(state.league, opts.hsTeamId)) state.career.teamId = state.league.teams[0].id;
   pickRivalTeam(state);
   state.player.seasonStats = emptyStats();
+  if (opts.legacyBonus) {
+    // the next generation: a head start from a famous parent
+    for (const k of STAT_KEYS) state.player.stats[k] += opts.legacyBonus;
+    refreshOverall(state.player);
+    state.player.parentName = opts.parentName ?? null;
+    state.player.fame = Math.min(100, state.player.fame + opts.legacyBonus * 4);
+  }
+  state.playStyle = opts.playStyle ?? 'moments';
   addNews(state, 'story', `${state.player.first} ${state.player.last} joins the ${teamName(state)} varsity as a sophomore ${state.player.position}.`);
+  if (state.player.parentName) addNews(state, 'story', `Like parent, like kid: ${state.player.parentName}'s child suits up for ${teamName(state)}.`);
+  initDepth(state);
+  initRace(state);
   beginWeek(state);
   return state;
 }
@@ -106,6 +118,7 @@ export function beginWeek(state) {
     newCoach(state);
     p.rel.teammates = 40;
     if (c.rivalTeamId === c.teamId) pickRivalTeam(state);
+    initDepth(state, { edge: randInt(state, -2, 3) });
     addNews(state, 'story', `${p.first} ${p.last} leaves the ${old} for the ${teamName(state)}.`);
   }
   newWeek(state);
@@ -119,6 +132,9 @@ export function beginWeek(state) {
     addNews(state, 'scandal', `${p.first} ${p.last} ruled academically ineligible.`);
   }
   weeklyTexts(state);
+  if (!p.depth) initDepth(state, { edge: -1 }); // older saves: you were the starter
+  weeklyDepth(state);
+  awardRace(state, { advance: true });
   const ev = rollEvent(state, 'season', 0.5);
   if (ev) {
     state.pendingEvent = ev;
@@ -183,6 +199,7 @@ export function finishGame(state) {
     g.userStats.games = 1;
     g.userStats.wins = g.won ? 1 : 0;
     g.userStats.grades = g.grade;
+    depthAfterGame(state, g.grade, true);
     addStats(p.seasonStats, g.userStats);
     addStats(p.careerStats, g.userStats);
     if (state.career.stage === 'pro') addStats(p.proCareerStats, g.userStats);
@@ -417,7 +434,7 @@ function nextStageStep(state) {
       c.stageSeason++;
       return startNewSeason(state, { reset: true });
     }
-    return runDraft(state, false);
+    return startCombine(state, false);
   }
   // Pro
   if (p.age > RETIRE_AGE) return retire(state, 'age');
@@ -439,6 +456,10 @@ function startNewSeason(state, { reset }) {
   if (reset) resetSeason(state, state.league);
   const p = state.player;
   p.seasonStats = emptyStats();
+  // the guy ahead of you may have graduated (school) or the team brought in competition
+  if (p.depth && reset && state.career.stage !== 'pro' && p.depth.role === 'backup' && chance(state, 0.6)) initDepth(state, { edge: randInt(state, -3, 2) });
+  else if (p.depth && p.depth.role === 'starter' && chance(state, 0.25)) initDepth(state, { edge: randInt(state, -4, 1) });
+  initRace(state);
   state.career.teamAbbr = state.career.teamId;
   if (!getTeam(state.league, state.career.rivalTeamId) || state.career.rivalTeamId === state.career.teamId) pickRivalTeam(state);
   beginWeek(state);
@@ -486,12 +507,25 @@ export function chooseCollege(state, teamId) {
   p.fame = p.fame * 0.85;
   state.offers = null;
   addNews(state, 'story', `${p.first} ${p.last} commits to ${offer.city}!`);
+  initDepth(state, { edge: offer.visit?.edge ?? Math.round((offer.prestige - 2.5) * 2.4 + gauss(state, 0, 2.5)) });
+  state.visits = 0;
   textFrom(state, 'family', `${offer.city}!!! We are so proud of you. Your mom already ordered the sweatshirt.`);
   startNewSeason(state, { reset: false });
 }
 
+/** The pre-draft combine: testing and an interview, then the draft. */
+function startCombine(state, early) {
+  runCombine(state);
+  state.combine.early = early;
+  state.phase = 'combine';
+}
+export function finishCombine(state) {
+  const early = !!state.combine?.early;
+  return runDraft(state, early);
+}
+
 export function declareForDraft(state, yes) {
-  if (yes) return runDraft(state, true);
+  if (yes) return startCombine(state, true);
   state.career.stageSeason++;
   addNews(state, 'story', `${state.player.last} returns for a senior season.`);
   return startNewSeason(state, { reset: true });
@@ -542,7 +576,7 @@ export function runDraft(state, early) {
     prospects.push({ name: `${n.first} ${n.last}`, pos: pick(state, posPool), stock: gauss(state, 62, 9), college: pick(state, collegeIds) });
   }
   const ds = draftStock(state);
-  const me = { name: `${p.first} ${p.last}`, pos: p.position, stock: ds.value - (early ? 1 : 0) + gauss(state, 0, 2), user: true, college: c.teamId };
+  const me = { name: `${p.first} ${p.last}`, pos: p.position, stock: ds.value - (early ? 1 : 0) + (state.combine?.bonus ?? 0) + gauss(state, 0, 2), user: true, college: c.teamId };
   prospects.push(me);
   // Each pick: the team takes the best mix of talent and need, with a little unpredictability.
   const need = {};
@@ -591,6 +625,9 @@ export function runDraft(state, early) {
   p.rel.teammates = 45;
   if (p.housing === 'dorm' || p.housing === 'parents') p.housing = 'offcampus';
   p.draft = { pick: pickNum, round: undrafted ? 0 : userPick.round, teamId, undrafted, year: c.year };
+  // early picks are expected to start; late picks and undrafted guys have to earn it
+  initDepth(state, { edge: undrafted ? randInt(state, 5, 9) : userPick.round === 1 ? randInt(state, -3, 1) : userPick.round <= 3 ? randInt(state, 0, 4) : randInt(state, 3, 7) });
+  state.combine = null;
   state.draft = { pick: pickNum, round: undrafted ? 0 : userPick.round, teamId, undrafted, salary, board, early, reason, stock: ds };
   addNews(state, 'story', undrafted
     ? `${p.first} ${p.last} goes undrafted but signs with ${teamName(state)}.`
@@ -655,6 +692,7 @@ export function signContract(state, idx) {
     state.career.teamId = o.teamId;
     newCoach(state);
     p.rel.teammates = 45;
+    initDepth(state, { edge: randInt(state, -3, 3) });
     addNews(state, 'story', `${p.first} ${p.last} signs a ${o.years}-year deal with the ${o.city} ${o.name}.`);
   } else addNews(state, 'story', `${p.first} ${p.last} re-signs with the ${o.city} ${o.name}: ${o.years} years.`);
   if (p.agentName) p.rel.agent = clamp(p.rel.agent + 5, 0, 100);
@@ -663,6 +701,12 @@ export function signContract(state, idx) {
 }
 
 // ---------------------------------------------------------------- retirement
+
+/** Life after football: pick a path (epilogue on the legacy screen). */
+export function choosePostCareer(state, id) {
+  if (!state.legacy) return;
+  state.legacy.post = id;
+}
 
 export function retire(state, reason) {
   const p = state.player;

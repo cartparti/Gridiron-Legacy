@@ -1,5 +1,6 @@
 // Postgame report and end-of-season review.
 import { h } from '../dom.js';
+import { backupModal } from './slots.js';
 import { STAGES, PLAY_CALLS } from '../../data/config.js';
 import { STAT_KEYS, STAT_LABELS } from '../../data/positions.js';
 import { getTeam } from '../../sim/league.js';
@@ -105,6 +106,9 @@ export function reviewScreen(app) {
       h('p', `Overall ${Math.round(r.ovrBefore)} → `, h(`b.${delta >= 0 ? 'good' : 'bad'}`, `${Math.round(r.ovrAfter)} (${signed(delta, 1)})`), ` · now age ${p.age}`),
       h('div.changes', STAT_KEYS.map((k) => h(`span.chip.${r.ageChanges[k] >= 0 ? 'good' : 'bad'}`, `${STAT_LABELS[k]} ${signed(r.ageChanges[k], 1)}`)))),
     r.invest.length ? h('div.card', h('h3', 'Investments'), r.invest.map((x) => h('div.row.between.small', h('span', x.label), h(`b.${x.r >= 0 ? 'good' : 'bad'}`, `${fmtMoney(x.from)} → ${fmtMoney(x.to)} (${signed(x.r * 100, 0)}%)`)))) : null,
+    h('div.card.flat.backup-nudge', h('div.row', { style: { gap: '10px', alignItems: 'center' } }, h('span', { style: { fontSize: '1.4rem' } }, '💾'),
+      h('div.grow', h('b', 'Back up your career'), h('p.tiny.muted', 'Saves live only on this phone. A backup code keeps your career safe.')),
+      h('button.btn.small', { onclick: () => { app.save(); backupModal(app.slot, `${p.first} ${p.last}`); } }, 'Back up'))),
     h('button.btn.primary.block', { onclick: () => { sfx.click(); flow.continueAfterReview(st); app.commit(); } }, 'Into the Offseason'));
 }
 

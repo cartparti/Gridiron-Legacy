@@ -43,6 +43,13 @@ export const DEF_POSITIONS = new Set(['CB', 'DT']);
 export const isDefense = (state) => DEF_POSITIONS.has(state.player.position);
 
 export function momentCount(state, { playoff, rivalry }) {
+  // backups only get a couple of late snaps (earn the job to get more)
+  if (state.player.depth?.role === 'backup') return state.playStyle === 'every' ? 4 : state.playStyle === 'more' ? 3 : 2;
+  if (state.playStyle === 'every') return 99; // every drive your unit is on the field
+  if (state.playStyle === 'more') return clamp(momentCountBase(state, { playoff, rivalry }) + 4, 9, 12);
+  return momentCountBase(state, { playoff, rivalry });
+}
+function momentCountBase(state, { playoff, rivalry }) {
   const c = state.player.rel.coach;
   // 5-8 drives with a key moment; a series can keep you on the field for more snaps (see resolveMoment).
   let n = 5;
@@ -98,7 +105,9 @@ export function createUserGame(state, league, sched, { playoff = false, round = 
   const userSide = isHome ? 'home' : 'away';
   const momentSide = isDefense(state) ? (userSide === 'home' ? 'away' : 'home') : userSide;
   const n = sitOut ? 0 : momentCount(state, { playoff, rivalry });
-  const candidates = drives.filter((d) => d.side === momentSide);
+  let candidates = drives.filter((d) => d.side === momentSide);
+  // the backup comes in late (second half)
+  if (state.player.depth?.role === 'backup') candidates = candidates.slice(Math.floor(candidates.length * 0.55));
   const chosen = new Set();
   if (n > 0) chosen.add(candidates.length - 2 - randInt(state, 0, 1)); // something late for drama
   let guard = 0;

@@ -1003,3 +1003,40 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 .look-sec .chip-row .opt { width: 100%; min-height: 36px; padding: 6px 4px; font-size: 0.7rem; text-align: center; white-space: normal; line-height: 1.15; }
 .look-sec .swatch-row { display: flex; flex-wrap: wrap; gap: 7px; }
 .look-sec .swatch-row .sw { width: 32px; height: 32px; border-radius: 50%; }
+.backup-code { width: 100%; box-sizing: border-box; font: 0.72rem/1.3 ui-monospace, monospace; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card2); color: var(--text); resize: vertical; word-break: break-all; }
+
+/* ---- season card: depth chart, playoff race, award race */
+.season-card { display: flex; flex-direction: column; gap: 12px; }
+.depth-box { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--card2); border: 1px solid var(--line); }
+.depth-bar { position: relative; height: 10px; border-radius: 99px; background: color-mix(in srgb, var(--text) 10%, transparent); overflow: hidden; }
+.depth-bar i { display: block; height: 100%; border-radius: inherit; }
+.depth-bar .mark { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 2px; background: var(--text); opacity: 0.6; }
+.stakes { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 8px; }
+.stakes > div { display: flex; flex-direction: column; padding: 8px 10px; border-radius: 10px; background: var(--card2); border: 1px solid var(--line); }
+.stakes b { font-family: var(--pixel); font-size: 1.05rem; }
+.stakes b.small { font-family: inherit; font-size: 0.8rem; }
+.stakes span { font-size: 0.68rem; color: var(--muted); }
+.race { display: flex; flex-direction: column; gap: 4px; }
+.race-row { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 8px; font-size: 0.85rem; }
+.race-row.me { background: color-mix(in srgb, var(--accent) 16%, transparent); font-weight: 700; }
+.race-row .rk { width: 18px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.race-row .pts { font-variant-numeric: tabular-nums; }
+
+/* ---- recruiting / signing day / combine / life after */
+.recruit-head { display: flex; gap: 14px; align-items: center; }
+.recruit-stars { font-size: 1.5rem; color: var(--accent); letter-spacing: 1px; flex: none; }
+.recruit-stars .dim { color: color-mix(in srgb, var(--text) 18%, transparent); }
+.visit-box { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--card2); border: 1px dashed var(--line); }
+.signing { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; }
+.signing-hat { width: 110px; height: 110px; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 8px 24px rgba(0,0,0,0.4); animation: pop 0.5s ease; }
+.btn.left { text-align: left; justify-content: flex-start; white-space: normal; line-height: 1.3; }
+.post-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.post-grid .pick-card { text-align: left; align-items: flex-start; }
+/* ---- guided first week */
+.tour { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; }
+.tour-icon { font-size: 2.6rem; }
+.tour p { margin: 0 0 6px; line-height: 1.4; }
+.tour-dots { display: flex; gap: 6px; margin: 4px 0 8px; }
+.tour-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.tour-dots span.on { background: var(--accent); width: 20px; border-radius: 99px; }
+.tour .row { width: 100%; }

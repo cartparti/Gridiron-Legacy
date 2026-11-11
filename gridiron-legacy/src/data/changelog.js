@@ -1,5 +1,16 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.30', date: 'Nov 11', title: 'A real career', items: [
+    'Earn your spot: you can start as the backup behind a named starter. Win the job with good games, training and coach trust. Bad stretches can get you benched.',
+    'Your Season card: your role, your playoff race and a live award race.',
+    'Recruiting: see your star rating, take two official visits to find out where you would start, then celebrate signing day.',
+    'The Combine: 40-yard dash, bench, vertical and drills, plus a team interview that moves your draft stock. See your projected round before draft night.',
+    'Storylines that remember your choices: a locker-room feud, love vs. the grind, a shady agent deal, and a rival who will not shut up.',
+    'Life after football: coach, broadcaster, family or business, plus "The Next Generation": play as your kid with a head start.',
+    'Settings: choose Key moments, More snaps or Every drive. Optional play-by-play voice and menu music.',
+    'Back up your career with a code you can copy anywhere, and restore it on any phone.',
+    'A quick guided tour for your first week.',
+  ] },
   { v: '0.29', date: 'Nov 11', title: 'Cleaner menus', items: [
     'This "What\'s new" screen shows up every time you open the game.',
     'Character customization is reorganized: every tab is visible with icons, options are grouped into sections, and the preview stays on screen while you scroll.',

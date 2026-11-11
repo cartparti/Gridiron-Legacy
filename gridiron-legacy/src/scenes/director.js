@@ -2,6 +2,7 @@
 // the stadium, the render loop, weather effects, the HUD overlay, and launches minigames.
 // If WebGL is unavailable, a simple 2D timing meter is used instead.
 import * as THREE from 'three';
+import { speak } from '../audio/voice.js';
 import { buildStadium } from './stadium.js';
 import { startCrowd, stopCrowd, playMusic, stopMusic, react } from '../audio/stadium.js';
 import { buildInterlude } from './interludes.js';
@@ -321,6 +322,7 @@ export function makeHud() {
     },
     /** Commentary banner (play-by-play). */
     say: (text, ms = 2200) => {
+      speak(text, { hype: /!/.test(text) });
       const c = q('.hud-comm');
       c.textContent = text;
       c.classList.remove('show'); void c.offsetWidth; c.classList.add('show');

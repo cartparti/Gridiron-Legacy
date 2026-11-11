@@ -9,6 +9,8 @@ import { sfx } from '../../audio/sfx.js';
 import { eventModal } from './event.js';
 import { topBar } from './hub.js';
 import { draftCutscene } from '../../scenes/cutscenes.js';
+import { openModal, closeAllModals } from '../components.js';
+import { recruitStars, visitSchool, answerInterview, projection } from '../../sim/career.js';
 
 export function campScreen(app) {
   const st = app.state;
@@ -31,13 +33,61 @@ export function campScreen(app) {
 export function recruitingScreen(app) {
   const st = app.state;
   const p = st.player;
+  const starsN = recruitStars(st);
+  const visitsLeft = Math.max(0, 2 - (st.visits ?? 0));
   return h('div.screen',
-    h('h1', 'Signing Day'),
-    h('p.muted', `${p.first}, ${st.offers.length} programs offered you a scholarship. Prestige means a stronger team and a bigger spotlight. Pick your school.`),
+    h('h1', 'Recruiting'),
+    h('div.card.recruit-head',
+      h('div.recruit-stars', '★'.repeat(starsN), h('span.dim', '★'.repeat(5 - starsN))),
+      h('div', h('b', `${starsN}-star ${p.position} recruit`), h('p.small.muted', `${st.offers.length} programs offered you a scholarship. You can take ${visitsLeft} more official visit${visitsLeft === 1 ? '' : 's'}: a visit shows whether you would start there.`))),
     st.offers.map((o) => h('div.card.offer', { style: { borderLeftColor: o.colors[0] } },
       h('div.row', teamBadge({ id: o.teamId, city: o.city, name: o.name, colors: o.colors }, 48),
         h('div.grow', h('h3', `${o.city} ${o.name}`), h('div.row', { style: { gap: '8px' } }, stars(o.prestige), o.conf ? h('span.tiny.muted', `${o.conf} Conf.`) : null), h('p.small.muted', `"${o.pitch}"`))),
-      h('button.btn.primary.block', { style: { marginTop: '8px' }, onclick: () => { sfx.levelUp(); flow.chooseCollege(st, o.teamId); app.commit(); } }, `Commit to ${o.city}`))));
+      o.visit ? h('div.visit-box',
+        h('div.row.between', h('b', o.visit.start), h('span.chip', o.visit.edge <= 0 ? 'STARTER' : o.visit.edge <= 3 ? 'COMPETE' : 'BACKUP')),
+        h('p.tiny.muted', `Starter at ${p.position} now: ${o.visit.incumbent}. ${o.visit.vibe}`)) : null,
+      h('div.row', { style: { gap: '8px', marginTop: '8px' } },
+        !o.visit ? h('button.btn.grow', { disabled: !visitsLeft, onclick: () => { sfx.click(); visitSchool(st, o.teamId); app.save(); app.render(); } }, visitsLeft ? 'Official visit' : 'No visits left') : null,
+        h('button.btn.primary.grow', { onclick: () => signingDay(app, o) }, 'Commit')))));
+}
+
+/** Signing day: the hat on the table, the family watching, then you're in. */
+function signingDay(app, o) {
+  const st = app.state;
+  const p = st.player;
+  sfx.levelUp();
+  openModal(h('div.signing',
+    h('div.kicker', 'SIGNING DAY'),
+    h('div.signing-hat', { style: { background: `linear-gradient(160deg, ${o.colors[0]}, ${o.colors[1] ?? o.colors[0]})` } }, teamBadge({ id: o.teamId, city: o.city, name: o.name, colors: o.colors }, 64)),
+    h('h2', `${p.first} ${p.last} is going to ${o.city}!`),
+    h('p.small.muted', `The gym erupts as you put on the ${o.name} hat. Your family is in the front row. ${o.visit ? o.visit.start + '.' : ''}`),
+    h('button.btn.primary.block', { onclick: () => { closeAllModals(); flow.chooseCollege(st, o.teamId); app.commit(); } }, 'Sign the letter')));
+}
+
+/** The pre-draft combine: testing numbers, one interview question, then draft night. */
+export function combineScreen(app) {
+  const st = app.state;
+  const p = st.player;
+  const c = st.combine;
+  const ds = flow.draftStock(st);
+  const proj = projection(ds.value + (c.bonus ?? 0));
+  const iv = c.interview;
+  return h('div.screen',
+    h('h1', 'The Combine'),
+    h('p.muted', 'Every scout in the league is here. Your numbers and your interview move your draft stock.'),
+    h('div.card', h('h3', 'Testing'),
+      h('div.bigstat',
+        h('div', h('b', `${c.forty}s`), h('span', '40-yard dash')),
+        h('div', h('b', c.bench), h('span', 'Bench reps')),
+        h('div', h('b', `${c.vert}"`), h('span', 'Vertical')),
+        h('div', h('b', c.drill), h('span', `${p.position} drills`)))),
+    h('div.card', h('h3', 'Team Interview'), h('p', iv.q),
+      c.answer === null
+        ? h('div.col', { style: { gap: '8px' } }, iv.a.map((a, i) => h('button.btn.block.left', { onclick: () => { sfx.click(); answerInterview(st, i); app.save(); app.render(); } }, a.t)))
+        : h('p.small', h('b', iv.a[c.answer].t), h('br'), h('span.muted', iv.a[c.answer].note))),
+    h('div.card.center', h('div.small.muted', 'Scouts project you'), h('div.display', { style: { fontSize: '1.4rem' } }, proj),
+      h('p.tiny.muted', `College production ${ds.perf} · ${ds.awards} award${ds.awards === 1 ? '' : 's'}`)),
+    h('button.btn.primary.block', { disabled: c.answer === null, onclick: () => { sfx.select(); flow.finishCombine(st); app.commit(); } }, c.answer === null ? 'Answer the interview first' : 'On to Draft Night'));
 }
 
 export function declareScreen(app) {

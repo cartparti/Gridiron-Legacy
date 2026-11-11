@@ -1,5 +1,5 @@
 import { h } from '../dom.js';
-import { listSlots, deleteSave, exportSave, importSave } from '../../core/storage.js';
+import { listSlots, deleteSave, exportSave, importSave, exportCode, importCode } from '../../core/storage.js';
 import { confirmDialog, toast, openModal } from '../components.js';
 import { STAGES } from '../../data/config.js';
 import { sfx } from '../../audio/sfx.js';
@@ -27,8 +27,8 @@ export function slotsScreen(app) {
             app.go('create');
           } }, s.empty ? 'New' : 'Overwrite')
           : (s.empty ? null : h('button.btn.small.primary', { onclick: () => { sfx.select(); app.loadSlot(s.slot); } }, 'Load')),
-        s.empty ? null : h('button.btn.small.ghost', { onclick: () => exportSlot(s) }, 'Export'),
-        s.empty ? h('button.btn.small.ghost', { onclick: () => importSlot(app, s.slot) }, 'Import')
+        s.empty ? null : h('button.btn.small.ghost', { onclick: () => backupModal(s.slot, s.meta.name) }, 'Back up'),
+        s.empty ? h('button.btn.small.ghost', { onclick: () => restoreModal(app, s.slot) }, 'Restore')
           : h('button.btn.small.danger', { onclick: async () => {
             if (await confirmDialog('Delete save?', `This permanently deletes ${m.name}'s career.`, 'Delete')) { deleteSave(s.slot); app.render(); }
           } }, 'Delete')));
@@ -36,6 +36,37 @@ export function slotsScreen(app) {
   return h('div.screen',
     h('div.row.between', h('h1', creating ? 'Choose a Slot' : 'Load Career'), h('button.btn.small.ghost', { onclick: () => app.go('title') }, 'Back')),
     slots.map(card));
+}
+
+/** Back up a career: a code to copy somewhere safe (notes, a text to yourself) or a file. */
+export async function backupModal(slot, name = 'career') {
+  const code = await exportCode(slot);
+  if (!code) return toast('Nothing to back up yet.');
+  const box = h('textarea.backup-code', { readonly: true, rows: 4 }, code);
+  const m = openModal(h('div.col', { style: { gap: '10px' } },
+    h('h2', 'Back up your career'),
+    h('p.small.muted', 'Saves live only on this device. Copy this code somewhere safe (your notes app, or text it to yourself). Paste it into Restore on any phone to get your career back.'),
+    box,
+    h('button.btn.primary.block', { onclick: async () => {
+      try { await navigator.clipboard.writeText(code); toast('Backup code copied!'); } catch { box.select(); document.execCommand?.('copy'); toast('Code selected: copy it.'); }
+    } }, 'Copy backup code'),
+    navigator.share ? h('button.btn.block', { onclick: () => { navigator.share({ title: `Gridiron Legacy backup: ${name}`, text: code }).catch(() => {}); } }, 'Share / save it') : null,
+    h('button.btn.ghost.block', { onclick: () => exportSlot({ slot, meta: { name } }) }, 'Download as a file'),
+    h('button.btn.ghost.block', { onclick: () => m.close() }, 'Done')), { dismissable: true });
+  return m;
+}
+
+function restoreModal(app, slot) {
+  const box = h('textarea.backup-code', { rows: 4, placeholder: 'Paste your backup code here' });
+  const m = openModal(h('div.col', { style: { gap: '10px' } },
+    h('h2', 'Restore a career'),
+    h('p.small.muted', 'Paste a backup code, or pick a backup file.'),
+    box,
+    h('button.btn.primary.block', { onclick: async () => {
+      if (await importCode(slot, box.value)) { toast('Career restored!'); m.close(); app.render(); } else toast('That code did not work. Check you copied all of it.');
+    } }, 'Restore from code'),
+    h('button.btn.block', { onclick: () => { m.close(); importSlot(app, slot); } }, 'Pick a file instead'),
+    h('button.btn.ghost.block', { onclick: () => m.close() }, 'Cancel')), { dismissable: true });
 }
 
 function exportSlot(s) {

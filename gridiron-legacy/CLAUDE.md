@@ -411,6 +411,21 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   every view is built from `sec(title, ...rows)` cards; `toggle()` for on/off; preview in a sticky `.look-sticky`.
 - Create screen: Position moved above Look; 5-column cards that fit; `.pos-detail` with stats sorted by weight as bars.
 
+## v0.30: a real career
+- `src/sim/career.js`: depth chart (`p.depth = { role, rival, trust }`; `initDepth` on every new team/stage with an
+  edge, `weeklyDepth` promotions/benchings/injuries ahead of you, `depthAfterGame`; backups get 2 late moments via
+  `momentCount` + late candidates in `createUserGame`), award race (`state.race`, `awardRace`), `seasonStakes`
+  (top 4 make the playoffs: per conference in the pros), recruiting (`recruitStars`, `visitSchool` reveals the role,
+  2 visits; `chooseCollege` uses the visit edge), combine (`runCombine`/`answerInterview`, phase `combine`,
+  `flow.finishCombine` -> `runDraft` adds `combine.bonus` to stock; draft round sets the pro depth edge),
+  `POST_CAREER` epilogues (`flow.choosePostCareer`) and `nextGenerationOpts` (newCareer `legacyBonus`, `parentName`).
+- Storylines: `src/data/events/arcs.js` (feud, love vs. grind, shady agent, rival race) chain with `effects.chain`
+  + flags. Play style: `state.playStyle` ('moments' | 'more' | 'every', from settings.playStyle).
+- Saves: `storage.exportCode/importCode` (GL2 = gzip base64), Back up / Restore modals (slots, settings, season
+  review), `requestPersist()`. Voice: `src/audio/voice.js` (speechSynthesis, settings.voice) hooked into hud.say.
+  Menu music: 'menu' song via `app.menuMusic()` on title/setup screens. Tour: `src/ui/onboarding.js` (once per career).
+- Tests: `tests/round10.test.js`.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

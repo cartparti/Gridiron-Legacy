@@ -104,6 +104,39 @@ export function exportSave(slot) {
   return storageGet(`slot${slot}`);
 }
 
+// ---- backup codes: the save squeezed (gzip when the browser can) into one copy-paste line
+const b64 = (bytes) => { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); };
+const unb64 = (str) => { const s = atob(str); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; };
+/** A backup code for a slot ("GL2." = gzip, "GL1." = plain). */
+export async function exportCode(slot) {
+  const text = storageGet(`slot${slot}`);
+  if (!text) return null;
+  const raw = new TextEncoder().encode(text);
+  if (typeof CompressionStream === 'function') {
+    try {
+      const zipped = new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+      return `GL2.${b64(zipped)}`;
+    } catch { /* fall through */ }
+  }
+  return `GL1.${b64(raw)}`;
+}
+/** Restore a backup code (or raw save JSON) into a slot. */
+export async function importCode(slot, code) {
+  try {
+    code = String(code ?? '').trim();
+    let text = code;
+    if (code.startsWith('GL2.')) text = await new Response(new Blob([unb64(code.slice(4))]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+    else if (code.startsWith('GL1.')) text = new TextDecoder().decode(unb64(code.slice(4)));
+    return importSave(slot, text);
+  } catch {
+    return false;
+  }
+}
+/** Ask the browser not to clear our saves when space is low (installed apps usually get this). */
+export function requestPersist() {
+  try { navigator.storage?.persist?.(); } catch { /* ignore */ }
+}
+
 export function importSave(slot, text) {
   try {
     const parsed = JSON.parse(text);

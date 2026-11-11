@@ -1,6 +1,7 @@
 // A headless "player" used by tests and balance scripts. It makes decisions
 // through the same flow functions as the UI.
 import { STAT_KEYS, POSITIONS } from '../data/positions.js';
+import { answerInterview } from './career.js';
 import { pick, rand, chance } from '../core/rng.js';
 import { availableActivities, maxEnergy, planCost } from './week.js';
 import { stepGame, resolveMoment, autoMoment, resolveDecision, autoDecision, resolveGameEvent, autoGameEvent } from './game.js';
@@ -88,6 +89,10 @@ export function botStep(state, strat, skill = 0.5) {
       return true;
     case 'declare':
       flow.declareForDraft(state, state.player.ovr >= 74);
+      return true;
+    case 'combine':
+      answerInterview(state, 0);
+      flow.finishCombine(state);
       return true;
     case 'draft':
       flow.ackDraft(state);
