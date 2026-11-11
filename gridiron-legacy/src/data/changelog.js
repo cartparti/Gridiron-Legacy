@@ -1,5 +1,10 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.39', date: 'Nov 11', title: 'Faces that always work', items: [
+    'Every face option and slider now blends into one smooth, natural face from the front, side and any angle in between.',
+    'No more broken extremes: maxed-out chins, cheekbones, jaws and eyes stay human (no spiky chins, pitted cheeks or bulging eyes).',
+    'The line down the side of the face is gone.',
+  ] },
   { v: '0.38', date: 'Nov 11', title: 'Human profiles', items: [
     'Side views look human now: the jaw runs back to a corner under the ear, then up to the ear, instead of one long slope to the back of the head.',
     'Ears are clearly visible. The chin and mouth line up under the nose instead of making a beak.',

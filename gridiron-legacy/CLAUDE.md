@@ -469,3 +469,7 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - v0.38 profile fix: jaw floor = near-level chin -> jaw angle at Zn -0.05, then steep ramus up to the skull base (was one
   chin->occiput slope = insect look); front wrap is cylindrical (x/z only) so the chin keeps its place; upper-lip mass and
   cheek fill beside the mouth; chin 0.03; bigger visible ears (scale 1.15-1.2, y 0.2); eyes set back (EYE_R*0.8), EYE_R 0.033.
+- v0.39 robustness: `blendSurface` (Taubin smoothing, 2 iters at seg 40, scaled by seg^2) after the face sculpt; choice x
+  slider products clamped (jaw angle 0.88-1.2, cheek bone <=1.9 / hollow <=2.3, chin size <=1.7, down <=0.025); toned-down
+  CHIN_K/CHEEK_K extremes; bigger eyes sink instead of bulging; face texture base = the side texture's gradient (no seam).
+  Stress test: every head shape with extreme sliders, front / 3/4 / profile.

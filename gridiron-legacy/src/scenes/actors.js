@@ -177,6 +177,27 @@ const headCache = {};
 const EYE_COLS = [3.1, 8.9]; // eye centres on the 12-wide face texture (wider set than before: features were bunched up)
 const gss = (dx, dy, sx, sy) => Math.exp(-(dx * dx) / (2 * sx * sx) - (dy * dy) / (2 * sy * sy));
 const sst = (e0, e1, x) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+/**
+ * Taubin smoothing (shrink-free): blends the sculpted features into one continuous surface so no combination of
+ * choices leaves a lump, crease or step. Vertices that share a position (box seams) move together.
+ */
+function blendSurface(g, iters) {
+  if (!iters) return;
+  const pos = g.attributes.position; const idx = g.index; if (!idx) return;
+  const id = new Int32Array(pos.count); const keyId = new Map(); let n = 0;
+  for (let i = 0; i < pos.count; i++) { const k = `${pos.getX(i).toFixed(4)},${pos.getY(i).toFixed(4)},${pos.getZ(i).toFixed(4)}`; let v = keyId.get(k); if (v === undefined) { v = n++; keyId.set(k, v); } id[i] = v; }
+  const P = new Float64Array(n * 3); for (let i = 0; i < pos.count; i++) { P[id[i] * 3] = pos.getX(i); P[id[i] * 3 + 1] = pos.getY(i); P[id[i] * 3 + 2] = pos.getZ(i); }
+  const nb = Array.from({ length: n }, () => new Set());
+  for (let t = 0; t < idx.count; t += 3) { const a = id[idx.getX(t)], b = id[idx.getX(t + 1)], c = id[idx.getX(t + 2)]; nb[a].add(b).add(c); nb[b].add(a).add(c); nb[c].add(a).add(b); }
+  const N = nb.map((s) => [...s]); const Q = new Float64Array(n * 3);
+  const step = (lam) => {
+    for (let v = 0; v < n; v++) { const L = N[v]; if (!L.length) continue; let sx = 0, sy = 0, sz = 0; for (const u of L) { sx += P[u * 3]; sy += P[u * 3 + 1]; sz += P[u * 3 + 2]; } const k = 1 / L.length;
+      Q[v * 3] = P[v * 3] + lam * (sx * k - P[v * 3]); Q[v * 3 + 1] = P[v * 3 + 1] + lam * (sy * k - P[v * 3 + 1]); Q[v * 3 + 2] = P[v * 3 + 2] + lam * (sz * k - P[v * 3 + 2]); }
+    P.set(Q);
+  };
+  for (let i = 0; i < iters; i++) { step(0.5); step(-0.53); }
+  for (let i = 0; i < pos.count; i++) pos.setXYZ(i, P[id[i] * 3], P[id[i] * 3 + 1], P[id[i] * 3 + 2]);
+}
 /** Average normals of vertices that share a position, so the seams of the box faces never show. */
 function smoothSeams(g) {
   const pos = g.attributes.position; const nor = g.attributes.normal; const acc = new Map();
@@ -197,8 +218,8 @@ const JAW_K = { // lift: how flat/high the underside of the jaw is (no double ch
   defined: { lift: 0.85, steep: -0.42, angle: 1.04, vee: 0.06 }, sharp: { lift: 1, steep: -0.3, angle: 0.94, vee: 0.2 },
   square: { lift: 0.9, steep: -0.45, angle: 1.2, vee: -0.1 }, soft: { lift: 0.65, steep: -0.55, angle: 1.06, vee: -0.02 },
 };
-const CHEEK_K = { normal: { bone: 1, hollow: 1, y: 6.9 }, high: { bone: 1.8, hollow: 1.5, y: 6.55 }, chiseled: { bone: 1.7, hollow: 3.2, y: 6.75 } };
-const CHIN_K = { normal: { size: 1, wide: 1, down: 0 }, strong: { size: 2.1, wide: 1.35, down: 0.02 }, pointed: { size: 1.5, wide: 0.6, down: 0.035 }, small: { size: 0.35, wide: 0.85, down: -0.015 } };
+const CHEEK_K = { normal: { bone: 1, hollow: 1, y: 6.9 }, high: { bone: 1.5, hollow: 1.3, y: 6.55 }, chiseled: { bone: 1.45, hollow: 1.9, y: 6.75 } };
+const CHIN_K = { normal: { size: 1, wide: 1, down: 0 }, strong: { size: 1.5, wide: 1.3, down: 0.01 }, pointed: { size: 1.15, wide: 0.75, down: 0.018 }, small: { size: 0.5, wide: 0.85, down: -0.01 } };
 const FACEW_K = { narrow: 0.9, normal: 1, broad: 1.09 };
 const NOSE_K = { small: { len: 0.85, wide: 0.9, tip: 0.85 }, wide: { len: 1, wide: 1.25, tip: 1.0 }, long: { len: 1.25, wide: 0.92, tip: 1.1 } };
 function faceParams(L) {
@@ -225,9 +246,11 @@ function headGeo(shape = 'oval', seg = 6, sex = 'm', fp = FP0) {
   const ck = `${shape}|${seg}|${sex}|${fpKey(fp)}`;
   const fs = fp.fs ?? fsOf(null);
   const J0 = JAW_K[fp.jaw] ?? JAW_K.defined, CK0 = CHEEK_K[fp.cheek] ?? CHEEK_K.normal, CH0 = CHIN_K[fp.chin] ?? CHIN_K.normal, NK0 = NOSE_K[fp.nose] ?? NOSE_K.small;
-  const J = { ...J0, angle: J0.angle * (1 + 0.1 * fs.jawW) };
-  const CK = { ...CK0, bone: CK0.bone * (1 + 0.7 * fs.cheekS), hollow: CK0.hollow * (1 + 0.5 * fs.cheekS) };
-  const CH = { ...CH0, size: CH0.size * (1 + 0.6 * fs.chinS), down: CH0.down + 0.012 * fs.chinS };
+  // combined choices + sliders are clamped to a human range (stacked extremes made spiky chins, pitted cheeks, flared jaws)
+  const clamp = (v, a, b2) => Math.max(a, Math.min(b2, v));
+  const J = { ...J0, angle: clamp(J0.angle * (1 + 0.08 * fs.jawW), 0.88, 1.2) };
+  const CK = { ...CK0, bone: clamp(CK0.bone * (1 + 0.5 * fs.cheekS), 0.5, 1.9), hollow: clamp(CK0.hollow * (1 + 0.3 * fs.cheekS), 0.5, 2.3) };
+  const CH = { ...CH0, size: clamp(CH0.size * (1 + 0.45 * fs.chinS), 0.3, 1.7), down: clamp(CH0.down + 0.006 * fs.chinS, -0.015, 0.025) };
   const NK = { len: NK0.len * (1 + 0.25 * fs.noseL), wide: NK0.wide * (1 + 0.25 * fs.noseW), tip: NK0.tip * (1 + 0.15 * fs.noseL) };
   const FW = FACEW_K[fp.faceW] ?? 1, EC = eyeCols(fs), LIP = 1 + 0.6 * fs.lips, BROW = -0.45 * fs.browH;
   if (headCache[ck]) return headCache[ck];
@@ -312,7 +335,7 @@ function headGeo(shape = 'oval', seg = 6, sex = 'm', fp = FP0) {
     for (const sd of [-1, 1]) f -= (fem ? 0.004 : 0.008) * CK.hollow * gss(cx - 6 - sd * 3.9, cy - 9.3, 0.85, 1.0); // hollows under them, out toward the jaw
     f += 0.006 * gss(cx - 6, cy - 9.3, 1.9, 0.9); // muzzle
     f += sw(gss(cx - 6, cy - 8.65, 1.5, 0.75), 0.013, 0.011); // the upper-lip area between nose and mouth (no deep notch under the nose)
-    for (const sd of [-1, 1]) f += 0.006 * gss(cx - 6 - sd * 2.6, cy - 8.4, 1.1, 1.3); // cheeks come forward beside the mouth, so the middle doesn't jut out alone
+    for (const sd of [-1, 1]) f += 0.004 * gss(cx - 6 - sd * 2.7, cy - 8.3, 1.5, 1.5); // cheeks come forward beside the mouth, so the middle doesn't jut out alone
     f += sw(gss(cx - 6, cy - 9.12, 1.55, 0.26), 0.008, 0.01) * LIP; // upper lip
     f += sw(gss(cx - 6, cy - 9.8, 1.3, 0.3), 0.01, 0.012) * LIP; // lower lip
     f -= 0.004 * gss(cx - 6, cy - 9.45, 1.7, 0.1); // the line between them
@@ -332,6 +355,7 @@ function headGeo(shape = 'oval', seg = 6, sex = 'm', fp = FP0) {
     const l = Math.hypot(nx, ny, nz) || 1;
     pos.setXYZ(i, pos.getX(i) + (nx / l) * f, pos.getY(i) + (ny / l) * f, pos.getZ(i) + (nz / l) * f);
   }
+  blendSurface(b, Math.round(2 * (seg / 40) ** 2));
   b.computeVertexNormals();
   smoothSeams(b);
   b.computeBoundingBox();
@@ -525,7 +549,7 @@ const HAIR_BACK = { bald: 0, buzz: 6, short: 7, fade: 5, flattop: 6, curly: 8, a
 function faceMat(L, hc, { eyeBlack = false } = {}) {
   const fem = L.gender === 'f';
   const fs = fsOf(L), EC = eyeCols(fs);
-  const key = `face7|${fs.noseL}|${fs.noseW}|${fs.browH}|${fs.eyeSpace}|${fs.lips}|${L.skin}|${L.hairStyle}|${L.hairColor}|${L.eyeColor}|${L.eyes}|${L.brows}|${L.nose}|${L.mouth}|${L.beard}|${eyeBlack}|${L.gender}|${L.lips}`;
+  const key = `face8|${fs.noseL}|${fs.noseW}|${fs.browH}|${fs.eyeSpace}|${fs.lips}|${L.skin}|${L.hairStyle}|${L.hairColor}|${L.eyeColor}|${L.eyes}|${L.brows}|${L.nose}|${L.mouth}|${L.beard}|${eyeBlack}|${L.gender}|${L.lips}`;
   // Drawn with smooth shapes on a 12x12 logical grid (rendered at 72x72): shading, real eyes, nose, lips.
   return pixMat(key, 12, 12, (g) => {
     const sk = SKIN_TONES[L.skin % SKIN_TONES.length];
@@ -533,8 +557,12 @@ function faceMat(L, hc, { eyeBlack = false } = {}) {
     const dk2 = shade(sk, -0.32);
     const ell = (x, y, rx, ry, col, rot = 0) => { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); g.fill(); };
     // skin with soft shading (cheeks lit, jaw and temples darker)
-    const base = g.createRadialGradient(6, 5.2, 1, 6, 6, 8.5);
-    base.addColorStop(0, shade(sk, 0.06)); base.addColorStop(0.65, sk); base.addColorStop(1, shade(sk, -0.12));
+    // the same base as the sides of the head (so there's no line where the face meets them), plus a soft highlight
+    // in the middle that fades out well before the edges
+    const vg = g.createLinearGradient(0, 0, 0, 12); vg.addColorStop(0, shade(sk, 0.03)); vg.addColorStop(0.7, sk); vg.addColorStop(1, shade(sk, -0.1));
+    g.fillStyle = vg; g.fillRect(0, 0, 12, 12);
+    const base = g.createRadialGradient(6, 5.4, 0.5, 6, 6, 5.2);
+    base.addColorStop(0, shade(sk, 0.06)); base.addColorStop(1, 'rgba(0,0,0,0)');
     g.fillStyle = base; g.fillRect(0, 0, 12, 12);
     for (const bx of [3.0, 9.0]) { const bg = g.createRadialGradient(bx, 7.6, 0.2, bx, 7.6, 2.2); bg.addColorStop(0, 'rgba(224,122,106,0.13)'); bg.addColorStop(1, 'rgba(224,122,106,0)'); g.fillStyle = bg; g.fillRect(0, 0, 12, 12); } // a little warmth in the cheeks
     // hairline / fringe
@@ -1523,7 +1551,7 @@ function makeEyes(anchors, L, skin, headY) {
     const e = new THREE.Group();
     const fs = fsOf(L);
     e.position.set(x, headY + y + 0.003, z + EYE_R * 0.8); // set back under the brow (a bulging eyeball looked bug-like in profile)
-    e.scale.setScalar(1 + 0.16 * fs.eyeSize);
+    e.scale.setScalar(1 + 0.12 * fs.eyeSize); e.position.z += EYE_R * 0.12 * fs.eyeSize; // bigger eyes sit deeper, never bulge
     const b = new THREE.Mesh(ball, eyeMat(EYE_COLORS[(L.eyeColor ?? 0) % EYE_COLORS.length]));
     e.add(b);
     const lidsG = new THREE.Group(); lidsG.rotation.set(0, sd * 0.18, sd * -(0.07 + 0.16 * fs.eyeTilt)); e.add(lidsG); // follow the face's curve, outer corner up
