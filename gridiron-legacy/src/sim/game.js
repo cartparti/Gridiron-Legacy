@@ -254,9 +254,11 @@ function pickType(state, g, d, yl) {
   const pos = state.player.position;
   if (pos === 'RB' && yl <= 3) return 'rb_goalline';
   if (pos === 'QB' && d.twoMin && d.chain >= 1 && yl > 34) return 'qb_hailmary';
-  if (pos === 'QB' && d.quarter === 2 && isLastDriveFor(g, g.cursor, d.side) === false && yl > 45 && chance(state, 0.08)) return 'qb_hailmary';
+  // a Hail Mary only makes sense on the last drive before the half (or the game), from far out
+  if (pos === 'QB' && (d.quarter === 2 || d.quarter === 4) && isLastDriveFor(g, g.cursor, d.side) && yl > 40 && chance(state, 0.35)) return 'qb_hailmary';
   let pool = MOMENT_POOL[pos];
   if (pos === 'WR' && yl < 18) pool = pool.filter(([t]) => t !== 'wr_jumpball');
+  if (pos === 'RB' && yl >= 92) pool = pool.filter(([t]) => t !== 'rb_screen'); // no screens from your own end zone
   return weightedPick(state, pool, ([, w]) => w)[0];
 }
 
@@ -264,6 +266,8 @@ function buildMoment(state, g, d, over = {}) {
   let yardLine = over.yardLine ?? (d.twoMin && d.chain === 0 ? randInt(state, 55, 78) : randInt(state, 12, 78));
   // Occasional goal-line situations.
   if (over.yardLine === undefined && !d.twoMin && chance(state, 0.1)) yardLine = randInt(state, 1, 4);
+  // ...and now and then you're backed up deep in your own end
+  else if (over.yardLine === undefined && !d.twoMin && chance(state, 0.06)) yardLine = randInt(state, 88, 97);
   let label = '';
   if (g.flagNext && !isDefense(state)) {
     yardLine = Math.min(95, yardLine + 15);

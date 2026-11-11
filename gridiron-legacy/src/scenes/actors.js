@@ -314,35 +314,156 @@ export const SKINS = SKIN_TONES;
 export const HAIRS = HAIR_COLORS;
 
 const INK = '#22324a';
-function drawTattoo(g, style, x0, y0, w, h) {
+/**
+ * Tattoos as real ink art (vector, soft-edged), painted on the limb's wrap-around texture. Region x0..x0+w wraps all
+ * the way round the limb (front at the middle), y0..y0+h runs down it. `aspect` = how much wider one texture unit
+ * is around the limb than along it (arms ~2.4), so designs keep their proportions.
+ */
+const INK_C = 'rgba(26,32,46,0.86)';
+function drawTattoo(g, style, x0, y0, w, h, { aspect = 2.4, seed = 1, skin = '#e0ab7f', size = 1 } = {}) {
   if (!style || style === 'none') return;
-  const P = (x, y) => px(g, x0 + x, y0 + y, INK);
-  if (style === 'band') { for (let x = 0; x < w; x++) { P(x, 2); P(x, 4); if (x % 2) P(x, 3); } }
-  else if (style === 'tribal') { for (let x = 0; x < w; x++) { P(x, 1 + (x % 3)); P(x, 4 + ((x + 1) % 3)); } }
-  else if (style === 'sleeve') { for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if ((x * 3 + y * 5) % 4 !== 0) P(x, y); }
-  else if (style === 'stars') { [[1, 1], [5, 3], [2, 6], [6, 8], [3, 10]].forEach(([x, y]) => { if (y < h) { P(x, y); P(x - 1, y); P(x + 1, y); P(x, y - 1); P(x, y + 1); } }); }
-  else if (style === 'script') { for (let y = 2; y < h - 1; y += 3) for (let x = 1; x < w - 1; x++) if ((x + y) % 3) P(x, y); }
-  else if (style === 'cross') { for (let y = 1; y < Math.min(h, 8); y++) P(Math.floor(w / 2), y); for (let x = Math.floor(w / 2) - 2; x <= Math.floor(w / 2) + 2; x++) P(x, 3); }
-  else {
-    const C = (x, y, c) => { if (x >= 0 && x < w && y >= 0 && y < h) px(g, x0 + x, y0 + y, c); };
-    if (style === 'flames') { for (let x = 0; x < w; x++) { const top = 2 + ((x * 7) % 5); for (let y = top; y < h; y++) C(x, y, y - top < 2 ? '#d9481e' : y - top < 4 ? '#e8a23a' : INK); } }
-    else if (style === 'skull') { const cx = Math.floor(w / 2) - 2; for (let y = 1; y < 5; y++) for (let x = 0; x < 5; x++) C(cx + x, y, INK); C(cx + 1, 2, '#e9e1d0'); C(cx + 3, 2, '#e9e1d0'); C(cx + 1, 5, INK); C(cx + 3, 5, INK); }
-    else if (style === 'wings') { for (let x = 0; x < w; x++) { C(x, 2 + Math.floor(Math.abs(x - w / 2) / 2), INK); C(x, 4 + Math.floor(Math.abs(x - w / 2) / 2), INK); } }
-    else if (style === 'rose') { const cx = Math.floor(w / 2); C(cx, 2, '#b3202a'); C(cx - 1, 3, '#b3202a'); C(cx + 1, 3, '#b3202a'); C(cx, 3, '#7a1218'); C(cx, 4, '#b3202a'); for (let y = 5; y < Math.min(h, 10); y++) C(cx, y, '#2f6a3a'); C(cx + 1, 7, '#2f6a3a'); }
-    else if (style === 'numbers') { for (const [x, y] of [[1, 2], [1, 3], [1, 4], [1, 5], [1, 6], [3, 2], [4, 2], [5, 2], [5, 3], [4, 4], [3, 5], [3, 6], [4, 6], [5, 6]]) C(x, y, INK); }
-    else if (style === 'geo') { for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if ((x + y) % 4 === 0 || (x - y + 40) % 4 === 0) if (y > 1 && y < 9) C(x, y, INK); }
-    else if (style === 'koi') { for (let x = 1; x < w - 1; x++) C(x, 3 + Math.round(Math.sin(x) * 1.2), '#e2702a'); C(1, 3, INK); for (let y = 5; y < Math.min(h, 12); y++) C((y * 3) % w, y, '#3a6fb5'); }
+  const cx = x0 + w / 2, cy = y0 + h / 2;
+  g.save();
+  g.beginPath(); g.rect(x0, y0, w, h); g.clip();
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  g.shadowColor = 'rgba(26,32,46,0.35)'; g.shadowBlur = 2.5; // ink bleeds a little into the skin
+  h /= size; // designs that use the region height work in the scaled units
+  const ink = (a = 1) => { g.fillStyle = INK_C; g.strokeStyle = INK_C; g.globalAlpha = a; };
+  // draw in "true shape" units (1 unit = one texture row) centred on the front of the limb
+  const local = (fn, ox = 0, oy = 0) => { g.save(); g.translate(cx + ox / aspect, cy + oy); g.scale(size / aspect, size); fn(); g.restore(); };
+  const star5 = (r, inner = 0.42) => { g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5; const rr = i % 2 ? r * inner : r; g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } g.closePath(); };
+  const W = w * aspect; // full way round, in true units
+  ink();
+  if (style === 'band') {
+    // a tribal armband all the way round: two lines with interlocking teeth between
+    g.save(); g.translate(x0, y0 + 1.2); g.scale(1 / aspect, 1);
+    g.lineWidth = 0.28; g.beginPath(); g.moveTo(0, 0); g.lineTo(W, 0); g.moveTo(0, 2.2); g.lineTo(W, 2.2); g.stroke();
+    const n = Math.round(W / 1.3);
+    for (let i = 0; i < n; i++) { const x = (i / n) * W; g.beginPath(); g.moveTo(x, 0.2); g.lineTo(x + W / n * 0.5, 1.6); g.lineTo(x + W / n, 0.2); g.closePath(); g.fill(); g.beginPath(); g.moveTo(x + W / n * 0.5, 2.0); g.lineTo(x + W / n, 0.9); g.lineTo(x + W / n * 1.5, 2.0); g.closePath(); g.fill(); }
+    g.restore();
+  } else if (style === 'tribal') {
+    local(() => {
+      const thorn = (x, y, len, ang, wid) => { g.save(); g.translate(x, y); g.rotate(ang); g.beginPath(); g.moveTo(0, -wid); g.quadraticCurveTo(len * 0.55, -wid * 1.2, len, 0); g.quadraticCurveTo(len * 0.5, wid * 0.2, 0, wid); g.closePath(); g.fill(); g.restore(); };
+      for (const sd of [-1, 1]) { thorn(0, -h * 0.3, 4.2, sd > 0 ? 0.35 : Math.PI - 0.35, 0.55); thorn(0, 0, 5, sd > 0 ? -0.25 : Math.PI + 0.25, 0.7); thorn(0, h * 0.28, 3.6, sd > 0 ? 0.6 : Math.PI - 0.6, 0.5); }
+      g.beginPath(); g.ellipse(0, 0, 0.9, 1.6, 0, 0, Math.PI * 2); g.fill();
+    });
+  } else if (style === 'sleeve') {
+    // full sleeve: Japanese-style waves and wind bars over soft grey shading
+    const sh = g.createLinearGradient(0, y0, 0, y0 + h); sh.addColorStop(0, 'rgba(26,32,46,0.32)'); sh.addColorStop(0.5, 'rgba(26,32,46,0.12)'); sh.addColorStop(1, 'rgba(26,32,46,0.3)');
+    g.fillStyle = sh; g.fillRect(x0, y0, w, h);
+    g.save(); g.translate(x0, y0); g.scale(1 / aspect, 1);
+    g.lineWidth = 0.22;
+    for (let row = 0; row < h / 1.6 + 1; row++) {
+      const y = row * 1.6 + 0.6, off = row % 2 ? 0.9 : 0;
+      for (let x = -2 + off; x < W + 2; x += 1.8) { g.beginPath(); g.arc(x, y, 0.9, Math.PI, 0); g.stroke(); g.beginPath(); g.arc(x, y, 0.5, Math.PI, 0); g.stroke(); }
+    }
+    g.lineWidth = 0.4; for (const y of [h * 0.33, h * 0.7]) { g.beginPath(); g.moveTo(W * 0.15, y); g.bezierCurveTo(W * 0.35, y - 1.2, W * 0.6, y + 1.2, W * 0.85, y); g.stroke(); }
+    g.restore();
+  } else if (style === 'stars') {
+    local(() => {
+      for (const [x, y, r] of [[-1.6, -h * 0.28, 1.25], [1.8, -h * 0.02, 0.95], [-0.6, h * 0.26, 1.1]]) {
+        g.save(); g.translate(x, y);
+        star5(r); g.lineWidth = 0.16; g.stroke();
+        // nautical star: alternate halves filled
+        for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * 2 * Math.PI / 5; g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(a) * r, Math.sin(a) * r); g.lineTo(Math.cos(a + Math.PI / 5) * r * 0.42, Math.sin(a + Math.PI / 5) * r * 0.42); g.closePath(); g.fill(); }
+        g.restore();
+      }
+    });
+  } else if (style === 'script') {
+    // a word written down the inside of the arm
+    const words = ['Loyalty', 'Blessed', 'Family', 'Legacy', 'Faith'];
+    local(() => { g.rotate(Math.PI / 2); g.font = `italic 600 ${Math.min(2.2, w * aspect * 0.12)}px Georgia, serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(words[seed % words.length], 0, 0); });
+  } else if (style === 'cross') {
+    local(() => {
+      g.lineWidth = 0.12;
+      for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; g.beginPath(); g.moveTo(Math.cos(a) * 1.4, Math.sin(a) * 1.4 - 0.8); g.lineTo(Math.cos(a) * 3, Math.sin(a) * 3 - 0.8); g.stroke(); }
+      g.fillRect(-0.45, -3.6, 0.9, 7); g.fillRect(-1.9, -1.9, 3.8, 0.9);
+      g.globalAlpha = 0.5; g.fillStyle = '#f2e9dc'; g.fillRect(-0.15, -3.2, 0.3, 6.2); g.globalAlpha = 1;
+    });
+  } else if (style === 'flames') {
+    // flames licking up from the wrist (bottom of the region), round the front of the arm
+    g.save(); g.translate(x0, y0); g.scale(1 / aspect, 1);
+    const n = 7;
+    for (let i = 0; i < n; i++) {
+      const x = W * (0.12 + 0.76 * i / (n - 1)), top = h * (0.25 + 0.3 * ((i * 37 + seed) % 5) / 5);
+      for (const [col, k] of [['rgba(214,72,30,0.8)', 1], ['rgba(236,160,58,0.85)', 0.62]]) {
+        g.fillStyle = col; g.beginPath(); g.moveTo(x - 1.1 * k, h); g.quadraticCurveTo(x - 1.2 * k, top + (h - top) * 0.45, x + 0.3 * k, top + (h - top) * (1 - k) * 0.6);
+        g.quadraticCurveTo(x + 0.2 * k, top + (h - top) * 0.55, x + 1.1 * k, h); g.closePath(); g.fill();
+      }
+    }
+    ink(); g.lineWidth = 0.14; g.globalAlpha = 0.9;
+    for (let i = 0; i < n; i++) { const x = W * (0.12 + 0.76 * i / (n - 1)), top = h * (0.25 + 0.3 * ((i * 37 + seed) % 5) / 5); g.beginPath(); g.moveTo(x - 1.1, h); g.quadraticCurveTo(x - 1.2, top + (h - top) * 0.45, x + 0.3, top); g.quadraticCurveTo(x + 0.2, top + (h - top) * 0.55, x + 1.1, h); g.stroke(); }
+    g.restore();
+  } else if (style === 'skull') {
+    local(() => {
+      g.beginPath(); g.ellipse(0, -0.6, 2.1, 2.2, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.roundRect?.(-1.25, 0.9, 2.5, 1.5, 0.4); if (!g.roundRect) g.rect(-1.25, 0.9, 2.5, 1.5); g.fill();
+      // eye sockets, nose and the gaps between the teeth show skin through the ink
+      g.shadowBlur = 0; g.globalAlpha = 1; g.fillStyle = skin;
+      for (const sd of [-1, 1]) { g.beginPath(); g.ellipse(sd * 0.85, -0.5, 0.62, 0.72, 0, 0, Math.PI * 2); g.fill(); }
+      g.beginPath(); g.moveTo(0, 0.25); g.lineTo(-0.3, 0.85); g.lineTo(0.3, 0.85); g.closePath(); g.fill();
+      for (let i = -2; i <= 2; i++) g.fillRect(i * 0.48 - 0.06, 1.55, 0.12, 0.85);
+      g.globalAlpha = 0.5; for (let i = -2; i <= 2; i++) g.fillRect(i * 0.5 - 0.18, 1.1, 0.36, 0.18);
+    });
+  } else if (style === 'wings') {
+    local(() => {
+      for (const sd of [-1, 1]) for (let i = 0; i < 5; i++) {
+        g.save(); g.scale(sd, 1); g.translate(0.5, -0.6 + i * 0.75); g.rotate(-0.35 + i * 0.16);
+        g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(2.6 - i * 0.25, -0.9, 4.4 - i * 0.55, -0.15); g.quadraticCurveTo(2.4 - i * 0.2, 0.35, 0, 0.45); g.closePath(); g.fill();
+        g.restore();
+      }
+    });
+  } else if (style === 'rose') {
+    local(() => {
+      g.fillStyle = 'rgba(54,112,62,0.85)';
+      for (const [x, y, r] of [[-1.7, 1.4, 0.6], [1.6, 1.8, -0.5]]) { g.save(); g.translate(x, y); g.rotate(r); g.beginPath(); g.ellipse(0, 0, 1.2, 0.5, 0, 0, Math.PI * 2); g.fill(); g.restore(); }
+      g.fillRect(-0.12, 1, 0.24, h * 0.4);
+      g.fillStyle = 'rgba(178,32,42,0.88)'; g.beginPath(); g.arc(0, -0.2, 1.7, 0, Math.PI * 2); g.fill();
+      ink(); g.lineWidth = 0.14;
+      for (let i = 0; i < 4; i++) { g.beginPath(); g.arc(0, -0.2, 0.35 + i * 0.36, i * 1.3, i * 1.3 + Math.PI * 1.35); g.stroke(); }
+      g.beginPath(); g.arc(0, -0.2, 1.7, 0, Math.PI * 2); g.stroke();
+    });
+  } else if (style === 'numbers') {
+    local(() => {
+      g.font = `900 ${Math.min(4.4, h * 0.55)}px Impact, 'Arial Black', sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      const txt = String(10 + (seed % 89));
+      g.lineWidth = 0.3; g.strokeText(txt, 0, 0); g.globalAlpha = 0.35; g.fillText(txt, 0, 0);
+    });
+  } else if (style === 'geo') {
+    local(() => {
+      g.lineWidth = 0.13;
+      for (let ring = 1; ring <= 3; ring++) { g.beginPath(); for (let i = 0; i <= 6; i++) { const a = i * Math.PI / 3 + ring * 0.26; g.lineTo(Math.cos(a) * ring * 1.05, Math.sin(a) * ring * 1.05); } g.stroke(); }
+      for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(a) * 3.3, Math.sin(a) * 3.3); g.stroke(); }
+      for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + Math.PI / 6; g.beginPath(); g.arc(Math.cos(a) * 2.2, Math.sin(a) * 2.2, 0.28, 0, Math.PI * 2); g.fill(); }
+    });
+  } else if (style === 'koi') {
+    local(() => {
+      g.save(); g.rotate(0.5);
+      g.fillStyle = 'rgba(226,112,42,0.88)'; g.beginPath(); g.ellipse(0, 0, 1.2, 3, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.moveTo(0, 2.6); g.quadraticCurveTo(-1.6, 4.4, -1.2, 4.6); g.quadraticCurveTo(0, 3.8, 1.2, 4.6); g.quadraticCurveTo(1.6, 4.4, 0, 2.6); g.fill();
+      g.fillStyle = 'rgba(245,240,230,0.8)'; g.beginPath(); g.ellipse(0.3, -0.8, 0.5, 0.9, 0, 0, Math.PI * 2); g.fill();
+      ink(); g.lineWidth = 0.12;
+      g.beginPath(); g.ellipse(0, 0, 1.2, 3, 0, 0, Math.PI * 2); g.stroke();
+      for (let y = -1.6; y < 2.2; y += 0.6) { g.beginPath(); g.arc(0, y, 0.7, 0.3, Math.PI - 0.3); g.stroke(); }
+      g.beginPath(); g.arc(-0.45, -2.2, 0.16, 0, Math.PI * 2); g.fill();
+      g.restore();
+      g.strokeStyle = 'rgba(58,111,181,0.75)'; g.lineWidth = 0.2;
+      for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(-2.6 + i * 2.4, 4.4, 1.1, Math.PI, 0); g.stroke(); }
+    });
   }
+  g.restore();
 }
 function neckMat(skin, tat) {
-  return pixMat(`neck|${skin}|${tat}`, 6, 4, (g) => {
+  // neck: wraps round the neck (front at the middle), rows run down it; designs sit on the side of the neck
+  return pixMat(`neck2|${skin}|${tat}`, 6, 4, (g) => {
     px(g, 0, 0, skin, 6, 4);
-    if (tat === 'script') { px(g, 1, 1, INK, 4, 1); px(g, 2, 2, INK, 2, 1); }
-    else if (tat === 'stars') { px(g, 1, 1, INK); px(g, 4, 2, INK); px(g, 2, 3, INK); }
-    else if (tat === 'wings') { px(g, 0, 1, INK, 2, 1); px(g, 4, 1, INK, 2, 1); px(g, 1, 2, INK); px(g, 4, 2, INK); }
-    else if (tat === 'rose') { px(g, 2, 1, '#b3202a', 2, 2); px(g, 3, 3, '#2f6a3a'); }
-    else if (tat === 'cross') { px(g, 3, 0, INK, 1, 4); px(g, 2, 1, INK, 3, 1); }
-  }, { skin: true });
+    if (!tat || tat === 'none') return;
+    g.save(); g.translate(-1.2, 0); // shift toward the side of the neck
+    if (tat === 'script') { g.translate(0, 0.4); drawTattoo(g, 'script', 1.8, 1.4, 2.4, 2.2, { aspect: 1, seed: skin.length, skin, size: 0.6 }); }
+    else if (tat === 'stars') drawTattoo(g, 'stars', 1.6, 1.3, 2.8, 2.4, { aspect: 1.1, skin, size: 0.55 });
+    else drawTattoo(g, tat, 1.6, 1.2, 2.8, 2.6, { aspect: 1.1, skin, size: 0.5 });
+    g.restore();
+  }, { skin: true, scale: 32 });
 }
 
 // ---- head textures (12x12 pixels per face)
@@ -471,19 +592,19 @@ function topMat(L, hc) {
 
 /** Arm texture: 8x16. top rows = sleeve (jersey/shirt) unless bare, rest skin + tattoo or arm sleeve. */
 function armMat(skin, sleeveCol, trim, tattoo, part, armSleeve, rows = 7) {
-  const key = `arm|${skin}|${sleeveCol}|${trim}|${tattoo}|${part}|${armSleeve}|${rows}`;
+  const key = `arm2|${skin}|${sleeveCol}|${trim}|${tattoo}|${part}|${armSleeve}|${rows}`;
   return pixMat(key, 8, 16, (g) => {
     px(g, 0, 0, skin, 8, 16);
     if (part === 'upper') {
-      drawTattoo(g, tattoo, 0, rows, 8, 16 - rows);
+      drawTattoo(g, tattoo, 0, rows, 8, 16 - rows, { aspect: 2.6, seed: rows, skin });
       if (armSleeve) px(g, 0, rows - 1, armSleeve, 8, 17 - rows);
       px(g, 0, 0, sleeveCol, 8, rows);
       if (trim && rows > 3) px(g, 0, rows - 2, trim, 8, 1);
     } else {
-      drawTattoo(g, tattoo, 0, 1, 8, 13);
+      drawTattoo(g, tattoo, 0, 1.2, 8, 12.4, { aspect: 2.2, seed: 3, skin });
       if (armSleeve) px(g, 0, 0, armSleeve, 8, 15);
     }
-  }, { soft: true, skin: true });
+  }, { skin: true, scale: 24 });
 }
 
 /** Jersey torso texture with stripes and a big blocky number. */

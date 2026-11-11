@@ -80,7 +80,8 @@ test('penalty yards move the ball and can give a first down, without counting in
   for (let i = 0; i < 50; i++) { r = stepGame(st); if (r.type === 'moment') break; if (r.type === 'gameEvent') resolveGameEvent(st, 0); if (r.type === 'decision') resolveDecision(st, false); }
   assert.equal(r.type, 'moment');
   const before = st.game.userStats.rushYds;
-  const res = resolveMoment(st, { complete: true, yards: 2, penYds: 15, autoFirst: true, flag: true, quality: 0.5, text: 'Facemask! 15 more yards.' });
+  // a penalty big enough to reach the end zone, so the drive ends here (no simulated carries mixed into the stats)
+  const res = resolveMoment(st, { complete: true, yards: 2, penYds: 99, autoFirst: true, flag: true, quality: 0.5, text: 'Facemask! Half the distance.' });
   assert.equal(st.game.userStats.rushYds, before + 2);
   assert.ok(res.outcome);
 });

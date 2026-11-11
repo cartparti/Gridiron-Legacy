@@ -390,6 +390,19 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Shading lessons: a steep nose underside, cheek hollows at nose height, or a drooping "long" nose all cast a band
   under the nose that reads as a mustache. Keep the nose easing into the lip and the hollows low/out toward the jaw.
 
+## v0.28: real tattoos + situational football
+- (v0.27 MakeHuman heads were reverted; heads are the v0.26 sculpted ones.)
+- Tattoos: `drawTattoo(g, style, x0, y0, w, h, { aspect, seed, skin, size })` paints vector ink art (soft bleed) on the
+  limb's wrap-around texture; `aspect` corrects for the limb being wider round than its texture is tall (arms ~2.2-2.6),
+  `size` scales designs for small areas (neck). Arms render crisp at 24x (`armMat` key `arm2`), neck at 32x (`neck2`).
+- Plays: `situationOf(m)` (goal line <=5, red zone <=20, backed up >=88, short <=2, long) and `playFit(mode, pl, s)` score
+  every play; `dealPlays(mode, call, m)` returns the best fits (with variety). `RED` pools hold red-zone/goal-line
+  concepts (red: true, never offered outside the red zone). The picker shows the situation tag.
+- Engine: routes are scaled to fit the end zone (`room = yardLine + 8.6`, break points scale too); backed up -> `under`
+  centre (own goal < 3 yds) or pistol (< 6.5) instead of shotgun.
+- Sim: Hail Mary only on the last drive of a half from 40+ out; ~6% of moments are backed up (88-97); no RB screens from
+  your own end zone.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

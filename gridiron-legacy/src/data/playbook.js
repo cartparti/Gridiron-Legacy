@@ -7,6 +7,8 @@
 export const OFF_FORMATION = {
   shotgun: { QB: [0, 5], RB: [-1.6, 5.2], X: [-12, 0.4], Z: [11, 0.4], S: [-6, 0.6], TE: [4.6, 0.9] },
   pistol: { QB: [0, 3.5], RB: [0, 6.5], X: [-12, 0.4], Z: [11, 0.4], S: [-6, 0.6], TE: [4.6, 0.9] },
+  // under centre: for when you're backed up against your own goal line
+  under: { QB: [0, 1.2], RB: [0, 4.4], X: [-12, 0.4], Z: [11, 0.4], S: [-6, 0.6], TE: [4.6, 0.9] },
 };
 export const OL_X = [-3.2, -1.6, 0, 1.6, 3.2];
 
@@ -379,20 +381,103 @@ for (const [mode, calls] of Object.entries(BIG)) for (const [call, list] of Obje
   for (const pl of list) if (!have.has(pl.name)) PLAYS[mode][call].push(pl);
 }
 
+// ---------------- situational football: the plays you're offered fit where you are on the field
+// Red-zone / goal-line concepts (red: true) only show up near the end zone; routes are built for ~10-15 yards.
+const RED = {
+  pass: [
+    { name: 'Fade-Stop', desc: 'Back-shoulder fades to both corners.', form: 'shotgun', red: true, routes: { X: [[-2, -12]], Z: [[2, -12]], S: [[0, -4], [4, -6]], TE: [[0, -3], [-3, -4]], RB: [[3, -1]] } },
+    { name: 'Slant-Flat', desc: 'Quick slant inside, flat outside. In and out.', form: 'shotgun', red: true, routes: { X: [[0, -2], [5, -6]], Z: [[0, -2], [-5, -6]], S: [[-2, 0], [-6, -1]], TE: [[0, -4], [-1, -4]], RB: [[4, -1]] } },
+    { name: 'Pylon Corner', desc: 'Corner to the pylon over a flat route.', form: 'shotgun', red: true, routes: { X: [[0, -6], [-6, -12]], Z: [[0, -4], [0, -3]], S: [[0, -6], [6, -11]], TE: [[0, -1], [5, -2]], RB: [[-4, -1]] } },
+    { name: 'Rub Cross', desc: 'Crossers rub off each other at the goal line.', form: 'shotgun', red: true, routes: { X: [[0, -1], [12, -2]], Z: [[0, -3], [-10, -4]], S: [[0, -7], [3, -9]], TE: [[0, -5], [0, -4]], RB: [[3, -1]] } },
+    { name: 'Smash Corner', desc: 'Hitch outside, corner from the slot.', form: 'shotgun', red: true, routes: { X: [[0, -4], [0, -3]], Z: [[0, -4], [0, -3]], S: [[0, -5], [-6, -11]], TE: [[0, -5], [6, -11]], RB: [[3, -1]] } },
+    { name: 'TE Leak', desc: 'Tight end blocks, then leaks to the back line.', form: 'pistol', red: true, routes: { X: [[0, -6], [1, -5]], Z: [[0, -6], [-1, -5]], S: [[0, -1], [-6, -2]], TE: [[0, -2], [-2, -3], [2, -11]], RB: [[4, -1]] } },
+  ],
+  route: [
+    { name: 'Fade', desc: 'Win the corner of the end zone.', route: [[2, -12]], red: true },
+    { name: 'Back Shoulder', desc: 'Stop late; the ball comes to your back shoulder.', route: [[1.5, -10], [2, -9]], sit: true, red: true },
+    { name: 'Corner', desc: 'Push inside, break to the pylon.', route: [[0, -5], [6, -11]], red: true },
+    { name: 'Drag Pick', desc: 'Underneath the rub, across the goal line.', route: [[0, -1], [-12, -3]], red: true },
+    { name: 'Whip', desc: 'Fake in, whip back out.', route: [[0, -4], [-3, -5], [3, -5]], red: true },
+  ],
+  run: [
+    { name: 'Goal Line Dive', desc: 'Behind the center. Push the pile.', form: 'pistol', hole: [0, 0], red: true },
+    { name: 'Power O', desc: 'Guard pulls. Hit it off tackle.', form: 'pistol', hole: [2.4, 2.4], red: true },
+    { name: 'Pylon Toss', desc: 'Pitch it and race the corner to the pylon.', form: 'pistol', hole: [8, 10], pitch: true, red: true },
+    { name: 'Leap', desc: 'Go over the top of the pile.', form: 'pistol', hole: [0.4, 0.4], red: true },
+  ],
+  cover: [
+    { name: 'Goal Line Man', desc: 'Press him. No room behind you anyway.', coverage: 'man', user: 'man', press: true, red: true },
+    { name: 'Red Zone Bracket', desc: 'Squeeze the flat; the end line is your help.', coverage: 'zone', user: 'flat', red: true },
+    { name: 'Goal Line Zero', desc: 'Everyone comes. Win now.', coverage: 'man', user: 'blitz', blitz: true, press: true, red: true },
+  ],
+  rush: [{ name: 'Goal Line Surge', desc: 'Low pad level, knock him back.', blitz: true, red: true }],
+  runStop: [{ name: 'Goal Line Plug', desc: 'Get under him and plug the A gap.', red: true }],
+  runD: [{ name: 'Goal Line Fill', desc: 'Fill the edge at the goal line.', red: true }],
+};
+const RED_SPLIT = { safe: [0, 2], balanced: [2, 4], risky: [4, 9] };
+
+/** Down, distance and field position, plus a short tag for the play picker. */
+export function situationOf(m = {}) {
+  const yl = m.yardLine ?? 50, down = m.down ?? 1, dist = Math.min(m.distance ?? 10, yl);
+  const s = { yl, down, dist, goalLine: yl <= 5, redZone: yl <= 20, backedUp: yl >= 88, short: dist <= 2, long: (dist >= 8 && down >= 3) || dist >= 14 };
+  const ord = ['', '1st', '2nd', '3rd', '4th'][down] ?? '';
+  const dd = `${ord} & ${yl <= (m.distance ?? 10) ? 'Goal' : dist}`;
+  s.tag = s.goalLine ? `GOAL LINE · ${dd}` : s.redZone ? `RED ZONE · ${dd}` : s.backedUp ? `BACKED UP · ${dd}` : s.short && down >= 3 ? `SHORT YARDAGE · ${dd}` : s.long ? `LONG YARDAGE · ${dd}` : dd;
+  return s;
+}
+/** How deep a play goes (the deepest receiver route), in yards. */
+export function depthOf(pl) {
+  if (pl.route) return Math.max(...pl.route.map(([, z]) => -z));
+  if (pl.routes) return Math.max(0, ...Object.entries(pl.routes).filter(([k]) => k !== 'RB').map(([, r]) => Math.max(...r.map(([, z]) => -z))));
+  return 0;
+}
+const insideRun = (pl) => !!pl.hole && !pl.pitch && Math.abs((pl.hole[0] + pl.hole[1]) / 2) < 1.6;
+const isDraw = (pl) => /draw|delay|counter/i.test(pl.name);
+/** How well a play fits the situation (higher = better). */
+export function playFit(mode, pl, s) {
+  let f = 0;
+  if (pl.red && !s.redZone) return -9; // goal-line stuff stays near the goal line
+  const d = depthOf(pl);
+  if (mode === 'pass' || mode === 'route') {
+    if (s.redZone) { if (pl.red) f += s.goalLine ? 3.2 : 2; if (d > s.yl + 18) f -= s.goalLine ? 3 : 1.5; }
+    else {
+      if (s.long) { if (d < s.dist) f -= 2.5; else if (d >= s.dist + 2) f += 1; }
+      if (s.short) { if (d <= 7) f += 1.5; if (d >= 20) f -= 1.5; }
+      if (s.backedUp && d >= 25) f -= 1;
+    }
+  } else if (mode === 'run') {
+    if (s.short || s.goalLine) { if (insideRun(pl) && !isDraw(pl)) f += 2; if (pl.red) f += 2; if (isDraw(pl)) f -= 1.5; }
+    if (s.long) { if (insideRun(pl) && !isDraw(pl)) f -= 1; if (isDraw(pl) || pl.pitch) f += 1; }
+    if (s.backedUp && pl.pitch) f -= 1.5; // no tosses from your own end zone
+  } else if (mode === 'cover') {
+    const prevent = /prevent/i.test(pl.name);
+    if (prevent && !(s.long && !s.redZone)) f -= 5;
+    if (s.redZone) { if (pl.coverage === 'man') f += 1; if (pl.red) f += 2.5; }
+    if (s.long && !s.redZone) { if (pl.coverage === 'zone' && pl.user === 'deep') f += 1.5; if (pl.blitz) f -= 0.6; }
+    if (s.short) { if (pl.press || pl.blitz) f += 1.2; }
+  } else {
+    if ((s.short || s.goalLine) && (pl.blitz || pl.red)) f += 1.2;
+    if (s.long && mode === 'rush' && pl.blitz) f += 0.6;
+  }
+  return f;
+}
+
 // Recently shown plays (per mode) are skipped, so you don't keep seeing the same three.
 const recent = {};
-/** Three fresh plays for this snap: two from your play call, one wildcard from a neighbouring call. */
-export function dealPlays(mode, call) {
+/** Three plays for this snap that fit the situation: two from your play call, one wildcard. */
+export function dealPlays(mode, call, m = {}) {
+  const s = situationOf(m);
   const seen = (recent[mode] ??= []);
-  const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-  const fresh = (list) => { const f = list.filter((x) => !seen.includes(x.name)); return shuffle((f.length >= 3 ? f : list).slice()); };
-  const own = fresh(PLAYS[mode][call]);
+  const red = (RED[mode] ?? []).slice(...(mode === 'pass' || mode === 'route' || mode === 'run' || mode === 'cover' ? RED_SPLIT[call] : [0, 9]));
+  const rank = (list) => list.map((pl) => ({ pl, sc: playFit(mode, pl, s) + Math.random() * 1.2 - (seen.includes(pl.name) ? 1.4 : 0) })).sort((a, b) => b.sc - a.sc);
+  const own = rank(PLAYS[mode][call].concat(s.redZone ? red : []));
   const other = call === 'balanced' ? (Math.random() < 0.5 ? 'safe' : 'risky') : 'balanced';
-  const wild = fresh(PLAYS[mode][other].filter((x) => !own.slice(0, 2).some((o) => o.name === x.name)));
-  const out = [own[0], own[1], Math.random() < 0.5 && wild[0] ? wild[0] : own[2]].filter(Boolean);
+  const wild = rank(PLAYS[mode][other].concat(s.redZone ? RED[mode] ?? [] : []).filter((x) => !own.slice(0, 2).some((o) => o.pl.name === x.name)));
+  const third = wild[0] && (!own[2] || wild[0].sc > own[2].sc) ? wild[0] : own[2];
+  const out = [own[0], own[1], third].filter(Boolean).map((x) => x.pl);
   seen.push(...out.map((x) => x.name));
   while (seen.length > 12) seen.shift();
-  return shuffle(out);
+  return out;
 }
 
 export const playCount = (mode) => Object.values(PLAYS[mode]).reduce((a, l) => a + l.length, 0);

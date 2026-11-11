@@ -13,7 +13,7 @@ import { xrayCard } from './xray.js';
 import { createBallPhysics, orientInFlight } from './ballphys.js';
 import { rig, endPlay, finalize, weatherFx, gaussR } from '../minigames/common.js';
 import { makeControls } from './controls.js';
-import { PLAYS, OFF_FORMATION, OL_X, playMode, dealPlays } from '../../data/playbook.js';
+import { PLAYS, OFF_FORMATION, OL_X, playMode, dealPlays, situationOf } from '../../data/playbook.js';
 import { sfx } from '../../audio/sfx.js';
 import { line } from '../../data/commentary.js';
 import { POS_SIZE } from '../../data/looks.js';
@@ -102,7 +102,8 @@ export function freePlay(ctx) {
   const runO = mode === 'run' || mode === 'runD' || mode === 'runStop'; // the offense runs the ball
   const passD = mode === 'cover' || mode === 'rush'; // you defend a pass play
   const dtMode = mode === 'rush' || mode === 'runStop';
-  let plays = dealPlays(mode, call);
+  let plays = dealPlays(mode, call, m);
+  const sit = situationOf(m);
   if (type === 'qb_hailmary') plays = [{ name: 'Hail Mary', desc: 'Everyone to the end zone. Throw it up!', form: 'shotgun', hail: true, routes: { X: [[0, goalZ - 3]], Z: [[0, goalZ - 3]], S: [[2, goalZ - 4]], TE: [[-2, goalZ - 2]], RB: [[3, -2]] } }];
   if (type === 'rb_screen') plays = [
     { name: 'Screen Left', desc: 'Leak out left, catch it, follow the linemen.', form: 'shotgun', screen: -1 },
@@ -156,7 +157,11 @@ export function freePlay(ctx) {
   let callForBall = false;
 
   const buildFormation = () => {
-    const formName = play.form ?? 'shotgun';
+    // backed up against your own goal line: no shotgun from inside your own end zone
+    const ownGoal = 100 - m.yardLine; // z of your own goal line (behind the line of scrimmage)
+    let formName = play.form ?? 'shotgun';
+    if (ownGoal < 3 && !play.hail) formName = 'under';
+    else if (ownGoal < 6.5 && formName === 'shotgun') formName = 'pistol';
     const F = OFF_FORMATION[formName];
     const ox = (x) => x;
     // offense
@@ -197,10 +202,15 @@ export function freePlay(ctx) {
       const concept = PLAYS.pass[call][Math.floor(Math.random() * 3)];
       return concept.routes[slot];
     };
+    // near the end zone the routes are fitted to the room you have (break points scale with them), so receivers
+    // finish inside the end zone instead of piling up against the end line
+    const room = m.yardLine + 8.6;
     for (const r of receivers) {
       const pts = routeFor(r.slot);
       if (!pts) continue;
-      r.route = [{ x: r.pos.x, z: r.pos.z }, ...pts.map(([dx, dz2]) => clampPos({ x: r.pos.x + dx, z: dz2 }))];
+      const deepest = Math.max(1, ...pts.map(([, z]) => -z));
+      const k = deepest > room && !play.hail ? room / deepest : 1;
+      r.route = [{ x: r.pos.x, z: r.pos.z }, ...pts.map(([dx, dz2]) => clampPos({ x: r.pos.x + dx * (k < 1 ? 0.6 + 0.4 * k : 1), z: dz2 * k }))];
       r.sit = mode === 'route' && r.slot === 'Z' ? !!play.sit : false;
     }
     if (play.screen !== undefined) { rb.route = null; }
@@ -217,7 +227,7 @@ export function freePlay(ctx) {
   const showPicker = () => {
     phase = 'pick';
     playMusic(opts.song ?? ['hype', 'charge', 'groove'][Math.floor(Math.random() * 3)], { vol: 0.75 });
-    hud.instr(m.defense ? 'Pick a defensive call' : 'Pick a play');
+    hud.instr(`${sit.tag} · ${m.defense ? 'Pick a defensive call' : 'Pick a play'}`);
     const box = document.createElement('div');
     box.className = 'fc-plays';
     plays.forEach((pl, i) => {
