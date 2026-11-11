@@ -77,10 +77,11 @@ export function openModal(content, { onClose, dismissable = false } = {}) {
   const overlay = document.getElementById('overlay');
   const back = h('div.modal-back', { role: 'dialog', 'aria-modal': 'true' });
   const box = h('div.modal', content);
+  if (dismissable) box.prepend(h('button.modal-x', { 'aria-label': 'Close', onclick: () => close() }, '×'));
   back.append(box);
   if (dismissable) back.addEventListener('click', (e) => { if (e.target === back) close(); });
   overlay.append(back);
-  const first = box.querySelector('button');
+  const first = box.querySelector('button:not(.modal-x)');
   if (first) setTimeout(() => first.focus({ preventScroll: true }), 50);
   function close() {
     back.remove();

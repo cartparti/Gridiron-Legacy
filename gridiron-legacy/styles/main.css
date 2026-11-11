@@ -1040,3 +1040,35 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 .tour-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
 .tour-dots span.on { background: var(--accent); width: 20px; border-radius: 99px; }
 .tour .row { width: 100%; }
+
+/* ---- v0.32: reachable Done / Back buttons ---- */
+/* Standalone screens start under the phone status bar (black-translucent), so pad for it. */
+#app > .screen:first-child { padding-top: calc(16px + var(--safe-top)); }
+/* Screen headers with a Done/Back button stay pinned while scrolling. */
+.screen > .row.between:first-child:has(> h1) {
+  position: sticky; top: 0; z-index: 4;
+  margin: calc(-16px - var(--safe-top)) -16px 0; padding: calc(10px + var(--safe-top)) 16px 10px;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.screen > .row.between:first-child > .btn.small { min-height: 44px; min-width: 76px; font-size: 0.82rem; }
+/* Modals: fit the real visible height and keep the closing buttons on screen. */
+.modal { max-height: 92vh; max-height: 92dvh; overscroll-behavior: contain; position: relative; }
+.modal > :last-child.row:has(> .btn),
+.modal > div:last-child > :last-child.row:has(> .btn) {
+  position: sticky; bottom: calc(-22px - var(--safe-bottom)); z-index: 2;
+  margin-bottom: calc(-22px - var(--safe-bottom)); padding: 14px 0 calc(16px + var(--safe-bottom));
+  background: linear-gradient(to bottom, transparent, var(--card) 14px);
+}
+.modal > :last-child.btn,
+.modal > div:last-child > :last-child.btn {
+  position: sticky; bottom: calc(-6px - var(--safe-bottom)); z-index: 2;
+  box-shadow: 0 0 0 10px var(--card), 0 -22px 14px var(--card);
+}
+.modal > :last-child.btn.ghost,
+.modal > div:last-child > :last-child.btn.ghost { background: var(--card2); }
+.modal-x {
+  position: sticky; top: -10px; float: right; z-index: 3; margin: -6px -8px 0 8px;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line2);
+  background: var(--card2); color: var(--text); font-size: 1.3rem; line-height: 1; cursor: pointer;
+}

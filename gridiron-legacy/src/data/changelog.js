@@ -1,5 +1,10 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.32', date: 'Nov 11', title: 'Easier buttons', items: [
+    'Done and Back buttons no longer hide under your phone\'s clock and battery bar, and they stay at the top while you scroll.',
+    'Menus keep their Done, Save and Cancel buttons pinned at the bottom, so you never have to scroll to find them.',
+    'Pop-up menus have an X in the corner to close them quickly.',
+  ] },
   { v: '0.31', date: 'Nov 11', title: 'Balance, physics and game day', items: [
     'Every position is balanced: QB, RB, WR, CB and DT careers now earn about the same awards and Hall of Fame chances.',
     'Game grades are fair at every position: a great run stop or a big day on the ground counts as much as a 300-yard passing game.',
