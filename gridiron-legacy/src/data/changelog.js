@@ -1,5 +1,10 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.35', date: 'Nov 11', title: 'More defined faces', items: [
+    'Faces are less round and pudgy: heads are a little shorter and less balloon-shaped.',
+    'Guys get a real jaw angle: the sides of the face come straight down and then turn in to the chin.',
+    'Stronger cheekbones with soft hollows under them, and less puffiness around the mouth.',
+  ] },
   { v: '0.34', date: 'Nov 11', title: 'See every change', items: [
     'Your athlete stays on screen the whole time you customize, even while you scroll through the options.',
     'The camera follows what you change: your face for face and hair, your chest and arms for jerseys, tattoos and gloves, your legs for socks, braces and cleats.',

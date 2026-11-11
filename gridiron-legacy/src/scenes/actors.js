@@ -170,8 +170,9 @@ function geo() {
 }
 // soft contact shadow under each player (radial gradient), cheaper than real shadow maps
 /** Head shapes: proportions (w, h, d), corner rounding, jaw taper. Real heads are taller and deeper than wide. */
-const HEAD_DIMS = { oval: [0.3, 0.4, 0.37, 0.13, 0.74], round: [0.32, 0.38, 0.37, 0.15, 0.84], square: [0.31, 0.4, 0.36, 0.1, 0.92],
-  long: [0.29, 0.43, 0.36, 0.12, 0.74], wide: [0.33, 0.38, 0.37, 0.12, 0.86], heart: [0.31, 0.4, 0.36, 0.13, 0.62] };
+// (v0.35: a little shorter and less rounded: tall, soft heads read as pudgy balloons)
+const HEAD_DIMS = { oval: [0.3, 0.375, 0.36, 0.1, 0.74], round: [0.315, 0.36, 0.36, 0.12, 0.84], square: [0.31, 0.375, 0.355, 0.08, 0.92],
+  long: [0.29, 0.405, 0.355, 0.095, 0.74], wide: [0.325, 0.36, 0.36, 0.095, 0.86], heart: [0.305, 0.375, 0.355, 0.1, 0.62] };
 const headCache = {};
 const EYE_COLS = [3.1, 8.9]; // eye centres on the 12-wide face texture (wider set than before: features were bunched up)
 const gss = (dx, dy, sx, sy) => Math.exp(-(dx * dx) / (2 * sx * sx) - (dy * dy) / (2 * sy * sy));
@@ -238,12 +239,18 @@ function headGeo(shape = 'oval', seg = 6, sex = 'm', fp = FP0) {
   for (let i = 0; i < pos.count; i++) {
     let x = pos.getX(i), yy = pos.getY(i), z = pos.getZ(i);
     const y = yy / hh; // -1 chin .. 1 crown
-    if (y < 0.1) x *= 1 - (1 - jaw) * Math.min(1, (0.1 - y) / 1.1);
+    // the sides of the face come down fairly straight to a jaw angle, then turn in to the chin (a steady taper all the
+    // way down made a soft, round lower face)
+    if (y < 0.1) {
+      const lin = Math.min(1, (0.1 - y) / 1.1);
+      const t = fem ? lin : 0.45 * lin + 0.55 * sst(-0.4, -1.0, y);
+      x *= 1 - (1 - jaw) * t;
+    }
     if (y < -0.3) z *= 1 - (-0.3 - y) * 0.12;
     // round the cranium toward an ellipsoid (back and top); the face stays flatter for the features
     const back = z > 0 ? Math.min(1, z / hd) : 0;
     // the face wraps around too (a flat front read as a mask strapped to an egg); the centre stays put
-    const fwrap = z < 0 ? 0.42 * Math.min(1, -z / hd) : 0;
+    const fwrap = z < 0 ? 0.3 * Math.min(1, -z / hd) : 0;
     const k = Math.min(1, back * 0.7 + Math.max(0, y) * 0.5 + fwrap);
     if (k > 0) {
       const ex = x / hw, ey = yy / hh, ez = z / hd; const len = Math.hypot(ex, ey, ez) || 1;
@@ -256,7 +263,7 @@ function headGeo(shape = 'oval', seg = 6, sex = 'm', fp = FP0) {
     z += sst(0.25, 1, Z) * Math.exp(-((Y - 0.2) ** 2) / 0.16) * hd * 0.08; // occiput
     z += sst(0.25, 1, Y) * sst(0, -1, Z) * hd * 0.07; // forehead slopes back to the crown
     x *= 1 - 0.07 * Math.exp(-((Y - 0.28) ** 2) / 0.05) * sst(0.3, -0.7, Z); // temples
-    x *= 1 + ((fem ? 0.97 : 1.03) * J.angle - 1) * gss(Y + 0.55, Z + 0.1, 0.24, 0.65); // jaw width (cheek to ear)
+    x *= 1 + ((fem ? 0.97 : 1.0) * J.angle - 1) * 0.7 * gss(Y + 0.55, Z + 0.1, 0.24, 0.65); // jaw width (cheek to ear), kept narrower than the cheekbones
     x *= 1 - J.vee * sst(-0.35, -1, Y) * sst(0.3, -0.9, Z); // taper toward the chin
     // the underside of the jaw: one clean slanted plane from the chin back to the neck (no double chin)
     {
@@ -285,9 +292,9 @@ function headGeo(shape = 'oval', seg = 6, sex = 'm', fp = FP0) {
     f += sw(along * gss(cx - 6, 0, (0.45 + (cy - 5) * 0.15) * NK.wide, 1), 0.035, 0.027) * (0.85 + 0.15 * NK.len);
     f += sw(gss(cx - 6, cy - 7.55 - (NK.len - 1) * 0.2, 0.62 * NK.wide, cy > 7.55 ? 0.75 : 0.52), 0.016, 0.013) * NK.tip;
     for (const sd of [-1, 1]) f += 0.006 * NK.wide * gss(cx - 6 - sd * 0.62 * NK.wide, cy - 7.75 - (NK.len - 1) * 0.2, 0.42, 0.35);
-    for (const sd of [-1, 1]) f += sw(gss(cx - 6 - sd * 3.4, cy - CK.y, 1.35, 0.9), 0.009, 0.01) * CK.bone; // cheekbones
-    for (const sd of [-1, 1]) f -= (fem ? 0.0025 : 0.005) * CK.hollow * gss(cx - 6 - sd * 3.9, cy - 9.4, 0.8, 0.95); // hollows under them, out toward the jaw
-    f += 0.009 * gss(cx - 6, cy - 9.3, 2.1, 1.0); // muzzle
+    for (const sd of [-1, 1]) f += sw(gss(cx - 6 - sd * 3.4, cy - CK.y, 1.3, 0.8), 0.012, 0.011) * CK.bone; // cheekbones
+    for (const sd of [-1, 1]) f -= (fem ? 0.004 : 0.008) * CK.hollow * gss(cx - 6 - sd * 3.9, cy - 9.3, 0.85, 1.0); // hollows under them, out toward the jaw
+    f += 0.006 * gss(cx - 6, cy - 9.3, 1.9, 0.9); // muzzle
     f += sw(gss(cx - 6, cy - 9.12, 1.55, 0.26), 0.008, 0.01) * LIP; // upper lip
     f += sw(gss(cx - 6, cy - 9.8, 1.3, 0.3), 0.01, 0.012) * LIP; // lower lip
     f -= 0.004 * gss(cx - 6, cy - 9.45, 1.7, 0.1); // the line between them
@@ -952,7 +959,7 @@ function buildRig(o) {
   // Big chunky heads: everything above the neck lives in a scaled group.
   const headGroup = new THREE.Group();
   headGroup.scale.setScalar(g.headScale * 1.05);
-  headGroup.position.y = -0.005; // sits down onto the neck (a long thin neck looked like a mannequin)
+  headGroup.position.y = -0.014; // sits down onto the neck (a long thin neck looked like a mannequin)
   neck.add(headGroup);
   headGroup.add(head);
   const eyes = makeEyes(head.geometry.userData.eyes ?? [[-0.072, 0.012, -0.17], [0.072, 0.012, -0.17]], L, skin, head.position.y);
