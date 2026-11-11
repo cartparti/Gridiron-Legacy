@@ -371,6 +371,14 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Beards are 3D (`addBeard`, curl texture) with a cheek line sloping to the sideburns and the back edge following the
   jaw; the face texture only keeps a soft shadow under them. Side/back/top head textures are plain skin now.
 
+## v0.25: unique faces, clean jaw lines
+- Look fields `jaw` (defined/sharp/square/soft), `cheek` (normal/high/chiseled), `chin` (normal/strong/pointed/small),
+  `faceW` (narrow/normal/broad); randomized per person, editable in the Body tab. `faceParams(L)` fills missing ones
+  from a hash of the look (old saves get unique faces, nothing is written back). `L.nose` drives the sculpted nose.
+- `headGeo(shape, seg, sex, fp)`: JAW_K/CHEEK_K/CHIN_K/FACEW_K/NOSE_K. The jaw underside is lifted to one slanted plane
+  chin -> neck (no double chin); jaw width spans cheek to ear; vee taper to the chin. Hair shells and beards use the
+  same fp so they fit. Tests: `tests/round9.test.js`.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

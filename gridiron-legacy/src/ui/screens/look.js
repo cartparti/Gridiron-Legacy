@@ -4,7 +4,7 @@ import { openModal, toast } from '../components.js';
 import {
   SKIN_TONES, HAIR_COLORS, EYE_COLORS, GEAR_COLORS, HAIR_STYLES, BROWS, EYES, NOSES, MOUTHS, BEARDS, TATTOOS,
   SIDES, VISORS, CELEBRATIONS, SPATS, TOWELS, CHAINS, normalizeLook,
-  HEAD_SHAPES, BODY_TYPES, NECK_TATTOOS, JERSEY_SLEEVES, JERSEY_LENGTHS, JERSEY_FITS, PAD_SIZES, PAD_EXTRAS, SOCKS, MOUTHGUARDS, CLEAT_DESIGNS, CLEAT_CUTS, GLOVE_DESIGNS, MASKS, MASK_COLORS, STRIPES, FINISHES, HEIGHT_RANGE, WEIGHT_RANGE, fmtHeight, randomLook, sizeStatMods,
+  HEAD_SHAPES, JAWS, CHEEKS, CHINS, FACE_WIDTHS, BODY_TYPES, NECK_TATTOOS, JERSEY_SLEEVES, JERSEY_LENGTHS, JERSEY_FITS, PAD_SIZES, PAD_EXTRAS, SOCKS, MOUTHGUARDS, CLEAT_DESIGNS, CLEAT_CUTS, GLOVE_DESIGNS, MASKS, MASK_COLORS, STRIPES, FINISHES, HEIGHT_RANGE, WEIGHT_RANGE, fmtHeight, randomLook, sizeStatMods,
 } from '../../data/looks.js';
 import { portraitImg } from '../../scenes/portrait.js';
 import { sfx } from '../../audio/sfx.js';
@@ -60,6 +60,10 @@ export function lookEditor(opts) {
     return [
       swatches('Skin tone', SKIN_TONES, 'skin', { index: true }),
       chips('Head shape', HEAD_SHAPES, 'headShape'),
+      chips('Jaw', JAWS, 'jaw'),
+      chips('Cheekbones', CHEEKS, 'cheek'),
+      chips('Chin', CHINS, 'chin'),
+      chips('Face width', FACE_WIDTHS, 'faceW'),
       chips('Body type', BODY_TYPES, 'bodyType'),
       opts.lockBody ? h('p.small.muted', `${fmtHeight(L.heightIn)} · ${L.weightLb} lb (set at creation)`) : [
         slider('Height', 'heightIn', HEIGHT_RANGE, fmtHeight),

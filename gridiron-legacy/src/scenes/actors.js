@@ -162,8 +162,34 @@ function smoothSeams(g) {
  * and a face (brow ridge, eye sockets, nose bridge/tip/nostrils, cheekbones, muzzle, lips, chin) lined up with the
  * painted face texture. Keeps the six face groups + UVs of a box so the face/side/top/back materials still map.
  */
-function headGeo(shape = 'oval', seg = 6, sex = 'm') {
-  const ck = `${shape}|${seg}|${sex}`;
+// Per-person face build. Old looks without these get a stable pick from their other features (so they're unique too).
+const JAW_K = { // lift: how flat/high the underside of the jaw is (no double chin); steep: where it meets the neck;
+  // angle: jaw width under the ears; vee: extra taper toward the chin
+  defined: { lift: 0.85, steep: -0.42, angle: 1.04, vee: 0.06 }, sharp: { lift: 1, steep: -0.3, angle: 0.94, vee: 0.2 },
+  square: { lift: 0.9, steep: -0.45, angle: 1.2, vee: -0.1 }, soft: { lift: 0.65, steep: -0.55, angle: 1.06, vee: -0.02 },
+};
+const CHEEK_K = { normal: { bone: 1, hollow: 1, y: 6.9 }, high: { bone: 2.2, hollow: 1.6, y: 6.5 }, chiseled: { bone: 2.0, hollow: 3.8, y: 6.75 } };
+const CHIN_K = { normal: { size: 1, wide: 1, down: 0 }, strong: { size: 2.1, wide: 1.35, down: 0.02 }, pointed: { size: 1.5, wide: 0.6, down: 0.035 }, small: { size: 0.35, wide: 0.85, down: -0.015 } };
+const FACEW_K = { narrow: 0.9, normal: 1, broad: 1.09 };
+const NOSE_K = { small: { len: 0.85, wide: 0.9, tip: 0.85 }, wide: { len: 1, wide: 1.45, tip: 1.05 }, long: { len: 1.25, wide: 0.95, tip: 1.25 } };
+function faceParams(L) {
+  let hsh = 0; for (const ch of `${L.skin}|${L.eyes}|${L.brows}|${L.mouth}|${L.hairStyle}|${L.eyeColor}|${L.headShape}`) hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0;
+  const pick = (list, salt) => list[((hsh >>> salt) ^ (hsh * (salt + 7))) % list.length >>> 0];
+  const fem = L.gender === 'f';
+  return {
+    jaw: JAW_K[L.jaw] ? L.jaw : pick(fem ? ['defined', 'sharp', 'soft'] : ['defined', 'sharp', 'square', 'defined'], 3),
+    cheek: CHEEK_K[L.cheek] ? L.cheek : pick(['normal', 'high', 'chiseled', 'normal'], 7),
+    chin: CHIN_K[L.chin] ? L.chin : pick(fem ? ['normal', 'pointed', 'small'] : ['normal', 'strong', 'pointed', 'strong'], 11),
+    faceW: FACEW_K[L.faceW] ? L.faceW : pick(['narrow', 'normal', 'normal', 'broad'], 15),
+    nose: NOSE_K[L.nose] ? L.nose : 'small',
+  };
+}
+const fpKey = (fp) => `${fp.jaw}|${fp.cheek}|${fp.chin}|${fp.faceW}|${fp.nose}`;
+const FP0 = { jaw: 'defined', cheek: 'normal', chin: 'normal', faceW: 'normal', nose: 'small' };
+function headGeo(shape = 'oval', seg = 6, sex = 'm', fp = FP0) {
+  const ck = `${shape}|${seg}|${sex}|${fpKey(fp)}`;
+  const J = JAW_K[fp.jaw] ?? JAW_K.defined, CK = CHEEK_K[fp.cheek] ?? CHEEK_K.normal, CH = CHIN_K[fp.chin] ?? CHIN_K.normal;
+  const NK = NOSE_K[fp.nose] ?? NOSE_K.small, FW = FACEW_K[fp.faceW] ?? 1;
   if (headCache[ck]) return headCache[ck];
   const [w, h, d, r, jaw] = HEAD_DIMS[shape] ?? HEAD_DIMS.oval;
   const b = softBox(w, h, d, r, seg);
@@ -189,7 +215,17 @@ function headGeo(shape = 'oval', seg = 6, sex = 'm') {
     z += sst(0.25, 1, Z) * Math.exp(-((Y - 0.2) ** 2) / 0.16) * hd * 0.08; // occiput
     z += sst(0.25, 1, Y) * sst(0, -1, Z) * hd * 0.07; // forehead slopes back to the crown
     x *= 1 - 0.07 * Math.exp(-((Y - 0.28) ** 2) / 0.05) * sst(0.3, -0.7, Z); // temples
-    if (!fem) x *= 1 + 0.05 * gss(Y + 0.62, Z - 0.1, 0.18, 0.35); // a squarer jaw angle under the ears
+    x *= 1 + ((fem ? 0.97 : 1.03) * J.angle - 1) * gss(Y + 0.55, Z + 0.1, 0.24, 0.65); // jaw width (cheek to ear)
+    x *= 1 - J.vee * sst(-0.35, -1, Y) * sst(0.3, -0.9, Z); // taper toward the chin
+    // the underside of the jaw: one clean slanted plane from the chin back to the neck (no double chin)
+    {
+      const Zn = z / hd, Yn = yy / hh;
+      if (Yn < 0 && Zn > -0.95) {
+        const floor = -1 + (J.steep + 1) * sst(-0.85, 0.45, Zn);
+        if (Yn < floor) yy += (floor - Yn) * hh * J.lift;
+      }
+    }
+    x *= FW;
     pos.setXYZ(i, x, yy, z);
   }
   // ---- face, placed by the texture's own coordinates (12 x 12 grid: eyes at row 5.7, mouth 9.3)
@@ -204,18 +240,18 @@ function headGeo(shape = 'oval', seg = 6, sex = 'm') {
     f += 0.004 * gss(cx - 6, cy - 3.2, 3.6, 1.2); // forehead
     for (const ex of [3.5, 8.5]) f -= 0.015 * gss(cx - ex, cy - 5.75, 1.25, 0.72); // eye sockets
     // nose: bridge widening to a tip, nostril wings, a dip under it
-    const along = sst(4.9, 7.5, cy) * (1 - sst(7.9, 8.3, cy));
-    f += sw(along * gss(cx - 6, 0, 0.42 + (cy - 5) * 0.13, 1), 0.034, 0.026);
-    f += sw(gss(cx - 6, cy - 7.55, 0.62, 0.5), 0.016, 0.012);
-    for (const sd of [-1, 1]) f += 0.011 * gss(cx - 6 - sd * 0.85, cy - 7.75, 0.42, 0.35);
+    const along = sst(4.9, 7.5, cy) * (1 - sst(7.9 + (NK.len - 1) * 0.6, 8.3 + (NK.len - 1) * 0.6, cy));
+    f += sw(along * gss(cx - 6, 0, (0.42 + (cy - 5) * 0.13) * NK.wide, 1), 0.034, 0.026) * (0.85 + 0.15 * NK.len);
+    f += sw(gss(cx - 6, cy - 7.55 - (NK.len - 1) * 0.5, 0.62 * NK.wide, 0.5), 0.016, 0.012) * NK.tip;
+    for (const sd of [-1, 1]) f += 0.011 * NK.wide * gss(cx - 6 - sd * 0.85 * NK.wide, cy - 7.75 - (NK.len - 1) * 0.5, 0.42, 0.35);
     f -= 0.004 * gss(cx - 6, cy - 8.35, 0.5, 0.25);
-    for (const sd of [-1, 1]) f += sw(gss(cx - 6 - sd * 3.4, cy - 6.9, 1.1, 0.75), 0.011, 0.012); // cheekbones
-    if (!fem) for (const sd of [-1, 1]) f -= 0.006 * gss(cx - 6 - sd * 3.1, cy - 8.7, 0.9, 0.9); // cheek hollows
-    f += 0.012 * gss(cx - 6, cy - 9.3, 2.3, 1.1); // muzzle
+    for (const sd of [-1, 1]) f += sw(gss(cx - 6 - sd * 3.4, cy - CK.y, 1.1, 0.75), 0.011, 0.012) * CK.bone; // cheekbones
+    for (const sd of [-1, 1]) f -= (fem ? 0.003 : 0.006) * CK.hollow * gss(cx - 6 - sd * 3.1, cy - 8.7, 0.9, 0.9); // hollows under them
+    f += 0.009 * gss(cx - 6, cy - 9.3, 2.1, 1.0); // muzzle
     f += sw(gss(cx - 6, cy - 9.12, 1.2, 0.24), 0.005, 0.007); // upper lip
     f += sw(gss(cx - 6, cy - 9.78, 1.0, 0.28), 0.006, 0.008); // lower lip
     f -= 0.004 * gss(cx - 6, cy - 10.35, 1.1, 0.28); // dip above the chin
-    f += sw(gss(cx - 6, cy - 11.2, 1.35, 0.8), 0.016, 0.01); // chin
+    f += sw(gss(cx - 6, cy - 11.2 - CH.down * 20, 1.35 * CH.wide, 0.8), 0.016, 0.01) * CH.size; // chin
     disp[i] = f;
   }
   // coincident vertices (box-face seams) share the front face's value so nothing cracks
@@ -686,7 +722,7 @@ function buildRig(o) {
   // counter the body's width scale so heads stay square
   neck.scale.set(1 / sc.build, 1 / sc.height * 0.96 + 0.04, 1 / body.scale.z);
   // a real neck: wider at the base where it meets the traps, sitting a touch behind the jaw
-  const neckK = football ? 1.12 : L.gender === 'f' ? 0.86 : 1;
+  const neckK = football ? 1.12 : L.gender === 'f' ? 0.88 : 1.0;
   const neckBox = new THREE.Mesh(neckGeo(neckK), L.tatNeck && L.tatNeck !== 'none' ? neckMat(skinC, L.tatNeck) : skin);
   neckBox.position.set(0, 0.2, 0.018);
   neckBox.rotation.x = 0.08;
@@ -694,7 +730,9 @@ function buildRig(o) {
   if (L.gender !== 'f') { const apple = new THREE.Mesh(G.joint, skin); apple.scale.set(0.016, 0.022, 0.014); apple.position.set(0, 0.105, 0.024 - 0.054 * neckK); neck.add(apple); }
   const helmetOn = football && o.helmet !== false;
   const sex = L.gender === 'f' ? 'f' : 'm';
-  const head = new THREE.Mesh(headGeo(L.headShape, helmetOn ? 12 : 30, sex), sixFaces(
+  const fp = faceParams(L);
+
+  const head = new THREE.Mesh(headGeo(L.headShape, helmetOn ? 12 : 30, sex, fp), sixFaces(
     sideMat(L, hairC, false), sideMat(L, hairC, true), topMat(L, hairC), skin, backMat(L, hairC),
     faceMat(L, hairC, { eyeBlack: helmetOn && L.eyeBlack }),
   ));
@@ -704,13 +742,13 @@ function buildRig(o) {
   const ears = [];
   for (const sd of [-1, 1]) {
     const e = new THREE.Mesh(earGeo(), skin);
-    e.position.set(sd * (hd[0] / 2 - 0.008), 0.215, 0.025); e.rotation.y = sd * 0.35; e.scale.x = sd;
+    e.position.set(sd * (hd[0] / 2 * (FACEW_K[fp.faceW] ?? 1) - 0.008), 0.215, 0.025); e.rotation.y = sd * 0.35; e.scale.x = sd;
     ears.push(e);
   }
   // Big chunky heads: everything above the neck lives in a scaled group.
   const headGroup = new THREE.Group();
   headGroup.scale.setScalar(g.headScale);
-  headGroup.position.y = 0.035;
+  headGroup.position.y = 0.02;
   neck.add(headGroup);
   headGroup.add(head);
   if (!(football && o.helmet !== false)) headGroup.add(...ears);
@@ -1028,8 +1066,9 @@ const HAIR_SPEC = {
 };
 const hairGeoCache = {};
 function hairShellGeo(shape, style, spec) {
-  const [w, h, d] = HEAD_DIMS[shape] ?? HEAD_DIMS.oval;
-  const g = headGeo(shape, 16, spec.sex ?? 'm').clone();
+  const [w0, h, d] = HEAD_DIMS[shape] ?? HEAD_DIMS.oval;
+  const w = w0 * (FACEW_K[spec.fp?.faceW] ?? 1);
+  const g = headGeo(shape, 16, spec.sex ?? 'm', spec.fp ?? FP0).clone();
   const pos = g.attributes.position; const uv = g.attributes.uv;
   const hw = w / 2, hh = h / 2, hd = d / 2;
   const v = new THREE.Vector3();
@@ -1091,8 +1130,9 @@ function lockGeo(points, prof, { bumps = 0, amp = 0, squash = 1, seg = 22, radia
   return g;
 }
 const SPH = new THREE.SphereGeometry(1, 20, 14);
-function hairExtras(shape, style, spec) {
-  const [w, h, d] = HEAD_DIMS[shape] ?? HEAD_DIMS.oval;
+function hairExtras(shape, style, spec, fw = 1) {
+  const [w0, h, d] = HEAD_DIMS[shape] ?? HEAD_DIMS.oval;
+  const w = w0 * fw;
   const hw = w / 2, hh = h / 2, hd = d / 2, cy = 0.23;
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
   // point on (a little outside) the head: az 0 = face, PI = back; th from the crown
@@ -1229,12 +1269,14 @@ function addBeard(neck, L, hairC) {
   const mask = BEARD_MASK[L.beard];
   if (!mask) return;
   const shape = L.headShape ?? 'oval';
-  const key = `${shape}|${L.beard}`;
+  const fp = faceParams(L);
+  const key = `${shape}|${L.beard}|${fpKey(fp)}`;
   const geo = (beardCache[key] ??= (() => {
-    const [w, h, d] = HEAD_DIMS[shape] ?? HEAD_DIMS.oval;
-    const g = headGeo(shape, 30, 'm').clone();
+    const [w0, h, d] = HEAD_DIMS[shape] ?? HEAD_DIMS.oval;
+    const w = w0 * (FACEW_K[fp.faceW] ?? 1);
+    const g = headGeo(shape, 30, 'm', fp).clone();
     const pos = g.attributes.position; const nor = g.attributes.normal;
-    const thick = L.beard === 'long' ? 0.022 : L.beard === 'full' ? 0.016 : L.beard === 'boxed' ? 0.012 : 0.01;
+    const thick = L.beard === 'long' ? 0.022 : L.beard === 'full' ? 0.016 : L.beard === 'boxed' ? 0.012 : L.beard === 'muttonchops' ? 0.006 : 0.01;
     for (let i = 0; i < pos.count; i++) {
       const X = pos.getX(i) / (w / 2), Y = pos.getY(i) / (h / 2), Z = pos.getZ(i) / (d / 2);
       let m = mask(X, Y, Z);
@@ -1256,8 +1298,9 @@ function addHairVolume(neck, L, hairC) {
   if (!spec) return; // bald
   const shape = L.headShape ?? 'oval';
   const sex = L.gender === 'f' ? 'f' : 'm';
-  const key = `${shape}|${style}|${sex}`;
-  const cached = (hairGeoCache[key] ??= { shell: hairShellGeo(shape, style, { ...spec, sex }), extras: hairExtras(shape, style, spec) });
+  const fp = faceParams(L);
+  const key = `${shape}|${style}|${sex}|${fpKey(fp)}`;
+  const cached = (hairGeoCache[key] ??= { shell: hairShellGeo(shape, style, { ...spec, sex, fp }), extras: hairExtras(shape, style, spec, FACEW_K[fp.faceW] ?? 1) });
   const mat = hairMat(hairC, spec.kind ?? 'strand', spec.rough ?? 0.6);
   const lockMat = style === 'dreads' || style === 'twists' || style === 'curly' ? hairMat(hairC, 'curl', 0.85) : hairMat(hairC, 'strand', spec.rough ?? 0.55);
   const tieMat = shiny(L.gender === 'f' ? '#c2185b' : '#1b1b1b', { rough: 0.5 });

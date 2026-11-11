@@ -41,6 +41,10 @@ export const FEMALE_HAIR = ['long', 'long', 'bun', 'ponytail', 'ponytail', 'brai
 export const EARRINGS = [{ id: 'none', label: 'None' }, { id: 'studs', label: 'Studs' }, { id: 'hoops', label: 'Hoops' }, { id: 'drops', label: 'Drops' }];
 export const LIP_COLORS = ['none', '#b5485d', '#c9305a', '#8e3b46', '#d97a7a', '#a0522d'];
 export const HEAD_SHAPES = [{ id: 'oval', label: 'Oval' }, { id: 'round', label: 'Round' }, { id: 'square', label: 'Square jaw' }, { id: 'long', label: 'Long' }, { id: 'wide', label: 'Wide' }, { id: 'heart', label: 'Narrow chin' }];
+export const JAWS = [{ id: 'defined', label: 'Defined' }, { id: 'sharp', label: 'Sharp' }, { id: 'square', label: 'Square' }, { id: 'soft', label: 'Soft' }];
+export const CHEEKS = [{ id: 'normal', label: 'Normal' }, { id: 'high', label: 'High' }, { id: 'chiseled', label: 'Chiseled' }];
+export const CHINS = [{ id: 'normal', label: 'Normal' }, { id: 'strong', label: 'Strong' }, { id: 'pointed', label: 'Pointed' }, { id: 'small', label: 'Small' }];
+export const FACE_WIDTHS = [{ id: 'narrow', label: 'Narrow' }, { id: 'normal', label: 'Normal' }, { id: 'broad', label: 'Broad' }];
 export const BODY_TYPES = [{ id: 'lean', label: 'Lean' }, { id: 'athletic', label: 'Athletic' }, { id: 'muscular', label: 'Muscular' }, { id: 'stocky', label: 'Stocky' }, { id: 'lanky', label: 'Lanky' }];
 export const SIDES = [{ id: 'none', label: 'None' }, { id: 'left', label: 'Left' }, { id: 'right', label: 'Right' }, { id: 'both', label: 'Both' }];
 export const VISORS = [{ id: 'none', label: 'None' }, { id: 'clear', label: 'Clear' }, { id: 'dark', label: 'Smoke' }, { id: 'gold', label: 'Gold' }, { id: 'chrome', label: 'Chrome' }, { id: 'blue', label: 'Ice blue' }, { id: 'red', label: 'Red' }, { id: 'purple', label: 'Iridescent' }, { id: 'amber', label: 'Amber' }];
@@ -139,7 +143,12 @@ export function randomLook(r, opts = {}) {
     elbowPad: r() < 0.85 ? 'none' : pickR(r, SIDES.slice(1)).id, elbowColor: pickR(r, GEAR_COLORS),
     towel: r() < 0.75 ? 'none' : pickR(r, TOWELS.slice(1)).id, handWarmer: r() < 0.12, chain: r() < 0.88 ? 'none' : pickR(r, CHAINS.slice(1)).id,
     celebration: pickR(r, CELEBRATIONS).id,
-    headShape: gender === 'f' ? pickR(r, ['oval', 'heart', 'round', 'long']) : pickR(r, HEAD_SHAPES).id, bodyType: gender === 'f' ? pickR(r, ['lean', 'athletic', 'athletic', 'stocky']) : randomBodyType(r, opts.position),
+    headShape: gender === 'f' ? pickR(r, ['oval', 'heart', 'round', 'long']) : pickR(r, HEAD_SHAPES).id,
+    // everyone's face is built differently
+    jaw: gender === 'f' ? pickR(r, ['defined', 'sharp', 'sharp', 'soft']) : pickR(r, ['defined', 'defined', 'sharp', 'square', 'square', 'soft']),
+    cheek: pickR(r, ['normal', 'normal', 'high', 'chiseled']),
+    chin: gender === 'f' ? pickR(r, ['normal', 'pointed', 'small', 'pointed']) : pickR(r, ['normal', 'strong', 'strong', 'pointed', 'small']),
+    faceW: pickR(r, ['narrow', 'normal', 'normal', 'broad']), bodyType: gender === 'f' ? pickR(r, ['lean', 'athletic', 'athletic', 'stocky']) : randomBodyType(r, opts.position),
     ...randomJersey(r, opts.position), tatNeck: r() < 0.9 ? 'none' : pickR(r, NECK_TATTOOS.slice(1)).id,
     cleatDesign: pickR(r, CLEAT_DESIGNS).id, cleatCut: r() < 0.6 ? 'low' : r() < 0.75 ? 'mid' : 'high',
     gloveDesign: pickR(r, GLOVE_DESIGNS).id, gloveAccent: pickR(r, GEAR_COLORS),
@@ -209,7 +218,7 @@ export function defaultLook(position = 'QB') {
     elbowPad: 'none', elbowColor: '#16181c', towel: 'none', handWarmer: false, chain: 'none', suit: '#16181f', tie: '#c92a2a',
     maskStyle: (POS_MASK[position] ?? ['three'])[0], maskColor: '#c3cad3', helmetStripe: 'single', helmetFinish: 'gloss',
     shirt: '#3a86ff', pants: '#2b2d42', shoe: '#f1f1f1',
-    ...JERSEY_DEFAULTS,
+    ...JERSEY_DEFAULTS, jaw: 'defined', cheek: 'high', chin: 'strong', faceW: 'normal',
   };
 }
 
