@@ -1,5 +1,14 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.31', date: 'Nov 11', title: 'Balance, physics and game day', items: [
+    'Every position is balanced: QB, RB, WR, CB and DT careers now earn about the same awards and Hall of Fame chances.',
+    'Game grades are fair at every position: a great run stop or a big day on the ground counts as much as a 300-yard passing game.',
+    'Interceptions are rarer and more special; most good reads on defense are pass breakups.',
+    'Tackling physics: wrap-up tackles carry momentum. Big backs drag tacklers for extra yards (even into the end zone), gang tackles stop the pile, and you can hold Sprint to fight for yards.',
+    'Running physics: you can\'t cut on a dime at full speed, sharp cuts bleed speed (more on wet grass), and arm tackles slow you down.',
+    'Game day outside: a full stadium facade in team colors, a plaza, packed parking lots, tailgate tents and fans, light poles and a blimp over big games.',
+    'Game day inside: coolers, TV cameras, photographers on the end lines and an inflatable team tunnel.',
+  ] },
   { v: '0.30', date: 'Nov 11', title: 'A real career', items: [
     'Earn your spot: you can start as the backup behind a named starter. Win the job with good games, training and coach trust. Bad stretches can get you benched.',
     'Your Season card: your role, your playoff race and a live award race.',

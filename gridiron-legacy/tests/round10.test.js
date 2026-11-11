@@ -72,3 +72,16 @@ test('storylines chain into follow-ups', () => {
   const chained = Object.values(EVENTS_BY_ID).filter((e) => e.id.startsWith('arc_')).flatMap((e) => e.choices.flatMap((c) => [c.effects?.chain?.id, c.chance?.success?.effects?.chain?.id, c.chance?.fail?.effects?.chain?.id])).filter(Boolean);
   for (const id of chained) assert.ok(EVENTS_BY_ID[id], `missing chapter ${id}`);
 });
+
+test('every position is balanced over full careers (awards and legacy within range of each other)', async () => {
+  const { simulateCareer, randomCareerOpts, STRATEGIES } = await import('../src/sim/bot.js');
+  const avg = {};
+  for (const pos of ['QB', 'RB', 'WR', 'CB', 'DT']) {
+    let aw = 0, lg = 0;
+    for (let i = 0; i < 10; i++) { const st = simulateCareer(randomCareerOpts(5000 + i, pos), STRATEGIES.balanced, 0.6); aw += st.player.awards.length; lg += st.legacy?.score ?? 0; }
+    avg[pos] = { aw: aw / 10, lg: lg / 10 };
+  }
+  const aws = Object.values(avg).map((v) => v.aw), lgs = Object.values(avg).map((v) => v.lg);
+  assert.ok(Math.max(...aws) / Math.min(...aws) < 1.7, `awards spread ${JSON.stringify(avg)}`);
+  assert.ok(Math.max(...lgs) / Math.min(...lgs) < 1.35, `legacy spread ${JSON.stringify(avg)}`);
+});

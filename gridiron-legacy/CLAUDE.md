@@ -426,6 +426,18 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   Menu music: 'menu' song via `app.menuMusic()` on title/setup screens. Tour: `src/ui/onboarding.js` (once per career).
 - Tests: `tests/round10.test.js`.
 
+## v0.31: balance, contact physics, stadium grounds
+- Balance (measure with a bot over many careers per position): `gameGrade` and `awards.seasonPerf` calibrated so a
+  typical good pro game/season is ~65-70 at every position; legacy "Career production" is position-neutral (from each
+  pro season's perf) and the peak bonus is relative to `POS_PEAK`. Result (40 careers each): ~11 awards, 340-365 legacy,
+  60-75% HOF for every position. Run-stop quality rewards stuffed runs; user INT odds lowered (PDs are the norm).
+- Engine physics: `startWrap`/`updateWrap`/`finishTackle` (inelastic momentum; tacklers ride along; gang tackles via
+  tryTackle on a wrapped carrier; Sprint drives the pile); big hits still drop the carrier instantly. Momentum cuts
+  (`cutK` on the user's acceleration, wet fields worse); glancing contacts slow the carrier. Debug hook `__play` has
+  `flight/qb/carrier/user` for scripted play tests.
+- `src/scenes/grounds.js`: facade behind the stands, plaza, parking lots with instanced cars, tailgates and fans,
+  light poles, blimp (college/pro), sideline coolers/TV cameras/photographers, inflatable team tunnel.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).

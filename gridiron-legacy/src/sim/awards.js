@@ -12,11 +12,11 @@ export function seasonPerf(pos, s) {
     const pct = s.passAtt ? s.passComp / s.passAtt : 0;
     prod = (s.passYds / g / 280) * 45 + (s.passTD / g / 2.4) * 35 + (pct - 0.55) * 80 - (s.int / g) * 10;
   } else if (pos === 'RB') {
-    prod = (s.rushYds / g / 120) * 55 + (s.rushTD / g / 1.2) * 30 + (s.recYds / g / 40) * 10 - (s.fumbles / g) * 12;
+    prod = (s.rushYds / g / 92) * 55 + (s.rushTD / g / 0.88) * 30 + (s.recYds / g / 34) * 10 - (s.fumbles / g) * 8;
   } else if (pos === 'DT') {
-    prod = ((s.defSacks ?? 0) / g / 0.7) * 36 + ((s.tfl ?? 0) / g / 1.0) * 20 + (s.tackles / g / 3.5) * 22 + (s.pd / g / 0.4) * 6 + 8;
+    prod = ((s.defSacks ?? 0) / g / 0.75) * 36 + ((s.tfl ?? 0) / g / 1.2) * 20 + (s.tackles / g / 4.5) * 16 + (s.pd / g / 1.5) * 4 + 8;
   } else if (pos === 'CB') {
-    prod = (s.defInt / g / 0.4) * 32 + (s.pd / g / 1.1) * 22 + (s.tackles / g / 4.5) * 18 + (s.defTD / g / 0.1) * 8 - (s.ydsAllowed / g / 60) * 12 - (s.tdAllowed / g / 0.4) * 8 + 8;
+    prod = (s.defInt / g / 0.4) * 32 + (s.pd / g / 1.4) * 22 + (s.tackles / g / 4.5) * 18 + (s.defTD / g / 0.1) * 8 - (s.ydsAllowed / g / 60) * 12 - (s.tdAllowed / g / 0.4) * 8 + 10;
   } else {
     prod = (s.recYds / g / 120) * 50 + (s.recTD / g / 1.0) * 30 + (s.rec / g / 8) * 12 - (s.drops / g) * 3;
   }

@@ -707,9 +707,10 @@ export function gameGrade(state, g) {
   const s = g.userStats;
   let prod;
   if (pos === 'QB') prod = s.passYds / 3.2 * 0.45 + s.passTD * 14 + (s.passAtt ? (s.passComp / s.passAtt - 0.5) * 60 : 0) - s.int * 12 - s.sacks * 2 + s.rushYds * 0.3;
-  else if (pos === 'RB') prod = s.rushYds / 1.2 * 0.55 + s.rushTD * 15 + s.recYds * 0.3 - s.fumbles * 14;
-  else if (pos === 'CB') prod = 40 + s.tackles * 3 + s.defInt * 22 + s.pd * 8 + s.defTD * 18 - s.tdAllowed * 12 - s.ydsAllowed * 0.35;
-  else if (pos === 'DT') prod = 32 + s.tackles * 4 + (s.defSacks ?? 0) * 20 + (s.tfl ?? 0) * 7 + s.pd * 6;
+  // calibrated so a typical good pro game at every position grades in the high 60s
+  else if (pos === 'RB') prod = 4 + s.rushYds * 0.55 + s.rushTD * 16 + s.recYds * 0.35 + (s.rushAtt >= 5 ? (s.rushYds / s.rushAtt - 3.5) * 6 : 0) - s.fumbles * 12;
+  else if (pos === 'CB') prod = 46 + s.tackles * 3 + s.defInt * 22 + s.pd * 8 + s.defTD * 18 - s.tdAllowed * 12 - s.ydsAllowed * 0.35;
+  else if (pos === 'DT') prod = 27 + s.tackles * 3 + (s.defSacks ?? 0) * 20 + (s.tfl ?? 0) * 7 + s.pd * 5;
   else prod = s.recYds / 1.1 * 0.55 + s.recTD * 16 + s.rec * 2 - s.drops * 4;
   prod = clamp(prod, 0, 100);
   const mq = g.moments.length ? g.moments.reduce((a, m) => a + m.quality, 0) / g.moments.length : 0.5;

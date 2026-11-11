@@ -193,7 +193,8 @@ export function freePlay(ctx) {
     if (play.twoDeep || zone) { ss.deep = -1; fs.deep = 1; } else { fs.deep = 0; ss.robber = true; }
     if (mode === 'runD') cbZ.zone = false;
     user = ents.find((e) => e.user);
-    if (globalThis.__playDebug) globalThis.__play = { receivers, defenders, time: () => t, phase: () => phase };
+    if (globalThis.__playDebug) globalThis.__play = { receivers, defenders, time: () => t, phase: () => phase, user, qb: () => qb, carrier: () => carrier,
+      flight: () => (flight ? { f: (t - flight.t0) / flight.T, to: flight.to, toUser: flight.target === user } : null) };
     // routes for receivers
     const routeFor = (slot) => {
       if (mode === 'route' && slot === 'Z') return play.route;
@@ -1149,6 +1150,8 @@ export function freePlay(ctx) {
 
   const tryTackle = (tackler, target) => {
     if (target.down || qteActive) return;
+    // already wrapped up: you join the pile (gang tackle) and the carrier goes down faster
+    if (target.wrap) { if (!target.wrap.by.includes(tackler)) { target.wrap.by.push(tackler); tackler.lunge = 0; playAction(tackler.mesh, 'tackle'); sfx.hit(); } return; }
     const u = target === user;
     tackler.lunge = 0;
     if (u && (moves.juke > 0 || moves.spin > 0)) {
@@ -1193,7 +1196,47 @@ export function freePlay(ctx) {
       sfx.hit(); ctx.shake(0.2);
       return;
     }
-    // Tackled.
+    // Tackled. Ordinary contact becomes a wrap-up where momentum decides the yards after contact;
+    // only a big collision drops the carrier on the spot.
+    const relV = Math.hypot(tackler.vel.x - target.vel.x, tackler.vel.z - target.vel.z);
+    if (!globalThis.__forceBigHit && !globalThis.__forceFumble && relV * Math.sqrt(tackler.mass / target.mass) < 9 && Math.random() > 0.12) { startWrap(tackler, target); return; }
+    finishTackle(tackler, target);
+  };
+  /** Wrap-up: carrier and tackler(s) move together with their combined momentum until the pile stops. */
+  const startWrap = (tackler, target) => {
+    const tv = tackler.lunge > 0 && tackler.lungeDir ? { x: tackler.lungeDir.x * 8.5, z: tackler.lungeDir.z * 8.5 } : tackler.vel;
+    const mC = target.mass, mT = tackler.mass;
+    const vx = (mC * target.vel.x + mT * tv.x) / (mC + mT), vz = (mC * target.vel.z + mT * tv.z) / (mC + mT);
+    const drive = Math.max(0, Math.min(2, (mC * Math.hypot(target.vel.x, target.vel.z)) / (mT * Math.hypot(tv.x, tv.z) + 1)));
+    target.wrap = { by: [tackler], t: 0, vx, vz, dur: 0.35 + drive * 0.3 + (target.user ? (st.strength ?? 60) / 400 : 0) };
+    tackler.lunge = 0;
+    playAction(tackler.mesh, 'tackle');
+    sfx.hit(); ctx.shake(0.18);
+    if (target.user && drive > 0.6) hud.big('FIGHT FOR IT!', '#fbbf24', 600);
+  };
+  const updateWrap = (dt) => {
+    const c = carrier;
+    if (!c?.wrap || c.down || phase !== 'live') return;
+    const w = c.wrap;
+    w.t += dt;
+    // the pile slows: every extra tackler adds a lot of stopping power
+    const k = Math.exp(-(1.8 + w.by.length * 1.7) * dt);
+    w.vx *= k; w.vz *= k;
+    // you can drive the pile (hold sprint), harder the stronger you are
+    if (c.user && controls.state.sprint) { const fwd = c.team === 'off' ? -1 : 1; w.vz += fwd * dt * 3.2 * ((st.strength ?? 60) / 60) / w.by.length; w.dur += dt * 0.25; }
+    c.vel.x = w.vx; c.vel.z = w.vz;
+    // tacklers hang on (dragged behind / around the carrier)
+    w.by.forEach((b, i) => {
+      const a = Math.atan2(-w.vx, -w.vz) + (i - (w.by.length - 1) / 2) * 0.9;
+      b.pos.x += (c.pos.x + Math.sin(a) * 0.55 - b.pos.x) * Math.min(1, dt * 12);
+      b.pos.z += (c.pos.z + Math.cos(a) * 0.55 - b.pos.z) * Math.min(1, dt * 12);
+      b.vel.x = w.vx; b.vel.z = w.vz;
+      faceToward(b.mesh, c.pos.x, c.pos.z);
+    });
+    if (w.t >= w.dur || Math.hypot(w.vx, w.vz) < 0.7) { const by = w.by[0]; c.wrap = null; finishTackle(by, c); }
+  };
+  const finishTackle = (tackler, target) => {
+    target.wrap = null;
     playAction(tackler.mesh, 'tackle', { then: null });
     target.down = true;
     const bigHit = hardHit(tackler, target);
@@ -1222,7 +1265,7 @@ export function freePlay(ctx) {
       startQte('ring', 'BREAK IT UP!', (ok) => {
         if (phase !== 'live') return;
         if (ok) {
-          if (Math.random() < 0.45 + (st.skill ?? 60) / 500 + (has('ballhawk') ? 0.2 : 0)) { holder = user; carrier = user; user.int = true; snap('Interception!', 100); hud.big('INTERCEPTION!', '#4ade80', 900); ctx.cinematic?.(() => user.pos, 1.3); sfx.catch(); setButtonsFor(); return; }
+          if (Math.random() < 0.28 + (st.skill ?? 60) / 600 + (has('ballhawk') ? 0.15 : 0)) { holder = user; carrier = user; user.int = true; snap('Interception!', 100); hud.big('INTERCEPTION!', '#4ade80', 900); ctx.cinematic?.(() => user.pos, 1.3); sfx.catch(); setButtonsFor(); return; }
           playAction(user.mesh, 'dive'); hud.big('BROKEN UP!', '#4ade80', 800); ctx.cinematic?.(() => user.pos, 1.1); whistle('pd'); return;
         }
         completeCatch(r, land);
@@ -1233,7 +1276,7 @@ export function freePlay(ctx) {
       const timing = swatPress === null ? 9 : Math.abs(f.t0 + f.T - swatPress - 0.12);
       const win = (0.16 + (st.skill ?? 60) / 100 * 0.12) * tol;
       if (timing <= win && dist(user.pos, land) <= dR + 0.5) {
-        if (Math.random() < 0.55 + (st.skill ?? 60) / 400 + (has('ballhawk') ? 0.2 : 0)) { holder = user; carrier = user; user.int = true; snap('Interception!', 150); hud.big('INTERCEPTION!', '#4ade80', 900); ctx.slowMo(0.5); sfx.catch(); setButtonsFor(); return; }
+        if (Math.random() < 0.3 + (st.skill ?? 60) / 600 + (has('ballhawk') ? 0.15 : 0)) { holder = user; carrier = user; user.int = true; snap('Interception!', 150); hud.big('INTERCEPTION!', '#4ade80', 900); ctx.slowMo(0.5); sfx.catch(); setButtonsFor(); return; }
         whistle('pd'); return;
       }
       if (timing <= win * 2.2 || dist(user.pos, land) < 0.9) { whistle('pd'); return; }
@@ -1370,7 +1413,7 @@ export function freePlay(ctx) {
       else {
         const ya = Math.max(0, yardsFrom(carrier));
         const yr = yardsFrom(carrier);
-        result = { defense: true, caught: mode === 'cover', tackle: by === user, tfl: by === user && yr < 0, yardsAllowed: ya, quality: Math.max(0.05, (by === user ? (yr < 0 ? 0.88 : 0.62) : 0.4) - ya / 40), text: by === user ? (yr < 0 ? `Tackle for a loss of ${-yr}!` : `You make the stop after ${ya} yards.`) : `${ya} yards allowed.` };
+        result = { defense: true, caught: mode === 'cover', tackle: by === user, tfl: by === user && yr < 0, yardsAllowed: ya, quality: Math.max(0.05, by === user ? (yr < 0 ? 0.88 : 0.7 - ya / 40) : 0.54 - ya / 30) /* a stuffed run is a win even when a teammate makes the stop */, text: by === user ? (yr < 0 ? `Tackle for a loss of ${-yr}!` : `You make the stop after ${ya} yards.`) : `${ya} yards allowed.` };
       }
     } else {
       if (why === 'int') result = { turnover: true, complete: false, yards: 0, quality: 0.03, text: 'INTERCEPTED!' };
@@ -1681,7 +1724,18 @@ export function freePlay(ctx) {
         // turf kicks up behind you when you sprint
         dustT -= dt;
         if (c.sprint && dustT <= 0 && Math.hypot(user.vel.x, user.vel.z) > 6) { dustT = 0.22; fxList.push(dustPuff(group, user.pos, 3)); }
-        moveToward(user, user.pos.x + c.x * 5, user.pos.z + c.z * 5, userSpeed * (rush.burst > 0 ? 1.25 : 1) * Math.min(1, Math.hypot(c.x, c.z) + 0.15), dt, 26);
+        // momentum: at full speed you can't turn on a dime. Sharp cuts take a wider arc and bleed speed
+        // (more on a wet field); agile players (speed rating) cut sharper.
+        const curSp = Math.hypot(user.vel.x, user.vel.z);
+        let cutK = 1;
+        if (curSp > 4.5 && Math.hypot(c.x, c.z) > 0.2) {
+          const cosA = (user.vel.x * c.x + user.vel.z * c.z) / (curSp * Math.hypot(c.x, c.z));
+          const ang = Math.acos(Math.max(-1, Math.min(1, cosA)));
+          const agility = 0.75 + (st.speed ?? 60) / 240;
+          cutK = 1 - Math.max(0, Math.min(0.6, (ang - 0.5) * 0.38 * (curSp / 8) / agility)) * (wetGame || snowGame ? 1.25 : 1);
+          if (ang > 1.3 && curSp > 6.5) { user.vel.x *= 1 - dt * 2.2; user.vel.z *= 1 - dt * 2.2; } // plant and redirect
+        }
+        moveToward(user, user.pos.x + c.x * 5, user.pos.z + c.z * 5, userSpeed * (rush.burst > 0 ? 1.25 : 1) * Math.min(1, Math.hypot(c.x, c.z) + 0.15), dt, 26 * cutK);
         if (moves.juke > 0.15) { user.vel.x += moves.jukeDir * 7 * dt * 10; }
       } else {
         // assists when you let go of the stick
@@ -1731,6 +1785,7 @@ export function freePlay(ctx) {
         if (e.lunge <= 0 && phase === 'live' && e.out <= 0) { e.out = 0.6; knockDown(e.mesh, 1); }
       }
       for (const [e, r] of tellRings) { r.visible = e.tell > 0 || e.lunge > 0; r.scale.setScalar(1 + Math.sin(t * 30) * 0.15); }
+      updateWrap(dt);
       // ---- separation & physics
       for (let i = 0; i < ents.length; i++) {
         const a = ents[i];
@@ -1748,6 +1803,9 @@ export function freePlay(ctx) {
             const rel = Math.hypot(a.vel.x - b.vel.x, a.vel.z - b.vel.z);
             if (rel > 3.5 && !(a.bumpCd > t) && !(b.bumpCd > t)) {
               a.bumpCd = b.bumpCd = t + 0.6;
+              // an arm tackle / glancing hit costs the ball carrier speed (and shoves him off line)
+              const cc = a === carrier ? a : b === carrier ? b : null;
+              if (cc && a.team !== b.team && !cc.wrap) { cc.vel.x = cc.vel.x * 0.72 + (cc === a ? -dx : dx) / d * 1.2; cc.vel.z *= 0.72; if (cc.user) moves.slow = Math.max(moves.slow, 0.12); }
               bump(a.mesh, { x: -dx / d, z: -dz / d }, Math.min(1.6, rel / 6) * wa * 2);
               bump(b.mesh, { x: dx / d, z: dz / d }, Math.min(1.6, rel / 6) * (1 - wa) * 2);
             }

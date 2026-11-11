@@ -3,6 +3,7 @@
 // Field coordinates (yards): x across (-26.65..26.65), z along. Goal lines at z = ±50.
 import * as THREE from 'three';
 import { buildEnvironment } from './environment.js';
+import { buildGrounds } from './grounds.js';
 import { buildSideline } from './sideline.js';
 import { buildFieldWear } from './fieldwear.js';
 
@@ -514,6 +515,7 @@ export function buildStadium(scene) {
 
   const env = buildEnvironment(world);
   env.set('plains', 1);
+  const grounds = buildGrounds(world);
 
   // Light towers.
   const poleMat = lambert('#9aa3ad');
@@ -563,6 +565,7 @@ export function buildStadium(scene) {
     crowd,
     /** Re-paint the field and crowd. far = end zone the offense attacks (-z), near = behind the offense. */
     setTeams(farColors, nearColors, farName, nearName, crowdColors = nearColors, style = null) {
+      grounds.setColors(crowdColors);
       fieldMat.map.dispose();
       fieldMat.map = fieldTexture(farColors, nearColors, farName, nearName, style);
       border.material.color.set(crowdColors[0]).multiplyScalar(0.55);
@@ -634,6 +637,7 @@ export function buildStadium(scene) {
     setBigGame(on) { this.bigGame = !!on; tifo.visible = this.level !== 'hs' || this.bigGame; },
     /** Match the venue to the level: 'hs' bleachers, 'college' bowl + band, 'pro' upper deck + roof. */
     setLevel(level = 'pro') {
+      grounds.setLevel(level);
       const maxTier = level === 'hs' ? 3 : level === 'college' ? 7 : 11;
       const ends = level !== 'hs';
       for (const s2 of standMeshes) s2.m.visible = s2.tier < maxTier && (ends || !s2.end);
@@ -658,6 +662,7 @@ export function buildStadium(scene) {
     /** How hyped the crowd is (more bouncing and camera flashes). */
     setExcitement(e) { flashRate = 0.003 + e * 0.02; },
     animateCrowd(t, excitement = 0.2, force = false) {
+      grounds.animate(t);
       const base = crowd.userData.base;
       // camera flashes
       for (let i = 0; i < flashN; i++) { const on = Math.random() < flashRate ? 1 : fcol[i * 3] * 0.6; fcol[i * 3] = fcol[i * 3 + 1] = fcol[i * 3 + 2] = on > 0.05 ? on : 0; }

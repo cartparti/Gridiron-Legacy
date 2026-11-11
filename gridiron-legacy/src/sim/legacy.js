@@ -29,13 +29,13 @@ export function computeLegacy(state) {
   for (const a of p.awards) counts[a.name] = (counts[a.name] ?? 0) + 1;
   for (const [name, n] of Object.entries(counts)) add(`${n}× ${name}`, (AWARD_POINTS[name] ?? 1) * n);
   add(`${p.records.length} record${p.records.length === 1 ? '' : 's'} broken`, p.records.length * 8);
-  const s = p.proCareerStats;
-  const yards = s.passYds / 3 + s.rushYds + s.recYds;
-  const tds = s.passTD * 0.6 + s.rushTD + s.recTD + (s.defInt ?? 0) * 0.9 + (s.defTD ?? 0) * 2;
-  const defYards = ((s.pd ?? 0) * 40 + (s.tackles ?? 0) * 12);
-  add('Career production', (yards + defYards) / 500 + tds * 0.4);
+  // production from each pro season's rating (position-neutral: a great DT season counts like a great QB season)
+  const prod = p.history.filter((h) => h.stage === 'pro').reduce((a, h) => a + Math.max(0, (h.perf ?? 50) - 45) * 0.5 * Math.min(1, (h.seasonStats?.games ?? 17) / 12), 0);
+  add('Career production', prod);
   const peak = Math.max(0, ...p.history.map((h) => h.ovr));
-  add(`Peak overall ${Math.round(peak)}`, Math.max(0, peak - 75) * 2);
+  // relative to what's typical at the position (QBs rate higher, RBs peak lower and shorter)
+  const POS_PEAK = { QB: 77.5, RB: 70, WR: 75, CB: 75, DT: 75 };
+  add(`Peak overall ${Math.round(peak)}`, Math.max(0, peak - (POS_PEAK[p.position] ?? 75)) * 2);
   add('Fame', p.fame / 4);
   let score = lines.reduce((a, l) => a + l.pts, 0);
   const diff = DIFFICULTIES[state.difficulty ?? 'normal'];
