@@ -1,5 +1,11 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.34', date: 'Nov 11', title: 'See every change', items: [
+    'Your athlete stays on screen the whole time you customize, even while you scroll through the options.',
+    'The camera follows what you change: your face for face and hair, your chest and arms for jerseys, tattoos and gloves, your legs for socks, braces and cleats.',
+    'The helmet goes on by itself when you change the visor, facemask, eye black or mouthguard.',
+    'Face / Upper / Full / Legs buttons let you look at any part whenever you want.',
+  ] },
   { v: '0.33', date: 'Nov 11', title: 'New faces', items: [
     'More natural faces for everyone: bigger eyes, real lips, softer noses, faces that wrap around the head, and fuller necks.',
     'Skin looks like skin now: soft and matte with fine texture, not plastic or clay.',

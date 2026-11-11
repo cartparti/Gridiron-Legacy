@@ -39,8 +39,8 @@ function ensure() {
  * { colors, uniform, look, number, helmet } (helmet defaults to off so the face shows).
  * opts: { full: full body, yaw: turn, big: render at 2x resolution }
  */
-export function portraitURL(spec, { full = false, face = false, yaw = 0.35, big = false } = {}) {
-  const key = JSON.stringify(spec) + (full ? 'F' : face ? 'C' : '') + yaw + big;
+export function portraitURL(spec, { full = false, face = false, view = null, yaw = 0.35, big = false } = {}) {
+  const key = JSON.stringify(spec) + (view ?? (full ? 'F' : face ? 'C' : '')) + yaw + big;
   if (cache.has(key)) return cache.get(key);
   const r = ensure();
   if (!r) return null;
@@ -51,14 +51,18 @@ export function portraitURL(spec, { full = false, face = false, yaw = 0.35, big 
   r.renderer.setSize(big ? 320 : 160, big ? 400 : 200, false);
   model.rotation.y = Math.PI + yaw; // face the camera, slight turn
   model.userData.u.targetYaw = model.rotation.y;
+  model.userData.u.look = 0; model.userData.u.lookT = Infinity; // look at the camera, not off to the side
   for (let i = 0; i < 4; i++) animateRun(model, 0.1, 0);
   r.scene.add(model);
   const hs = model.userData.rig.body.scale.y;
-  if (full) { r.camera.position.set(0, 1.12 * hs, 4.0); r.camera.lookAt(0, 1.02 * hs, 0); }
-  else if (face) { // close-up for face editing: find the head and frame it
+  // views for the look editor: 'upper' (chest, arms, jersey), 'legs' (socks, braces, cleats)
+  if (view === 'upper') { r.camera.position.set(0, 1.3 * hs, 2.5); r.camera.lookAt(0, 1.2 * hs, 0); }
+  else if (view === 'legs') { r.camera.position.set(0, 0.5 * hs, 2.3); r.camera.lookAt(0, 0.42 * hs, 0); }
+  else if (full || view === 'full') { r.camera.position.set(0, 1.12 * hs, 4.0); r.camera.lookAt(0, 1.02 * hs, 0); }
+  else if (face || view === 'face') { // close-up for face editing: find the head and frame it
     model.updateMatrixWorld(true);
     const hp = new THREE.Vector3(); (model.userData.rig.headG ?? model).getWorldPosition(hp); hp.y += 0.2;
-    r.camera.position.set(0, hp.y + 0.03, 1.12); r.camera.lookAt(0, hp.y - 0.005, 0);
+    const dist = spec.helmet ? 1.35 : 1.12; r.camera.position.set(0, hp.y + 0.03, dist); r.camera.lookAt(0, hp.y - 0.005, 0);
   }
   else { r.camera.position.set(0, 1.72 * hs, 1.75); r.camera.lookAt(0, 1.63 * hs, 0); }
   r.renderer.setClearColor(0x000000, 0);

@@ -1074,3 +1074,7 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 }
 .face-slider .fs-end { flex: none; width: 50px; }
 .face-slider .fs-end.r { text-align: right; }
+/* the preview stays visible under the pinned screen header while you scroll the options */
+.screen .look-sticky { top: calc(64px + var(--safe-top)); }
+.view-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.view-pick .subtab { min-height: 34px; }

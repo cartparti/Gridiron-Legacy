@@ -18,6 +18,17 @@ const TABS = [
 ];
 const TAB_GROUPS = [['You', ['body', 'face', 'hair', 'ink']], ['Uniform', ['jersey', 'helmet', 'gear', 'swag']], ['Off the field', ['casual', 'gala', 'celeb']]];
 const CLOTHES = ['#f4f4f4', '#16181c', '#3a86ff', '#e63946', '#2a9d8f', '#f4a261', '#6d597a', '#ff006e', '#8ac926', '#264653', '#c8b38a', '#6c757d', '#1d3557', '#9c3d2b'];
+// What the preview shows: each tab has a default view, and changing an option moves the camera to that part
+// (and puts the helmet on for things you only see with it on).
+const TAB_VIEW = { body: 'full', face: 'face', hair: 'face', ink: 'upper', jersey: 'upper', helmet: 'face', gear: 'full', swag: 'full', casual: 'full', gala: 'full', celeb: 'full' };
+const KEY_VIEW = {
+  sockStyle: 'legs', cleats: 'legs', cleatDesign: 'legs', cleatAccent: 'legs', cleatCut: 'legs', spats: 'legs', kneeBrace: 'legs', kneeColor: 'legs',
+  legSleeve: 'legs', legSleeveColor: 'legs', gloves: 'upper', gloveDesign: 'upper', gloveAccent: 'upper', sleeve: 'upper', sleeveColor: 'upper',
+  wristband: 'upper', wristColor: 'upper', elbowPad: 'upper', elbowColor: 'upper', towel: 'upper', handWarmer: 'upper', chain: 'upper',
+  visor: 'face', eyeBlack: 'face', mouthguard: 'face', maskStyle: 'face', maskColor: 'face', helmetStripe: 'face', helmetFinish: 'face', tatNeck: 'upper',
+  heightIn: 'full', weightLb: 'full', bodyType: 'full', skin: 'full',
+};
+const HELMET_KEYS = new Set(['visor', 'eyeBlack', 'mouthguard', 'maskStyle', 'maskColor', 'helmetStripe', 'helmetFinish']);
 const SUITS = ['#16181f', '#1d2a44', '#3b3f48', '#5a1e2a', '#f2f2f2', '#2f4a3a', '#7a5a2a'];
 
 /**
@@ -30,7 +41,8 @@ export function lookEditor(opts) {
   if (opts.lockBody) st.tab = 'hair';
   const wrap = h('div.look-editor');
   const changed = () => { opts.onChange?.(L); draw(); };
-  const set = (k, v) => { sfx.click(); L[k] = v; changed(); };
+  const focus = (k) => { if (KEY_VIEW[k]) st.view = KEY_VIEW[k]; st.helmet = HELMET_KEYS.has(k) || st.tab === 'helmet'; };
+  const set = (k, v) => { sfx.click(); L[k] = v; focus(k); changed(); };
 
   const chips = (label, list, key) => h('div.look-row', h('div.section-label', label),
     h('div.chip-row', list.map((o) => h(`button.opt${L[key] === o.id ? '.on' : ''}`, { onclick: () => set(key, o.id) }, o.label))));
@@ -42,7 +54,7 @@ export function lookEditor(opts) {
         return h(`button.sw${L[key] === v ? '.on' : ''}`, { style: { background: c }, 'aria-label': c, onclick: () => set(key, v) });
       })));
   const slider = (label, key, [a, b], fmt) => h('div.look-row', h('div.row.between', h('div.section-label', label), h('b.pix', fmt(L[key]))),
-    h('input.slider', { type: 'range', min: a, max: b, value: L[key], oninput: (e) => { L[key] = Number(e.target.value); opts.onChange?.(L); draw(); } }));
+    h('input.slider', { type: 'range', min: a, max: b, value: L[key], oninput: (e) => { L[key] = Number(e.target.value); focus(key); opts.onChange?.(L); draw(); } }));
 
   // face sliders: -10..10 on screen, -1..1 in the look. The label updates while dragging; the preview on release.
   const faceSlider = (k, label, lo, hi) => {
@@ -61,11 +73,13 @@ export function lookEditor(opts) {
     h(`button.opt${L[key] ? '.on' : ''}`, { onclick: () => set(key, true) }, 'On'),
     h(`button.opt${!L[key] ? '.on' : ''}`, { onclick: () => set(key, false) }, 'Off')));
 
-  const closeUp = () => (st.tab === 'face' || st.tab === 'hair') && !st.helmet;
+  const view = () => st.view ?? TAB_VIEW[st.tab] ?? 'full';
   const preview = () => {
     const spec = st.tab === 'casual' ? { ...L, outfit: 'casual' } : st.tab === 'gala' ? { ...L, outfit: 'gala' } : { uniform: opts.uniform, look: { ...L }, number: opts.number ?? 1, helmet: st.helmet };
     return h('div.look-preview',
-      h('div.look-stage', portraitImg(spec, 200, { full: !closeUp(), face: closeUp(), big: true, yaw: st.yaw })),
+      h('div.look-stage', portraitImg(spec, 200, { view: view(), big: true, yaw: st.yaw })),
+      h('div.view-pick', [['face', 'Face'], ['upper', 'Upper'], ['full', 'Full'], ['legs', 'Legs']].map(([v, l]) =>
+        h(`button.subtab${view() === v ? '.on' : ''}`, { onclick: () => { sfx.click(); st.view = v; draw(); } }, l))),
       h('div.row', { style: { justifyContent: 'center', gap: '6px' } },
         h('button.btn.small', { 'aria-label': 'Turn left', onclick: () => { st.yaw -= 0.8; draw(); } }, '⟲'),
         h(`button.btn.small${st.helmet ? '.primary' : ''}`, { onclick: () => { st.helmet = !st.helmet; draw(); } }, st.helmet ? 'Helmet on' : 'Helmet off'),
@@ -151,7 +165,7 @@ export function lookEditor(opts) {
       h('div.look-tabgroups', TAB_GROUPS.map(([gname, ids]) => h('div.look-tabgroup',
         h('div.look-tabgroup-name', gname),
         h('div.look-tabgrid', ids.map((id) => { const [, l, icon] = TABS.find((t) => t[0] === id);
-          return h(`button.look-tab${st.tab === id ? '.on' : ''}`, { onclick: () => { sfx.click(); st.tab = id; st.helmet = id === 'helmet'; draw(); } }, h('span.ico', icon), h('span', l)); }))))),
+          return h(`button.look-tab${st.tab === id ? '.on' : ''}`, { onclick: () => { sfx.click(); st.tab = id; st.view = null; st.helmet = id === 'helmet'; draw(); } }, h('span.ico', icon), h('span', l)); }))))),
       h('div.look-panel', views[st.tab]()));
   };
   draw();

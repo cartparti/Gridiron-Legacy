@@ -456,3 +456,6 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   only) in the Face tab, which now also holds Face shape. randomLook adds random sliders (computed last).
 - Portraits: front key light; `portraitURL(spec, { face: true })` close-up (uses `rig.headG`), used by the editor on the
   Face/Hair tabs. Tests: `tests/round11.test.js`.
+- v0.34: look editor preview follows the change: `TAB_VIEW` (default per tab) + `KEY_VIEW` (per option) in look.js, helmet
+  forced on for `HELMET_KEYS`; Face/Upper/Full/Legs picker; `portraitURL(..., { view })` ('face'|'upper'|'full'|'legs');
+  portraits look at the camera (no idle glance). `.screen .look-sticky` sits under the pinned screen header.
