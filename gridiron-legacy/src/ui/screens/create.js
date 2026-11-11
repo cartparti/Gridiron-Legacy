@@ -39,14 +39,10 @@ export function createScreen(app) {
             h('div.row',
               h('label.field.grow', 'Number', h('input', { type: 'number', min: 0, max: 99, value: f.number, onchange: (e) => { f.number = Math.max(0, Math.min(99, Number(e.target.value) || 0)); draw(); } })),
               h('button.btn.small', { style: { marginTop: '18px' }, onclick: () => { sfx.click(); f.first = rnd(FIRST_NAMES); f.last = rnd(LAST_NAMES); f.number = Math.floor(Math.random() * 90) + 1; draw(); } }, '🎲 Random'))))),
-      h('div.card',
-        h('h2', 'Look'),
-        h('p.small.muted', 'Make them yours: skin, hair, face, tattoos, gear, size and touchdown celebration. You can change everything except height and weight later.'),
-        lookEditor({ look: f.look, uniform: teamKits(school).home, number: f.number, position: f.position })),
-      h('div.card',
+      h('div.card.pos-card',
         h('h2', 'Position'),
         h('div.pos-cards', Object.entries(POSITIONS).map(([id, p]) =>
-          h(`button.pick-card${f.position === id ? '.on' : ''}`, { onclick: () => {
+          h(`button.pick-card.pos${f.position === id ? '.on' : ''}`, { onclick: () => {
             sfx.click();
             const [h0, w0] = POS_SIZE[f.position];
             if (f.look.heightIn === h0 && f.look.weightLb === w0) [f.look.heightIn, f.look.weightLb] = POS_SIZE[id];
@@ -54,10 +50,19 @@ export function createScreen(app) {
             draw();
           } },
             h('span.big', id), h('span.lbl', p.label)))),
-        h('p.small.muted', { style: { marginTop: '10px' } }, POSITIONS[f.position].blurb),
-        h('div.small', { style: { marginTop: '6px' } },
-          STAT_KEYS.map((k) => h('div.row.between', h('span', STAT_LABELS[k]),
-            h('span.muted', `${POSITIONS[f.position].statNotes[k]} · ${Math.round(POSITIONS[f.position].weights[k] * 100)}%`))))),
+        h('div.pos-detail',
+          h('div.pos-detail-head', h('b', POSITIONS[f.position].label), h('span.tiny.muted', 'What matters most')),
+          h('p.small.muted', POSITIONS[f.position].blurb),
+          h('div.pos-stats', STAT_KEYS.slice().sort((a, b) => POSITIONS[f.position].weights[b] - POSITIONS[f.position].weights[a]).map((k) => {
+            const w = POSITIONS[f.position].weights[k];
+            return h('div.pos-stat',
+              h('div.pos-stat-row', h('span.pos-stat-name', STAT_LABELS[k]), h('div.pos-bar', h('i', { style: { width: `${Math.round(w * 100 / 0.4 * 100) / 100}%` } })), h('span.pos-stat-pct', `${Math.round(w * 100)}%`)),
+              h('div.tiny.muted', POSITIONS[f.position].statNotes[k]));
+          })))),
+      h('div.card',
+        h('h2', 'Look'),
+        h('p.small.muted', 'Make them yours: skin, hair, face, tattoos, gear, size and touchdown celebration. You can change everything except height and weight later.'),
+        lookEditor({ look: f.look, uniform: teamKits(school).home, number: f.number, position: f.position })),
       h('div.card',
         h('h2', 'Background'),
         h('div.bg-cards', BACKGROUNDS.map((b) =>

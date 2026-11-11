@@ -10,7 +10,13 @@ import { portraitImg } from '../../scenes/portrait.js';
 import { sfx } from '../../audio/sfx.js';
 import { STAT_LABELS } from '../../data/positions.js';
 
-const TABS = [['body', 'Body'], ['hair', 'Hair'], ['face', 'Face'], ['ink', 'Ink'], ['jersey', 'Jersey'], ['helmet', 'Helmet'], ['gear', 'Gear'], ['swag', 'Swag'], ['casual', 'Casual'], ['gala', 'Gala'], ['celeb', 'Celebrate']];
+// tabs in three groups: you, your uniform, off the field
+const TABS = [
+  ['body', 'Body', '🧍'], ['face', 'Face', '🙂'], ['hair', 'Hair', '💇'], ['ink', 'Ink', '🖋️'],
+  ['jersey', 'Jersey', '👕'], ['helmet', 'Helmet', '🏈'], ['gear', 'Gear', '👟'], ['swag', 'Swag', '⌚'],
+  ['casual', 'Casual', '🧢'], ['gala', 'Gala', '🤵'], ['celeb', 'Celebrate', '🎉'],
+];
+const TAB_GROUPS = [['You', ['body', 'face', 'hair', 'ink']], ['Uniform', ['jersey', 'helmet', 'gear', 'swag']], ['Off the field', ['casual', 'gala', 'celeb']]];
 const CLOTHES = ['#f4f4f4', '#16181c', '#3a86ff', '#e63946', '#2a9d8f', '#f4a261', '#6d597a', '#ff006e', '#8ac926', '#264653', '#c8b38a', '#6c757d', '#1d3557', '#9c3d2b'];
 const SUITS = ['#16181f', '#1d2a44', '#3b3f48', '#5a1e2a', '#f2f2f2', '#2f4a3a', '#7a5a2a'];
 
@@ -38,6 +44,12 @@ export function lookEditor(opts) {
   const slider = (label, key, [a, b], fmt) => h('div.look-row', h('div.row.between', h('div.section-label', label), h('b.pix', fmt(L[key]))),
     h('input.slider', { type: 'range', min: a, max: b, value: L[key], oninput: (e) => { L[key] = Number(e.target.value); opts.onChange?.(L); draw(); } }));
 
+  // a titled group of options
+  const sec = (title, ...rows) => h('section.look-sec', h('div.look-sec-title', title), h('div.look-sec-body', rows.flat().filter(Boolean)));
+  const toggle = (label, key) => h('div.look-row', h('div.section-label', label), h('div.chip-row',
+    h(`button.opt${L[key] ? '.on' : ''}`, { onclick: () => set(key, true) }, 'On'),
+    h(`button.opt${!L[key] ? '.on' : ''}`, { onclick: () => set(key, false) }, 'Off')));
+
   const preview = () => {
     const spec = st.tab === 'casual' ? { ...L, outfit: 'casual' } : st.tab === 'gala' ? { ...L, outfit: 'gala' } : { uniform: opts.uniform, look: { ...L }, number: opts.number ?? 1, helmet: st.helmet };
     return h('div.look-preview',
@@ -58,86 +70,72 @@ export function lookEditor(opts) {
     const mods = sizeStatMods(L, opts.position);
     const modTxt = Object.entries(mods).filter(([, v]) => v).map(([k, v]) => `${STAT_LABELS[k]} ${v > 0 ? '+' : ''}${v}`).join(' · ');
     return [
-      swatches('Skin tone', SKIN_TONES, 'skin', { index: true }),
-      chips('Head shape', HEAD_SHAPES, 'headShape'),
-      chips('Jaw', JAWS, 'jaw'),
-      chips('Cheekbones', CHEEKS, 'cheek'),
-      chips('Chin', CHINS, 'chin'),
-      chips('Face width', FACE_WIDTHS, 'faceW'),
-      chips('Body type', BODY_TYPES, 'bodyType'),
-      opts.lockBody ? h('p.small.muted', `${fmtHeight(L.heightIn)} · ${L.weightLb} lb (set at creation)`) : [
-        slider('Height', 'heightIn', HEIGHT_RANGE, fmtHeight),
-        slider('Weight', 'weightLb', WEIGHT_RANGE, (v) => `${v} lb`),
-        h('p.tiny.muted', modTxt ? `Starting ratings: ${modTxt}` : 'Average size for your position.'),
-      ],
+      sec('Skin', swatches('Skin tone', SKIN_TONES, 'skin', { index: true })),
+      sec('Face shape', chips('Head shape', HEAD_SHAPES, 'headShape'), chips('Jaw', JAWS, 'jaw'), chips('Cheekbones', CHEEKS, 'cheek'), chips('Chin', CHINS, 'chin'), chips('Face width', FACE_WIDTHS, 'faceW')),
+      sec('Build', chips('Body type', BODY_TYPES, 'bodyType'),
+        opts.lockBody ? h('p.small.muted', `${fmtHeight(L.heightIn)} · ${L.weightLb} lb (set at creation)`) : [
+          slider('Height', 'heightIn', HEIGHT_RANGE, fmtHeight),
+          slider('Weight', 'weightLb', WEIGHT_RANGE, (v) => `${v} lb`),
+          h('p.tiny.muted', modTxt ? `Starting ratings: ${modTxt}` : 'Average size for your position.'),
+        ]),
     ];
   };
   const views = {
     body,
-    hair: () => [chips('Style', HAIR_STYLES, 'hairStyle'), swatches('Color', HAIR_COLORS, 'hairColor', { index: true })],
-    face: () => [chips('Eyes', EYES, 'eyes'), swatches('Eye color', EYE_COLORS, 'eyeColor', { index: true }), chips('Brows', BROWS, 'brows'),
-      chips('Nose', NOSES, 'nose'), chips('Mouth', MOUTHS, 'mouth'), chips('Facial hair', BEARDS, 'beard')],
-    ink: () => [chips('Left arm', TATTOOS, 'tatL'), chips('Right arm', TATTOOS, 'tatR'), chips('Neck', NECK_TATTOOS, 'tatNeck')],
-    jersey: () => [
+    hair: () => [sec('Hairstyle', chips('Style', HAIR_STYLES, 'hairStyle')), sec('Color', swatches('Hair color', HAIR_COLORS, 'hairColor', { index: true }))],
+    face: () => [
+      sec('Eyes', chips('Eye shape', EYES, 'eyes'), swatches('Eye color', EYE_COLORS, 'eyeColor', { index: true }), chips('Brows', BROWS, 'brows')),
+      sec('Nose & mouth', chips('Nose', NOSES, 'nose'), chips('Mouth', MOUTHS, 'mouth')),
+      sec('Facial hair', chips('Style', BEARDS, 'beard')),
+    ],
+    ink: () => [sec('Arms', chips('Left arm', TATTOOS, 'tatL'), chips('Right arm', TATTOOS, 'tatR')), sec('Neck', chips('Neck', NECK_TATTOOS, 'tatNeck'))],
+    jersey: () => [sec('Jersey',
       chips('Sleeves', JERSEY_SLEEVES, 'jSleeve'),
       chips('Length', JERSEY_LENGTHS, 'jLength'),
       chips('Fit', JERSEY_FITS, 'jFit'),
       h('div.look-row', h('div.section-label', L.jLength === 'crop' ? 'Undershirt / belly' : 'Undershirt'), h('div.swatch-row',
         [['team', `linear-gradient(135deg, ${opts.uniform?.jersey ?? '#1d3557'} 50%, ${opts.uniform?.trim ?? '#ffd43b'} 50%)`], ['skin', SKIN_TONES[L.skin % SKIN_TONES.length]], ...GEAR_COLORS.map((c) => [c, c])].map(([v, bg]) =>
-          h(`button.sw${L.underColor === v ? '.on' : ''}`, { style: { background: bg }, 'aria-label': v, title: v === 'skin' ? 'No undershirt' : v === 'team' ? 'Team color' : v, onclick: () => set('underColor', v) })))),
-      chips('Shoulder pads', PAD_SIZES, 'padSize'),
-      chips('Back plate', PAD_EXTRAS, 'backplate'),
-      chips('Horse collar (neck roll)', PAD_EXTRAS, 'neckRoll'),
-      chips('Socks', SOCKS, 'sockStyle'),
-      chips('Mouthguard', MOUTHGUARDS, 'mouthguard'),
+          h(`button.sw${L.underColor === v ? '.on' : ''}`, { style: { background: bg }, 'aria-label': v, title: v === 'skin' ? 'No undershirt' : v === 'team' ? 'Team color' : v, onclick: () => set('underColor', v) }))))),
+      sec('Pads', chips('Shoulder pads', PAD_SIZES, 'padSize'), chips('Back plate', PAD_EXTRAS, 'backplate'), chips('Horse collar (neck roll)', PAD_EXTRAS, 'neckRoll')),
+      sec('Extras', chips('Socks', SOCKS, 'sockStyle'), chips('Mouthguard', MOUTHGUARDS, 'mouthguard')),
       h('p.tiny.muted', 'Jersey colors come from your team. How you wear it is up to you.'),
     ],
-    helmet: () => [
+    helmet: () => [sec('Facemask',
       chips('Facemask', MASKS, 'maskStyle'),
       h('div.look-row', h('div.section-label', 'Facemask color'), h('div.swatch-row', MASK_COLORS.map((c) => h(`button.sw${L.maskColor === c ? '.on' : ''}`, {
-        style: { background: c === 'team' ? `linear-gradient(135deg, ${opts.uniform?.stripe ?? '#ffd43b'} 50%, ${opts.uniform?.helmet ?? '#1d3557'} 50%)` : c }, 'aria-label': c, onclick: () => set('maskColor', c) })))),
-      chips('Helmet stripe', STRIPES, 'helmetStripe'),
-      chips('Shell finish', FINISHES, 'helmetFinish'),
-      chips('Visor tint', VISORS, 'visor'),
+        style: { background: c === 'team' ? `linear-gradient(135deg, ${opts.uniform?.stripe ?? '#ffd43b'} 50%, ${opts.uniform?.helmet ?? '#1d3557'} 50%)` : c }, 'aria-label': c, onclick: () => set('maskColor', c) }))))),
+      sec('Shell', chips('Helmet stripe', STRIPES, 'helmetStripe'), chips('Shell finish', FINISHES, 'helmetFinish')),
+      sec('Visor', chips('Visor tint', VISORS, 'visor')),
       h('p.tiny.muted', 'Helmet colors come from your team. The facemask, stripe and finish are yours.'),
     ],
     gear: () => [
-      swatches('Cleats', GEAR_COLORS, 'cleats'),
-      chips('Cleat design', CLEAT_DESIGNS, 'cleatDesign'),
-      L.cleatDesign !== 'solid' ? swatches('Cleat accent', GEAR_COLORS, 'cleatAccent') : null,
-      chips('Cleat cut', CLEAT_CUTS, 'cleatCut'),
-      chips('Spats / tape', SPATS, 'spats'),
-      swatches('Gloves', GEAR_COLORS, 'gloves', { none: true }),
-      L.gloves ? chips('Glove design', GLOVE_DESIGNS, 'gloveDesign') : null,
-      L.gloves && L.gloveDesign !== 'solid' ? swatches('Glove accent', GEAR_COLORS, 'gloveAccent') : null,
-      chips('Visor tint', VISORS, 'visor'),
-      h('div.look-row', h('div.section-label', 'Eye black'), h('div.chip-row',
-        h(`button.opt${L.eyeBlack ? '.on' : ''}`, { onclick: () => set('eyeBlack', true) }, 'On'),
-        h(`button.opt${!L.eyeBlack ? '.on' : ''}`, { onclick: () => set('eyeBlack', false) }, 'Off'))),
+      sec('Cleats', swatches('Cleat color', GEAR_COLORS, 'cleats'), chips('Cleat design', CLEAT_DESIGNS, 'cleatDesign'),
+        L.cleatDesign !== 'solid' ? swatches('Cleat accent', GEAR_COLORS, 'cleatAccent') : null, chips('Cleat cut', CLEAT_CUTS, 'cleatCut'), chips('Spats / tape', SPATS, 'spats')),
+      sec('Gloves', swatches('Glove color', GEAR_COLORS, 'gloves', { none: true }), L.gloves ? chips('Glove design', GLOVE_DESIGNS, 'gloveDesign') : null,
+        L.gloves && L.gloveDesign !== 'solid' ? swatches('Glove accent', GEAR_COLORS, 'gloveAccent') : null),
+      sec('Face', chips('Visor tint', VISORS, 'visor'), toggle('Eye black', 'eyeBlack')),
     ],
     swag: () => [
-      chips('Arm sleeves', SIDES, 'sleeve'), L.sleeve !== 'none' ? swatches('Arm sleeve color', GEAR_COLORS, 'sleeveColor') : null,
-      chips('Wristbands', SIDES, 'wristband'), L.wristband !== 'none' ? swatches('Wristband color', GEAR_COLORS, 'wristColor') : null,
-      chips('Elbow pads', SIDES, 'elbowPad'), L.elbowPad !== 'none' ? swatches('Elbow pad color', GEAR_COLORS, 'elbowColor') : null,
-      chips('Knee braces', SIDES, 'kneeBrace'), L.kneeBrace !== 'none' ? swatches('Brace color', GEAR_COLORS, 'kneeColor') : null,
-      chips('Leg sleeves', SIDES, 'legSleeve'), L.legSleeve !== 'none' ? swatches('Leg sleeve color', GEAR_COLORS, 'legSleeveColor') : null,
-      chips('Towel', TOWELS, 'towel'),
-      h('div.look-row', h('div.section-label', 'Hand warmer'), h('div.chip-row',
-        h(`button.opt${L.handWarmer ? '.on' : ''}`, { onclick: () => set('handWarmer', true) }, 'On'),
-        h(`button.opt${!L.handWarmer ? '.on' : ''}`, { onclick: () => set('handWarmer', false) }, 'Off'))),
-      chips('Chain', CHAINS, 'chain'),
+      sec('Arms', chips('Arm sleeves', SIDES, 'sleeve'), L.sleeve !== 'none' ? swatches('Arm sleeve color', GEAR_COLORS, 'sleeveColor') : null,
+        chips('Wristbands', SIDES, 'wristband'), L.wristband !== 'none' ? swatches('Wristband color', GEAR_COLORS, 'wristColor') : null,
+        chips('Elbow pads', SIDES, 'elbowPad'), L.elbowPad !== 'none' ? swatches('Elbow pad color', GEAR_COLORS, 'elbowColor') : null),
+      sec('Legs', chips('Knee braces', SIDES, 'kneeBrace'), L.kneeBrace !== 'none' ? swatches('Brace color', GEAR_COLORS, 'kneeColor') : null,
+        chips('Leg sleeves', SIDES, 'legSleeve'), L.legSleeve !== 'none' ? swatches('Leg sleeve color', GEAR_COLORS, 'legSleeveColor') : null),
+      sec('Extras', chips('Towel', TOWELS, 'towel'), toggle('Hand warmer', 'handWarmer'), chips('Chain', CHAINS, 'chain')),
     ],
-    casual: () => [swatches('Shirt', CLOTHES, 'shirt'), swatches('Pants', CLOTHES, 'pants'), swatches('Shoes', CLOTHES, 'shoe'), h('p.tiny.muted', 'What you wear around town, at home and on your phone.')],
-    gala: () => [swatches('Suit', SUITS, 'suit'), swatches('Tie', ['#c92a2a', '#1c7ed6', '#e8b730', '#16181c', '#f4f4f4', '#2f9e44', '#ae3ec9'], 'tie'), h('p.tiny.muted', 'Worn on draft night, award shows and the Hall of Fame.')],
-    celeb: () => [chips('Touchdown celebration', CELEBRATIONS, 'celebration'), h('p.tiny.muted', 'Shown in the end zone after you score.')],
+    casual: () => [sec('Around town', swatches('Shirt', CLOTHES, 'shirt'), swatches('Pants', CLOTHES, 'pants'), swatches('Shoes', CLOTHES, 'shoe')), h('p.tiny.muted', 'What you wear around town, at home and on your phone.')],
+    gala: () => [sec('Formal', swatches('Suit', SUITS, 'suit'), swatches('Tie', ['#c92a2a', '#1c7ed6', '#e8b730', '#16181c', '#f4f4f4', '#2f9e44', '#ae3ec9'], 'tie')), h('p.tiny.muted', 'Worn on draft night, award shows and the Hall of Fame.')],
+    celeb: () => [sec('Touchdown celebration', chips('Celebration', CELEBRATIONS, 'celebration')), h('p.tiny.muted', 'Shown in the end zone after you score.')],
   };
 
   const draw = () => {
     clear(wrap);
     wrap.append(
-      preview(),
-      h('div.subtabs.look-tabs', TABS.map(([id, l]) =>
-        h(`button.subtab${st.tab === id ? '.on' : ''}`, { onclick: () => { sfx.click(); st.tab = id; st.helmet = id === 'gear' || id === 'swag' || id === 'helmet' || id === 'jersey'; draw(); } }, l))),
+      h('div.look-sticky', preview()),
+      h('div.look-tabgroups', TAB_GROUPS.map(([gname, ids]) => h('div.look-tabgroup',
+        h('div.look-tabgroup-name', gname),
+        h('div.look-tabgrid', ids.map((id) => { const [, l, icon] = TABS.find((t) => t[0] === id);
+          return h(`button.look-tab${st.tab === id ? '.on' : ''}`, { onclick: () => { sfx.click(); st.tab = id; st.helmet = id === 'helmet'; draw(); } }, h('span.ico', icon), h('span', l)); }))))),
       h('div.look-panel', views[st.tab]()));
   };
   draw();

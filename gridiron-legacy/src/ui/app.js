@@ -1,5 +1,6 @@
 // App controller: owns the current game state, routes to screens, autosaves.
 import { clear } from './dom.js';
+import { showWhatsNew } from './whatsnew.js';
 import { closeAllModals, toast } from './components.js';
 import * as storage from '../core/storage.js';
 import { setSoundEnabled } from '../audio/sfx.js';
@@ -29,6 +30,8 @@ export const app = {
   init() {
     this.applySettings();
     this.render();
+    // what's new: every time the game opens
+    setTimeout(() => showWhatsNew(), 350);
   },
 
   applySettings() {

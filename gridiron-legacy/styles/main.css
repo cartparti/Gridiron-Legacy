@@ -951,3 +951,55 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 .halftime.min > :not(.ht-head) { display: none; }
 .halftime.min { background: rgba(14, 17, 22, 0.6); }
 .ht-head { gap: 6px; }
+
+/* ---- what's new */
+.whatsnew { display: flex; flex-direction: column; gap: 12px; max-height: min(78vh, 640px); overflow-y: auto; }
+.wn-top { display: flex; gap: 12px; align-items: center; }
+.wn-top h2 { margin: 2px 0 0; }
+.wn-badge { font-family: var(--pixel); font-weight: 700; font-size: 0.75rem; letter-spacing: 0.08em; padding: 8px 10px; border-radius: 10px; background: var(--accent); color: #111; flex: none; }
+.wn-list, .wn-entry ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; font-size: 0.92rem; line-height: 1.35; }
+.wn-list li::marker, .wn-entry li::marker { color: var(--accent); }
+.wn-older { display: flex; flex-direction: column; gap: 12px; }
+.wn-entry { border-top: 1px solid var(--line); padding-top: 10px; }
+.wn-entry ul { font-size: 0.85rem; color: var(--muted); }
+.wn-head { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+.wn-head b { flex: 1; }
+
+/* ---- position picker */
+.pos-cards { display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.pick-card.pos { min-width: 0; padding: 10px 2px 9px; gap: 3px; }
+.pick-card.pos .big { font-size: 1.15rem; }
+.pick-card.pos .lbl { font-size: 0.56rem; overflow-wrap: normal; word-break: keep-all; hyphens: manual; }
+.pos-detail { margin-top: 12px; padding: 12px; border-radius: 14px; background: var(--card2); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+.pos-detail-head { display: flex; justify-content: space-between; align-items: baseline; }
+.pos-detail p { margin: 0; }
+.pos-stats { display: flex; flex-direction: column; gap: 9px; }
+.pos-stat-row { display: grid; grid-template-columns: 76px 1fr 38px; gap: 8px; align-items: center; font-size: 0.85rem; }
+.pos-stat-name { font-weight: 600; }
+.pos-stat-pct { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.pos-bar { height: 8px; border-radius: 99px; background: color-mix(in srgb, var(--text) 10%, transparent); overflow: hidden; }
+.pos-bar i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.pos-stat .tiny { padding-left: 84px; margin-top: 2px; line-height: 1.25; }
+
+/* ---- look editor: sticky preview, grouped icon tabs, titled sections */
+.look-editor { display: flex; flex-direction: column; gap: 12px; }
+.look-sticky { position: sticky; top: 0; z-index: 5; margin: 0 -2px; padding: 4px 2px 8px; background: var(--card); border-bottom: 1px solid var(--line); }
+.look-sticky .look-stage { height: 190px; }
+.look-sticky .look-stage img { height: 182px !important; }
+.look-tabgroups { display: flex; flex-direction: column; gap: 8px; }
+.look-tabgroup-name { font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px 2px; }
+.look-tabgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.look-tab { appearance: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px 7px; border-radius: 12px;
+  border: 1.5px solid var(--line); background: var(--card2); color: var(--text); font-size: 0.72rem; font-weight: 600; min-height: 52px; }
+.look-tab .ico { font-size: 1.15rem; line-height: 1; }
+.look-tab.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--card2)); }
+.look-panel { gap: 10px !important; }
+.look-sec { border: 1px solid var(--line); border-radius: 14px; background: color-mix(in srgb, var(--card2) 70%, transparent); overflow: hidden; }
+.look-sec-title { font-family: var(--pixel); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 9px 12px; color: var(--accent);
+  background: color-mix(in srgb, var(--text) 4%, transparent); border-bottom: 1px solid var(--line); }
+.look-sec-body { display: flex; flex-direction: column; gap: 12px; padding: 10px 12px 12px; }
+.look-sec .section-label { font-size: 0.7rem; margin-bottom: 6px; color: var(--muted); }
+.look-sec .chip-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
+.look-sec .chip-row .opt { width: 100%; min-height: 36px; padding: 6px 4px; font-size: 0.7rem; text-align: center; white-space: normal; line-height: 1.15; }
+.look-sec .swatch-row { display: flex; flex-wrap: wrap; gap: 7px; }
+.look-sec .swatch-row .sw { width: 32px; height: 32px; border-radius: 50%; }

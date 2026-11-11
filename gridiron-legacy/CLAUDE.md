@@ -403,6 +403,14 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Sim: Hail Mary only on the last drive of a half from 40+ out; ~6% of moments are backed up (88-97); no RB screens from
   your own end zone.
 
+## v0.29: what's new + cleaner menus
+- `src/data/changelog.js` (newest first, plain language) + `src/ui/whatsnew.js`: shown every time the game opens
+  (`app.init`), skipped in automated browsers (`navigator.webdriver`) unless `window.__forceWhatsNew`. ADD AN ENTRY
+  for every update the player will notice. No slide-in animation (it stalled over the 3D title screen).
+- Look editor: `TABS` (id, label, icon) in `TAB_GROUPS` (You / Uniform / Off the field) shown as an icon grid;
+  every view is built from `sec(title, ...rows)` cards; `toggle()` for on/off; preview in a sticky `.look-sticky`.
+- Create screen: Position moved above Look; 5-column cards that fit; `.pos-detail` with stats sorted by weight as bars.
+
 ## Known gaps / next ideas
 - Pass rush and kicking minigames not built yet.
 - Minigame feel needs real-device playtesting and tuning (timings in `src/scenes/minigames/*`).
