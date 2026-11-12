@@ -31,6 +31,11 @@ export const TRAITS = [
   { id: 'motor', pos: 'DT', name: 'Relentless Motor', icon: 'flame', desc: 'Leverage builds 40% faster.', goal: { stat: 'tackles', n: 60, label: 'Career tackles' } },
   { id: 'batter', pos: 'DT', name: 'Batting Practice', icon: 'target', desc: 'Batting passes at the line is much easier.', goal: { stat: 'games', n: 20, label: 'Career games' } },
   { id: 'closer', pos: 'DT', name: 'Sack Artist', icon: 'star', desc: 'Your sack lunge reaches 30% farther.', goal: { stat: 'defSacks', n: 5, label: 'Career sacks' } },
+  // ---------------- mascot
+  { id: 'showman', pos: 'MS', name: 'Born Showman', icon: 'star', desc: 'Beat windows in Hype the Crowd are 30% bigger.', goal: { stat: 'hype', n: 400, label: 'Career crowd hype' } },
+  { id: 'cannonarm', pos: 'MS', name: 'Cannon Arm', icon: 'target', desc: 'One extra T-shirt and bigger targets.', goal: { stat: 'shirts', n: 40, label: 'Career shirts landed' } },
+  { id: 'smoothmoves', pos: 'MS', name: 'Smooth Moves', icon: 'bolt', desc: 'More time to answer in mascot showdowns.', goal: { stat: 'danceWins', n: 5, label: 'Career showdown wins' } },
+  { id: 'acrobat', pos: 'MS', name: 'Acrobat', icon: 'flame', desc: 'The trampoline power zone is 40% bigger.', goal: { stat: 'stunts', n: 4, label: 'Career stunts landed' } },
   // ---------------- everyone
   { id: 'captain', pos: 'ANY', name: 'Team Captain', icon: 'crown', desc: 'Momentum swings your way 25% harder.', goal: { rel: 'teammates', n: 75, label: 'Teammate relationship' } },
   { id: 'clutchgene', pos: 'ANY', name: 'Clutch Gene', icon: 'trophy', desc: 'All quick-time events are 25% easier.', goal: { level: 8, label: 'Player level' } },

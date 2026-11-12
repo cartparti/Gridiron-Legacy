@@ -1,4 +1,5 @@
 // Career pages: stats overview (by season, by level, journey, market value), Legends, Award Race.
+import { awardLabel } from '../../sim/awards.js';
 import { h } from '../dom.js';
 import { fmtMoney } from '../../core/util.js';
 import { getTeam } from '../../sim/league.js';
@@ -61,7 +62,7 @@ export function careerStatsSections(app) {
     card('trophy', t.ind, 'Individual awards', `${t.team} team title${t.team === 1 ? '' : 's'}`),
     card('scroll', seasons, 'Seasons', `${teams} team${teams === 1 ? '' : 's'}`),
     card('bolt', bestPerf ? Math.round(bestPerf) : '-', 'Best season rating', ''),
-    card('flame', ['CB', 'DT'].includes(p.position) ? bigPlaysD(cs) : totalTD(cs), ['CB', 'DT'].includes(p.position) ? 'Big plays (INT + sacks)' : 'Total touchdowns', ''))));
+    card('flame', p.position === 'MS' ? (cs.stunts ?? 0) : ['CB', 'DT'].includes(p.position) ? bigPlaysD(cs) : totalTD(cs), p.position === 'MS' ? 'Halftime stunts landed' : ['CB', 'DT'].includes(p.position) ? 'Big plays (INT + sacks)' : 'Total touchdowns', ''))));
 
   // by season
   const rows = p.history.map((x) => ({ year: x.year, stage: x.stage, team: x.teamId, colors: x.colors, s: x.seasonStats, perf: x.perf, champ: x.champion }));
@@ -140,13 +141,13 @@ export function racePage(app) {
     h('b', x.name.split(' ').slice(-1)[0], x.you ? ' ★' : ''), h('span.tiny', `${x.pts} PTS`), h('div.pod-block.pix', place === 1 ? '1st' : place === 2 ? '2nd' : '3rd')) : h('div');
   return h('div.col', { style: { gap: '14px' } },
     h('div.card.race-card',
-      h('div.card-title', h('h2', r.award), h('span.chip.pix', `WEEK ${r.weeks}`)),
+      h('div.card-title', h('h2', awardLabel(r.award, st.player.position)), h('span.chip.pix', `WEEK ${r.weeks}`)),
       h('div.race-me', h('div', h('small.pix', 'YOUR POSITION'), h('b.pix', me ? `${me.rank}${['st', 'nd', 'rd'][me.rank - 1] ?? 'th'}` : '-')), h('div', h('small.pix', 'POINTS'), h('b.pix', me?.pts ?? 0)), h('div', h('small.pix', 'GAP TO 1ST'), h('b.pix', me && me.rank > 1 ? `-${r.rows[0].pts - me.pts}` : '—'))),
       h('div.podiums', pod(top3[1], 2), pod(top3[0], 1), pod(top3[2], 3)),
       h('div.list', r.rows.slice(3, 12).map((x) => h(`div.li${x.you ? '.me' : ''}`, h('b.pix.lg-rank', x.rank), teamOf(x.team) ? crest(teamOf(x.team), 22) : null, h('div.grow', h('b', x.name), h('span.tiny.muted', ` ${x.pos}`)), h('b.pix', x.pts)))),
       me && me.rank > 12 ? h('div.li.me', h('b.pix.lg-rank', me.rank), h('div.grow', h('b', `${me.name} (you)`)), h('b.pix', me.pts)) : null,
       h('p.tiny.muted', 'Points come from game performance and team wins. Voters decide at the end of the season.')),
-    h('div.card', h('h3', r.kidAward), h('div.list', r.kids.map((x, i) => h(`div.li${x.you ? '.me' : ''}`, h('b.pix.lg-rank', i + 1), h('div.grow', h('b', x.name, x.you ? ' (you)' : ''), h('span.tiny.muted', ` ${x.pos} · age ${x.age}`)), h('b.pix', x.pts)))),
+    h('div.card', h('h3', awardLabel(r.kidAward, st.player.position)), h('div.list', r.kids.map((x, i) => h(`div.li${x.you ? '.me' : ''}`, h('b.pix.lg-rank', i + 1), h('div.grow', h('b', x.name, x.you ? ' (you)' : ''), h('span.tiny.muted', ` ${x.pos} · age ${x.age}`)), h('b.pix', x.pts)))),
       r.kids.length ? null : h('p.small.muted', 'No eligible young players yet.')));
 }
 

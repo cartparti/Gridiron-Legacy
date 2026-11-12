@@ -1,5 +1,13 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.50', date: 'Nov 12', title: 'Be the Mascot', items: [
+    'New position: Mascot. Start a career inside the big foam costume of your school, then college, then the pros. You never take a snap; the crowd is your field.',
+    'Four game-day moments: Hype the Crowd (tap on the beat as the rings close in; every hit is a dance move and combos make the stadium roar), T-Shirt Cannon (tap fans waving in the stands; gold VIPs are worth double), Mascot Showdown (copy the other team\'s mascot\'s dance combo, three rounds, then the winner flattens the loser) and the Halftime Stunt (trampoline: power, flips, stick the landing).',
+    'Flop and your mascot head pops off and rolls across the field. Everyone sees it.',
+    'How you work the crowd swings momentum and helps your team\'s drives. Your stats: Crowd Hype, Shirts Landed, Showdown Wins and Stunts.',
+    'Mascot awards: Mascot of the Year, Crowd Igniter of the Year, the Golden Foam Head Trophy, Legacy Bowl Halftime Hero and more, plus mascot records to chase.',
+    'Four mascot traits to unlock: Born Showman, Cannon Arm, Smooth Moves and Acrobat. Try every mascot moment in Practice (pick Mascot).',
+  ] },
   { v: '0.49', date: 'Nov 12', title: 'Extreme hits and live X-rays', items: [
     'Extreme hits: a full-speed, square collision (or now and then a big hit that lands just right) goes into slow motion, the camera swoops in tight, and both players turn into a live X-ray with their skeletons moving inside them as the hit happens. If something breaks, you see the bone light up red and snap.',
     'It happens whatever position you play: getting tackled, laying the hit yourself as a corner or a lineman, getting sacked or sacking the QB. Sometimes you see it on hits between other players too.',

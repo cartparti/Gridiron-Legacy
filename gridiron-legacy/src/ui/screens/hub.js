@@ -1,4 +1,5 @@
 // Main career hub: top bar with meters, bottom tabs, and the five tab views.
+import { awardLabel } from '../../sim/awards.js';
 import { injuryInfo, injuryNote } from '../../sim/injury.js';
 import { h, clear } from '../dom.js';
 import { maybeTour } from '../onboarding.js';
@@ -62,7 +63,7 @@ export function topBar(app) {
       h('div.ovr-badge', Math.round(p.ovr), h('small', 'OVR')),
       h('div.grow',
         h('div.name', `${p.first} ${p.last}`),
-        h('div.sub', `#${p.number} ${p.position} · Age ${p.age} · ${team ? team.name : ''}`),
+        h('div.sub', `#${p.number} ${p.position === 'MS' ? 'Mascot' : p.position} · Age ${p.age} · ${team ? team.name : ''}`),
         h('div.sub', `${stageLbl} · ${st.career.year} · ${wk} · LV ${p.level ?? 1}${p.skillPoints ? ` · ${p.skillPoints} pts` : ''}`)),
       h('button.icon-btn.phone-btn', { 'aria-label': 'Phone', onclick: () => openPhone(app) }, icon('chat'), phoneBadge(st) ? h('span.app-badge', phoneBadge(st)) : null),
       h('button.icon-btn', { 'aria-label': 'Settings', onclick: () => { app.ui.back = 'career'; app.go('settings'); } }, icon('gear'))),
@@ -309,7 +310,7 @@ function seasonCard(st) {
   return h('div.card.season-card',
     h('div.card-title', h('h3', 'Your Season'), sk ? h('span.chip.pix', sk.record) : null),
     d ? h('div.depth-box',
-      h('div.row.between', h('b', d.role === 'starter' ? `Starting ${p.position}` : `Backup ${p.position}`), h('span.tiny.muted', d.role === 'starter' ? `Holding off ${d.rival.name} (${Math.round(d.rival.ovr)})` : `Behind ${d.rival.name} (${Math.round(d.rival.ovr)})`)),
+      h('div.row.between', h('b', d.role === 'starter' ? `Starting ${p.position === 'MS' ? 'mascot' : p.position}` : `Backup ${p.position === 'MS' ? 'mascot' : p.position}`), h('span.tiny.muted', d.role === 'starter' ? `Holding off ${d.rival.name} (${Math.round(d.rival.ovr)})` : `Behind ${d.rival.name} (${Math.round(d.rival.ovr)})`)),
       h('div.depth-bar', h('i', { style: { width: `${prog}%`, background: d.role === 'starter' ? 'var(--good)' : 'var(--accent)' } }), h('span.mark')),
       h('p.tiny.muted', d.role === 'starter' ? 'Keep playing well to keep the job. A few bad weeks and coach could make a change.' : 'Win the job: train hard, play well when you get your snaps, and keep coach happy. Backups only get a couple of late snaps.')) : null,
     sk ? h('div.stakes', h('div', h('b', `#${sk.rank}`), h('span', sk.conf ? `${sk.conf} Conf.` : sk.div ? sk.div : 'League')), h('div', h('b', sk.left), h('span', 'Games left')), h('div.wide', h('b.small', sk.status), h('span', 'Playoff race'))) : null,
@@ -498,7 +499,7 @@ function awardsView(app) {
   const counts = {};
   for (const a of p.awards) { counts[a.name] ??= { n: 0, years: [], stage: a.stage }; counts[a.name].n++; counts[a.name].years.push(a.year); }
   const tile = (name, c) => h(`div.trophy${c ? '' : '.locked'}${kindOf(name) === 'team' ? '.team' : ''}`,
-    h('div.trophy-ic', icon(iconOf(name))), h('b.tiny', name), c ? h('span.tiny.muted', `${c.n > 1 ? `${c.n}× · ` : ''}${c.years.join(', ')}`) : h('span.tiny.muted', 'Not yet'));
+    h('div.trophy-ic', icon(iconOf(name))), h('b.tiny', awardLabel(name, p.position)), c ? h('span.tiny.muted', `${c.n > 1 ? `${c.n}× · ` : ''}${c.years.join(', ')}`) : h('span.tiny.muted', 'Not yet'));
   const w = awardWatch(st);
   const madePO = p.history.filter((x) => x.madePlayoffs).length;
   const titles = p.history.filter((x) => x.champion);
@@ -540,6 +541,7 @@ function profileView(app) {
   const team = getTeam(st.league, st.career.teamId);
   const s = p.seasonStats;
   const posLine = (x) => (p.position === 'QB' ? `${x.passComp}/${x.passAtt}, ${x.passYds} yds, ${x.passTD} TD, ${x.int} INT`
+    : p.position === 'MS' ? `${x.hype ?? 0} hype, ${x.shirts ?? 0} shirts, ${x.danceWins ?? 0} showdown wins, ${x.stunts ?? 0} stunts`
     : p.position === 'DT' ? `${x.defSacks ?? 0} sacks, ${x.tfl ?? 0} TFL, ${x.tackles ?? 0} tkl`
     : p.position === 'CB' ? `${x.defInt ?? 0} INT, ${x.pd ?? 0} PD, ${x.tackles ?? 0} tkl, ${x.defTD ?? 0} TD · ${x.ydsAllowed ?? 0} yds allowed`
     : p.position === 'RB' ? `${x.rushAtt} car, ${x.rushYds} yds, ${x.rushTD} TD · ${x.rec} rec ${x.recYds} yds`
@@ -556,7 +558,7 @@ function profileView(app) {
         h('span.small.muted', `${POSITIONS[p.position].label} · ${p.hometown}`),
         p.look?.heightIn ? h('span.small', fmtSize(p.look)) : null,
         h('span.small', `${team.city} ${team.name}`),
-        p.draft ? h('span.small.muted', p.draft.undrafted ? 'Undrafted free agent' : `Drafted ${ordinal(p.draft.pick)} overall (${p.draft.year})`) : null,
+        p.draft ? h('span.small.muted', p.position === 'MS' ? `Hired as the team mascot (${p.draft.year})` : p.draft.undrafted ? 'Undrafted free agent' : `Drafted ${ordinal(p.draft.pick)} overall (${p.draft.year})`) : null,
         p.injury ? h('span.chip.bad', icon('bandage'), `${p.injury.label} · ${injuryInfo(p.injury, p.position)?.label} · ${p.injury.weeks} wk`) : null,
         p.suspended ? h('span.chip.bad', `Suspended ${p.suspended}`) : null))),
     h('div.card', h('div.card-title', h('h3', 'Ratings'), h('span.display', { style: { fontSize: '1.4rem' } }, `${Math.round(p.ovr)} OVR`)), statBars(p.stats, POSITIONS[p.position].statNotes)),

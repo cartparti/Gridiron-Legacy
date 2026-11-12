@@ -54,10 +54,11 @@ export function positionDiagram(pos) {
   const off = { QB: [50, 70], RB: [50, 82], WR1: [8, 57], WR2: [92, 57], SL: [24, 59], TE: [66, 58], OL1: [38, 57], OL2: [44, 57], OL3: [50, 57], OL4: [56, 57], OL5: [62, 57] };
   const def = { DT1: [44, 50], DT2: [56, 50], DE1: [34, 50], DE2: [66, 50], LB1: [40, 40], LB2: [60, 40], CB1: [8, 46], CB2: [92, 46], NB: [24, 44], SS: [36, 26], FS: [64, 22] };
   const me = { QB: 'QB', RB: 'RB', WR: 'WR2', CB: 'CB2', DT: 'DT2' }[pos];
+  const ms = pos === 'MS' ? '<rect x="45" y="92" width="10" height="6" fill="#ffd43b" stroke="#000" stroke-width="0.8"/><rect x="42" y="89.5" width="16" height="11" fill="none" stroke="#ffd43b" stroke-width="1"/>' : '';
   const dots = (set, color) => Object.entries(set).map(([k, [x, y]]) => `<rect x="${x - 2.5}" y="${y - 2.5}" width="5" height="5" fill="${k === me ? '#ffd43b' : color}" stroke="#000" stroke-width="0.8"/>${k === me ? `<rect x="${x - 5}" y="${y - 5}" width="10" height="10" fill="none" stroke="#ffd43b" stroke-width="1"/>` : ''}`).join('');
   const svg = `<svg viewBox="0 0 100 100" width="100%" height="100%" shape-rendering="crispEdges">
     <rect width="100" height="100" fill="#2f6f35"/>${[10, 20, 30, 40, 60, 70, 80, 90].map((y) => `<rect x="0" y="${y}" width="100" height="0.6" fill="rgba(255,255,255,0.35)"/>`).join('')}
-    <rect x="0" y="53.5" width="100" height="1" fill="#4dabf7"/>${dots(off, '#e9ecef')}${dots(def, '#ff6b6b')}</svg>`;
+    <rect x="0" y="53.5" width="100" height="1" fill="#4dabf7"/>${dots(off, '#e9ecef')}${dots(def, '#ff6b6b')}${ms}</svg>`;
   return h('div.pos-diagram', { html: svg });
 }
 
@@ -70,6 +71,11 @@ export function gameKits(st, me, opp) {
   return { myId, mine, theirs };
 }
 
+const CALL_DESC_MS = {
+  safe: 'Crowd-pleasers you know by heart. Easier, smaller payoff.',
+  balanced: 'Your usual routine.',
+  risky: 'Go big. Bigger hype, bigger flops.',
+};
 const CALL_DESC_DEF = {
   safe: 'Play soft. Fewer big plays, fewer picks.',
   balanced: 'Mirror and react.',
@@ -81,6 +87,7 @@ function statLineOf(pos, s) {
   if (pos === 'RB') return [[s.rushAtt, 'Carries'], [s.rushYds, 'Rush yds'], [s.rushTD, 'TD']];
   if (pos === 'DT') return [[s.defSacks ?? 0, 'Sacks'], [s.tfl ?? 0, 'TFL'], [s.tackles ?? 0, 'Tackles']];
   if (pos === 'CB') return [[s.defInt ?? 0, 'INT'], [s.pd ?? 0, 'Pass def'], [s.tackles ?? 0, 'Tackles']];
+  if (pos === 'MS') return [[s.hype ?? 0, 'Hype'], [s.shirts ?? 0, 'Shirts'], [s.danceWins ?? 0, 'Showdowns']];
   return [[`${s.rec}/${s.targets}`, 'Rec/Tgt'], [s.recYds, 'Rec yds'], [s.recTD, 'TD']];
 }
 
@@ -326,7 +333,7 @@ export function gamedayScreen(app) {
       h('h2', { style: { marginTop: '10px' } }, m.label),
       h('p.small.muted', `${MOMENT_NAMES[m.type] ?? 'Key moment'}${m.trailing ? ' · you are trailing' : ''}${g.weather !== 'clear' && g.weather !== 'night' ? ` · ${w.label.toLowerCase()}` : ''}. Pick a play call:`),
       h('div.calls', Object.entries(PLAY_CALLS).map(([id, c]) => h(`button.btn.call.${id}`, { onclick: () => play(m, id) },
-        c.label, h('span.cd', defense ? CALL_DESC_DEF[id] : c.desc), h('span.tw', tolTxt(id))))),
+        c.label, h('span.cd', st.player.position === 'MS' ? CALL_DESC_MS[id] : defense ? CALL_DESC_DEF[id] : c.desc), h('span.tw', tolTxt(id))))),
       h('button.btn.small.ghost.block', { style: { marginTop: '8px' }, onclick: () => { sfx.click(); finishMoment(autoMoment(st, 'balanced')); } }, 'Sim this play'));
     const tip = tipCard(app, 'moment', 'Key moments', 'Safe plays are easier with smaller gains. Risky plays are harder but can break open. Your ratings, health, freshness, weather and momentum set the timing window.');
     if (tip) momentSlot.append(tip);
@@ -397,6 +404,7 @@ export function gamedayScreen(app) {
       position: st.player.position,
       teamColors: me.colors,
       oppColors: opp.colors,
+      myMascot: mascotKind(me), oppMascot: mascotKind(opp), myTeamName: me.name, oppTeamName: opp.name,
       teamUniform: kitUniform(gameKits(st, me, opp).mine),
       oppUniform: kitUniform(gameKits(st, me, opp).theirs),
       look: st.player.look,
@@ -407,7 +415,7 @@ export function gamedayScreen(app) {
       culture: { ...culture, mascot: mascotKind(home) },
       homeName: home.name,
       // a broadcast shot between plays about half the time (mascot, cheer squad, coach, crowd, huddle, bench)
-      interlude: Math.random() < 0.55 ? INTERLUDES[Math.floor(Math.random() * INTERLUDES.length)] : null,
+      interlude: !m.type.startsWith('ms_') && Math.random() < 0.55 ? INTERLUDES[Math.floor(Math.random() * INTERLUDES.length)] : null,
       song: culture.song,
       bigGame: !!(g.playoff || g.rivalry),
       teamName: me.name,
@@ -534,13 +542,13 @@ export function gamedayScreen(app) {
       clear(box);
       const { myId, mine, theirs } = gameKits(st, me, opp);
       const kits = teamKits(me);
-      const star = randomLook(`${opp.id}-star`, { position: { CB: 'WR', DT: 'OL', QB: 'DL', RB: 'LB', WR: 'CB' }[st.player.position] ?? 'CB' });
+      const star = randomLook(`${opp.id}-star`, { position: { CB: 'WR', DT: 'OL', QB: 'DL', RB: 'LB', WR: 'CB', MS: 'WR' }[st.player.position] ?? 'CB' });
       box.append(
         h('div.lineup',
           h('div.lineup-side', portraitImg({ uniform: kitUniform(mine), look: st.player.look, number: st.player.number, helmet: false }, 120, { full: true, big: true, yaw: -0.5 }), h('span.lineup-size.pix', fmtSize(st.player.look))),
           h('div.lineup-vs.pix', 'VS'),
           h('div.lineup-side', portraitImg({ uniform: kitUniform(theirs), look: star, number: 1 + (opp.id.charCodeAt(0) % 40), helmet: false }, 120, { full: true, big: true, yaw: 0.5 }), h('span.lineup-size.pix', fmtSize(star)))),
-        h('div.row', { style: { gap: '10px', alignItems: 'center' } }, positionDiagram(st.player.position), h('div.grow', h('div.section-label', 'Where you line up'), h('p.tiny.muted', `You're the highlighted square. ${{ QB: 'Under center, running the show.', RB: 'Behind the QB, ready for the handoff.', WR: 'Split out wide on the right.', CB: 'Across from their top receiver.', DT: 'In the trenches, over the guard.' }[st.player.position] ?? ''}`))),
+        h('div.row', { style: { gap: '10px', alignItems: 'center' } }, positionDiagram(st.player.position), h('div.grow', h('div.section-label', 'Where you line up'), h('p.tiny.muted', `You're the highlighted square. ${{ QB: 'Under center, running the show.', RB: 'Behind the QB, ready for the handoff.', WR: 'Split out wide on the right.', CB: 'Across from their top receiver.', DT: 'In the trenches, over the guard.', MS: 'On the sideline in the costume. The crowd is your field.' }[st.player.position] ?? ''}`))),
         h('div.section-label', 'Choose your uniform'),
         h('div.kit-row',
           KIT_IDS.map((id) => h(`button.kit-btn${myId === id ? '.on' : ''}`, { 'aria-label': kits[id].label, onclick: () => { sfx.click(); g.kit = id; app.save(); draw(); } },

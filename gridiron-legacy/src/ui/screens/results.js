@@ -1,4 +1,5 @@
 // Postgame report and end-of-season review.
+import { awardLabel } from '../../sim/awards.js';
 import { injuryInfo, injuryNote } from '../../sim/injury.js';
 import { h } from '../dom.js';
 import { backupModal } from './slots.js';
@@ -23,6 +24,7 @@ export function statLine(pos, s) {
   if (pos === 'RB') return [[s.rushAtt, 'Carries'], [s.rushYds, 'Rush Yds'], [s.rushTD, 'TD']];
   if (pos === 'DT') return [[s.defSacks ?? 0, 'Sacks'], [s.tfl ?? 0, 'TFL'], [s.tackles ?? 0, 'Tackles']];
   if (pos === 'CB') return [[s.defInt ?? 0, 'INT'], [s.pd ?? 0, 'Pass Def'], [s.tackles ?? 0, 'Tackles']];
+  if (pos === 'MS') return [[s.hype ?? 0, 'Crowd Hype'], [s.shirts ?? 0, 'Shirts Landed'], [`${s.danceWins ?? 0}/${s.stunts ?? 0}`, 'Showdowns/Stunts']];
   return [[`${s.rec}/${s.targets}`, 'Rec/Tgt'], [s.recYds, 'Rec Yds'], [s.recTD, 'TD']];
 }
 
@@ -86,7 +88,7 @@ export function reviewScreen(app) {
     r.banquetPlayed = true;
     app.save();
     const wait = r.champion ? 8600 : 60; // after the trophy lift
-    setTimeout(() => runSetCutscene((ctx) => banquetScene(ctx, { look: p.look, name: `${p.first} ${p.last}`, awards: r.awards, year: r.year }), { music: 'anthem' }), wait);
+    setTimeout(() => runSetCutscene((ctx) => banquetScene(ctx, { look: p.look, name: `${p.first} ${p.last}`, awards: r.awards.map((a) => awardLabel(a, p.position)), year: r.year }), { music: 'anthem' }), wait);
   }
   const delta = r.ovrAfter - r.ovrBefore;
   setTimeout(() => (r.awards.length ? sfx.levelUp() : null), 300);
@@ -98,11 +100,11 @@ export function reviewScreen(app) {
         h('div', h('b', r.champion ? '★' : r.seed >= 0 ? `#${(r.seed % 4) + 1}` : '—'), h('span', r.champion ? 'Champions' : r.seed >= 0 ? 'Playoff seed' : 'No playoffs')),
         h('div', h('b', r.perf), h('span', 'Season rating'))),
       h('p.small.muted', { style: { marginTop: '8px' } }, `${STAGES[r.stage].titleName}: ${champ.city} ${champ.name}`)),
-    r.awards.length ? h('div.col', r.awards.map((a, i) => h('div.award', { style: { animationDelay: `${i * 0.15}s` } }, h('span.ic', icon(AWARD_ICONS[a] ?? 'medal')), h('div', h('div.nm', a), h('div.tiny.muted', `${r.year}`))))) : null,
+    r.awards.length ? h('div.col', r.awards.map((a, i) => h('div.award', { style: { animationDelay: `${i * 0.15}s` } }, h('span.ic', icon(AWARD_ICONS[a] ?? 'medal')), h('div', h('div.nm', awardLabel(a, p.position)), h('div.tiny.muted', `${r.year}`))))) : null,
     r.records.length ? h('div.card', { style: { borderColor: 'var(--accent)' } }, h('h3', 'Records Broken'), r.records.map((x) => h('p', h('b', x)))) : null,
     h('div.card', h('h3', 'Season Stats'), h('div.bigstat', statLine(p.position, r.seasonStats).map(([v, l]) => h('div', h('b', v), h('span', l)))),
       h('p.tiny.muted', { style: { marginTop: '6px' } }, `${r.seasonStats.games} games played`)),
-    r.leaders ? h('div.card', h('h3', 'League Leaders'), leadersTable(r.leaders, p)) : null,
+    r.leaders && p.position !== 'MS' ? h('div.card', h('h3', 'League Leaders'), leadersTable(r.leaders, p)) : null,
     h('div.card', h('h3', 'Aging & Growth'),
       h('p', `Overall ${Math.round(r.ovrBefore)} → `, h(`b.${delta >= 0 ? 'good' : 'bad'}`, `${Math.round(r.ovrAfter)} (${signed(delta, 1)})`), ` · now age ${p.age}`),
       h('div.changes', STAT_KEYS.map((k) => h(`span.chip.${r.ageChanges[k] >= 0 ? 'good' : 'bad'}`, `${STAT_LABELS[k]} ${signed(r.ageChanges[k], 1)}`)))),

@@ -606,3 +606,19 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   force })`), setTimeScale 0.45, timed in play time (0.07 crack, 0.23 end). Injury report / X-ray card / AI injury line wait
   in `afterXray` until it ends. One per play; always when you're involved, 35% for AI hits; off with reduced motion.
 - CSS `.xray-fx` overlay (vignette, scanlines, X-RAY tag, red flash + FRACTURE/CONCUSSION/INJURY label). sfx.crack.
+
+## v0.50: Mascot position
+- `POSITIONS.MS` (label Mascot, `mascot: true`; stats read as hustle/showmanship/crowd IQ/stamina), POS_SIZE.MS. Moments
+  (MOMENT_POOL.MS): ms_hype / ms_tshirt / ms_rival (once a game, `g.rivalDone`) / ms_stunt (Q2-Q3 only). `MASCOT_TYPES`,
+  `isMascot`. outcomeFromQuality -> `mascotOutcome` (hype = q*20, shirts, danceWin, stunt, text). resolveMoment ->
+  `resolveMascotMoment`: mascot stats, momentum (q-0.5)*0.5, drive simulated by driveOutcome with +(q-0.5)*0.08 bonus.
+  No presnap/clutch game events, no autoDriveStats for MS. gameGrade MS = 12 + avg quality * 88. Labels per moment.
+- Stats (emptyStats): hype, shirts, danceWins, stunts. seasonPerf MS; STAT_CATS/records hype + danceWins (no generated AI
+  mascots in leaders). Awards keep internal names; `awardLabel(name, pos)` shows mascot names (UI, news, banquet, watch, race).
+  Balance (20 careers): MS ~11 awards / ~357 legacy, same band as QB/RB/CB.
+- Scenes: `src/scenes/minigames/mascot.js` (mascotHype rhythm rings, mascotTshirt screen-space target taps + arcing shirts,
+  mascotRival Simon-style combo copy + charge/takedown, mascotStunt trampoline power/flips/landing; `headOff` on flops). You
+  are `makeMascot(opts.myMascot, teamColors)` from sideline.js at x 27.8 in front of the +x stands; the sideline mascot is
+  hidden during the moment. gameday passes myMascot/oppMascot/team names; no interludes for mascot moments; CALL_DESC_MS.
+- Traits MS: showman, cannonarm, smoothmoves, acrobat. Practice: position chip 'Mascot'. Create: 3-column position grid
+  (🐾 card). Lineup shows the mascot card on the sideline; position diagram marks the sideline. Tests: `tests/round14.test.js`.

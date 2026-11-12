@@ -27,6 +27,7 @@ const MOMENT_POOL = {
   WR: [['wr_route', 6], ['wr_jumpball', 2], ['wr_toetap', 2]],
   CB: [['cb_cover', 6], ['cb_tackle', 3]],
   DT: [['dt_rush', 6], ['dt_run', 3]],
+  MS: [['ms_hype', 5], ['ms_tshirt', 3], ['ms_rival', 2.5], ['ms_stunt', 2]],
 };
 export const MOMENT_NAMES = {
   qb_throw: 'Pass Play', qb_scramble: 'Scramble', qb_hailmary: 'Hail Mary',
@@ -34,6 +35,7 @@ export const MOMENT_NAMES = {
   wr_route: 'Route & Catch', wr_jumpball: 'Jump Ball', wr_toetap: 'Sideline Toe-Tap',
   cb_cover: 'Coverage', cb_tackle: 'Open-Field Tackle',
   dt_rush: 'Pass Rush', dt_run: 'Run Stop',
+  ms_hype: 'Hype the Crowd', ms_tshirt: 'T-Shirt Cannon', ms_rival: 'Mascot Showdown', ms_stunt: 'Halftime Stunt',
 };
 const PASS_TYPES = new Set(['qb_throw', 'qb_hailmary', 'wr_route', 'wr_jumpball', 'wr_toetap', 'rb_screen', 'cb_cover', 'dt_rush']);
 const DEEP_TYPES = new Set(['qb_hailmary', 'wr_jumpball']);
@@ -42,6 +44,8 @@ const MAX_EVENTS = 3;
 
 export const DEF_POSITIONS = new Set(['CB', 'DT']);
 export const isDefense = (state) => DEF_POSITIONS.has(state.player.position);
+export const isMascot = (state) => state.player.position === 'MS';
+export const MASCOT_TYPES = new Set(['ms_hype', 'ms_tshirt', 'ms_rival', 'ms_stunt']);
 
 export function momentCount(state, { playoff, rivalry }) {
   // backups only get a couple of late snaps (earn the job to get more)
@@ -262,6 +266,13 @@ function momentumBonus(g, side) {
 
 function pickType(state, g, d, yl) {
   const pos = state.player.position;
+  if (pos === 'MS') {
+    // the halftime stunt only happens at halftime-ish (end of Q2 / start of Q3); rival mascots show up once a game
+    let pool = MOMENT_POOL.MS.filter(([t]) => (t !== 'ms_stunt' || d.quarter === 2 || d.quarter === 3) && (t !== 'ms_rival' || !g.rivalDone));
+    const t = weightedPick(state, pool, ([, w]) => w)[0];
+    if (t === 'ms_rival') g.rivalDone = true;
+    return t;
+  }
   // short yardage: the tush push (you sneak it as the QB, or shove the QB from behind as the RB)
   if ((pos === 'QB' || pos === 'RB') && d.shortYd && d.shortYd.distance <= 1 && chance(state, pos === 'QB' ? 0.75 : 0.3)) return 'qb_sneak';
   if (pos === 'RB' && yl <= 3) return 'rb_goalline';
@@ -309,7 +320,7 @@ function buildMoment(state, g, d, over = {}) {
     twoMin: !!d.twoMin,
     weather: g.weather,
     wind: g.wind,
-    label: `${label}${ords[down]} and ${yardLine <= distance ? 'Goal' : distance} at ${yardText(yardLine)}`,
+    label: MASCOT_TYPES.has(type) ? `Q${d.quarter} · ${{ ms_hype: 'TV timeout: get them loud', ms_tshirt: 'Break in play: T-shirt time', ms_rival: 'Their mascot is coming over...', ms_stunt: 'Halftime show' }[type]}` : `${label}${ords[down]} and ${yardLine <= distance ? 'Goal' : distance} at ${yardText(yardLine)}`,
     trailing: userScore(g) < oppScore(g),
     situation: d.twoMin ? (isDefense(state) ? 'Final stand' : 'Two-minute drill') : clutch ? 'Clutch' : type === 'qb_sneak' ? 'Short yardage' : null,
     pusher: type === 'qb_sneak' && state.player.position === 'RB',
@@ -372,6 +383,7 @@ export function outcomeFromQuality(state, m, q, call) {
   const pc = PLAY_CALLS[call];
   const res = { quality: q, yards: 0, td: false, turnover: false, sack: false, complete: false, call };
   if (m.defense) return defenseOutcome(state, m, q, call, res);
+  if (MASCOT_TYPES.has(m.type)) return mascotOutcome(state, m, q, res);
   if (m.type === 'qb_sneak') {
     const need = Math.min(m.distance, m.yardLine);
     if (q > 0.42 || (q > 0.28 && chance(state, 0.35))) { res.complete = true; res.yards = need >= m.yardLine ? m.yardLine : need + (q > 0.8 ? 1 : 0); res.td = res.yards >= m.yardLine; res.text = res.td ? 'Pushed over the top! TOUCHDOWN!' : 'Tush push. First down!'; res.quality = Math.max(q, 0.68); }
@@ -487,6 +499,7 @@ export function resolveMoment(state, result) {
     g.lastDelta = delta;
     (g.ratingHist ??= [6]).push(Math.round(g.rating * 10) / 10);
   }
+  if (MASCOT_TYPES.has(m.type)) return resolveMascotMoment(state, g, d, m, result);
 
   if (m.defense) {
     s.tgtAgainst += m.type === 'cb_cover' ? 1 : 0;
@@ -595,6 +608,47 @@ export function resolveMoment(state, result) {
   return { outcome: out };
 }
 
+// ---------------- mascot
+const MASCOT_TEXT = {
+  ms_hype: [[0.75, 'The whole stadium is on its feet. You OWN this crowd.'], [0.45, 'Good energy. The student section is with you.'], [0, 'Crickets. Somebody coughs. Rough.']],
+  ms_tshirt: [[0.75, 'Shirts raining into the upper deck. Legend.'], [0.4, 'A few happy fans in brand-new shirts.'], [0, 'One shirt hits a hot dog vendor. Oops.']],
+  ms_rival: [[0.6, 'You win the mascot showdown! The crowd chants your name.'], [0.35, 'Close call... the fans call it a draw.'], [0, 'The other mascot humiliates you on the big screen.']],
+  ms_stunt: [[0.7, 'STUCK THE LANDING! That\'s going viral.'], [0.4, 'Wobbly landing, but you stay up. Big cheer.'], [0, 'Faceplant. The head falls off. Everyone saw.']],
+};
+function mascotOutcome(state, m, q, res) {
+  res.mascot = true;
+  res.hype = Math.round(q * 20);
+  if (m.type === 'ms_tshirt') res.shirts = res.shirts ?? Math.round(q * 6);
+  if (m.type === 'ms_rival') res.danceWin = res.danceWin ?? q >= 0.5;
+  if (m.type === 'ms_stunt') res.stunt = res.stunt ?? q >= 0.45;
+  res.text = res.text ?? MASCOT_TEXT[m.type].find(([t]) => q >= t)[1];
+  return res;
+}
+/**
+ * A mascot moment: no snap, no yards. How well you work the crowd swings momentum and gives your team's drive a
+ * small boost (or a small dip when you flop); then the drive is simulated.
+ */
+function resolveMascotMoment(state, g, d, m, result) {
+  const s = g.userStats;
+  const q = result.quality;
+  s.hype = (s.hype ?? 0) + (result.hype ?? Math.round(q * 20));
+  if (result.shirts) s.shirts = (s.shirts ?? 0) + result.shirts;
+  if (result.danceWin) s.danceWins = (s.danceWins ?? 0) + 1;
+  if (result.stunt) s.stunts = (s.stunts ?? 0) + 1;
+  if (m.clutch && q > 0.7) s.clutch++;
+  momentumShift(g, (q - 0.5) * 0.5);
+  if (m.type === 'ms_rival' && result.danceWin) state.player.fame = clamp(state.player.fame + 0.3, 0, 100);
+  g.moments.push({ ...m, call: result.call, quality: q, yards: 0, td: false, turnover: false, text: result.text, outcome: null, played: !!result.played });
+  const rec = g.moments[g.moments.length - 1];
+  let out = driveOutcome(state, g.ratings[d.side].off, g.ratings[otherSide(d.side)].def, g.toBonus[d.side] + momentumBonus(g, d.side) + planBonus(state, g, d.side) + (q - 0.5) * 0.08);
+  g.toBonus[d.side] = 0;
+  rec.outcome = out;
+  finishDrive(state, g, d, out, null);
+  g.cursor++;
+  afterMomentEvents(state, result, m);
+  return { outcome: out };
+}
+
 /** Rest of a drive after a moment that neither scored nor turned it over. */
 function continueDrive(state, g, d, m, yl, converted, q) {
   const off = g.ratings[d.side].off;
@@ -683,6 +737,7 @@ function autoDriveStats(state, g, out, partial = false) {
   const p = state.player;
   const s = g.userStats;
   const o = p.ovr;
+  if (p.position === 'MS') return; // the mascot doesn't pile up football stats on simulated drives
   if (partial && (p.position === 'WR' || (p.position === 'RB' && chance(state, 0.5)) || (out !== 'TD' ? chance(state, 0.5) : chance(state, 0.45)))) return;
   if (p.position === 'QB') {
     const att = partial ? randInt(state, 1, 3) : randInt(state, 2, 5);
@@ -747,6 +802,7 @@ export function gameGrade(state, g) {
   else if (pos === 'RB') prod = 4 + s.rushYds * 0.55 + s.rushTD * 16 + s.recYds * 0.35 + (s.rushAtt >= 5 ? (s.rushYds / s.rushAtt - 3.5) * 6 : 0) - s.fumbles * 12;
   else if (pos === 'CB') prod = 46 + s.tackles * 3 + s.defInt * 22 + s.pd * 8 + s.defTD * 18 - s.tdAllowed * 12 - s.ydsAllowed * 0.35;
   else if (pos === 'DT') prod = 27 + s.tackles * 3 + (s.defSacks ?? 0) * 20 + (s.tfl ?? 0) * 7 + s.pd * 5;
+  else if (pos === 'MS') { const ms = g.moments.filter((x) => MASCOT_TYPES.has(x.type)); prod = ms.length ? 12 + (ms.reduce((a, x) => a + x.quality, 0) / ms.length) * 88 : 40; }
   else prod = s.recYds / 1.1 * 0.55 + s.recTD * 16 + s.rec * 2 - s.drops * 4;
   prod = clamp(prod, 0, 100);
   const mq = g.moments.length ? g.moments.reduce((a, m) => a + m.quality, 0) / g.moments.length : 0.5;
@@ -785,6 +841,8 @@ function maybeEvent(state, trigger, p) {
   const g = state.game;
   if (g.eventsFired.length >= MAX_EVENTS || g.pendingEvent) return false;
   if (!chance(state, p)) return false;
+  // the mascot never takes a snap: no presnap reads or two-minute heroics, just pregame/halftime/random life
+  if (state.player.position === 'MS' && (trigger === 'presnap' || trigger === 'clutch')) return false;
   const pool = GAME_EVENTS.filter((e) => e.trigger === trigger && eventEligible(state, g, e));
   if (!pool.length) return false;
   const ev = pick(state, pool);

@@ -61,6 +61,11 @@ export function lineupView(app) {
       h('div.lu-pic', portraitImg({ uniform: uni, look, number: num, helmet: false }, 58), h('span.lu-pos.pix', label), h('span.lu-ovr.pix', pl?.ovr ?? '-'), pl?.you && captain ? h('span.lu-c.pix', 'C') : null),
       h('div.lu-name', (pl?.name ?? 'Open').split(' ').slice(-1)[0]));
   });
+  if (p.position === 'MS') { // the mascot works the sideline
+    cards.push(h('div.lu-card.you', { style: { left: '50%', top: '95%' } },
+      h('div.lu-pic', portraitImg({ uniform: uni, look: p.look, number: p.number, helmet: false }, 58), h('span.lu-pos.pix', 'MASCOT'), h('span.lu-ovr.pix', Math.round(p.ovr)), captain ? h('span.lu-c.pix', 'C') : null),
+      h('div.lu-name', p.last)));
+  }
   const bench = all.filter((r) => !used.has(r)).slice(0, 10);
   return h('div.col', { style: { gap: '14px' } },
     h('div.card',

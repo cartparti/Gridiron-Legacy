@@ -17,6 +17,7 @@ const BY_POS = {
   WR: ['wr_route', 'wr_jumpball', 'wr_toetap'],
   CB: ['cb_cover', 'cb_tackle'],
   DT: ['dt_rush', 'dt_run'],
+  MS: ['ms_hype', 'ms_tshirt', 'ms_rival', 'ms_stunt'],
 };
 const HOW = {
   qb_throw: 'Read the coverage and hit the open man before the rush gets you.',
@@ -34,6 +35,10 @@ const HOW = {
   cb_tackle: 'Square up the ball carrier in space and bring him down.',
   dt_rush: 'Beat your blocker with rip, swim or bull rush and get the sack.',
   dt_run: 'Shed the block and stuff the run at the line.',
+  ms_hype: 'In the costume: tap on the beat to get the stadium loud.',
+  ms_tshirt: 'Fire the T-shirt cannon at fans waving in the stands.',
+  ms_rival: 'Copy the other mascot\'s dance combo, then settle it.',
+  ms_stunt: 'Trampoline backflips at halftime. Stick the landing.',
 };
 const LEVELS = { rookie: ['Rookie', 55], starter: ['Starter', 70], star: ['Star', 84], legend: ['Legend', 96] };
 const OPPS = { weak: ['Weak', -1.1], even: ['Even', 0], tough: ['Tough', 0.7], elite: ['Elite', 1.4] };
@@ -59,7 +64,7 @@ function buildMoment(type, spot, weather) {
   return {
     type, defense, down, distance, yardLine, quarter: spot === 'two' ? 4 : 1 + Math.floor(Math.random() * 4), clock: spot === 'two' ? '1:48' : '8:12',
     weather, wind: { x: Math.cos(ang) * wmph * 0.7, z: Math.sin(ang) * wmph * 0.7, mph: Math.round(wmph * 2.2) },
-    label: `${ords[down]} and ${yardLine <= distance ? 'Goal' : distance} at ${side}`,
+    label: type.startsWith('ms_') ? 'In the costume' : `${ords[down]} and ${yardLine <= distance ? 'Goal' : distance} at ${side}`,
     situation: spot === 'two' ? 'Two-minute drill' : 'Practice', practice: true, pusher,
   };
 }
@@ -114,7 +119,7 @@ export function practiceScreen(app) {
           h('span.tiny.muted', `${reps} rep${reps === 1 ? '' : 's'} · avg ${grade(avg)}`))) : null,
       h('div.card',
         h('h2', 'Position'),
-        chips('pos', { QB: 'QB', RB: 'RB', WR: 'WR', CB: 'CB', DT: 'DT' }),
+        chips('pos', { QB: 'QB', RB: 'RB', WR: 'WR', CB: 'CB', DT: 'DT', MS: 'Mascot' }),
         h('div.col', { style: { gap: '8px', marginTop: '12px' } }, types.map((t) =>
           h('button.practice-ev', { onclick: () => play(t) },
             h('div.grow', h('b', MOMENT_NAMES[t]), h('div.tiny.muted', HOW[t])),

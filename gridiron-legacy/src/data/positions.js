@@ -74,6 +74,23 @@ export const POSITIONS = {
   },
 };
 
+// The mascot: you never play a snap. You're inside the costume, winning the crowd, firing T-shirts, taking on the
+// other team's mascot and pulling off halftime stunts. Same four stats, read differently.
+POSITIONS.MS = {
+  label: 'Mascot',
+  short: 'MASCOT',
+  mascot: true,
+  weights: { speed: 0.22, skill: 0.34, iq: 0.22, strength: 0.22 },
+  blurb: 'Be the big-headed legend in the costume. Pump up the crowd, fire the T-shirt cannon, win mascot dance-offs and stick the halftime backflip.',
+  statNotes: {
+    speed: 'Hustle: dance moves and getting around',
+    skill: 'Showmanship: rhythm, aim and stunts',
+    iq: 'Crowd IQ: reading the moment',
+    strength: 'Stamina: surviving a game in a 40 lb costume',
+  },
+};
+export const isMascotPos = (pos) => pos === 'MS';
+
 /** Background picked at character creation: shapes starting stats. */
 export const BACKGROUNDS = [
   { id: 'natural', label: 'Natural Athlete', desc: 'Born fast. Everything else is a work in progress.', stats: { speed: 8, skill: 0, iq: -3, strength: 1 } },

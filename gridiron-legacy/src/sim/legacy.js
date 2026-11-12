@@ -34,7 +34,7 @@ export function computeLegacy(state) {
   add('Career production', prod);
   const peak = Math.max(0, ...p.history.map((h) => h.ovr));
   // relative to what's typical at the position (QBs rate higher, RBs peak lower and shorter)
-  const POS_PEAK = { QB: 77.5, RB: 70, WR: 75, CB: 75, DT: 75 };
+  const POS_PEAK = { QB: 77.5, RB: 70, WR: 75, CB: 75, DT: 75, MS: 75 };
   add(`Peak overall ${Math.round(peak)}`, Math.max(0, peak - (POS_PEAK[p.position] ?? 75)) * 2);
   add('Fame', p.fame / 4);
   let score = lines.reduce((a, l) => a + l.pts, 0);
