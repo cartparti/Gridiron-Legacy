@@ -7,7 +7,8 @@
 //
 // Returns the same result objects as the old minigames, so the game simulation is unchanged.
 import * as THREE from 'three';
-import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, confetti, ragdoll, bloodBurst, dustPuff, markTicked, bump, applyWear, addWear, applyInjuryLook, setLookAt } from '../actors.js';
+import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, confetti, ragdoll, bloodBurst, dustPuff, markTicked, bump, applyWear, addWear, applyInjuryLook, setLookAt, setSurface } from '../actors.js';
+import { surfaceFor } from '../../data/surface.js';
 import { INJURIES } from '../../data/lifestyle.js';
 import { xrayCard } from './xray.js';
 import { createBallPhysics, orientInFlight } from './ballphys.js';
@@ -37,6 +38,10 @@ export function freePlay(ctx) {
   const qbSkill = Math.max(0, Math.min(1, (((st.skill ?? 60) + (st.iq ?? 60)) / 2 - 50) / 45));
   const call = opts.call;
   const wfx = weatherFx(m);
+  // footing: the home field's grass or turf, the weather and how torn up it is (data/surface.js)
+  const surf = surfaceFor(opts.culture ?? null, m.weather ?? 'clear', opts.wear?.progress ?? 0);
+  setSurface(surf);
+  ctx.addCleanup?.(() => setSurface(null));
   const offColors = m.defense ? opts.oppColors : opts.teamColors;
   const defColors = m.defense ? opts.teamColors : opts.oppColors;
   const offUniform = m.defense ? opts.oppUniform : opts.teamUniform;
@@ -89,7 +94,7 @@ export function freePlay(ctx) {
     const sizeSpeed = Math.max(0.86, Math.min(1.1, 1 - ((wLb - w0) / w0) * 0.45 + (hIn - h0) * 0.004));
     const e = {
       team, role, slot, mesh, pos: { x, z }, vel: { x: 0, z: 0 }, start: { x, z }, hIn, wLb, mass: wLb / 210,
-      maxSpeed: BASE_SPEED[role] * (team === 'def' ? defBoost : wfx.speed * (m.defense && !isUser ? 1 + oppK * 0.035 : 1)) * rnd(0.97, 1.03) * (isUser ? 1 : sizeSpeed),
+      maxSpeed: BASE_SPEED[role] * (team === 'def' ? defBoost : wfx.speed * (m.defense && !isUser ? 1 + oppK * 0.035 : 1)) * rnd(0.97, 1.03) * (isUser ? 1 : sizeSpeed) * (1 - surf.sink),
       user: isUser, route: null, s: 0, engaged: null, out: 0, tell: 0, lunge: 0, lungeDir: null, down: false, ...extra,
     };
     ents.push(e);
@@ -379,7 +384,7 @@ export function freePlay(ctx) {
         moves.juke = (0.24 + st.skill / 100 * 0.16) * tol * (has('ankles') || (has('escape') && user === qb) ? 1.4 : 1); moves.jukeCd = 0.8; moves.jukeDir = dir;
         playAction(user.mesh, 'juke', { dir });
         sfx.juke();
-        if (Math.random() < wfx.slip * 1.5) { moves.slow = 0.6; hud.big('SLIPPED!', '#fbbf24', 600); }
+        if (Math.random() < surf.slip * 1.5) { moves.slow = 0.6; playAction(user.mesh, 'slip', { dir: -dir }); hud.big('SLIPPED!', '#fbbf24', 600); }
       }
       if (id === 'spin' && user === carrier && moves.spinCd <= 0) { moves.spin = 0.42 * Math.sqrt(tol) * (has('ankles') ? 1.4 : 1); moves.spinCd = 1.3; playAction(user.mesh, 'spin'); sfx.juke(); }
       if (id === 'stiff' && user === carrier && moves.stiffCd <= 0) { moves.stiff = 0.6; moves.stiffCd = 1.1; playAction(user.mesh, 'stiff'); }
@@ -489,8 +494,9 @@ export function freePlay(ctx) {
     let vx = 0;
     let vz = 0;
     if (d > 0.08) { const s = Math.min(speed, d * 4); vx = (dx / d) * s; vz = (dz / d) * s; }
-    e.vel.x += (vx - e.vel.x) * Math.min(1, accel * dt / Math.max(1, speed));
-    e.vel.z += (vz - e.vel.z) * Math.min(1, accel * dt / Math.max(1, speed));
+    // traction: turf grips (quicker starts and cuts), mud / snow / slick ground don't
+    e.vel.x += (vx - e.vel.x) * Math.min(1, accel * surf.grip * dt / Math.max(1, speed));
+    e.vel.z += (vz - e.vel.z) * Math.min(1, accel * surf.grip * dt / Math.max(1, speed));
   };
   const routePoint = (e, s) => {
     const path = e.route;
@@ -508,6 +514,40 @@ export function freePlay(ctx) {
     const len = Math.hypot(b.x - a.x, b.z - a.z) || 0.001;
     const over = s - acc;
     return clampPos({ x: b.x + ((b.x - a.x) / len) * over, z: b.z + ((b.z - a.z) / len) * over });
+  };
+
+  /**
+   * Footing for one player this frame: a hard cut at speed on slick ground (wet turf, snow, mud) can slip (a stumble,
+   * or a wipeout for anyone but the ball carrier); in mud or deep snow a player who plants to start or change direction
+   * can get stuck for a moment, legs churning.
+   */
+  const footing = (e, dt) => {
+    const sp = Math.hypot(e.vel.x, e.vel.z);
+    const pvx = e.pvx ?? e.vel.x, pvz = e.pvz ?? e.vel.z;
+    e.pvx = e.vel.x; e.pvz = e.vel.z;
+    if (phase !== 'live' || e.down || e.out > 0 || e.engaged || e.engagedBy || e.wrap || e.lunge > 0) return;
+    if (e.stuck > 0) {
+      e.stuck -= dt;
+      const cap = 1.3;
+      if (sp > cap) { e.vel.x *= cap / sp; e.vel.z *= cap / sp; }
+      return;
+    }
+    const pv = Math.hypot(pvx, pvz);
+    if (surf.slip > 0 && sp > 4.5 && pv > 4.5) {
+      const turn = Math.acos(Math.max(-1, Math.min(1, (e.vel.x * pvx + e.vel.z * pvz) / (sp * pv)))) / dt; // rad/s
+      if (turn > 2.5 && Math.random() < surf.slip * dt * (turn / 3) * (e.user ? 1 : 0.6)) {
+        const side = Math.sign(e.vel.x * pvz - e.vel.z * pvx) || 1;
+        if (e !== carrier && !e.user && Math.random() < 0.3) { e.out = 1.1; knockDown(e.mesh, 1); } // feet go out from under him
+        else { playAction(e.mesh, 'slip', { dir: side }); e.vel.x *= 0.45; e.vel.z *= 0.45; if (e.user) { moves.slow = 0.5; hud.big('SLIPPED!', '#fbbf24', 600); } else e.out = 0.35; }
+        fxList.push(dustPuff(group, e.pos, 5));
+        return;
+      }
+    }
+    if (surf.sink > 0.05 && sp > 0.8 && sp < 4 && Math.random() < surf.sink * dt * 1.4 * (e.user ? 0.7 : 1)) {
+      e.stuck = 0.45; playAction(e.mesh, 'stuck');
+      fxList.push(dustPuff(group, e.pos, 6));
+      if (e.user && !e.stuckSaid) { e.stuckSaid = true; hud.big(surf.debris === 'snow' ? 'BOGGED DOWN!' : 'STUCK IN THE MUD!', '#c08a4a', 700); }
+    }
   };
 
   // ---------------- AI
@@ -1310,7 +1350,7 @@ export function freePlay(ctx) {
     const w = c.wrap;
     w.t += dt;
     // the pile slows: every extra tackler adds a lot of stopping power
-    const k = Math.exp(-(1.8 + w.by.length * 1.7) * dt);
+    const k = Math.exp(-(1.8 + w.by.length * 1.7) * dt * Math.pow(1 / surf.slide, 0.5) * (1 + surf.sink * 3)); // slick ground: the pile slides; mud: it sticks
     w.vx *= k; w.vz *= k;
     // you can drive the pile (hold sprint), harder the stronger you are
     if (c.user && controls.state.sprint) { const fwd = c.team === 'off' ? -1 : 1; w.vz += fwd * dt * 3.2 * ((st.strength ?? 60) / 60) / w.by.length; w.dur += dt * 0.25; }
@@ -1774,13 +1814,13 @@ export function freePlay(ctx) {
       const [uh0, uw0] = POS_SIZE[opts.position] ?? POS_SIZE[user.role] ?? [73, 210];
       const userSize = Math.max(0.9, Math.min(1.06, 1 - ((user.wLb - uw0) / uw0) * 0.3 + (user.hIn - uh0) * 0.003));
       const traitSpeed = (has('gear2') && c.sprint ? 1.08 : 1) * (has('escape') && user === qb && carrier === qb ? 1.08 : 1) * (has('deep') && mode === 'route' && user.pos.z < -10 ? 1.07 : 1) * (has('closing') && flight && user.team === 'def' ? 1.1 : 1);
-      const userSpeed = traitSpeed * BASE_SPEED[user.role] * userSize * (0.86 + (st.speed ?? 60) / 100 * 0.28) * wfx.speed * (c.sprint ? 1.15 : 0.95) * (moves.slow > 0 ? 0.55 : 1) * (moves.spin > 0 ? 0.8 : 1);
+      const userSpeed = traitSpeed * BASE_SPEED[user.role] * userSize * (0.86 + (st.speed ?? 60) / 100 * 0.28) * wfx.speed * (1 - surf.sink) * (c.sprint ? 1.15 : 0.95) * (moves.slow > 0 ? 0.55 : 1) * (moves.spin > 0 ? 0.8 : 1);
       if (user.out > 0) { user.out -= dt; if (user.out <= 0 && isDown(user.mesh)) knockDown(user.mesh, 0); user.vel.x *= 0.8; user.vel.z *= 0.8; }
       else if (moves.dive) {
         moves.dive += dt;
         const dir = norm(user.vel.x, user.vel.z || -1);
         user.vel.x = dir.x * 7; user.vel.z = dir.z * 7;
-        if (moves.dive > 0.45) { user.down = true; knockDown(user.mesh, 1); whistle('tackle'); }
+        if (moves.dive > Math.min(0.75, 0.45 * Math.sqrt(surf.slide))) { user.down = true; knockDown(user.mesh, 1); whistle('tackle'); } // slick ground: the dive slides on
       } else if (user.lunge > 0) {
         user.lunge -= dt;
         user.vel.x = user.lungeDir.x * 9.5; user.vel.z = user.lungeDir.z * 9.5;
@@ -1823,7 +1863,7 @@ export function freePlay(ctx) {
           const cosA = (user.vel.x * c.x + user.vel.z * c.z) / (curSp * Math.hypot(c.x, c.z));
           const ang = Math.acos(Math.max(-1, Math.min(1, cosA)));
           const agility = 0.75 + (st.speed ?? 60) / 240;
-          cutK = 1 - Math.max(0, Math.min(0.6, (ang - 0.5) * 0.38 * (curSp / 8) / agility)) * (wetGame || snowGame ? 1.25 : 1);
+          cutK = 1 - Math.max(0, Math.min(0.6, (ang - 0.5) * 0.38 * (curSp / 8) / agility)) * Math.pow(1 / surf.grip, 1.5);
           if (ang > 1.3 && curSp > 6.5) { user.vel.x *= 1 - dt * 2.2; user.vel.z *= 1 - dt * 2.2; } // plant and redirect
         }
         moveToward(user, user.pos.x + c.x * 5, user.pos.z + c.z * 5, userSpeed * (rush.burst > 0 ? 1.25 : 1) * Math.min(1, Math.hypot(c.x, c.z) + 0.15), dt, 26 * cutK);
@@ -1924,6 +1964,7 @@ export function freePlay(ctx) {
       }
       for (const e of ents) {
         if (e.down) { e.vel.x *= 0.8; e.vel.z *= 0.8; }
+        footing(e, dt);
         e.pos.x += e.vel.x * dt;
         e.pos.z += e.vel.z * dt;
         if (e !== carrier) clampPos(e.pos);
@@ -1931,7 +1972,11 @@ export function freePlay(ctx) {
         const sp = Math.hypot(e.vel.x, e.vel.z);
         if (sp > 0.6 && !e.mesh.userData.u.back && e.lunge <= 0 && e.tell <= 0) faceToward(e.mesh, e.pos.x + e.vel.x, e.pos.z + e.vel.z);
         if (e.jam > 0) e.jam -= dt;
-        animateRun(e.mesh, dt, e.engaged || e.engagedBy ? 0.3 : sp);
+        animateRun(e.mesh, dt, e.stuck > 0 ? 6 : e.engaged || e.engagedBy ? 0.3 : sp);
+        // the ground answers: turf crumbs / mud / snow on every body impact, a spray behind fast runners
+        const gh = e.mesh.userData.u.groundHit ?? 0;
+        if (gh > (e.ghSeen ?? 0)) { e.ghSeen = gh; fxList.push(dustPuff(group, e.pos, surf.debris === 'mud' || surf.debris === 'snow' ? 10 : 6)); }
+        if ((e.user || e === carrier) && sp > 5.5 && surf.debris !== 'grass' && Math.random() < dt * 3) fxList.push(dustPuff(group, e.pos, 2));
         if (fw) {
           // cleats tear up the turf; going down leaves a slide mark and a dirtier uniform
           e.stepT = (e.stepT ?? Math.random() * 0.3) - dt;

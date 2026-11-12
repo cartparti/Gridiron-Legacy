@@ -100,5 +100,8 @@ export function teamCulture(team, level = 'pro') {
     seed: Math.floor(r() * 1e9),
     // city landmarks outside the stadium (bridge, arch, needle...), see environment.js
     landmarks: def?.landmarks ?? [],
+    // playing surface: painted (colored) fields are always artificial turf; otherwise a mix by level (own random stream,
+    // so adding it didn't change anyone's stadium name, trait or colors)
+    surface: def?.surfaceType ?? (TURFS.indexOf(turf) >= 4 || seededRandom(`surface:${team.id}`)() < ({ hs: 0.3, college: 0.4, pro: 0.5 }[level] ?? 0.4) ? 'turf' : 'grass'),
   };
 }

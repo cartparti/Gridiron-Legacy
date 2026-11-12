@@ -1899,7 +1899,7 @@ export function tickIdle(root, dt) {
   root.traverse((o) => { if (o.userData?.rig && o.userData.ticked !== FRAME) animateRun(o, dt, 0); });
 }
 
-const ACTION_DUR = { throw: 0.55, catch: 0.5, jump: 0.7, juke: 0.35, spin: 0.5, stiff: 0.6, dive: 0.7, tackle: 0.55, lunge: 0.4, fall: 0.5, getup: 0.7, wave: 1.2, spike: 0.9, release: 0.3, cut: 0.25 };
+const ACTION_DUR = { slip: 0.55, stuck: 0.45, throw: 0.55, catch: 0.5, jump: 0.7, juke: 0.35, spin: 0.5, stiff: 0.6, dive: 0.7, tackle: 0.55, lunge: 0.4, fall: 0.5, getup: 0.7, wave: 1.2, spike: 0.9, release: 0.3, cut: 0.25 };
 
 /** Pose for this frame. Returns target joint angles. */
 function computePose(u, dt) {
@@ -1977,6 +1977,8 @@ function computePose(u, dt) {
       case 'release': P.rs = 1.6; P.re = 0.2; P.spine = 0.3; P.ry = -0.3; break;
       case 'catch': P.ls = 1.6 + k * 0.6; P.rs = 1.6 + k * 0.6; P.le = 0.2; P.re = 0.2; P.lw = -0.45; P.rw = -0.45; break; // hands open toward the ball
       case 'jump': P.ls = 2.9; P.rs = 2.9; P.le = 0.1; P.re = 0.1; P.lh = 0.9 * k; P.lk = 1.6 * k; P.rh = 0.3; P.rk = 1.0 * k; u.hop = Math.max(u.hop, k * 0.9); break;
+      case 'slip': P.y = -0.22 * k; P.rz = (act.dir ?? 1) * 0.5 * k; P.lh = 0.9 * k; P.lk = 0.2; P.rh = -0.3 * k; P.rk = 0.9 * k; P.ls = 1.3 * k; P.rs = 0.4; P.lout = 0.9 * k; P.rout = -1.1 * k; P.spine = -0.2 * k; break; // a foot kicks out, arms fly out for balance
+      case 'stuck': P.spine = 0.45; P.y = -0.1; P.lh = 0.7 * Math.max(0, Math.sin(act.t * 22)); P.rh = 0.7 * Math.max(0, -Math.sin(act.t * 22)); P.lk = 1.1; P.rk = 1.1; P.ls = -Math.sin(act.t * 22) * 1.1; P.rs = Math.sin(act.t * 22) * 1.1; P.le = 1.4; P.re = 1.4; break; // churning legs, going nowhere
       case 'juke': case 'cut': P.rz = (act.dir ?? 1) * 0.45 * k; P.y = -0.15 * k; P.lh = 0.6 * k * (act.dir ?? 1); P.rh = -0.6 * k * (act.dir ?? 1); P.lk = 0.6; P.rk = 0.6; P.spine = 0.3; break;
       case 'spin': P.ry = p * Math.PI * 2; P.spine = 0.25; P.ls = 1.1; P.rs = 0.4; P.lout = 0.6; P.rout = -0.9; break;
       case 'stiff': P.ls = 1.55; P.le = 0; P.lout = -0.05; P.spine = 0.35; P.rs = 0.2; P.re = 1.5; break;
@@ -2172,7 +2174,7 @@ function legIK(p, dt, jv) {
     const lift = F.plant ? 0 : Math.sin(Math.PI * F.sw) * (moving ? 0.07 + 0.2 * Math.min(1, (u.speed ?? 0) / 8) : 0.06);
     // the model's legs are a touch long for its hip height: aim the ankle slightly low (the cleat sinks into the turf a
     // little) so a standing player's knees stay soft instead of squatting
-    const tgt = _v3.set(F.pos.x, groundY + 0.008 * sy + lift, F.pos.z);
+    const tgt = _v3.set(F.pos.x, groundY + 0.008 * sy - (F.plant ? SURF.footSink ?? 0 : 0) + lift, F.pos.z); // cleats sink into mud / snow
     r.hips.worldToLocal(tgt);
     const dx = tgt.x - lg.hip.position.x, dy = tgt.y - lg.hip.position.y, dz = tgt.z - lg.hip.position.z;
     const raw = Math.hypot(dx, dy, dz);
@@ -2270,6 +2272,11 @@ function groundContact(p, dt) {
   r.body.position.y += fix;
 }
 
+// ------------------------------------------------------------------ ground surface (set per play by the engine)
+// { grip, sink, slip, slide, bounce, debris, footSink } from data/surface.js; dry grass when nothing is set
+let SURF = { slide: 1, bounce: 1, footSink: 0, debris: 'grass' };
+export function setSurface(s) { SURF = s ? { ...SURF, ...s } : { slide: 1, bounce: 1, footSink: 0, debris: 'grass' }; }
+
 // ------------------------------------------------------------------ ragdoll tumble
 
 /**
@@ -2345,11 +2352,24 @@ function applyRag(p, dt) {
     b.position.y += 0.02 - low;
     if (!g.settled && g.vy < 0) {
       g.bounce++;
-      g.vy = -g.vy * 0.3;
-      g.vx *= 0.45; g.vz *= 0.45; g.wx *= 0.4; g.wz *= 0.4; g.wy *= 0.4;
-      if (g.bounce >= 2 || Math.abs(g.vy) < 0.7) g.settled = true;
+      // hard turf bounces bodies back up, mud and snow swallow the hit; slick ground keeps them moving
+      const bz = SURF.bounce ?? 1;
+      const rest = Math.min(0.62, 0.3 * bz * (bz > 1.2 ? 1.25 : 1));
+      const keep = Math.min(0.9, 0.45 * Math.pow(SURF.slide ?? 1, 0.75));
+      g.vy = -g.vy * rest + (bz > 1.2 && g.bounce === 1 ? 0.9 : 0); // turf kicks a body back up off the hard surface
+      g.vx *= keep; g.vz *= keep; g.wx *= 0.4; g.wz *= 0.4; g.wy *= 0.4;
+      if (g.bounce >= (bz > 1.2 ? 3 : 2) || Math.abs(g.vy) < (bz > 1.2 ? 0.35 : 0.7)) { g.settled = true; g.slideV = { x: g.vx, z: g.vz }; }
+      g.splash = (g.splash ?? 0) + 1; // the engine kicks up turf / mud / snow on each impact (u.groundHit)
+      u.groundHit = (u.groundHit ?? 0) + 1;
     }
   } else if (g.settled) b.position.y -= Math.min(low - 0.02, dt * 3);
+  // sliding along the ground after landing: far on wet turf / snow, a short skid on grass, barely in mud
+  if (g.settled && g.slideV) {
+    const fr = Math.exp(-dt * 5 / Math.max(0.6, SURF.slide ?? 1));
+    g.slideV.x *= fr; g.slideV.z *= fr;
+    b.position.x += g.slideV.x * dt; b.position.z += g.slideV.z * dt;
+    if (Math.hypot(g.slideV.x, g.slideV.z) < 0.05) g.slideV = null;
+  }
   const sh = p.userData.shadow;
   if (sh) { sh.position.x = b.position.x; sh.position.z = b.position.z; }
   const k = Math.min(1, dt * (g.settled ? 6 : 18));
@@ -2628,10 +2648,18 @@ export function bloodBurst(scene, origin, dir = { x: 0, z: -1 }) {
 }
 
 /** A puff of turf and dust where bodies hit the ground. Returns an updater (false when done). */
-export function dustPuff(scene, origin, n = 12) {
+const DEBRIS = {
+  grass: ['#5a8f3c', '#3f7a33', '#b8a37a', '#d8cfb8'],
+  pellets: ['#141414', '#222222', '#2f6f35', '#1a1a1a'], // turf rubber crumbs
+  mud: ['#4a3520', '#5d4428', '#3a2a18', '#6e4e2e'],
+  snow: ['#f4f8fb', '#e6eef4', '#ffffff', '#d8e4ec'],
+  spray: ['#d8ecff', '#b8d8f2', '#ffffff', '#9fc2e0'],
+};
+/** Turf, mud, snow or water kicked up from the ground. kind defaults to the current play's surface. */
+export function dustPuff(scene, origin, n = 12, kind = SURF.debris) {
   const geoD = new THREE.BoxGeometry(0.12, 0.12, 0.12);
   const mesh = new THREE.InstancedMesh(geoD, new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.9 }), n);
-  const cols = ['#5a8f3c', '#3f7a33', '#b8a37a', '#d8cfb8'].map((c) => new THREE.Color(c));
+  const cols = (DEBRIS[kind] ?? DEBRIS.grass).map((c) => new THREE.Color(c));
   const P = [];
   for (let i = 0; i < n; i++) {
     const a = Math.random() * Math.PI * 2;

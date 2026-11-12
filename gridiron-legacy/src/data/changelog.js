@@ -1,5 +1,14 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.46', date: 'Nov 12', title: 'The ground fights back', items: [
+    'Every stadium has natural grass or artificial turf, shown on the pregame card and the in-game weather tag. Painted fields are always turf.',
+    'Dry turf is fast and grippy: quicker starts and sharper cuts, and bodies bounce off the hard surface on big hits.',
+    'Rain turns grass into mud, and it gets worse as the game goes on. Everyone bogs down, players sometimes get stuck with their legs churning, cleats sink in, and tackles and falls slide and splat. Wet turf is slick, so bodies hydroplane after a fall.',
+    'Snow is slow and slippery: hard cuts can slip, falls slide farther, and you can get bogged down.',
+    'Hard cuts at speed on slick ground can slip you up (SLIPPED!), and defenders can wipe out too. Dives and piles slide farther on wet or snowy fields and stop short in mud.',
+    'What kicks up matches the field: grass and dirt, black turf crumbs, mud, snow or spray.',
+    'Practice mode has a Field choice (natural grass or artificial turf) to try every combination.',
+  ] },
   { v: '0.45', date: 'Nov 12', title: 'Real pressure on the QB and lifelike movement', items: [
     'When you take off as QB the defense comes after you. Cross the line and every defender chases you (it counts as a scramble with rushing yards, not a sack). Roll out and the linebackers and nearby defenders break off coverage to run you down.',
     'The defense mixes in blitzes and sometimes puts a linebacker on you as a spy. The pass rush gets home a little faster, and designed QB runs are read sooner.',

@@ -548,3 +548,15 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   knees stay soft. Engine sets look targets every live frame (ball in the air, carrier, QB, CB's man).
 - Test tools (scratchpad, not in the repo): poses.cjs (pose sheet in cells), film.cjs (filmstrips: cut, tackle, catch, idle,
   block), animperf.cjs, qbrun.cjs (edge scramble yards).
+
+## v0.46: surfaces and footing
+- `src/data/surface.js` `surfaceFor(culture, weather, wear)` -> { kind grass|turf, cond, grip, sink, slip, slide, bounce,
+  debris, footSink, label, short, desc }. Wet grass becomes mud with wear progress. culture.surface (culture.js, own seeded
+  stream: painted turf colors always 'turf', else hs 30% / college 40% / pro 50%; a team def may set surfaceType).
+- engine.js: `surf` per play (setSurface in actors, cleared on cleanup); maxSpeed and user speed * (1 - sink); moveToward
+  accel * grip; user cutK * (1/grip)^1.5; `footing(e, dt)` each frame: slips on hard cuts at speed (stumble 'slip' action,
+  or a wipeout for non-carrier AI) and getting stuck in mud/snow ('stuck' action, speed capped 0.45 s, legs churn); wrap
+  pile decay and dive length scale with slide/sink; ground-impact debris via u.groundHit; spray behind user/carrier.
+- actors.js: `setSurface`; ragdoll restitution/slide from SURF (turf bounces up to 3 times, slick ground keeps sliding after
+  settling via g.slideV); IK planted feet sink by footSink; dustPuff(scene, origin, n, kind = SURF.debris) with DEBRIS colors.
+- UI: pregame venue card FIELD chip; HUD weather tag adds Turf/Mud/Slick turf/Snow; Practice has a FIELD option.

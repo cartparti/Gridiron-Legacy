@@ -8,6 +8,7 @@ import { startCrowd, stopCrowd, setCrowd, playMusic, stopMusic, react } from '..
 import { buildInterlude } from './interludes.js';
 import { nextFrame, tickIdle, sweepActorCaches } from './actors.js';
 import { buildWorld } from './world.js';
+import { surfaceFor } from '../data/surface.js';
 import { goalLine } from './minigames/goalLine.js';
 import { freePlay } from './play/engine.js';
 import { fallbackMeter } from './minigames/fallback.js';
@@ -371,7 +372,9 @@ export function runMinigame(type, opts) {
     const m = opts.moment;
     const sitText = `${m.label}${m.situation ? ` · ${m.situation}` : ''}`;
     hud.top(sitText, opts.call.toUpperCase());
-    hud.weather(m.weather && m.weather !== 'clear' ? ({ night: 'Night', rain: 'Rain', storm: 'Storm', snow: 'Snow', wind: 'Wind', fog: 'Fog' }[m.weather] ?? '') : (m.wind?.mph >= 4 ? 'Breezy' : ''), m.wind);
+    const wLabel = m.weather && m.weather !== 'clear' ? ({ night: 'Night', rain: 'Rain', storm: 'Storm', snow: 'Snow', wind: 'Wind', fog: 'Fog' }[m.weather] ?? '') : (m.wind?.mph >= 4 ? 'Breezy' : '');
+    const sLabel = opts.culture ? surfaceFor(opts.culture, m.weather ?? 'clear', opts.wear?.progress ?? 0).short : ''; // Turf / Mud / Slick turf
+    hud.weather([wLabel, sLabel && sLabel !== wLabel ? sLabel : ''].filter(Boolean).join(' · '), m.wind);
     if (!r) {
       fallbackMeter({ hud, opts, done: finish, addCleanup: (f) => cleanups.push(f) });
       return;

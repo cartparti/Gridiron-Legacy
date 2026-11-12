@@ -14,6 +14,7 @@ import { people } from '../../sim/social.js';
 import { crest, mascotKind } from '../crest.js';
 import { equippedTraits } from '../../sim/traits.js';
 import { teamCulture, BIOME_INFO } from '../../data/culture.js';
+import { surfaceFor } from '../../data/surface.js';
 import * as flow from '../../sim/flow.js';
 import { teamBadge, changeChips } from '../components.js';
 import { sfx } from '../../audio/sfx.js';
@@ -571,6 +572,8 @@ export function gamedayScreen(app) {
         h('div.row.wrap', { style: { gap: '6px', marginTop: '6px' } },
           h(`span.chip.pix${g.userSide === 'away' ? '.bad' : '.good'}`, `HOME FIELD: ${culture.trait.label.toUpperCase()}`),
           h('span.tiny.muted', g.userSide === 'away' ? culture.trait.desc : 'Your crowd gives you a small lift.')),
+        (() => { const sf = surfaceFor(culture, g.weather ?? 'clear', 0); return h('div.row.wrap', { style: { gap: '6px', marginTop: '6px' } },
+          h(`span.chip.pix${sf.cond !== 'dry' ? '.bad' : ''}`, `FIELD: ${sf.label.toUpperCase()}`), h('span.tiny.muted', sf.desc)); })(),
         culture.crowd !== 'normal' ? h('p.tiny', { style: { marginTop: '6px' } }, `Fans are doing a ${culture.crowd === 'whiteout' ? 'WHITEOUT' : culture.crowd === 'blackout' ? 'BLACKOUT' : 'COLOR RUSH'} tonight.`) : null),
       h('p.center.small.muted', { style: { marginTop: '10px' } }, g.sitOut ? 'You are sitting out this one.'
         : `${g.drives.filter((d) => d.moment).length}+ ${defense ? 'defensive snaps' : 'key moments'} expected · freshness ${Math.round((st.week.freshness ?? 0) * 100)}%`),

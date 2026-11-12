@@ -82,3 +82,17 @@ test('older saves keep their two-conference pro league', () => {
   assert.equal(po.seeds.length, 8);
   assert.equal(roundName(league, 1), 'Conference Final');
 });
+
+test('surfaces: turf grips and bounces, rain turns grass to mud that worsens, snow slips', async () => {
+  const { surfaceFor } = await import('../src/data/surface.js');
+  const dryGrass = surfaceFor({ surface: 'grass' }, 'clear', 0);
+  const dryTurf = surfaceFor({ surface: 'turf' }, 'clear', 0);
+  assert.ok(dryTurf.grip > dryGrass.grip && dryTurf.bounce > dryGrass.bounce && dryGrass.sink === 0);
+  const mudEarly = surfaceFor({ surface: 'grass' }, 'rain', 0), mudLate = surfaceFor({ surface: 'grass' }, 'rain', 1);
+  assert.ok(mudLate.sink > mudEarly.sink && mudLate.grip < mudEarly.grip && mudEarly.debris === 'mud');
+  const slick = surfaceFor({ surface: 'turf' }, 'rain', 1);
+  assert.equal(slick.sink, 0); assert.ok(slick.slide > dryTurf.slide && slick.slip > 0);
+  const snow = surfaceFor(null, 'snow', 0);
+  assert.ok(snow.slip > 0 && snow.grip < 1 && snow.debris === 'snow');
+  for (const t of PRO_TEAMS) assert.ok(['grass', 'turf'].includes(teamCulture(t, 'pro').surface));
+});
