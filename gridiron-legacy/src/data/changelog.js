@@ -1,5 +1,13 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.45', date: 'Nov 12', title: 'Real pressure on the QB and lifelike movement', items: [
+    'When you take off as QB the defense comes after you. Cross the line and every defender chases you (it counts as a scramble with rushing yards, not a sack). Roll out and the linebackers and nearby defenders break off coverage to run you down.',
+    'The defense mixes in blitzes and sometimes puts a linebacker on you as a spy. The pass rush gets home a little faster, and designed QB runs are read sooner.',
+    'Players move like one connected body. Feet plant on the turf and stay there instead of sliding, land flat, push off the toes and lift on every stride. Stride length matches running speed.',
+    'Real ankles and wrists. Knees and elbows only bend the right way. Standing players keep soft knees and take small steps to rebalance or turn, and blockers keep a wide, staggered base.',
+    'Heads follow the action: everyone watches the ball in the air, defenders read the quarterback or the ball carrier, and corners watch their man.',
+    'Dives, tackles and falls rest on the ground instead of sinking into it. Smaller joints at the knees, elbows and hips, so limbs flow into each other.',
+  ] },
   { v: '0.44', date: 'Nov 12', title: 'Receivers keep working to get open', items: [
     'When you hold the ball as QB, receivers no longer drift out of bounds after their routes. They break off and look for open grass, spread out and come back toward you.',
     'When you scramble, receivers run with you to that side of the field (the scramble drill).',

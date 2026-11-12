@@ -1061,7 +1061,7 @@ function buildRig(o) {
     const hip = new THREE.Group();
     hip.position.set(side * 0.1, -0.04, 0);
     const th = new THREE.Mesh(g.thigh, football && un.style && un.style.pants !== 'none' ? pantsStripeMat(un) : pants); th.scale.set(bt.leg, 1, bt.leg); hip.add(th);
-    hip.add(joint(0.098 * bt.leg, pants, 0, -0.02, 0)); // hip joint blends thigh into hips
+    hip.add(joint(0.088 * bt.leg, pants, 0, -0.025, 0)); // hip joint blends thigh into hips (no bigger than the thigh, or it reads as a ball)
     const knee = new THREE.Group();
     knee.position.y = -0.48;
     hip.add(knee);
@@ -1069,16 +1069,21 @@ function buildRig(o) {
     const shin = new THREE.Mesh(g.shin, legSleeve ? toon(L.legSleeveColor ?? '#16181c') : football ? sock : pants);
     shin.scale.set(bt.leg, 1, bt.leg);
     knee.add(shin);
-    knee.add(joint(0.082 * bt.leg, legSleeve ? toon(L.legSleeveColor ?? '#16181c') : football ? pants : pants, 0, 0.01, 0)); // knee
+    knee.add(joint(0.066 * bt.leg, legSleeve ? toon(L.legSleeveColor ?? '#16181c') : football ? pants : pants, 0, 0.01, 0)); // knee: just covers the thigh/shin seam when it bends
     if (football && !legSleeve) { const sk = new THREE.Mesh(box(0.15, 0.05, 0.155), toon(un.trim)); sk.position.y = -0.1; knee.add(sk); }
     if (football && onSide(L.kneeBrace, side)) {
       const kb = new THREE.Mesh(box(0.19, 0.16, 0.2), braceTex(L.kneeColor ?? '#16181c'));
       kb.position.y = -0.01;
       knee.add(kb);
     }
+    // ankle joint: the foot pivots here so it can sit flat on the ground, roll off the toes and point in the air
+    const ankle = new THREE.Group();
+    ankle.position.set(0, -0.44, 0);
+    knee.add(ankle);
+    ankle.add(joint(0.047 * bt.leg, legSleeve ? toon(L.legSleeveColor ?? '#16181c') : football ? sock : skin, 0, 0.02, 0));
     const foot = new THREE.Mesh(g.shoe, cleatMat);
-    foot.position.set(0, -0.44, -0.05);
-    knee.add(foot);
+    foot.position.set(0, 0, -0.05);
+    ankle.add(foot);
     if (football && (L.cleatCut === 'mid' || L.cleatCut === 'high')) { // mid / high-top cleats
       const hi = L.cleatCut === 'high';
       const ank = new THREE.Mesh(box(0.165, hi ? 0.15 : 0.08, 0.17), toon(L.cleats ?? '#16181c'));
@@ -1091,7 +1096,7 @@ function buildRig(o) {
       knee.add(sp);
     }
     hips.add(hip);
-    return { hip, knee, foot };
+    return { hip, knee, ankle, foot };
   };
   const legL = mkLeg(-1);
   const legR = mkLeg(1);
@@ -1225,15 +1230,19 @@ function buildRig(o) {
     el.position.y = -0.31;
     sh.add(el);
     const fore = new THREE.Mesh(g.fore, armMat(skinC, shirtC, null, tat, 'fore', armSleeve)); fore.scale.set(bt.arm, 1, bt.arm); el.add(fore);
-    el.add(joint(0.066 * bt.arm, armSleeve ? toon(armSleeve) : skin, 0, 0.005, 0)); // elbow
+    el.add(joint(0.054 * bt.arm, armSleeve ? toon(armSleeve) : skin, 0, 0.005, 0)); // elbow (covers the seam without a knob)
     if (football && onSide(L.elbowPad, side)) { const ep = new THREE.Mesh(box(0.145, 0.09, 0.145), toon(L.elbowColor ?? '#16181c')); ep.position.y = -0.02; el.add(ep); }
-    const wrist = football && (L.wristband === 'both' || L.wristband === (side < 0 ? 'left' : 'right'));
-    if (wrist) { const b = new THREE.Mesh(g.band, toon(L.wristColor ?? '#f2f2f2')); b.position.y = -0.25; el.add(b); }
+    const band = football && (L.wristband === 'both' || L.wristband === (side < 0 ? 'left' : 'right'));
+    if (band) { const b = new THREE.Mesh(g.band, toon(L.wristColor ?? '#f2f2f2')); b.position.y = -0.25; el.add(b); }
     const hand = new THREE.Mesh(g.hand, football && L.gloves ? (L.gloveDesign && L.gloveDesign !== 'solid' ? gloveTex(L.gloves, L.gloveAccent ?? '#f2f2f2', L.gloveDesign) : toon(L.gloves)) : skin);
-    hand.position.y = -0.34;
-    el.add(hand);
+    // wrist joint: the hand flexes a beat behind the forearm (secondary motion) instead of being welded on
+    const wrist = new THREE.Group();
+    wrist.position.y = -0.3;
+    el.add(wrist);
+    hand.position.y = -0.04;
+    wrist.add(hand);
     chest.add(sh);
-    return { sh, el, hand };
+    return { sh, el, wrist, hand };
   };
   const armL = mkArm(-1);
   const armR = mkArm(1);
@@ -1894,13 +1903,19 @@ const ACTION_DUR = { throw: 0.55, catch: 0.5, jump: 0.7, juke: 0.35, spin: 0.5, 
 
 /** Pose for this frame. Returns target joint angles. */
 function computePose(u, dt) {
-  const P = { lh: 0, lk: 0, rh: 0, rk: 0, ls: 0.1, le: 0.3, rs: 0.1, re: 0.3, lout: 0.12, rout: -0.12, spine: 0.05, y: 0, rz: 0, ry: 0, rx: 0, head: 0, hy: 0, sy: 0, ny: 0, sx: 0 };
+  const P = { lh: 0, lk: 0, rh: 0, rk: 0, ls: 0.1, le: 0.3, rs: 0.1, re: 0.3, lout: 0.12, rout: -0.12, spine: 0.05, y: 0, rz: 0, ry: 0, rx: 0, head: 0, hy: 0, sy: 0, ny: 0, sx: 0, lw: 0.08, rw: 0.08 };
   const s = u.speed;
   // ---- locomotion
   if (s > 0.4 && !u.down) {
     const run = Math.min(1, s / 7);
     const gt = u.gait ?? { stride: 1, arm: 1, lean: 0, tempo: 1, bounce: 1 };
-    u.phase += dt * (5 + s * 1.25) * (u.back ? 1.3 : 1) * gt.tempo;
+    // cadence follows ground speed: one full stride cycle covers cycleLen yards, so planted feet don't skate
+    // (longer strides when sprinting, quicker shorter steps when backpedalling)
+    const cycleLen = Math.min(3.7, Math.max(1.0, 0.95 + s * 0.29)) * gt.stride * (u.back ? 0.62 : 1) * (u.legK ?? 1);
+    u.omega = Math.max(4.5, (2 * Math.PI * s) / cycleLen) * gt.tempo;
+    u.cycleLen = cycleLen;
+    u.duty = u.back ? 0.6 : 0.62 - run * 0.26; // share of the cycle a foot is on the ground (sprinters fly)
+    u.phase += dt * u.omega;
     const a = Math.sin(u.phase);
     const b = Math.cos(u.phase);
     if (u.back) {
@@ -1915,6 +1930,8 @@ function computePose(u, dt) {
       P.ls = -a * (0.45 + run * 0.75) * gt.arm; P.rs = a * (0.45 + run * 0.75) * gt.arm;
       P.le = 0.7 + run * 0.8 + Math.max(0, a) * 0.35; P.re = 0.7 + run * 0.8 + Math.max(0, -a) * 0.35;
       P.lout = 0.1 + run * 0.08; P.rout = -0.1 - run * 0.08;
+      // hands flick at the end of each arm swing (relaxed wrists, knife-hand when sprinting)
+      P.lw = 0.05 + Math.max(0, a) * 0.3 * run; P.rw = 0.05 + Math.max(0, -a) * 0.3 * run;
       // hips swing with the legs, shoulders counter-rotate, head stays steady
       P.hy = a * 0.22 * (0.4 + run * 0.6); P.sy = -a * 0.42 * (0.4 + run * 0.6); P.ny = a * 0.18 * run;
       P.spine = 0.1 + run * 0.3 + gt.lean; P.head = -run * 0.18 + Math.sin(u.phase * 2) * 0.03;
@@ -1941,7 +1958,7 @@ function computePose(u, dt) {
   if (hold === 'stance') { P.y = -0.32; P.spine = 1.0; P.lh = 0.9; P.lk = 1.5; P.rh = 0.3; P.rk = 1.1; P.ls = 1.4; P.le = 0; P.rs = 0.5; P.re = 0.5; P.head = -0.6; }
   if (hold === 'block' || hold === 'tackle') { P.y = -0.16; P.spine = 0.55; P.lh = 0.5; P.lk = 0.9; P.rh = -0.3; P.rk = 0.7; P.ls = 1.35; P.rs = 1.35; P.le = 0.25; P.re = 0.25; P.lout = -0.15; P.rout = 0.15; P.head = -0.3; }
   if (hold === 'throw' || hold === 'throwWind') { P.rs = -2.5; P.re = 1.3; P.rout = -0.3; P.ls = 0.9; P.le = 0.6; P.spine = -0.1; P.ry = 0.5; }
-  if (hold === 'catch' || hold === 'catchReach') { P.ls = 1.7; P.rs = 1.7; P.le = 0.2; P.re = 0.2; P.lout = -0.1; P.rout = 0.1; }
+  if (hold === 'catch' || hold === 'catchReach') { P.ls = 1.7; P.rs = 1.7; P.le = 0.2; P.re = 0.2; P.lout = -0.1; P.rout = 0.1; P.lw = -0.4; P.rw = -0.4; }
   if (hold === 'jump' || hold === 'jumpCatch') { P.ls = 2.9; P.rs = 2.9; P.le = 0.1; P.re = 0.1; P.lh = 0.9; P.lk = 1.6; P.rh = 0.3; P.rk = 1.0; }
   if (hold === 'dive') { P.rx = 1.2; P.y = -0.5; P.ls = 2.8; P.rs = 2.8; P.le = 0; P.re = 0; P.lh = -0.3; P.rh = -0.4; }
   if (hold === 'sit') { P.y = -0.45; P.lh = 1.55; P.rh = 1.55; P.lk = 1.55; P.rk = 1.55; P.ls = 0.4; P.rs = 0.4; P.le = 1.1; P.re = 1.1; }
@@ -1956,9 +1973,9 @@ function computePose(u, dt) {
     const p = Math.min(1, act.t / act.dur);
     const k = Math.sin(p * Math.PI);
     switch (act.name) {
-      case 'throw': if (p < 0.45) { P.rs = -2.6 * (p / 0.45); P.re = 1.4; P.ry = 0.6; P.spine = -0.12; } else { P.rs = -2.6 + 4.2 * ((p - 0.45) / 0.55); P.re = 0.3; P.ry = -0.3; P.spine = 0.3; } P.ls = 0.8; break;
+      case 'throw': if (p < 0.45) { P.rs = -2.6 * (p / 0.45); P.re = 1.4; P.ry = 0.6; P.spine = -0.12; P.rw = -0.5; } else { P.rs = -2.6 + 4.2 * ((p - 0.45) / 0.55); P.re = 0.3; P.ry = -0.3; P.spine = 0.3; P.rw = 0.7; } P.ls = 0.8; break; // wrist cocks back, then snaps through the release
       case 'release': P.rs = 1.6; P.re = 0.2; P.spine = 0.3; P.ry = -0.3; break;
-      case 'catch': P.ls = 1.6 + k * 0.6; P.rs = 1.6 + k * 0.6; P.le = 0.2; P.re = 0.2; break;
+      case 'catch': P.ls = 1.6 + k * 0.6; P.rs = 1.6 + k * 0.6; P.le = 0.2; P.re = 0.2; P.lw = -0.45; P.rw = -0.45; break; // hands open toward the ball
       case 'jump': P.ls = 2.9; P.rs = 2.9; P.le = 0.1; P.re = 0.1; P.lh = 0.9 * k; P.lk = 1.6 * k; P.rh = 0.3; P.rk = 1.0 * k; u.hop = Math.max(u.hop, k * 0.9); break;
       case 'juke': case 'cut': P.rz = (act.dir ?? 1) * 0.45 * k; P.y = -0.15 * k; P.lh = 0.6 * k * (act.dir ?? 1); P.rh = -0.6 * k * (act.dir ?? 1); P.lk = 0.6; P.rk = 0.6; P.spine = 0.3; break;
       case 'spin': P.ry = p * Math.PI * 2; P.spine = 0.25; P.ls = 1.1; P.rs = 0.4; P.lout = 0.6; P.rout = -0.9; break;
@@ -2029,13 +2046,14 @@ function applyPose(p, P, dt) {
   S(r.armR.sh.rotation, 'x', P.rs, 140, 15); S(r.armR.el.rotation, 'x', P.re, 120, 13); S(r.armR.sh.rotation, 'z', -P.rout, 120, 14);
   S(r.spine.rotation, 'x', -P.spine, 110, 14);
   S(r.neck.rotation, 'x', -P.head, 90, 12);
+  if (r.armL.wrist) { S(r.armL.wrist.rotation, 'x', P.lw, 80, 9); S(r.armR.wrist.rotation, 'x', P.rw, 80, 9); } // loose wrists lag and overshoot a touch
   L(r.hips.rotation, 'y', P.hy);
-  L(r.spine.rotation, 'y', P.sy);
+  L(r.spine.rotation, 'y', P.sy + (u.lookW > 0.01 ? u.spineLook ?? 0 : 0));
   L(r.neck.rotation, 'y', P.ny - P.sy * 0.6 - P.hy * 0.6);
   L(r.body.position, 'x', P.sx);
   // body: position offset (crouch/hop), roll (juke lean), pitch (dive/fall), yaw (spin)
   u.hop = Math.max(0, u.hop - dt * 2.2);
-  L(r.body.position, 'y', P.y + u.hop);
+  L(r.body.position, 'y', P.y + u.hop + (u.gfix ?? 0) - (u.pelvis ?? 0));
   // body roll wobbles a little (bumps, cuts) on a softer spring
   u.rzv = (u.rzv ?? 0) + (95 * (P.rz - r.body.rotation.z) - 11 * (u.rzv ?? 0)) * sdt;
   r.body.rotation.z += u.rzv * sdt;
@@ -2046,6 +2064,210 @@ function applyPose(p, P, dt) {
   while (d > Math.PI) d -= Math.PI * 2;
   while (d < -Math.PI) d += Math.PI * 2;
   p.rotation.y += d * (1 - Math.exp(-12 * dt));
+  lookAtTarget(p, P, dt);
+  legIK(p, dt, jv);
+  jointLimits(r);
+  groundContact(p, dt);
+}
+
+// ------------------------------------------------------------------ biomechanics: IK feet, joint limits, ground, gaze
+// Leg lengths in the hips' local space (hip pivot -> knee -> ankle), see mkLeg.
+const THIGH = 0.48, SHIN = 0.44;
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
+const IK_HOLDS = new Set([null, 'catch', 'throw', 'wave', 'reach', 'hatOn', 'block', 'tackle']);
+const IK_ACTIONS = new Set(['throw', 'release', 'catch', 'stiff', 'wave']);
+// stance offsets per held pose (forward, width) in yards: a staggered, wide base for blocking
+const STANCE = { block: [[0.22, 0.2], [-0.18, 0.2]], tackle: [[0.22, 0.2], [-0.18, 0.2]] };
+const smooth01 = (k) => (k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k));
+
+/**
+ * Feet that stay planted. Each foot is either on the ground (locked to a world spot while the body moves over it)
+ * or swinging along an arc to the next footstep. While running, the stride phase decides lift-off and landing;
+ * standing still, a foot steps back under the hip when the body drifts away from it. A two-bone IK then solves the
+ * hip and knee angles that put the ankle on that spot, the ankle keeps the sole flat (toe-off and toes-up in the
+ * swing), and the pelvis drops a little when a foot would be out of reach.
+ */
+function legIK(p, dt, jv) {
+  const u = p.userData.u;
+  const r = p.userData.rig;
+  if (!r.legL.ankle) return;
+  const hold = u.hold ?? null;
+  const want = !u.rag && !u.down && !u.celebrate && IK_HOLDS.has(hold) && (!u.action || IK_ACTIONS.has(u.action.name)) && (u.hop ?? 0) < 0.03 && Math.abs(r.body.rotation.x) < 0.5;
+  u.ikW = (u.ikW ?? 0) + ((want ? 1 : 0) - (u.ikW ?? 0)) * Math.min(1, dt * (want ? 7 : 16));
+  if (!want) u.feet = null;
+  const w = u.ikW;
+  const legs = [r.legL, r.legR];
+  if (w < 0.01) {
+    for (const lg of legs) { lg.ankle.rotation.x *= 0.8; lg.ankle.rotation.z *= 0.8; lg.hip.rotation.z *= 0.8; }
+    u.pelvis = (u.pelvis ?? 0) * 0.9;
+    return;
+  }
+  r.hips.updateWorldMatrix(true, false);
+  const sy = r.body.scale.y;
+  const root = _v1.setFromMatrixPosition(p.matrixWorld);
+  const groundY = root.y;
+  const yaw = p.rotation.y;
+  const fwdX = -Math.sin(yaw), fwdZ = -Math.cos(yaw); // characters face -z at yaw 0
+  const rgtX = Math.cos(yaw), rgtZ = -Math.sin(yaw);
+  const half = 0.135 * r.body.scale.x; // an athletic base, feet about shoulder width
+  const st = STANCE[hold];
+  const restSpot = (i, out) => {
+    const sd = i === 0 ? -1 : 1;
+    const f = st ? st[i][0] : 0, wdt = st ? st[i][1] : half;
+    return out.set(root.x + rgtX * sd * wdt + fwdX * f, groundY, root.z + rgtZ * sd * wdt + fwdZ * f);
+  };
+  // seat the feet where they are right now (first frame, or coming back from a dive / ragdoll / celebration)
+  if (!u.feet) {
+    u.feet = legs.map((lg, i) => { lg.foot.updateWorldMatrix(true, false); const fp = new THREE.Vector3().setFromMatrixPosition(lg.foot.matrixWorld); fp.y = groundY; if (fp.distanceTo(restSpot(i, _v2)) > 0.5) fp.copy(_v2); return { pos: fp, plant: true, from: fp.clone(), to: fp.clone(), t: 0, dur: 0.25, sw: 0 }; });
+  }
+  const vel = u.vel ?? { x: 0, z: 0 };
+  const moving = (u.speed ?? 0) > 0.4;
+  const T = moving ? (2 * Math.PI) / (u.omega || 8) : 0.6;
+  const duty = u.duty ?? 0.6;
+  const vl = Math.hypot(vel.x, vel.z);
+  const dX = vl > 0.3 ? vel.x / vl : fwdX, dZ = vl > 0.3 ? vel.z / vl : fwdZ;
+  const landing = (i, timeLeft, out) => {
+    restSpot(i, out);
+    const ahead = moving ? duty * (u.cycleLen ?? 1.5) * 0.42 : 0; // land a touch ahead of the hips, not out in front (good sprint form)
+    out.x += vel.x * timeLeft + dX * ahead; out.z += vel.z * timeLeft + dZ * ahead;
+    return out;
+  };
+  legs.forEach((lg, i) => {
+    const F = u.feet[i];
+    const other = u.feet[1 - i];
+    if (moving) {
+      const c = ((((u.phase - Math.PI / 2 - i * Math.PI) / (2 * Math.PI)) % 1) + 1) % 1;
+      const stance = c < duty;
+      if (stance && !F.plant) { F.plant = true; F.pos.copy(landing(i, 0, _v2)); }
+      else if (!stance && F.plant) { F.plant = false; F.from.copy(F.pos); }
+      if (!F.plant) {
+        F.sw = (c - duty) / (1 - duty);
+        const tl = (1 - F.sw) * (1 - duty) * T;
+        landing(i, tl, F.to);
+        const k = smooth01(F.sw);
+        F.pos.set(F.from.x + (F.to.x - F.from.x) * k, groundY, F.from.z + (F.to.z - F.from.z) * k);
+      }
+      // a foot left far behind (sharp cut, shove) lets go early
+      if (F.plant && Math.hypot(F.pos.x - root.x, F.pos.z - root.z) > 0.95 * sy) { F.plant = false; F.from.copy(F.pos); }
+    } else {
+      if (F.plant) {
+        const rs = restSpot(i, _v2);
+        // step when the body has drifted off this foot, or a turn has left it on the wrong side (crossed legs)
+        const side = (F.pos.x - root.x) * rgtX + (F.pos.z - root.z) * rgtZ;
+        const crossed = (i === 0 ? side > -0.04 : side < 0.04);
+        if ((Math.hypot(F.pos.x - rs.x, F.pos.z - rs.z) > 0.17 || crossed) && other.plant) { F.plant = false; F.from.copy(F.pos); F.to.copy(rs); F.t = 0; F.dur = 0.24; }
+      } else {
+        F.t += dt; restSpot(i, F.to);
+        F.sw = Math.min(1, F.t / F.dur);
+        const k = smooth01(F.sw);
+        F.pos.set(F.from.x + (F.to.x - F.from.x) * k, groundY, F.from.z + (F.to.z - F.from.z) * k);
+        if (F.sw >= 1) { F.plant = true; F.pos.copy(F.to); }
+      }
+    }
+  });
+  // solve each leg in the hips' local space (the body's scale and lean are taken into account by worldToLocal)
+  let deficit = 0;
+  legs.forEach((lg, i) => {
+    const F = u.feet[i];
+    const lift = F.plant ? 0 : Math.sin(Math.PI * F.sw) * (moving ? 0.07 + 0.2 * Math.min(1, (u.speed ?? 0) / 8) : 0.06);
+    // the model's legs are a touch long for its hip height: aim the ankle slightly low (the cleat sinks into the turf a
+    // little) so a standing player's knees stay soft instead of squatting
+    const tgt = _v3.set(F.pos.x, groundY + 0.008 * sy + lift, F.pos.z);
+    r.hips.worldToLocal(tgt);
+    const dx = tgt.x - lg.hip.position.x, dy = tgt.y - lg.hip.position.y, dz = tgt.z - lg.hip.position.z;
+    const raw = Math.hypot(dx, dy, dz);
+    if (F.plant) deficit = Math.max(deficit, raw - (THIGH + SHIN - 0.01));
+    const len = Math.min(THIGH + SHIN - 0.004, Math.max(0.3, raw));
+    const roll = Math.max(-0.35, Math.min(0.35, Math.atan2(dx, -dy)));
+    const phi = Math.atan2(-dz, Math.max(0.05, -dy));
+    const cosK = (THIGH * THIGH + SHIN * SHIN - len * len) / (2 * THIGH * SHIN);
+    const bend = Math.PI - Math.acos(Math.max(-1, Math.min(1, cosK)));
+    const gam = Math.acos(Math.max(-1, Math.min(1, (THIGH * THIGH + len * len - SHIN * SHIN) / (2 * THIGH * len))));
+    const hipX = phi + gam, kneeX = -bend;
+    lg.hip.rotation.x += (hipX - lg.hip.rotation.x) * w;
+    lg.knee.rotation.x += (kneeX - lg.knee.rotation.x) * w;
+    lg.hip.rotation.z += (roll - lg.hip.rotation.z) * w;
+    // sole flat on the ground in stance; toes push off, then pull up to clear the turf, then flat for the landing
+    const sw = F.plant ? 0 : F.sw;
+    const toe = F.plant ? 0 : sw < 0.3 ? -0.75 * (1 - sw / 0.3) : sw < 0.75 ? 0.25 * Math.sin(((sw - 0.3) / 0.45) * Math.PI) : 0.12 * (1 - (sw - 0.75) / 0.25);
+    const flat = -(r.body.rotation.x + lg.hip.rotation.x + lg.knee.rotation.x);
+    lg.ankle.rotation.x += (Math.max(-1.1, Math.min(0.9, flat + toe)) - lg.ankle.rotation.x) * w;
+    lg.ankle.rotation.z += ((-lg.hip.rotation.z - r.body.rotation.z) * 0.9 - lg.ankle.rotation.z) * w;
+  });
+  // the springs keep their own velocity; zero it while IK drives the legs so nothing jumps when IK lets go
+  if (w > 0.5) for (let k = 0; k < 4; k++) jv[k] = 0;
+  // pelvis drops (bends both knees) when a planted foot would be out of reach
+  u.pelvis = (u.pelvis ?? 0) + (Math.min(0.14, Math.max(0, deficit) * sy) * w - (u.pelvis ?? 0)) * Math.min(1, dt * 10);
+}
+
+/** Anatomical limits: knees and elbows only bend one way; nothing folds past what a human joint can do. */
+function jointLimits(r) {
+  const c = (o, k, lo, hi) => { if (o[k] < lo) o[k] = lo; else if (o[k] > hi) o[k] = hi; };
+  for (const lg of [r.legL, r.legR]) { c(lg.knee.rotation, 'x', -2.6, 0.02); c(lg.hip.rotation, 'x', -1.0, 2.7); c(lg.hip.rotation, 'z', -0.6, 0.6); }
+  for (const a of [r.armL, r.armR]) { c(a.el.rotation, 'x', -0.03, 2.6); if (a.wrist) c(a.wrist.rotation, 'x', -0.9, 0.9); }
+  c(r.spine.rotation, 'x', -1.35, 0.5);
+  c(r.neck.rotation, 'x', -0.75, 0.9); c(r.neck.rotation, 'y', -1.25, 1.25);
+}
+
+/**
+ * Head and eyes: when the game gives a look target (the ball, the carrier), the neck turns toward it within human
+ * limits, the head leading and the spine following a little (set via setLookAt).
+ */
+function lookAtTarget(p, P, dt) {
+  const u = p.userData.u;
+  const r = p.userData.rig;
+  const tg = u.lookAt;
+  const on = tg && !u.rag && !u.down;
+  u.lookW = (u.lookW ?? 0) + ((on ? 1 : 0) - (u.lookW ?? 0)) * Math.min(1, dt * 5);
+  if (u.lookW < 0.01) return;
+  if (on) {
+    const hx = p.position.x, hz = p.position.z;
+    const dx = tg.x - hx, dz = tg.z - hz;
+    let rel = Math.atan2(-dx, -dz) - p.rotation.y;
+    while (rel > Math.PI) rel -= Math.PI * 2;
+    while (rel < -Math.PI) rel += Math.PI * 2;
+    const reach = Math.abs(rel) < 2.2; // can't look straight behind: keep the last comfortable angle
+    if (reach) u.lkY = (u.lkY ?? 0) + (Math.max(-1.15, Math.min(1.15, rel)) - (u.lkY ?? 0)) * Math.min(1, dt * 9);
+    const dist = Math.hypot(dx, dz);
+    const pitch = Math.atan2((tg.y ?? 1) - 1.7 * r.body.scale.y, Math.max(0.5, dist));
+    u.lkP = (u.lkP ?? 0) + (Math.max(-0.5, Math.min(0.55, pitch)) - (u.lkP ?? 0)) * Math.min(1, dt * 7);
+  }
+  const k = u.lookW * 0.85;
+  const ny = (u.lkY ?? 0) - r.hips.rotation.y - r.spine.rotation.y;
+  r.neck.rotation.y += (ny - r.neck.rotation.y) * k;
+  const nx = (u.lkP ?? 0) - r.spine.rotation.x - r.body.rotation.x * 0.6;
+  r.neck.rotation.x += (nx - r.neck.rotation.x) * k * 0.7;
+  // the chest turns a little with a big head turn so it doesn't look like the head is screwed on
+  u.spineLook = (u.lkY ?? 0) * 0.18 * u.lookW; // applied as an offset on the spine's twist target in applyPose
+}
+/** Give a character something to watch (a world-space point with x, y, z), or null to look ahead. */
+export function setLookAt(p, target) { if (p?.userData?.u) p.userData.u.lookAt = target; }
+
+/**
+ * Ground contact for poses that aren't on the feet (dives, falls, tackles, lying down, getting up): find the lowest
+ * body part and lift (or settle) the body so it rests on the turf instead of sinking into it or hovering.
+ */
+const GC_PARTS = (r) => [[r.headG, 0.2], [r.chest, 0.17], [r.hips, 0.14], [r.armL.hand, 0.05], [r.armR.hand, 0.05], [r.legL.foot, 0.05], [r.legR.foot, 0.05], [r.legL.knee, 0.07], [r.legR.knee, 0.07], [r.armL.el, 0.05], [r.armR.el, 0.05]];
+let GC_STAMP = 0;
+function groundContact(p, dt) {
+  const u = p.userData.u;
+  const r = p.userData.rig;
+  const act = u.action?.name;
+  const need = !u.rag && (u.down || Math.abs(r.body.rotation.x) > 0.45 || act === 'dive' || act === 'tackle' || act === 'fall' || act === 'getup' || act === 'lunge' || u.hold === 'dive' || u.hold === 'getup' || u.hold === 'stance');
+  if (!need) { if (u.gfix) u.gfix *= Math.max(0, 1 - dt * 6); if (Math.abs(u.gfix ?? 0) < 0.002) u.gfix = 0; return; }
+  // only the joints we measure (and their parents) need fresh matrices, not every mesh on the body
+  r.body.updateWorldMatrix(true, false);
+  const groundY = _v1.setFromMatrixPosition(p.matrixWorld).y;
+  const s = r.body.scale.y;
+  let low = Infinity;
+  const stamp = ++GC_STAMP;
+  const fresh = (o) => { if (!o || o.userData.gcs === stamp) return; if (o.parent && o.parent !== r.body) fresh(o.parent); o.updateMatrix(); o.matrixWorld.multiplyMatrices(o.parent.matrixWorld, o.matrix); o.userData.gcs = stamp; };
+  for (const [o, rad] of GC_PARTS(r)) { if (!o) continue; fresh(o); _v2.setFromMatrixPosition(o.matrixWorld); low = Math.min(low, _v2.y - rad * s - groundY); }
+  if (!Number.isFinite(low)) return;
+  // sinking: push up right away; hovering while lying down: settle down onto the turf
+  const fix = low < 0 ? -low : (u.down || act === 'fall') && low > 0.02 ? -Math.min(low - 0.02, dt * 2) : 0;
+  u.gfix = Math.max(-0.4, Math.min(1.2, (u.gfix ?? 0) + fix));
+  r.body.position.y += fix;
 }
 
 // ------------------------------------------------------------------ ragdoll tumble
@@ -2170,6 +2392,15 @@ export function animateRun(p, dt, speed) {
     u.turn = (u.turn ?? 0) + (dy / dt - (u.turn ?? 0)) * k;
     u.accel = (u.accel ?? 0) + ((speed - (u.speed ?? 0)) / dt - (u.accel ?? 0)) * k;
     u.prevYaw = p.rotation.y;
+    // ground velocity (yards/s, parent space) for footstep placement
+    const pv = (u.prevPos ??= { x: p.position.x, z: p.position.z });
+    const vx = (p.position.x - pv.x) / dt, vz = (p.position.z - pv.z) / dt;
+    const jump = Math.hypot(vx, vz) > 25; // teleported (new play, replay): don't treat it as running
+    u.vel = u.vel ?? { x: 0, z: 0 };
+    if (jump) { u.vel.x = 0; u.vel.z = 0; u.feet = null; }
+    else { u.vel.x += (vx - u.vel.x) * Math.min(1, dt * 12); u.vel.z += (vz - u.vel.z) * Math.min(1, dt * 12); }
+    pv.x = p.position.x; pv.z = p.position.z;
+    u.legK ??= p.userData.rig.body.scale.y;
   }
   u.speed = speed;
   applyPose(p, computePose(u, dt), dt);

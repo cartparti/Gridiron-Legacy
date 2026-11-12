@@ -528,3 +528,23 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   throwing range, scramble side, sideline penalty and spacing from other receivers; hard break when it opens room. Stays in
   bounds and downfield of the line. aiDefense: zone defenders cover loose (improvising) receivers within 13 yds, preferring
   uncovered ones; man coverage unchanged (keeps trailing its man). Test: hold.cjs-style probe with the rush disabled.
+
+## v0.45: QB pressure + biomechanics pass
+- QB pressure (engine.js): a pass-play QB who crosses the line (z < -0.4) becomes `carrier` with `qb.scramble` (all defenders
+  pursue; result { scramble } -> rushing stats in game.js, no more "sack" 10 yards downfield). When you're QB the defense
+  blitzes (LB, sometimes NB) or spies (`e.spy`: mirrors, attacks when you leave the pocket / after 3.2 s); on rollouts
+  (|x - start| > 4.5) LBs and defenders within 8 yds pursue after a read delay; pass-rush shed +0.1 and DL pursuit 0.92 for a
+  user QB; designed QB runs (play.qbRun) are read at 0.6/0.75 s with 0.93 pursuit.
+- Rig (actors.js mkLeg/mkArm): `ankle` group (foot pivots there) and `wrist` group (hand); seam spheres shrunk (hip 0.088,
+  knee 0.066, elbow 0.054) + ankle sphere. Replays record ankles (partsOf has 15 parts).
+- Animation (applyPose tail): `lookAtTarget` (u.lookAt via `setLookAt(mesh, {x,y,z})` in the character's parent space; neck
+  yaw/pitch within limits, spine follows 18%), `legIK` (planted feet: stance/swing from the stride phase and duty factor,
+  idle corrective steps incl. crossed-feet after turns, landing prediction from u.vel, two-bone IK in hips-local space with
+  roll, flat-foot ankle + toe-off/toe-up, pelvis drop when out of reach; IK blends out for actions/holds not in IK_HOLDS /
+  IK_ACTIONS, hops, ragdolls, celebrations; `STANCE` gives block/tackle a staggered base), `jointLimits`, `groundContact`
+  (lifts/settles dives, falls, tackles, lying down via key joint points; u.gfix). Cadence: u.omega = 2*pi*speed/cycleLen.
+  Wrists spring toward P.lw/P.rw (flick when running, cocked on throws, open on catches).
+- The model's legs (0.92) are slightly longer than the hip height (0.91): IK aims the ankle at ground + 0.008 so standing
+  knees stay soft. Engine sets look targets every live frame (ball in the air, carrier, QB, CB's man).
+- Test tools (scratchpad, not in the repo): poses.cjs (pose sheet in cells), film.cjs (filmstrips: cut, tackle, catch, idle,
+  block), animperf.cjs, qbrun.cjs (edge scramble yards).

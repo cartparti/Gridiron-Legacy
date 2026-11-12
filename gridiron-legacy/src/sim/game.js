@@ -485,7 +485,12 @@ export function resolveMoment(state, result) {
     }
     momentumShift(g, ((result.quality - 0.5) * 0.35 + (result.turnover ? 0.25 : 0) - (result.tdAllowed ? 0.2 : 0)) * ((state.player.traits?.equipped ?? []).includes('captain') && result.quality > 0.5 ? 1.25 : 1));
   } else {
-    if (m.type === 'qb_throw' || m.type === 'qb_hailmary') {
+    if ((m.type === 'qb_throw' || m.type === 'qb_hailmary') && result.scramble) {
+      // you took off and ran it yourself
+      s.rushAtt++; s.rushYds += result.yards;
+      if (result.td) s.rushTD++;
+      if (result.turnover) s.fumbles++;
+    } else if (m.type === 'qb_throw' || m.type === 'qb_hailmary') {
       if (result.sack) s.sacks++;
       else {
         s.passAtt++;

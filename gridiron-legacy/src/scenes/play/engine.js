@@ -7,7 +7,7 @@
 //
 // Returns the same result objects as the old minigames, so the game simulation is unchanged.
 import * as THREE from 'three';
-import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, confetti, ragdoll, bloodBurst, dustPuff, markTicked, bump, applyWear, addWear, applyInjuryLook } from '../actors.js';
+import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, confetti, ragdoll, bloodBurst, dustPuff, markTicked, bump, applyWear, addWear, applyInjuryLook, setLookAt } from '../actors.js';
 import { INJURIES } from '../../data/lifestyle.js';
 import { xrayCard } from './xray.js';
 import { createBallPhysics, orientInFlight } from './ballphys.js';
@@ -191,6 +191,14 @@ export function freePlay(ctx) {
     for (const d of defenders) d.zone = zone;
     if (play.blitz) { lbs.forEach((l) => { l.blitz = true; }); if (mode === 'cover' && play.user === 'blitz') cbZ.blitz = true; }
     if (play.twoDeep || zone) { ss.deep = -1; fs.deep = 1; } else { fs.deep = 0; ss.robber = true; }
+    // When you're the QB the defense mixes in pressure: a linebacker (sometimes the nickel too) blitzes, or a
+    // linebacker spies you and comes the moment you leave the pocket.
+    if (mode === 'pass' && userRole === 'QB' && !m.defense && !play.hail) {
+      const r = Math.random();
+      const blitzP = call === 'risky' ? 0.34 : call === 'safe' ? 0.18 : 0.26;
+      if (r < blitzP) { lbs[1].blitz = true; lbs[1].man = null; if (Math.random() < 0.35) { nb.blitz = true; nb.man = null; } }
+      else if (r < blitzP + 0.42) { lbs[0].spy = true; lbs[0].man = null; }
+    }
     if (mode === 'runD') cbZ.zone = false;
     user = ents.find((e) => e.user);
     if (globalThis.__playDebug) globalThis.__play = { receivers, defenders, time: () => t, phase: () => phase, user, qb: () => qb, carrier: () => carrier,
@@ -719,7 +727,7 @@ export function freePlay(ctx) {
     if (e.out > 0) { e.out -= dt; if (e.out <= 0 && isDown(e.mesh)) knockDown(e.mesh, 0); return; }
     if (e.engagedBy) {
       // Blocked: try to shed the block over time.
-      e.shed += dt * ((mode === 'run' ? 0.2 : mode === 'pass' || mode === 'route' ? 0.2 : 0.32) + (call === 'risky' ? 0.1 : 0) + (m.defense ? -0.05 : 0.03 + oppK * 0.04) + (e.blitz ? 0.1 : 0));
+      e.shed += dt * ((mode === 'run' ? 0.2 : mode === 'pass' || mode === 'route' ? 0.2 : 0.32) + (mode === 'pass' && user === qb ? 0.1 : 0) + (call === 'risky' ? 0.1 : 0) + (m.defense ? -0.05 : 0.03 + oppK * 0.04) + (e.blitz ? 0.1 : 0));
       if (Math.random() < e.shed * dt * 1.6 || t > 4.5) { const b = e.engagedBy; b.engaged = null; e.engagedBy = null; setPose(b.mesh, null); setPose(e.mesh, null); e.out = 0.25; }
       return;
     }
@@ -732,10 +740,26 @@ export function freePlay(ctx) {
     // Before the ball is out
     if (runO) {
       // Linebackers read the play first, then fly to the ball; in run defense your teammates are a step slower.
-      const readT = e.role === 'LB' ? 0.9 : e.role === 'DL' ? 0 : 1.0;
-      if (t > readT && holder) { pursueAndTackle(e, holder, dt, mode === 'runD' || mode === 'runStop' ? 0.62 : 0.85); return; }
+      // designed QB runs: the defense keys on the quarterback a beat sooner and pursues harder
+      const qbKey = play.qbRun && holder === qb;
+      const readT = e.role === 'LB' ? (qbKey ? 0.6 : 0.9) : e.role === 'DL' ? 0 : qbKey ? 0.75 : 1.0;
+      if (t > readT && holder) { pursueAndTackle(e, holder, dt, mode === 'runD' || mode === 'runStop' ? 0.62 : qbKey ? 0.93 : 0.85); return; }
     }
-    if ((e.role === 'DL' || e.blitz) && holder) { pursueAndTackle(e, holder, dt, 0.85); return; }
+    if ((e.role === 'DL' || e.blitz) && holder) { pursueAndTackle(e, holder, dt, mode === 'pass' && user === qb ? 0.92 : 0.85); return; }
+    // QB spy: mirror the quarterback from the second level, attack once he leaves the pocket or holds it too long
+    if (e.spy && holder === qb && !flight) {
+      if (Math.abs(qb.pos.x - qb.start.x) > 3.2 || qb.pos.z < 1.2 || t > 3.2) { pursueAndTackle(e, qb, dt, 1); return; }
+      moveToward(e, qb.pos.x * 0.8, Math.min(-3.5, e.start.z + 1), e.maxSpeed * 0.6, dt);
+      backpedalFace(e, false, qb);
+      return;
+    }
+    // QB rolls out of the pocket: linebackers and anyone close by break off coverage and run him down
+    if (mode === 'pass' && holder === qb && !flight && t > 0.8 && Math.abs(qb.pos.x - qb.start.x) > 4.5) {
+      e.qbRead ??= t + 0.3 + Math.random() * 0.35; // see it, then go
+      // linebackers, anyone close, and the defenders on the side he's rolling to (they give up their receiver: throw it!)
+      const sameSide = Math.sign(e.pos.x || 1) === Math.sign(qb.pos.x || 1) && dist(e.pos, qb.pos) < 14;
+      if (t > e.qbRead && (e.role === 'LB' || dist(e.pos, qb.pos) < 8 || sameSide)) { pursueAndTackle(e, qb, dt, 0.97); return; }
+    }
     if (e.role === 'S') {
       const deepZ = Math.min(e.start.z, -12, ...receivers.map((r) => r.pos.z - 4));
       const half = receivers.filter((r) => r.route && (e.deep === undefined || e.deep === 0 || Math.sign(r.pos.x || 1) === e.deep));
@@ -821,7 +845,10 @@ export function freePlay(ctx) {
     if (e.tell > 0) {
       e.tell -= dt;
       faceToward(e.mesh, target.pos.x, target.pos.z);
-      e.vel.x *= 0.85; e.vel.z *= 0.85;
+      // a quarterback running away: keep chasing through the tell (still readable) instead of stopping dead and
+      // watching him outrun the lunge
+      const away = target === qb && (target.vel.x * (target.pos.x - e.pos.x) + target.vel.z * (target.pos.z - e.pos.z)) > 0;
+      if (away) pursue(e, target, dt, 0.92); else { e.vel.x *= 0.85; e.vel.z *= 0.85; }
       if (e.tell <= 0) { e.lunge = 0.32; e.lungeDir = norm(target.pos.x + target.vel.x * 0.25 - e.pos.x, target.pos.z + target.vel.z * 0.25 - e.pos.z); playAction(e.mesh, 'tackle'); }
       return;
     }
@@ -843,8 +870,8 @@ export function freePlay(ctx) {
 
   // ---------------- contact resolution
   // ---------------- instant replay: record every body pose ~30 times a second
-  const partsOf = (mesh) => { const r = mesh.userData.rig; return [r.body, r.hips, r.spine, r.chest, r.neck, r.legL.hip, r.legL.knee, r.legR.hip, r.legR.knee, r.armL.sh, r.armL.el, r.armR.sh, r.armR.el]; };
-  const REC = 3 + 3 + 13 * 3 + 1; // root x/z/yaw, body pos, 13 joint rotations, rotation order
+  const partsOf = (mesh) => { const r = mesh.userData.rig; return [r.body, r.hips, r.spine, r.chest, r.neck, r.legL.hip, r.legL.knee, r.legR.hip, r.legR.knee, r.armL.sh, r.armL.el, r.armR.sh, r.armR.el, r.legL.ankle, r.legR.ankle]; };
+  const REC = 3 + 3 + 15 * 3 + 1; // root x/z/yaw, body pos, 15 joint rotations (incl. ankles), rotation order
   const rec = { frames: [], acc: 0 };
   const record = (dt) => {
     rec.acc += dt;
@@ -1463,7 +1490,7 @@ export function freePlay(ctx) {
       const chaser = defenders.concat(ents.filter((x) => x.team === 'off')).filter((d) => d.team !== carrier.team && !d.down).sort((a, b) => dist(a.pos, carrier.pos) - dist(b.pos, carrier.pos))[0];
       if (chaser && dist(chaser.pos, carrier.pos) < 2.6 && !opts.reducedMotion) { playAction(carrier.mesh, 'dive', { dur: 0.5 }); ctx.cinematic?.(() => carrier.pos, 1.2); snap('Dives in!', 200); }
       result = def ? (carrier.team === 'def' ? (user.scoop ? { defense: true, forcedFumble: lastFumble?.by === user, fumbleRec: true, turnover: true, defTD: true, quality: 0.99, text: 'SCOOP AND SCORE!' } : { defense: true, int: true, turnover: true, defTD: true, quality: 0.98, text: 'PICK SIX!' }) : { defense: true, caught: true, yardsAllowed: m.yardLine, tdAllowed: true, quality: 0.05, text: 'They score.' })
-        : { complete: true, yards: m.yardLine, td: true, quality: 0.95, text: 'TOUCHDOWN!' };
+        : (carrier === qb && qb.scramble ? { scramble: true, complete: false, yards: m.yardLine, td: true, quality: 0.95, text: 'TOUCHDOWN! You took it in yourself!' } : { complete: true, yards: m.yardLine, td: true, quality: 0.95, text: 'TOUCHDOWN!' });
       if ((def && carrier.team === 'def') || (!def && carrier.team === 'off')) startCelebration();
       return;
     }
@@ -1485,7 +1512,8 @@ export function freePlay(ctx) {
       else if (why === 'fumble') result = { turnover: true, complete: false, yards: yardsFrom(lastFumble?.from ?? carrier), quality: 0.05, text: 'FUMBLE! Defense recovers.' };
       else {
         const y = yardsFrom(carrier);
-        result = { complete: true, yards: y, quality: Math.max(0.05, 0.3 + y / 22 + (carrier?.broken ?? 0) * 0.05), text: why === 'oob' ? `Out of bounds after ${y}.` : null };
+        if (carrier === qb && qb.scramble) result = { scramble: true, complete: false, yards: y, quality: Math.max(0.05, 0.28 + y / 20), text: why === 'oob' ? `Scramble, out of bounds after ${y}.` : `Scramble for ${y}.` };
+        else result = { complete: true, yards: y, quality: Math.max(0.05, 0.3 + y / 22 + (carrier?.broken ?? 0) * 0.05), text: why === 'oob' ? `Out of bounds after ${y}.` : null };
       }
     }
     maybeFlag();
@@ -1812,6 +1840,12 @@ export function freePlay(ctx) {
         else { user.vel.x *= 0.85; user.vel.z *= 0.85; }
       }
       if (dtMode) setButtonsFor();
+      // A QB who takes off past the line of scrimmage on a pass play is a runner now: no more passing, and every
+      // defender comes after him (before this he was still 'about to throw', so nobody chased and a tackle was a sack).
+      if (mode === 'pass' && holder === qb && !carrier && !thrown && !flight && qb.pos.z < -0.4) {
+        carrier = qb; qb.runner = true; qb.scramble = true;
+        if (user === qb) { setButtonsFor(); hud.big('SCRAMBLE!', '#ffd23a', 600); }
+      }
       // ---- AI
       for (const e of ents) {
         if (e.user || e.down) continue;
@@ -1821,6 +1855,17 @@ export function freePlay(ctx) {
         else aiDefense(e, dt);
         if (e.jukeCd > 0) e.jukeCd -= dt;
         if (e.juking > 0) e.juking -= dt;
+      }
+      // ---- heads track the action: the ball in the air or on the ground, the ball carrier, the quarterback
+      const ballUp = flight || loose || bphys.active;
+      for (const e of ents) {
+        let tg = null;
+        const at = (o) => { const v = (e.lookV ??= { x: 0, y: 1.4, z: 0 }); v.x = o.pos.x; v.y = 1.35; v.z = o.pos.z; return v; };
+        if (ballUp) tg = ball.position;
+        else if (carrier && e !== carrier) tg = at(carrier);
+        else if (holder === qb && e !== qb && e.team === 'def') tg = e.man && !e.blitz && e.role === 'CB' ? at(e.man) : at(qb);
+        else if (holder === qb && e.team === 'off' && e.improv) tg = at(qb); // freelancing receivers find the QB
+        setLookAt(e.mesh, tg);
       }
       // ---- lunges (AI)
       for (const e of defenders) {
