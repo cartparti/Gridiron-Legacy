@@ -815,6 +815,30 @@ function jerseyMat(un, number, side) {
     const P = st?.pattern ?? 'plain';
     const band = colorDist(un.numbers, T) < 0.25 ? shade(J, luma(J) > 0.5 ? -0.25 : 0.25) : T;
     const poly = (pts, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(...pts[0]); for (const q of pts.slice(1)) g.lineTo(...q); g.closePath(); g.fill(); };
+    // all-over patterns for the built-in pro teams (front, back and sides)
+    if (P === 'plaid') { // lumberjack flannel: dark crossing bands + thin trim lines
+      const dk = shade(J, -0.38);
+      g.globalAlpha = 0.55; for (let x = 0; x < 22; x += 5.5) px(g, x, 0, dk, 2.6, 26); for (let y = 0; y < 26; y += 5.5) px(g, 0, y, dk, 22, 2.6);
+      g.globalAlpha = 0.5; for (let x = 4; x < 22; x += 5.5) px(g, x, 0, T, 0.25, 26); for (let y = 4; y < 26; y += 5.5) px(g, 0, y, T, 22, 0.25); g.globalAlpha = 1;
+    }
+    if (P === 'scales') { // snake scales: rows of small arcs
+      g.strokeStyle = shade(J, 0.14); g.lineWidth = 0.22; g.globalAlpha = 0.7;
+      for (let y = 0, row = 0; y < 27; y += 1.4, row++) for (let x = (row % 2) * 1.2; x < 23; x += 2.4) { g.beginPath(); g.arc(x, y, 1.2, 0, Math.PI); g.stroke(); }
+      g.globalAlpha = 1;
+    }
+    if (P === 'flames' && side !== 'back') { // flames licking up from the hem
+      const fl = (x0, w, h, col) => poly([[x0, 26], [x0 + w * 0.15, 26 - h * 0.55], [x0 + w * 0.3, 26 - h * 0.35], [x0 + w * 0.5, 26 - h], [x0 + w * 0.68, 26 - h * 0.4], [x0 + w * 0.85, 26 - h * 0.7], [x0 + w, 26]], col);
+      for (let x = -2; x < 22; x += 5) fl(x, 6, 8 + ((x * 7) % 5), T);
+      for (let x = 0.5; x < 22; x += 5) fl(x, 4, 4.5 + ((x * 3) % 3), shade(T, 0.3));
+    }
+    if (P === 'stars' && side !== 'side') { // a band of stars across the shoulders
+      px(g, 0, 0, T, 22, 3.6);
+      g.fillStyle = J;
+      const star = (cx, cy, r) => { g.beginPath(); for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + (k * Math.PI) / 5; const rr = k % 2 ? r * 0.45 : r; g.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); } g.closePath(); g.fill(); };
+      for (let x = 1.5; x < 22; x += 3.2) if (side !== 'front' || Math.abs(x - 11) > 3.5) star(x, 1.8, 1.1);
+      px(g, 0, 3.6, shade(T, -0.3), 22, 0.35);
+    }
+    if (P === 'stars' && side === 'side') { px(g, 0, 0, T, 22, 3.6); }
     if (side === 'side') {
       if (P === 'sidePanels' || P === 'claws') px(g, 7, 0, T, 8, 26);
       if (P === 'shoulders' || P === 'yoke') px(g, 0, 0, T, 22, 4);
@@ -1915,6 +1939,8 @@ function computePose(u, dt) {
   if (hold === 'dive') { P.rx = 1.2; P.y = -0.5; P.ls = 2.8; P.rs = 2.8; P.le = 0; P.re = 0; P.lh = -0.3; P.rh = -0.4; }
   if (hold === 'sit') { P.y = -0.45; P.lh = 1.55; P.rh = 1.55; P.lk = 1.55; P.rk = 1.55; P.ls = 0.4; P.rs = 0.4; P.le = 1.1; P.re = 1.1; }
   if (hold === 'wave') { P.rs = 2.8; P.re = 0.6 + Math.sin(u.phase * 6) * 0.4; }
+  if (hold === 'reach') { P.spine = 0.38; P.rs = 1.05; P.re = 0.25; P.rout = 0.05; P.ls = 0.3; P.le = 0.4; P.head = -0.25; } // reach for something on a table
+  if (hold === 'hatOn') { P.ls = 2.75; P.rs = 2.75; P.le = 1.75; P.re = 1.75; P.lout = -0.35; P.rout = 0.35; } // both hands up at the head
   if (hold === 'getup') { P.y = -0.5; P.spine = 0.9; P.lh = 1.4; P.lk = 2; P.rh = 0.6; P.rk = 1.4; P.ls = 1; P.rs = 1; }
   // ---- one-shot actions
   const act = u.action;

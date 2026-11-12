@@ -1,40 +1,61 @@
 // All teams are fictional. Colors are [primary, secondary].
 // `base` is a rough strength from 0-99 that the league generator jitters each season.
 
+// Pro league (v0.42): 20 teams in five divisions of four, in real cities with original names. Each team has its own
+// mascot glyph, colors, hand-picked uniform (`kit` overrides teamIdentity in kits.js), stadium scenery (`biome` +
+// `landmarks`, see environment.js) and home-field edge (`trait`, see culture.js).
+export const PRO_DIVISIONS = ['Northwest', 'Southwest', 'Northeast', 'Southeast', 'Heartland'];
+const P = (id, city, name, colors, div, base, extra) => ({ id, city, name, colors, div, base, conf: null, ...extra });
 export const PRO_TEAMS = [
-  // Summit Conference
-  { id: 'IRV', city: 'Ironvale', name: 'Forge', colors: ['#8a2b0f', '#f2a541'], conf: 'Summit', div: 'North', base: 74 },
-  { id: 'HBC', city: 'Harbor City', name: 'Krakens', colors: ['#0b3954', '#2ec4b6'], conf: 'Summit', div: 'North', base: 78 },
-  { id: 'RMS', city: 'Red Mesa', name: 'Scorpions', colors: ['#b5121b', '#f5d547'], conf: 'Summit', div: 'North', base: 70 },
-  { id: 'CBY', city: 'Cobalt Bay', name: 'Squalls', colors: ['#1f4e9c', '#e8eef7'], conf: 'Summit', div: 'North', base: 66 },
-  { id: 'GFG', city: 'Granite Falls', name: 'Grizzlies', colors: ['#4a3b2a', '#d9a441'], conf: 'Summit', div: 'North', base: 72 },
-  { id: 'NWF', city: 'Northwind', name: 'Frost', colors: ['#5b8fc7', '#f4f9ff'], conf: 'Summit', div: 'Central', base: 69 },
-  { id: 'SPW', city: 'Silverpine', name: 'Wolves', colors: ['#4d5d53', '#c9ccce'], conf: 'Summit', div: 'Central', base: 75 },
-  { id: 'KPT', city: 'Kestrel Point', name: 'Talons', colors: ['#5b2a86', '#f2c14e'], conf: 'Summit', div: 'Central', base: 80 },
-  { id: 'BRP', city: 'Brassport', name: 'Engineers', colors: ['#b08d57', '#222222'], conf: 'Summit', div: 'Central', base: 64 },
-  { id: 'TRS', city: 'Thunder Ridge', name: 'Stallions', colors: ['#222831', '#ffd369'], conf: 'Summit', div: 'Central', base: 77 },
-  { id: 'LKH', city: 'Lakeshore', name: 'Herons', colors: ['#2a9d8f', '#e9c46a'], conf: 'Summit', div: 'South', base: 68 },
-  { id: 'CPM', city: 'Copperton', name: 'Miners', colors: ['#b87333', '#1d3557'], conf: 'Summit', div: 'South', base: 71 },
-  { id: 'EMF', city: 'Emberfield', name: 'Firebirds', colors: ['#e85d04', '#370617'], conf: 'Summit', div: 'South', base: 76 },
-  { id: 'STH', city: 'Steelhaven', name: 'Sentinels', colors: ['#3d405b', '#e07a5f'], conf: 'Summit', div: 'South', base: 73 },
-  { id: 'PCR', city: 'Pinecrest', name: 'Rangers', colors: ['#2d6a4f', '#f1faee'], conf: 'Summit', div: 'South', base: 63 },
-  // Coastal Conference
-  { id: 'SUN', city: 'Sunspire', name: 'Solar', colors: ['#ffb703', '#023047'], conf: 'Coastal', div: 'North', base: 79 },
-  { id: 'DCJ', city: 'Dune City', name: 'Jackals', colors: ['#c9a227', '#5c4033'], conf: 'Coastal', div: 'North', base: 67 },
-  { id: 'BVP', city: 'Bayview', name: 'Pelicans', colors: ['#00a6a6', '#f49d37'], conf: 'Coastal', div: 'North', base: 70 },
-  { id: 'MBP', city: 'Midnight Bay', name: 'Phantoms', colors: ['#14213d', '#fca311'], conf: 'Coastal', div: 'North', base: 81 },
-  { id: 'RBR', city: 'Riverbend', name: 'Rapids', colors: ['#0077b6', '#90e0ef'], conf: 'Coastal', div: 'North', base: 65 },
-  { id: 'CCC', city: 'Crescent City', name: 'Corsairs', colors: ['#6a040f', '#d4af37'], conf: 'Coastal', div: 'Central', base: 76 },
-  { id: 'PSC', city: 'Palm Shores', name: 'Cyclones', colors: ['#1b998b', '#ed217c'], conf: 'Coastal', div: 'Central', base: 72 },
-  { id: 'GFP', city: 'Goldfield', name: 'Prospectors', colors: ['#d4a017', '#2b2d42'], conf: 'Coastal', div: 'Central', base: 69 },
-  { id: 'VVC', city: 'Vista Verde', name: 'Condors', colors: ['#386641', '#f2e8cf'], conf: 'Coastal', div: 'Central', base: 66 },
-  { id: 'SCB', city: 'Stormcliff', name: 'Breakers', colors: ['#3a506b', '#5bc0be'], conf: 'Coastal', div: 'Central', base: 74 },
-  { id: 'CSC', city: 'Canyon Springs', name: 'Coyotes', colors: ['#a44a3f', '#f6e27f'], conf: 'Coastal', div: 'South', base: 71 },
-  { id: 'WGM', city: 'Westgate', name: 'Monarchs', colors: ['#4b0082', '#e0aaff'], conf: 'Coastal', div: 'South', base: 77 },
-  { id: 'SMC', city: 'Saltmarsh', name: 'Crocs', colors: ['#3a5a40', '#a3b18a'], conf: 'Coastal', div: 'South', base: 62 },
-  { id: 'NVV', city: 'Neon Valley', name: 'Voltage', colors: ['#7209b7', '#4cc9f0'], conf: 'Coastal', div: 'South', base: 73 },
-  { id: 'HPB', city: 'Highplains', name: 'Bison', colors: ['#432818', '#bb9457'], conf: 'Coastal', div: 'South', base: 68 },
+  // Northwest: mountains, fog, rain forests
+  P('SLC', 'Salt Lake City', 'Bighorns', ['#2b3a4a', '#d0703a'], 'Northwest', 72, { glyph: 'bison', biome: 'mountain', landmarks: ['saltflat', 'temple'], trait: 'altitude',
+    kit: { pattern: 'yoke', font: 'block', stripe: 'wide', finish: 'matte', mask: 'trim', sleeve: 2, pants: 'single', collar: 'v', chestLogo: true, logo: 'glyph' } }),
+  P('SFO', 'San Francisco', 'Sea Lions', ['#a3232c', '#c9ced6'], 'Northwest', 77, { glyph: 'sea', biome: 'coast', landmarks: ['bridge', 'hills'], trait: 'wind',
+    kit: { pattern: 'tvStripe', font: 'varsity', stripe: 'double', finish: 'gloss', mask: 'gray', sleeve: 2, pants: 'double', collar: 'round', chestLogo: false, logo: 'glyph' } }),
+  P('SEA', 'Seattle', 'Sasquatch', ['#1f4d3a', '#8fb3d1'], 'Northwest', 75, { glyph: 'bear', biome: 'mountain', landmarks: ['needle', 'skyline', 'volcano'], trait: 'loud',
+    kit: { pattern: 'fade', font: 'rounded', stripe: 'single', finish: 'matte', mask: 'dark', sleeve: 0, pants: 'single', collar: 'v', chestLogo: true, logo: 'glyph' } }),
+  P('POR', 'Portland', 'Lumberjacks', ['#b3282d', '#1c1c1c'], 'Northwest', 66, { glyph: 'axe', biome: 'snow', landmarks: ['volcano', 'bridges'], trait: 'intimate',
+    kit: { pattern: 'plaid', font: 'serif', stripe: 'none', finish: 'matte', mask: 'dark', sleeve: 0, pants: 'none', collar: 'round', chestLogo: false, logo: 'glyph' } }),
+  // Southwest: beaches, desert and neon
+  P('LAX', 'Los Angeles', 'Comets', ['#4a2a86', '#ff8a3d'], 'Southwest', 79, { glyph: 'star', biome: 'coast', landmarks: ['skyline', 'hills', 'palms'], trait: 'loud',
+    kit: { pattern: 'chestBand', font: 'italic', stripe: 'tri', finish: 'metallic', mask: 'trim', sleeve: 2, pants: 'tri', collar: 'v', chestLogo: false, logo: 'glyph' } }),
+  P('PHX', 'Phoenix', 'Infernos', ['#d9531e', '#3a1a12'], 'Southwest', 70, { glyph: 'flame', biome: 'desert', landmarks: ['saguaro', 'skyline'], trait: 'heat',
+    kit: { pattern: 'flames', font: 'italic', stripe: 'single', finish: 'satin', mask: 'dark', sleeve: 0, pants: 'single', collar: 'v', chestLogo: true, logo: 'glyph' } }),
+  P('DAL', 'Dallas', 'Stampede', ['#7a1c24', '#e8d3a6'], 'Southwest', 76, { glyph: 'horse', biome: 'plains', landmarks: ['skyline', 'orb'], trait: 'heat',
+    kit: { pattern: 'yoke', font: 'serif', stripe: 'triple', finish: 'matte', mask: 'white', sleeve: 3, pants: 'double', collar: 'v', chestLogo: false, logo: 'glyph' } }),
+  P('LVG', 'Las Vegas', 'Scorpions', ['#14141a', '#ff2ea6'], 'Southwest', 68, { glyph: 'scorpion', biome: 'desert', landmarks: ['strip', 'pyramid'], trait: 'loud',
+    kit: { pattern: 'sidePanels', font: 'stencil', stripe: 'none', finish: 'chrome', mask: 'trim', sleeve: 0, pants: 'single', collar: 'v', chestLogo: true, logo: 'glyph' } }),
+  // Northeast: big skylines
+  P('NYC', 'New York', 'Empire', ['#1b1d24', '#d4af37'], 'Northeast', 80, { glyph: 'crown', biome: 'city', landmarks: ['skyline', 'spire', 'river'], trait: 'loud',
+    kit: { pattern: 'pinstripe', font: 'serif', stripe: 'single', finish: 'gloss', mask: 'dark', sleeve: 0, pants: 'single', collar: 'round', chestLogo: true, logo: 'glyph' } }),
+  P('CHI', 'Chicago', 'Gales', ['#1d2d44', '#e63946'], 'Northeast', 74, { glyph: 'storm', biome: 'city', landmarks: ['skyline', 'supertall', 'lake'], trait: 'wind',
+    kit: { pattern: 'shoulders', font: 'block', stripe: 'double', finish: 'gloss', mask: 'gray', sleeve: 2, pants: 'double', collar: 'v', chestLogo: false, logo: 'glyph' } }),
+  P('WDC', 'Washington', 'Sentinels', ['#2f4b7c', '#e8e6df'], 'Northeast', 69, { glyph: 'shield', biome: 'city', landmarks: ['obelisk', 'dome', 'river'], trait: 'intimate',
+    kit: { pattern: 'stars', font: 'varsity', stripe: 'tri', finish: 'satin', mask: 'white', sleeve: 2, pants: 'tri', collar: 'v', chestLogo: false, logo: 'letter', letter: 'W' } }),
+  P('DET', 'Detroit', 'Gearheads', ['#4f5963', '#ff7a00'], 'Northeast', 65, { glyph: 'gear', biome: 'city', landmarks: ['skyline', 'towers', 'river'], trait: 'cold',
+    kit: { pattern: 'shoulders', font: 'stencil', stripe: 'wide', finish: 'metallic', mask: 'trim', sleeve: 1, pants: 'single', collar: 'round', chestLogo: true, logo: 'glyph' } }),
+  // Southeast: beaches, bayous and music
+  P('MIA', 'Miami', 'Flamingos', ['#ff5fa2', '#13b5b1'], 'Southeast', 73, { glyph: 'bird', biome: 'coast', landmarks: ['deco', 'palms', 'skyline'], trait: 'humid',
+    kit: { pattern: 'fade', font: 'rounded', stripe: 'tri', finish: 'gloss', mask: 'white', sleeve: 2, pants: 'tri', collar: 'v', chestLogo: false, logo: 'glyph' } }),
+  P('NOL', 'New Orleans', 'Gators', ['#4b2a7b', '#e6b422'], 'Southeast', 71, { glyph: 'gator', biome: 'swamp', landmarks: ['skyline', 'superdome', 'river'], trait: 'humid',
+    kit: { pattern: 'yoke', font: 'varsity', stripe: 'double', finish: 'metallic', mask: 'trim', sleeve: 3, pants: 'double', collar: 'v', chestLogo: true, logo: 'glyph' } }),
+  P('CLT', 'Charlotte', 'Copperheads', ['#0e3b43', '#c0743a'], 'Southeast', 67, { glyph: 'snake', biome: 'mountain', landmarks: ['skyline', 'speedway'], trait: 'loud',
+    kit: { pattern: 'scales', font: 'italic', stripe: 'single', finish: 'satin', mask: 'trim', sleeve: 0, pants: 'single', collar: 'round', chestLogo: false, logo: 'glyph' } }),
+  P('NSH', 'Nashville', 'Outlaws', ['#22324f', '#d29a3a'], 'Southeast', 70, { glyph: 'skull', biome: 'plains', landmarks: ['skyline', 'twinspire', 'river'], trait: 'intimate',
+    kit: { pattern: 'yoke', font: 'serif', stripe: 'double', finish: 'matte', mask: 'gray', sleeve: 2, pants: 'double', collar: 'v', chestLogo: true, logo: 'glyph' } }),
+  // Heartland (the middle of the map): the Rockies, the plains, the lakes and the river
+  P('DEN', 'Denver', 'Pumas', ['#10223e', '#6cb4e4'], 'Heartland', 74, { glyph: 'cat', biome: 'mountain', landmarks: ['skyline', 'rockies'], trait: 'altitude',
+    kit: { pattern: 'claws', font: 'block', stripe: 'single', finish: 'gloss', mask: 'gray', sleeve: 2, pants: 'single', collar: 'v', chestLogo: false, logo: 'glyph' } }),
+  P('KCY', 'Kansas City', 'Bison', ['#5a3a22', '#e3b448'], 'Heartland', 72, { glyph: 'bison', biome: 'plains', landmarks: ['skyline', 'fountains'], trait: 'loud',
+    kit: { pattern: 'shoulders', font: 'varsity', stripe: 'triple', finish: 'matte', mask: 'white', sleeve: 3, pants: 'tri', collar: 'round', chestLogo: true, logo: 'glyph' } }),
+  P('MSP', 'Minneapolis', 'Frostwolves', ['#3e6c9a', '#eef5fb'], 'Heartland', 69, { glyph: 'wolf', biome: 'snow', landmarks: ['skyline', 'lakes'], trait: 'cold',
+    kit: { pattern: 'sidePanels', font: 'rounded', stripe: 'wide', finish: 'satin', mask: 'white', sleeve: 2, pants: 'single', collar: 'v', chestLogo: false, logo: 'glyph' } }),
+  P('STL', 'St. Louis', 'Riverhawks', ['#1b6f7a', '#c9452f'], 'Heartland', 68, { glyph: 'bird', biome: 'city', landmarks: ['arch', 'river'], trait: 'intimate',
+    kit: { pattern: 'tvStripe', font: 'serif', stripe: 'double', finish: 'gloss', mask: 'gray', sleeve: 2, pants: 'double', collar: 'round', chestLogo: true, logo: 'glyph' } }),
 ];
+const PRO_BY_ID = new Map(PRO_TEAMS.map((t) => [t.id, t]));
+/** The built-in pro team definition for an id (glyph, biome, landmarks, kit...), or null for other teams. */
+export const proTeamDef = (id) => PRO_BY_ID.get(id) ?? null;
 
 // 32 colleges in 4 conferences. prestige 1-5 drives recruiting interest and program strength.
 const C = (id, city, name, colors, conf, prestige) => ({ id, city, name, colors, conf, prestige, base: 52 + prestige * 5 + ((id.charCodeAt(0) + id.charCodeAt(2)) % 7) - 3 });

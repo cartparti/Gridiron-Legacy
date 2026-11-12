@@ -90,7 +90,7 @@ function pickRivalTeam(state) {
   // High school: the crosstown school is the rival.
   const crosstown = others.filter((t) => t.town && mine?.town && t.town === mine.town);
   if (crosstown.length) { state.career.rivalTeamId = pick(state, crosstown).id; return; }
-  const sameConf = others.filter((t) => t.conf && t.conf === mine?.conf);
+  const sameConf = others.filter((t) => (t.conf && t.conf === mine?.conf) || (!t.conf && t.div && t.div === mine?.div)); // pros: a division rival
   const pool = (sameConf.length ? sameConf : others).slice().sort((a, b) => b.base - a.base).slice(0, 4);
   state.career.rivalTeamId = pick(state, pool).id;
 }

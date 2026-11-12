@@ -10,6 +10,7 @@ export const shade = (c, t) => (t < 0 ? mix(c, '#000000', -t) : mix(c, '#ffffff'
 export function colorDist(a, b) { const A = rgb(a); const B = rgb(b); return Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2]) / 441; }
 
 import { mascotKind } from './mascots.js';
+import { proTeamDef } from './teams.js';
 
 const ALT_STYLES = ['black', 'secondary', 'gray', 'cream', 'dark'];
 
@@ -24,6 +25,7 @@ export function teamIdentity(team) {
   const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const pick = (a) => a[Math.floor(r() * a.length)];
   const glyph = mascotKind(team);
+  const fixed = proTeamDef(team.id)?.kit; // built-in pro teams have a hand-picked uniform
   return {
     glyph,
     // generic-shield teams wear their letter
@@ -33,6 +35,7 @@ export function teamIdentity(team) {
     pattern: pick(JERSEY_PATTERNS), font: pick(NUMBER_FONTS),
     sleeve: pick([0, 2, 2, 3, 1]), pants: pick(['single', 'double', 'tri', 'none', 'single']),
     collar: pick(['v', 'round', 'v']), chestLogo: r() < 0.5,
+    ...(fixed ?? {}),
   };
 }
 function hashId(id) { let h = 0; for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; }

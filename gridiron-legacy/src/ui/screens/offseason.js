@@ -9,6 +9,10 @@ import { sfx } from '../../audio/sfx.js';
 import { eventModal } from './event.js';
 import { topBar } from './hub.js';
 import { draftCutscene } from '../../scenes/cutscenes.js';
+import { runSetCutscene } from '../../scenes/director.js';
+import { commitScene } from '../../scenes/sets.js';
+import { crestURL } from '../crest.js';
+import { people } from '../../sim/social.js';
 import { openModal, closeAllModals } from '../components.js';
 import { recruitStars, visitSchool, answerInterview, projection } from '../../sim/career.js';
 
@@ -52,15 +56,35 @@ export function recruitingScreen(app) {
 }
 
 /** Signing day: the hat on the table, the family watching, then you're in. */
-function signingDay(app, o) {
+async function signingDay(app, o) {
   const st = app.state;
   const p = st.player;
+  if (signingDay.busy) return;
+  signingDay.busy = true;
+  // the ceremony: hats from your top 3 schools on the table (the one you picked + your two best other offers)
+  if (!app.settings.reducedMotion) {
+    try {
+      const others = st.offers.filter((x) => x.teamId !== o.teamId).sort((a, b) => b.prestige - a.prestige).slice(0, 2);
+      const list = [o, ...others];
+      // shuffle the table order so the chosen hat isn't always in the same spot
+      const order = list.map((x, i) => [x, (x.teamId.charCodeAt(0) * 7 + i * 13 + (p.last ?? '').length) % 11]).sort((a, b) => a[1] - b[1]).map((x) => x[0]);
+      const hs = getTeam(st.league, st.career.teamId);
+      const folks = people(st);
+      const asTeam = (x) => ({ id: x.teamId, city: x.city, name: x.name, colors: x.colors });
+      await runSetCutscene((ctx) => commitScene(ctx, {
+        look: p.look, name: `${p.first} ${p.last}`, hsName: hs ? `${hs.city} ${hs.name}` : '', hsColors: hs?.colors, hsCrest: hs ? crestURL(hs) : null,
+        hats: order.map((x) => ({ city: x.city, name: x.name, colors: x.colors, crest: crestURL(asTeam(x)), chosen: x === o })),
+        momLook: p.familyLook, mateLooks: folks.filter((x) => x.kind === 'teammate').map((x) => x.look),
+      }), { music: 'anthem' });
+    } catch (err) { console.error('signing day', err); }
+  }
+  signingDay.busy = false;
   sfx.levelUp();
   openModal(h('div.signing',
     h('div.kicker', 'SIGNING DAY'),
     h('div.signing-hat', { style: { background: `linear-gradient(160deg, ${o.colors[0]}, ${o.colors[1] ?? o.colors[0]})` } }, teamBadge({ id: o.teamId, city: o.city, name: o.name, colors: o.colors }, 64)),
     h('h2', `${p.first} ${p.last} is going to ${o.city}!`),
-    h('p.small.muted', `The gym erupts as you put on the ${o.name} hat. Your family is in the front row. ${o.visit ? o.visit.start + '.' : ''}`),
+    h('p.small.muted', `The gym erupts as you pull on the ${o.name} hat. Your family is in the front row. ${o.visit ? o.visit.start + '.' : ''}`),
     h('button.btn.primary.block', { onclick: () => { closeAllModals(); flow.chooseCollege(st, o.teamId); app.commit(); } }, 'Sign the letter')));
 }
 

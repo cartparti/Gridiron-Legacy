@@ -1,5 +1,5 @@
 // Leagues: teams, generated rosters (pro), schedules, standings, playoffs and quick-simmed games.
-import { PRO_TEAMS, COLLEGE_TEAMS, HS_TEAMS } from '../data/teams.js';
+import { PRO_TEAMS, COLLEGE_TEAMS, HS_TEAMS, PRO_DIVISIONS } from '../data/teams.js';
 import { hometownSchools } from '../data/hometown.js';
 import { FIRST_NAMES, LAST_NAMES } from '../data/names.js';
 import { STAGES, SALARY_CAP, MIN_SALARY } from '../data/config.js';
@@ -219,16 +219,41 @@ export function recordResult(league, game, homeScore, awayScore, countStandings 
 
 export function standings(league, conf = null) {
   return league.teams
-    .filter((t) => !conf || t.conf === conf)
+    .filter((t) => !conf || t.conf === conf || (!t.conf && t.div === conf))
     .slice()
     .sort((a, b) => b.w - a.w || (b.pf - b.pa) - (a.pf - a.pa) || b.pf - a.pf || a.id.localeCompare(b.id));
+}
+
+/** The v0.42+ pro league: five divisions of four, no conferences (older saves keep Summit / Coastal). */
+export const isDivisionLeague = (league) => league.kind === 'pro' && league.teams.some((t) => t.div) && !league.teams.some((t) => t.conf);
+
+/** The pro divisions in display order (only for a division league). */
+export function leagueDivisions(league) {
+  const present = new Set(league.teams.map((t) => t.div).filter(Boolean));
+  return [...PRO_DIVISIONS.filter((d) => present.has(d)), ...[...present].filter((d) => !PRO_DIVISIONS.includes(d))];
+}
+
+/**
+ * Playoff seeds for a division league if the season ended now: the five division winners (seeds 1-5 by record),
+ * then the three best other records as wild cards (6-8).
+ */
+export function projectedSeeds(league) {
+  const all = standings(league);
+  const winners = leagueDivisions(league).map((d) => all.find((t) => t.div === d)).filter(Boolean);
+  const wild = all.filter((t) => !winners.includes(t)).slice(0, Math.max(0, 8 - winners.length));
+  return { seeds: [...winners, ...wild], winners, wild };
 }
 
 /** Build the playoff bracket from current standings. */
 export function seedPlayoffs(league) {
   const games = [];
   let seeds;
-  if (league.kind === 'pro') {
+  if (isDivisionLeague(league)) {
+    const s = projectedSeeds(league).seeds;
+    seeds = s.map((t) => t.id);
+    // 1v8 and 4v5 meet in one semifinal, 2v7 and 3v6 in the other
+    games.push(mk(s[0], s[7]), mk(s[3], s[4]), mk(s[1], s[6]), mk(s[2], s[5]));
+  } else if (league.kind === 'pro') {
     const s = standings(league, 'Summit').slice(0, 4);
     const c = standings(league, 'Coastal').slice(0, 4);
     seeds = [...s.map((t) => t.id), ...c.map((t) => t.id)];
@@ -248,7 +273,7 @@ export function roundName(league, round) {
   const totalRounds = league.kind === 'pro' ? 3 : 2;
   const fromEnd = totalRounds - 1 - round;
   if (fromEnd === 0) return STAGES[league.kind].titleName;
-  if (league.kind === 'pro') return fromEnd === 1 ? 'Conference Final' : 'Wild Card';
+  if (league.kind === 'pro') return fromEnd === 1 ? (isDivisionLeague(league) ? 'Semifinal' : 'Conference Final') : 'Wild Card';
   return 'Semifinal';
 }
 
@@ -270,8 +295,9 @@ export function advancePlayoffRound(league) {
   for (let i = 0; i < winners.length; i += 2) {
     const a = winners[i];
     const b = winners[i + 1];
-    const seedA = po.seeds.indexOf(a) % 4;
-    const seedB = po.seeds.indexOf(b) % 4;
+    const per = isDivisionLeague(league) ? 8 : 4; // seeds are league-wide in a division league, per conference before
+    const seedA = po.seeds.indexOf(a) % per;
+    const seedB = po.seeds.indexOf(b) % per;
     next.push(seedA <= seedB ? { home: a, away: b, result: null } : { home: b, away: a, result: null });
   }
   po.rounds.push(next);

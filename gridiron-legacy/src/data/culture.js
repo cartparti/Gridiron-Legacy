@@ -1,6 +1,7 @@
 // Team & city identity: where the stadium is (biome), its name and nickname, traditions, home-field
 // traits, field paint and fan culture. Everything is derived from the team (stable, no save data needed).
 import { seededRandom } from './looks.js';
+import { proTeamDef } from './teams.js';
 
 const BIOMES = [
   ['swamp', /saltmarsh|bayou|marsh/i],
@@ -23,6 +24,8 @@ export const BIOME_INFO = {
 };
 
 export function biomeFor(team) {
+  const fixed = proTeamDef(team.id)?.biome; // built-in pro teams match their real city
+  if (fixed) return fixed;
   const key = `${team.city} ${team.name} ${team.town ?? ''}`;
   return BIOMES.find(([, re]) => re.test(key))[0];
 }
@@ -78,7 +81,9 @@ export function teamCulture(team, level = 'pro') {
   const biome = biomeFor(team);
   const tokens = { town: team.town ?? team.city, city: team.city, name: team.name, brand: pick(r, BRANDS), coach: pick(r, COACHES) };
   const fill = (s) => s.replace(/\{(\w+)\}/g, (_, k) => tokens[k] ?? '');
-  const traitId = r() < 0.7 ? BIOME_TRAIT[biome] : pick(r, Object.keys(TRAITS));
+  const def = proTeamDef(team.id);
+  const rolled = r() < 0.7 ? BIOME_TRAIT[biome] : pick(r, Object.keys(TRAITS));
+  const traitId = def?.trait ?? rolled;
   // special turf only for a few teams (and more often in college), green otherwise
   const turf = r() < (level === 'college' ? 0.2 : 0.08) ? TURFS[4 + Math.floor(r() * 4)] : TURFS[Math.floor(r() * 4)];
   return {
@@ -93,5 +98,7 @@ export function teamCulture(team, level = 'pro') {
     crowd: level === 'hs' ? 'normal' : pick(r, CROWD_LOOKS),
     song: pick(r, SONGS),
     seed: Math.floor(r() * 1e9),
+    // city landmarks outside the stadium (bridge, arch, needle...), see environment.js
+    landmarks: def?.landmarks ?? [],
   };
 }

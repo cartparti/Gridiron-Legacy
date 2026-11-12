@@ -7,7 +7,7 @@ import { POSITIONS } from '../../data/positions.js';
 import { HOUSING, CARS, PERKS, INVESTMENTS } from '../../data/lifestyle.js';
 import { RECORD_LABELS, seasonPerf, TROPHIES, awardWatch } from '../../sim/awards.js';
 import { availableActivities, maxEnergy, planCost, ACTIVITY_BY_ID } from '../../sim/week.js';
-import { getTeam, standings, roundName, capSpace } from '../../sim/league.js';
+import { getTeam, standings, roundName, capSpace, isDivisionLeague, projectedSeeds, leagueDivisions } from '../../sim/league.js';
 import * as flow from '../../sim/flow.js';
 import { fmtMoney, ordinal, fillTokens } from '../../core/util.js';
 import { meter, teamBadge, jersey, ratingChart, statBars, openModal, changeChips, toast, confirmDialog } from '../components.js';
@@ -153,7 +153,7 @@ function weekView(app) {
 
   // Team banner: crest, mascot, record, streak, rank
   {
-    const conf = st.league.kind === 'pro' ? me.conf : null;
+    const conf = st.league.kind === 'pro' ? (me.conf ?? me.div) : null;
     const rank = standings(st.league, conf).findIndex((t) => t.id === me.id) + 1;
     const streak = me.streak > 0 ? `W${me.streak}` : me.streak < 0 ? `L${-me.streak}` : '-';
     container.append(h('div.team-hero',
@@ -310,7 +310,7 @@ function seasonCard(st) {
       h('div.row.between', h('b', d.role === 'starter' ? `Starting ${p.position}` : `Backup ${p.position}`), h('span.tiny.muted', d.role === 'starter' ? `Holding off ${d.rival.name} (${Math.round(d.rival.ovr)})` : `Behind ${d.rival.name} (${Math.round(d.rival.ovr)})`)),
       h('div.depth-bar', h('i', { style: { width: `${prog}%`, background: d.role === 'starter' ? 'var(--good)' : 'var(--accent)' } }), h('span.mark')),
       h('p.tiny.muted', d.role === 'starter' ? 'Keep playing well to keep the job. A few bad weeks and coach could make a change.' : 'Win the job: train hard, play well when you get your snaps, and keep coach happy. Backups only get a couple of late snaps.')) : null,
-    sk ? h('div.stakes', h('div', h('b', `#${sk.rank}`), h('span', sk.conf ? `${sk.conf} Conf.` : 'League')), h('div', h('b', sk.left), h('span', 'Games left')), h('div.wide', h('b.small', sk.status), h('span', 'Playoff race'))) : null,
+    sk ? h('div.stakes', h('div', h('b', `#${sk.rank}`), h('span', sk.conf ? `${sk.conf} Conf.` : sk.div ? sk.div : 'League')), h('div', h('b', sk.left), h('span', 'Games left')), h('div.wide', h('b.small', sk.status), h('span', 'Playoff race'))) : null,
     h('div.race', h('div.row.between', h('span.section-label', 'Award race'), h('span.tiny.muted', myRank ? `You: #${myRank}` : '')),
       race.map((r, i) => h(`div.race-row${r.you ? '.me' : ''}`, h('span.rk', i + 1), h('span.grow', r.name, h('span.tiny.muted', ` · ${r.team}`)), h('span.pts', r.perf ? Math.round(r.perf) : '—')))));
 }
@@ -325,7 +325,10 @@ function teamView(app) {
   const out = h('div.col', { style: { gap: '14px' } }, h('h2', STAGES[league.kind].leagueName), tabs);
   if (sub === 'lineup') out.append(lineupView(app));
   else if (sub === 'standings') {
-    const confs = league.kind === 'pro' ? ['Summit', 'Coastal'] : league.kind === 'college' ? [...new Set(league.teams.map((t) => t.conf))].sort((a, b) => (a === getTeam(league, st.career.teamId).conf ? -1 : b === getTeam(league, st.career.teamId).conf ? 1 : 0)) : [null];
+    const divLeague = isDivisionLeague(league);
+    const proj = divLeague ? projectedSeeds(league) : null;
+    const myDiv = getTeam(league, st.career.teamId)?.div;
+    const confs = divLeague ? leagueDivisions(league).sort((a, b) => (a === myDiv ? -1 : b === myDiv ? 1 : 0)) : league.kind === 'pro' ? ['Summit', 'Coastal'] : league.kind === 'college' ? [...new Set(league.teams.map((t) => t.conf))].sort((a, b) => (a === getTeam(league, st.career.teamId).conf ? -1 : b === getTeam(league, st.career.teamId).conf ? 1 : 0)) : [null];
     // last-5 form from the schedule
     const form = {};
     for (const wk of league.schedule) for (const gm of wk) if (gm.result) {
@@ -339,13 +342,13 @@ function teamView(app) {
     for (const c of confs) {
       const rows = standings(league, c);
       const lead = rows[0];
-      out.append(h('div.card.standings', c ? h('div.card-title', h('h3', `${c} Conference`)) : null, h('div.scroll-x', h('table.tbl.stand',
+      out.append(h('div.card.standings', c ? h('div.card-title', h('h3', divLeague ? `${c} Division` : `${c} Conference`), divLeague && proj.winners.find((t) => t.div === c) ? h('span.tiny.muted', 'Leader takes a playoff spot') : null) : null, h('div.scroll-x', h('table.tbl.stand',
         h('tr', h('th', '#'), h('th', 'Team'), h('th.num', 'W-L'), h('th.num', 'GB'), h('th.num', '+/-'), h('th', 'Last 5')),
         rows.map((t, i) => {
-          const inPO = nationwide ? natRank.indexOf(t.id) < playoffSpots : i < playoffSpots;
+          const inPO = divLeague ? proj.seeds.includes(t) : nationwide ? natRank.indexOf(t.id) < playoffSpots : i < playoffSpots;
           const gb = ((lead.w - t.w) + (t.l - lead.l)) / 2;
           const diff = t.pf - t.pa;
-          return h(`tr${t.id === st.career.teamId ? '.me' : ''}${inPO ? '.po' : ''}${i === playoffSpots - 1 && !nationwide ? '.cut' : ''}`,
+          return h(`tr${t.id === st.career.teamId ? '.me' : ''}${inPO ? '.po' : ''}${i === playoffSpots - 1 && !nationwide && !divLeague ? '.cut' : ''}`,
             h('td', i + 1),
             h('td', h('div.row', { style: { gap: '6px', flexWrap: 'nowrap' } }, teamBadge(t, 20), h('b.small', t.name), t.id === st.career.rivalTeamId ? h('span.rival-dot', { title: 'Rival' }, icon('flame')) : null)),
             h('td.num', `${t.w}-${t.l}`), h('td.num', gb ? (gb % 1 ? gb.toFixed(1) : gb) : '-'),
@@ -353,7 +356,7 @@ function teamView(app) {
             h('td', h('div.form', (form[t.id] ?? []).slice(-5).map((r) => h(`i.${r === 'W' ? 'w' : 'l'}`, r)))));
         })))));
     }
-    out.append(h('p.tiny.muted', league.kind === 'pro' ? 'Highlighted: top 4 in each conference make the playoffs.' : nationwide ? 'Highlighted: the top 4 records nationwide make the playoff.' : 'Highlighted: top 4 make the playoffs.'));
+    out.append(h('p.tiny.muted', divLeague ? 'Highlighted: the 5 division winners plus the 3 best other records (wild cards) make the playoffs.' : league.kind === 'pro' ? 'Highlighted: top 4 in each conference make the playoffs.' : nationwide ? 'Highlighted: the top 4 records nationwide make the playoff.' : 'Highlighted: top 4 make the playoffs.'));
   } else if (sub === 'schedule') {
     out.append(h('div.card', h('div.list', league.schedule.map((wk, i) => {
       const g = wk.find((x) => x.home === st.career.teamId || x.away === st.career.teamId);

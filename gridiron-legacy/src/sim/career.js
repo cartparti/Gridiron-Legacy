@@ -2,7 +2,7 @@
 // the pre-draft combine, season stakes for the hub, life after football and the next generation.
 import { clamp } from '../core/util.js';
 import { gauss, chance, pick, randInt, rand } from '../core/rng.js';
-import { getTeam, standings, genName } from './league.js';
+import { getTeam, standings, genName, isDivisionLeague, projectedSeeds } from './league.js';
 import { seasonPerf } from './awards.js';
 import { addNews } from './press.js';
 import { textFrom } from './phone.js';
@@ -104,6 +104,19 @@ export function seasonStakes(state) {
   const league = state.league;
   const me = getTeam(league, state.career.teamId);
   if (!me) return null;
+  // pro division league: division winners + 3 wild cards (see league.seedPlayoffs)
+  if (isDivisionLeague(league)) {
+    const all = standings(league);
+    const div = standings(league, me.div);
+    const rank = div.findIndex((t) => t.id === me.id) + 1;
+    const { seeds, winners, wild } = projectedSeeds(league);
+    const left = Math.max(0, league.schedule.length - league.week);
+    const lastIn = wild[wild.length - 1];
+    const behind = Math.min(div[0] ? div[0].w - me.w : 99, lastIn ? lastIn.w - me.w : 99);
+    let status = winners.includes(me) ? (rank === 1 && div[1] && me.w - div[1].w >= 2 ? 'Leading the division' : 'Division leader') : seeds.includes(me) ? 'In a wild card spot' : behind <= 0 ? 'On the bubble' : behind <= left ? `${behind} game${behind === 1 ? '' : 's'} out of a playoff spot` : 'Eliminated from playoff contention';
+    if (league.phase === 'playoffs') status = 'Playoffs: win or go home';
+    return { record: `${me.w}-${me.l}`, rank, of: div.length, overall: all.findIndex((t) => t.id === me.id) + 1, status, left, conf: null, div: me.div };
+  }
   // playoffs: top 4 per conference in the pros, top 4 overall below that (see league.seedPlayoffs)
   const pro = league.kind === 'pro';
   const confTeams = pro ? standings(league, me.conf) : standings(league);

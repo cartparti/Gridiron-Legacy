@@ -1,5 +1,13 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.42', date: 'Nov 12', title: 'Signing Day and a new pro league', items: [
+    'Signing Day: when you commit to a college, hats from your top 3 schools sit on a table in your high school gym. You reach for the others first, then grab your school\'s hat and put it on while your family and teammates go wild.',
+    'The pro league now has 20 teams in real cities, in five divisions: Northwest (Salt Lake City, San Francisco, Seattle, Portland), Southwest (Los Angeles, Phoenix, Dallas, Las Vegas), Northeast (New York, Chicago, Washington, Detroit), Southeast (Miami, New Orleans, Charlotte, Nashville) and Heartland (Denver, Kansas City, Minneapolis, St. Louis).',
+    'Every pro team has its own colors, mascot and uniform: Portland flannel, Phoenix flames, Charlotte snake scales, Vegas neon, New York pinstripes, Washington stars and more. New mascots: axe, star, gear, gator and snake.',
+    'Each pro stadium looks like its city: a red bridge over the bay, a needle tower, the Rockies, a neon strip, an obelisk, a gateway arch, a superdome and more. Home teams get a matching edge, like thin air in Denver or cold in Detroit.',
+    'Playoffs: the five division winners plus three wild cards. Standings show each division.',
+    'Careers already in the pros keep their old league. New pro careers get the new one.',
+  ] },
   { v: '0.41', date: 'Nov 12', title: 'No more freezing on phones', items: [
     'Fixed: picking a play call (Safe, Balanced or Risky) could freeze the game on phones, especially iPhones, after you had played for a while.',
     'The game now clears out old players\' faces and uniforms after each play, so memory stays steady however long you play.',

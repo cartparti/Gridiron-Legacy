@@ -382,7 +382,7 @@ export function runMinigame(type, opts) {
     // dress the stadium for this game; each step on its own so one failure (e.g. a phone out of canvas memory)
     // only skips that bit instead of freezing the play
     const safe = (f) => { try { f(); } catch (err) { console.error('stadium setup', err); } };
-    safe(() => { if (opts.culture) r.stadium.setEnvironment?.(opts.culture.biome, opts.culture.seed, { night: m.weather === 'night' }); });
+    safe(() => { if (opts.culture) r.stadium.setEnvironment?.(opts.culture.biome, opts.culture.seed, { night: m.weather === 'night', landmarks: opts.culture.landmarks }); });
     safe(() => {
       if (m.defense) r.stadium.setTeams(opts.teamColors, opts.oppColors, myName, oppName, opts.homeColors, opts.culture);
       else r.stadium.setTeams(opts.oppColors, opts.teamColors, oppName, myName, opts.homeColors, opts.culture);

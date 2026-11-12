@@ -632,7 +632,7 @@ export function buildStadium(scene) {
     },
     /** Make the crowd bounce (excitement 0..1). */
     /** Scenery outside the stadium for the home team's city. */
-    setEnvironment(biome, seed, opts) { if (this._env !== `${biome}:${seed}:${opts?.night}`) { this._env = `${biome}:${seed}:${opts?.night}`; env.set(biome, seed, opts); } },
+    setEnvironment(biome, seed, opts) { const k = `${biome}:${seed}:${opts?.night}:${(opts?.landmarks ?? []).join(",")}`; if (this._env !== k) { this._env = k; env.set(biome, seed, opts); } },
     /** Big games (playoffs, rivalries) bring out the tifo even in high school. */
     setBigGame(on) { this.bigGame = !!on; tifo.visible = this.level !== 'hs' || this.bigGame; },
     /** Match the venue to the level: 'hs' bleachers, 'college' bowl + band, 'pro' upper deck + roof. */

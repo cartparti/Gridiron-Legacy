@@ -495,3 +495,19 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Robustness: pixMat returns a plain material if getContext fails; runMinigame wraps each stadium setup step (`safe`) and
   the play build (sims it with fallbackQuality on failure); gameday's play() catches a rejected runMinigame.
 - Don't keep actor meshes alive across plays in persistent scenes (a swept texture's canvas is emptied).
+
+## v0.42: signing day + real-city pro league
+- Signing day (`commitScene` in sets.js, run from `signingDay` in offseason.js before the letter modal): HS gym, bleachers,
+  family/teammates/coach/photographers, three `schoolCap`s (chosen + 2 best other offers by prestige, shuffled). Fake reaches
+  ('reach' pose) at the others, then the chosen hat flies to the head ('hatOn' pose) and is attached to `rig.headG`.
+- Pro league = 20 teams, `PRO_DIVISIONS` (Northwest, Southwest, Northeast, Southeast, Heartland), real cities + original names.
+  Each def has `glyph` (mascotKind uses it; new GLYPHS axe/star/gear/gator/snake + sideline mascot features), `kit`
+  (overrides teamIdentity; new jersey patterns plaid/scales/flames/stars), `biome`, `landmarks`, `trait` (culture.js).
+  `proTeamDef(id)` looks them up, so other levels and old saves are unaffected.
+- environment.js `LANDMARKS` (bridge, needle, volcano, rockies, saltflat, temple, bridges, river, lake, lakes, palms, saguaro, orb,
+  strip, pyramid, spire, supertall, obelisk, dome, superdome, towers, deco, speedway, twinspire, fountains, arch, hills, skyline)
+  placed past the -z end (the offense attacks -z) so the play camera sees them. Passed via culture.landmarks -> setEnvironment.
+- league.js: `isDivisionLeague` (pro teams with div and no conf), `leagueDivisions`, `projectedSeeds` (5 division winners by record
+  then 3 wild cards); seedPlayoffs 1v8/4v5 + 2v7/3v6; rounds Wild Card / Semifinal / Legacy Bowl. Old saves (Summit/Coastal confs)
+  keep the old rules. seasonStakes returns { div } and division rank; hub standings by division; rivals from the same division.
+- Tests: `tests/round12.test.js`.

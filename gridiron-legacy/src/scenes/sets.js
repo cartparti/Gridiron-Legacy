@@ -390,3 +390,133 @@ export function gamingScene(ctx, opts) {
     return t < 6.4;
   };
 }
+
+// ------------------------------------------------------------------ college signing day
+
+/** A ball cap in school colors with the crest on the front (front faces +z). */
+function schoolCap(colors, crestUrl) {
+  const [c0, c1] = colors;
+  const g = new THREE.Group();
+  const crown = new THREE.Mesh(new THREE.SphereGeometry(0.16, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2), M(c0, 0.82));
+  crown.scale.set(1, 0.82, 1.06); crown.castShadow = true; g.add(crown);
+  // six seams and a button on top
+  for (let i = 0; i < 3; i++) { const s = new THREE.Mesh(new THREE.TorusGeometry(0.161, 0.003, 4, 32, Math.PI), M(shade(c0, -0.12), 0.8)); s.rotation.y = (i * Math.PI) / 3; s.scale.set(1, 0.82, 1.06); g.add(s); }
+  const btn = new THREE.Mesh(new THREE.SphereGeometry(0.018, 10, 6), M(c1, 0.6)); btn.position.y = 0.13; g.add(btn);
+  // the bill: a curved half disc out the front
+  const bill = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.014, 28, 1, false, -Math.PI / 2, Math.PI), [M(c1, 0.7), M(c1, 0.7), M(shade(c1, -0.35), 0.8)]);
+  bill.position.set(0, 0.004, 0.08); bill.scale.set(0.95, 1, 1.15); bill.rotation.x = 0.12; bill.castShadow = true; g.add(bill);
+  if (crestUrl) { const cr = imagePlane(crestUrl, 0.12, 0.12); cr.position.set(0, 0.07, 0.148); cr.rotation.x = -0.42; g.add(cr); }
+  else { const pt = new THREE.Mesh(new THREE.CircleGeometry(0.045, 16), M(c1, 0.6)); pt.position.set(0, 0.07, 0.15); pt.rotation.x = -0.42; g.add(pt); }
+  return g;
+}
+
+/**
+ * Signing day in your high school gym: three hats on the table from your top schools. You reach for the others first,
+ * then grab the one you're committing to and put it on. opts: { look, name, hsName, hsColors, hsCrest, hats: [{ city,
+ * name, colors, crest, chosen }], momLook, dadLook, mateLooks }
+ */
+export function commitScene(ctx, opts) {
+  const { scene, camera } = ctx;
+  const [h0, h1] = opts.hsColors ?? ['#1d3557', '#f1c40f'];
+  const W = 16; const D = 11;
+  room(scene, { w: W, d: D, h: 5.2, wall: '#d8d2c4', band: h0, light: '#fff4e0', lightK: 1.05, floorRough: 0.45, floorDraw: (g, w, hh) => {
+    woodFloor('#c89a62')(g, w, hh);
+    g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 6; g.beginPath(); g.arc(w / 2, hh * 0.62, hh * 0.18, 0, 7); g.stroke();
+    g.fillStyle = h0; g.globalAlpha = 0.85; g.fillRect(0, hh * 0.9, w, hh * 0.1); g.globalAlpha = 1;
+  } });
+  scene.background = new THREE.Color('#14120f');
+  // bleachers along the back wall, school banner, pennants
+  for (let k = 0; k < 4; k++) rb(scene, W - 1.2, 0.45, 0.7, M(k % 2 ? '#8a6a45' : '#7a5c3a', 0.6), 0, k * 0.45, -D / 2 + 0.45 + (3 - k) * 0.7, 0.03);
+  const ban = textPlane('SIGNING DAY', { w: 6, h: 0.9, bg: h0, fg: h1 }); ban.position.set(0, 4.1, -D / 2 + 0.03); scene.add(ban);
+  const sub = textPlane(opts.hsName ?? '', { w: 6, h: 0.45, bg: shade(h0, -0.15), fg: '#ffffff', font: 700 }); sub.position.set(0, 3.45, -D / 2 + 0.03); scene.add(sub);
+  if (opts.hsCrest) for (const x of [-4.2, 4.2]) { const c = imagePlane(opts.hsCrest, 1.1, 1.1); c.position.set(x, 3.8, -D / 2 + 0.04); scene.add(c); }
+  (opts.hats ?? []).forEach((ht, i) => { const p = textPlane(ht.name.toUpperCase(), { w: 1.6, h: 0.5, bg: ht.colors[0], fg: ht.colors[1] ?? '#fff', font: 800 }); p.position.set(-W / 2 + 0.06, 2.6 - i * 0.7, -2 + i * 1.6); p.rotation.y = Math.PI / 2; scene.add(p); });
+  // the table: school-colored cloth, a microphone, the letter of intent
+  rb(scene, 2.9, 0.06, 0.95, M('#f2efe8', 0.7), 0, 0.76, -1.5, 0.02);
+  const cloth = new THREE.Mesh(new THREE.BoxGeometry(2.92, 0.74, 0.02), M(h0, 0.9)); cloth.position.set(0, 0.4, -1.03); scene.add(cloth);
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(2.93, 0.08, 0.025), M(h1, 0.8)); stripe.position.set(0, 0.62, -1.02); scene.add(stripe);
+  for (const x of [-1.38, 1.38]) for (const z of [-1.9, -1.1]) rb(scene, 0.05, 0.76, 0.05, M('#3a3f46', 0.5, 0.4), x, 0, z, 0.01);
+  rb(scene, 0.34, 0.01, 0.44, M('#ffffff', 0.9), 0.95, 0.82, -1.45, 0.005);
+  const mic = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.26, 8), M('#222', 0.4, 0.6)); mic.position.set(-1.0, 0.95, -1.55); mic.rotation.x = 0.4; scene.add(mic);
+  // the hats
+  const xs = (opts.hats ?? []).length === 3 ? [-0.75, 0, 0.75] : (opts.hats ?? []).length === 2 ? [-0.45, 0.45] : [0];
+  const hats = (opts.hats ?? []).map((ht, i) => { const c = schoolCap(ht.colors, ht.crest); c.position.set(xs[i], 0.8, -1.35); c.userData.home = c.position.clone(); scene.add(c); return { ...ht, mesh: c, x: xs[i] }; });
+  const chosen = hats.find((x) => x.chosen) ?? hats[0];
+  const fakes = hats.filter((x) => x !== chosen);
+  // you, behind the table in a school polo; family and teammates around you; folks in the bleachers
+  const me = makePerson({ ...opts.look, outfit: 'casual', shirt: h0, pants: '#2b2f36' }); stand(shadows(me), 0, -2.15, 0, 5); scene.add(me);
+  const momL = opts.momLook ?? randomLook(`mom${opts.name}`, { gender: 'f' });
+  const dadL = opts.dadLook ?? randomLook(`dad${opts.name}`, { gender: 'm' });
+  const mom = makePerson({ ...momL, outfit: 'casual', shirt: h1 }); stand(shadows(mom), 1.05, -2.45, 0.2, 4); scene.add(mom);
+  const dad = makePerson({ ...dadL, outfit: 'casual', shirt: h0 }); stand(shadows(dad), -1.1, -2.5, -0.2, 4); scene.add(dad);
+  const coach = makePerson({ ...randomLook(`coach${opts.hsName}`, { gender: 'm' }), outfit: 'casual', shirt: shade(h0, -0.2) }); stand(shadows(coach), 2.1, -2.2, 0, 4); scene.add(coach);
+  const crowd = [mom, dad, coach];
+  const mates = (opts.mateLooks ?? []).slice(0, 3);
+  mates.forEach((L, i) => { const m = makePerson({ ...L, outfit: 'casual', shirt: i % 2 ? h1 : h0 }); stand(shadows(m), -2.3 - i * 0.75, -2.3 + i * 0.25, 0, 4); scene.add(m); crowd.push(m); });
+  for (let i = 0; i < 10; i++) {
+    const row = i % 3; const x = -5.6 + (i * 1.13) % 11.2; if (Math.abs(x) < 2.8) continue;
+    const p = makePerson({ ...randomLook(`fan${i}${opts.hsName}`, { gender: i % 2 ? 'f' : 'm' }), outfit: 'casual', shirt: i % 3 ? h0 : h1 });
+    seat(shadows(p), x, -D / 2 + 0.75 + (3 - row) * 0.7, x * 0.3, 2); p.position.y = row * 0.45 + 0.45; scene.add(p); crowd.push(p);
+  }
+  // photographers off to the side
+  for (const [x, z] of [[-3.4, 0.6], [3.5, 0.3]]) {
+    const ph = makePerson({ ...randomLook(`photo${x}`, { gender: 'm' }), outfit: 'casual', shirt: '#2b2f36' }); stand(shadows(ph), x, z, 0, -1.6); scene.add(ph); setPose(ph, 'catch');
+    const cam = rb(ph, 0.16, 0.11, 0.12, M('#141414', 0.4), 0, 1.4, -0.32, 0.02); cam.castShadow = false;
+  }
+  const flash = new THREE.PointLight('#ffffff', 0, 9); flash.position.set(0, 2, 0.4); scene.add(flash);
+  ctx.caption('Signing Day', `${opts.name ?? ''} · ${opts.hsName ?? ''}`);
+  const headTarget = () => {
+    // on top of your head (world space), a little forward over the brow
+    const box = new THREE.Box3().setFromObject(me.userData.rig.headG);
+    const size = box.getSize(new THREE.Vector3());
+    return { pos: new THREE.Vector3((box.min.x + box.max.x) / 2, box.max.y - size.y * 0.33, (box.min.z + box.max.z) / 2 + size.z * 0.05), scale: (Math.max(size.x, size.z) * 0.52) / 0.16 };
+  };
+  // the script: hover over each other hat, then go for the real one
+  const plan = [];
+  let tt = 1.6;
+  for (const f of fakes) { plan.push({ t: tt, hat: f, fake: true }); tt += 1.15; }
+  plan.push({ t: tt + 0.35, hat: chosen, fake: false });
+  const grabT = tt + 0.85; const onT = grabT + 1.0;
+  let step = 0; let from = null; let attached = false; let cheered = false;
+  return (dt, t) => {
+    // where your attention is: the hat you're reaching for
+    const cur = [...plan].reverse().find((p) => t >= p.t);
+    if (cur && t < grabT) {
+      faceToward(me, cur.hat.x * 1.4, 2);
+      setPose(me, t - cur.t > 0.25 && t - cur.t < 0.9 ? 'reach' : null);
+      if (cur.fake && t - cur.t > 0.35 && t - cur.t < 0.8) cur.hat.mesh.position.y = cur.hat.mesh.userData.home.y + Math.sin((t - cur.t - 0.35) * 7) * 0.03; else cur.hat.mesh.position.y = cur.hat.mesh.userData.home.y;
+      if (step < plan.indexOf(cur) + 1) {
+        step = plan.indexOf(cur) + 1;
+        ctx.caption(cur.fake ? `${cur.hat.city}?` : `${cur.hat.city}...`, cur.fake ? 'The gym holds its breath' : '');
+      }
+    }
+    // grab the real one and put it on
+    if (t >= grabT && !attached) {
+      if (!from) { from = chosen.mesh.position.clone(); faceToward(me, 0, 5); setPose(me, 'hatOn'); }
+      const k = ease(Math.min(1, (t - grabT) / (onT - grabT)));
+      const tg = headTarget();
+      const p = from.clone().lerp(tg.pos, k); p.y += Math.sin(k * Math.PI) * 0.35;
+      chosen.mesh.position.copy(p);
+      chosen.mesh.rotation.set(-0.5 * Math.sin(k * Math.PI), 0, 0); // the bill stays pointed the way you face (the camera)
+      chosen.mesh.scale.setScalar(1 + (tg.scale - 1) * k);
+      if (k >= 1) {
+        me.userData.rig.headG.attach(chosen.mesh); // rides along with your head from now on
+        attached = true;
+      }
+    }
+    if (attached && !cheered && t > onT + 0.15) {
+      cheered = true;
+      setPose(me, null); celebrate(me, 'pump');
+      crowd.forEach((c, i) => setTimeout(() => { setPose(c, null); celebrate(c, i % 3 ? 'pump' : 'dance'); }, 60 + i * 55));
+      ctx.caption(`${opts.name ?? 'You'} commits to ${chosen.city}!`, `The ${chosen.name} land their recruit`);
+    }
+    flash.intensity = cheered && Math.sin(t * 23) > 0.93 ? 30 : Math.max(0, flash.intensity - dt * 200);
+    // camera: wide on the table, then push in for the hat
+    const push = ease(Math.min(1, Math.max(0, (t - (grabT - 0.6)) / 1.6)));
+    const sway = Math.sin(t * 0.35) * 0.5;
+    camera.position.set(lerp(sway, 0.15, push), lerp(2.35, 2.1, push), lerp(5.6, 3.0, push));
+    const look = attached || t > grabT ? headTarget().pos : new THREE.Vector3(0, 1.05, -1.6);
+    camera.lookAt(lerp(0, look.x, push), lerp(1.2, look.y - 0.3, push), lerp(-1.6, look.z, push));
+    return t < onT + 4.2;
+  };
+}

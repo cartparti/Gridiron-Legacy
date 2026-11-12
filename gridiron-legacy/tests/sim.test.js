@@ -11,7 +11,7 @@ import { stepGame, resolveMoment, autoMoment, tolerance, resolveDecision, resolv
 import { maxEnergy, planCost } from '../src/sim/week.js';
 import { computeLegacy } from '../src/sim/legacy.js';
 
-const holder = (seed) => ({ rngState: seed, career: { year: 2026, stage: 'pro', teamId: 'IRV' }, player: { rel: { teammates: 50 }, ovr: 70 } });
+const holder = (seed) => ({ rngState: seed, career: { year: 2026, stage: 'pro', teamId: 'SLC' }, player: { rel: { teammates: 50 }, ovr: 70 } });
 
 test('rng is deterministic for a seed', () => {
   const a = holder(42);
@@ -95,7 +95,7 @@ test('quick-simmed games never end in a tie and scores look like football', () =
   const league = createLeague(st, 'pro');
   let total = 0;
   for (let i = 0; i < 300; i++) {
-    const r = quickSim(st, league, 'IRV', 'HBC');
+    const r = quickSim(st, league, 'SLC', 'SFO');
     assert.notEqual(r.home, r.away);
     total += r.home + r.away;
   }

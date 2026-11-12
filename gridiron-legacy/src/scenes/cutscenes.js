@@ -40,7 +40,7 @@ function smoke(group, origin, n = 40) {
 
 const stadiumSetup = (colors, name, level = 'pro', culture = null) => (r) => {
   r.stadium.setLevel?.(level);
-  if (culture) r.stadium.setEnvironment?.(culture.biome, culture.seed, {});
+  if (culture) r.stadium.setEnvironment?.(culture.biome, culture.seed, { landmarks: culture.landmarks });
   r.stadium.setTeams(colors, colors, name, name, colors);
   r.stadium.setYardLine(50, 10);
   r.stadium.hideLines();

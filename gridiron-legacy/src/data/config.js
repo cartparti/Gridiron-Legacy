@@ -23,7 +23,7 @@ export const STAGES = {
   pro: {
     label: 'Pro',
     games: 14,
-    playoffTeams: 8, // top 4 in each conference
+    playoffTeams: 8, // 5 division winners + 3 wild cards (older saves: top 4 in each conference)
     titleName: 'Legacy Bowl',
     leagueName: 'Grand Gridiron League',
   },
