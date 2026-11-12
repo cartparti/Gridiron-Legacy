@@ -81,7 +81,7 @@ export const POS_MASK = { OL: ['cage', 'bull'], DL: ['cage', 'bull', 'robot'], L
 export const SPATS = [{ id: 'none', label: 'None' }, { id: 'white', label: 'White tape' }, { id: 'black', label: 'Black tape' }, { id: 'team', label: 'Team color' }];
 export const TOWELS = [{ id: 'none', label: 'None' }, { id: 'white', label: 'White' }, { id: 'black', label: 'Black' }, { id: 'team', label: 'Team color' }];
 export const CHAINS = [{ id: 'none', label: 'None' }, { id: 'gold', label: 'Gold' }, { id: 'silver', label: 'Silver' }, { id: 'ice', label: 'Iced out' }];
-export const CELEBRATIONS = [{ id: 'pump', label: 'Fist pump' }, { id: 'dance', label: 'Dance' }, { id: 'flex', label: 'Flex' }, { id: 'flip', label: 'Backflip' }, { id: 'salute', label: 'Salute' }, { id: 'point', label: 'Point up' }];
+export const CELEBRATIONS = [{ id: 'pump', label: 'Fist pump' }, { id: 'dance', label: 'Dance' }, { id: 'flex', label: 'Flex' }, { id: 'flip', label: 'Backflip' }, { id: 'salute', label: 'Salute' }, { id: 'point', label: 'Point up' }, { id: 'bow', label: 'Take a bow' }, { id: 'shuffle', label: 'Shuffle' }, { id: 'heart', label: 'Heart hands' }, { id: 'leanback', label: 'Lean back' }];
 
 /** Typical size by position (inches, pounds). */
 export const POS_SIZE = { DT: [76, 300], QB: [75, 220], RB: [70, 212], WR: [73, 196], CB: [72, 190], TE: [77, 250], OL: [77, 312], DL: [76, 290], LB: [74, 238], S: [72, 205] };

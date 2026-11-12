@@ -8,6 +8,7 @@
 //
 // Game situations: weather, momentum, two-minute drills (offense) / goal-line stands (defense),
 // 4th-down decisions, penalties, extra moments earned through mid-game events.
+import { INJURY_STATUS, inGameOutcome } from './injury.js';
 import { PLAY_CALLS, DIFFICULTIES, WEATHER } from '../data/config.js';
 import { GAME_EVENTS } from '../data/gameEvents.js';
 import { teamCulture, TRAITS } from '../data/culture.js';
@@ -29,14 +30,14 @@ const MOMENT_POOL = {
 };
 export const MOMENT_NAMES = {
   qb_throw: 'Pass Play', qb_scramble: 'Scramble', qb_hailmary: 'Hail Mary',
-  rb_run: 'Run Play', rb_screen: 'Screen Pass', rb_goalline: 'Goal-Line Dive',
+  rb_run: 'Run Play', rb_screen: 'Screen Pass', rb_goalline: 'Goal-Line Dive', qb_sneak: 'Tush Push', rb_push: 'Tush Push',
   wr_route: 'Route & Catch', wr_jumpball: 'Jump Ball', wr_toetap: 'Sideline Toe-Tap',
   cb_cover: 'Coverage', cb_tackle: 'Open-Field Tackle',
   dt_rush: 'Pass Rush', dt_run: 'Run Stop',
 };
 const PASS_TYPES = new Set(['qb_throw', 'qb_hailmary', 'wr_route', 'wr_jumpball', 'wr_toetap', 'rb_screen', 'cb_cover', 'dt_rush']);
 const DEEP_TYPES = new Set(['qb_hailmary', 'wr_jumpball']);
-const CONTACT_TYPES = new Set(['rb_run', 'rb_screen', 'rb_goalline', 'qb_scramble', 'wr_route', 'wr_jumpball', 'cb_tackle', 'dt_rush', 'dt_run']);
+const CONTACT_TYPES = new Set(['qb_sneak', 'rb_run', 'rb_screen', 'rb_goalline', 'qb_scramble', 'wr_route', 'wr_jumpball', 'cb_tackle', 'dt_rush', 'dt_run']);
 const MAX_EVENTS = 3;
 
 export const DEF_POSITIONS = new Set(['CB', 'DT']);
@@ -261,6 +262,8 @@ function momentumBonus(g, side) {
 
 function pickType(state, g, d, yl) {
   const pos = state.player.position;
+  // short yardage: the tush push (you sneak it as the QB, or shove the QB from behind as the RB)
+  if ((pos === 'QB' || pos === 'RB') && d.shortYd && d.shortYd.distance <= 1 && chance(state, pos === 'QB' ? 0.75 : 0.3)) return 'qb_sneak';
   if (pos === 'RB' && yl <= 3) return 'rb_goalline';
   if (pos === 'QB' && d.twoMin && d.chain >= 1 && yl > 34) return 'qb_hailmary';
   // a Hail Mary only makes sense on the last drive before the half (or the game), from far out
@@ -288,6 +291,13 @@ function buildMoment(state, g, d, over = {}) {
   let distance = over.distance ?? (down === 1 ? 10 : down === 2 ? randInt(state, 3, 10) : randInt(state, 2, 12));
   if (yardLine <= 4 && over.distance === undefined) { distance = yardLine; down = Math.max(down, 2); }
   if (d.twoMin && over.down === undefined) { down = 1; distance = 10; }
+  // now and then: 3rd/4th and inches (or 1st and goal from the 1), the tush push spot
+  d.shortYd = null;
+  const pos = state.player.position;
+  if (over.down === undefined && over.type === undefined && !d.twoMin && (pos === 'QB' || pos === 'RB') && (yardLine === 1 ? chance(state, 0.35) : chance(state, 0.05))) {
+    if (yardLine > 1) { down = chance(state, 0.3) ? 4 : 3; distance = 1; }
+    d.shortYd = { distance };
+  }
   const type = over.type ?? pickType(state, g, d, yardLine);
   const clutch = d.quarter === 4 && Math.abs(userScore(g) - oppScore(g)) <= 8;
   const ords = ['', '1st', '2nd', '3rd', '4th'];
@@ -301,7 +311,8 @@ function buildMoment(state, g, d, over = {}) {
     wind: g.wind,
     label: `${label}${ords[down]} and ${yardLine <= distance ? 'Goal' : distance} at ${yardText(yardLine)}`,
     trailing: userScore(g) < oppScore(g),
-    situation: d.twoMin ? (isDefense(state) ? 'Final stand' : 'Two-minute drill') : clutch ? 'Clutch' : null,
+    situation: d.twoMin ? (isDefense(state) ? 'Final stand' : 'Two-minute drill') : clutch ? 'Clutch' : type === 'qb_sneak' ? 'Short yardage' : null,
+    pusher: type === 'qb_sneak' && state.player.position === 'RB',
   };
 }
 
@@ -342,7 +353,7 @@ export function tolerance(state, call = 'balanced', type = state.game?.pending?.
     else if (g.homeTrait) t *= 1.02;
     if ((g.energy ?? 100) < 50) t *= 0.8 + (g.energy ?? 100) / 250;
     t *= 1 + g.momentum * 0.06;
-    if (g.playingHurt) t *= 0.75;
+    if (g.playingHurt) t *= INJURY_STATUS[g.playingHurt]?.tol ?? 0.75;
     t *= 1 - matchup(state, g).k * 0.09; // good teams make for hard games
   }
   return clamp(t / PLAY_CALLS[call].difficulty, 0.35, 1.8);
@@ -361,6 +372,13 @@ export function outcomeFromQuality(state, m, q, call) {
   const pc = PLAY_CALLS[call];
   const res = { quality: q, yards: 0, td: false, turnover: false, sack: false, complete: false, call };
   if (m.defense) return defenseOutcome(state, m, q, call, res);
+  if (m.type === 'qb_sneak') {
+    const need = Math.min(m.distance, m.yardLine);
+    if (q > 0.42 || (q > 0.28 && chance(state, 0.35))) { res.complete = true; res.yards = need >= m.yardLine ? m.yardLine : need + (q > 0.8 ? 1 : 0); res.td = res.yards >= m.yardLine; res.text = res.td ? 'Pushed over the top! TOUCHDOWN!' : 'Tush push. First down!'; res.quality = Math.max(q, 0.68); }
+    else if (chance(state, 0.015 * pc.turnover)) { res.turnover = true; res.text = 'FUMBLE in the pile!'; }
+    else { res.complete = true; res.yards = 0; res.text = 'Stuffed! Short of the line.'; }
+    return res;
+  }
   if (m.type === 'rb_goalline') {
     if (q > 0.45 || (q > 0.3 && chance(state, 0.3))) { res.complete = true; res.yards = m.yardLine; res.td = true; res.text = 'Over the top! TOUCHDOWN!'; }
     else if (chance(state, 0.04 * pc.turnover)) { res.turnover = true; res.text = 'FUMBLE at the goal line!'; }
@@ -444,8 +462,18 @@ export function resolveMoment(state, result) {
   let converted = false;
   if (result.injured && !g.userOut) {
     applyEffects(state, { injury: true, injuryId: result.injuryId ?? null });
-    g.userOut = true;
-    g.log.push({ q: m.quarter, clock: m.clock, team: '', user: true, out: 'INFO', text: `${state.player.last} is helped off the field${state.player.injury ? ` (${state.player.injury.label.toLowerCase()})` : ''}.`, score: `${g.score.away}-${g.score.home}`, key: true });
+    g.freshInjury = true;
+    const back = inGameOutcome(result.injuryId ?? state.player.injury?.id, rand(state)) === 'return';
+    const lbl = state.player.injury ? ` (${state.player.injury.label.toLowerCase()})` : '';
+    if (back) {
+      // shaken up: trainers look at it on the sideline, you're back after a series, but you're playing hurt now
+      g.skipNext = true;
+      g.playingHurt = g.playingHurt || 'probable';
+      g.log.push({ q: m.quarter, clock: m.clock, team: '', user: true, out: 'INFO', text: `${state.player.last} is shaken up${lbl} but heads to the sideline to get taped up.`, score: `${g.score.away}-${g.score.home}`, key: true });
+    } else {
+      g.userOut = true;
+      g.log.push({ q: m.quarter, clock: m.clock, team: '', user: true, out: 'INFO', text: `${state.player.last} is helped off the field${lbl} and won't return.`, score: `${g.score.away}-${g.score.home}`, key: true });
+    }
   }
 
   // energy and live rating
@@ -497,6 +525,9 @@ export function resolveMoment(state, result) {
         if (result.complete) { s.passComp++; s.passYds += result.yards; if (result.td) s.passTD++; }
         if (result.turnover) s.int++;
       }
+    } else if (m.type === 'qb_sneak') {
+      // the QB carries it; as the RB you were pushing (it's a team play, no carry for you)
+      if (state.player.position === 'QB') { s.rushAtt++; s.rushYds += result.yards; if (result.td) s.rushTD++; if (result.turnover) s.fumbles++; }
     } else if (m.type === 'rb_run' || m.type === 'rb_goalline' || m.type === 'qb_scramble') {
       s.rushAtt++;
       s.rushYds += result.yards;
@@ -807,7 +838,10 @@ export function resolveGameEvent(state, idx, forced = undefined) {
   }
   const hadInjury = !!state.player.injury;
   const changes = applyEffects(state, effects);
-  if (effects.injury && !hadInjury) g.userOut = true;
+  if (effects.injury && !hadInjury) {
+    g.freshInjury = true;
+    if (inGameOutcome(state.player.injury?.id, rand(state)) === 'return') { g.skipNext = true; g.playingHurt = g.playingHurt || 'probable'; } else g.userOut = true;
+  }
   if (game.tol) { g.tolMod = clamp(g.tolMod * (1 + game.tol), 0.7, 1.35); changes.push({ label: 'Timing', delta: game.tol, text: `${game.tol > 0 ? '+' : ''}${Math.round(game.tol * 100)}%` }); }
   if (game.momentum) { momentumShift(g, game.momentum); changes.push({ label: 'Momentum', delta: game.momentum, text: game.momentum > 0 ? '▲' : '▼' }); }
   if (game.extra) { g.extraPending++; changes.push({ label: 'Extra moment', delta: 1, text: '+1' }); }

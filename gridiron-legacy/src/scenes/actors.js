@@ -112,13 +112,18 @@ function skinDetailTex() {
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 3);
   return (skinDetail = t);
 }
+// Phones during plays: players are small on screen, so skip the sheen / clearcoat / pore bump (the most expensive
+// part of the skin shader). Portraits and cutscenes keep the full look.
+let LITE = false;
+export function setLiteMaterials(on) { LITE = !!on; }
 function skinPhys(params) {
+  if (LITE) return new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0, ...params });
   const d = skinDetailTex();
   return new THREE.MeshPhysicalMaterial({ roughness: 0.52, metalness: 0, sheen: 0.45, sheenRoughness: 0.5, sheenColor: new THREE.Color('#ff9478'), clearcoat: 0.12, clearcoatRoughness: 0.42,
     ...(d ? { bumpMap: d, bumpScale: 0.3 } : {}), ...params });
 }
 export function skinMat(color) {
-  const key = `skin2|${color}`;
+  const key = `skin2|${color}${LITE ? '|lite' : ''}`;
   if (!matCache.has(key)) matCache.set(key, skinPhys({ color, emissive: new THREE.Color(color).multiplyScalar(0.07) }));
   return matCache.get(key);
 }
@@ -136,6 +141,7 @@ const texCache = trackedMap(true);
 //   soft: drawn small then upscaled with smoothing (hair, skin, tattoos look organic, not blocky).
 const TEX_SCALE = 6;
 function pixMat(key, w, h, draw, { transparent = false, soft = false, rough = 0.72, metal = 0, skin = false, scale = TEX_SCALE } = {}) {
+  if (skin && LITE) key += '|lite';
   if (texCache.has(key)) return texCache.get(key);
   const c = document.createElement('canvas');
   c.width = w * scale;
@@ -1899,6 +1905,127 @@ export function tickIdle(root, dt) {
   root.traverse((o) => { if (o.userData?.rig && o.userData.ticked !== FRAME) animateRun(o, dt, 0); });
 }
 
+// ------------------------------------------------------------------ celebrations
+// Each routine is a little sequence on a loop: beats with anticipation (a dip before a jump, a wind-up before a
+// spike), overshoot and settle, the whole body involved (knees, hips, head), never a pure metronome sine.
+const ease = (x) => smooth01(Math.max(0, Math.min(1, x)));
+const pulse = (x, at, len) => { const q = (x - at) / len; return q <= 0 || q >= 1 ? 0 : Math.sin(q * Math.PI); }; // 0 -> 1 -> 0 bump
+const wob = (t, a, b, c) => Math.sin(t * a) * 0.6 + Math.sin(t * b + 1.3) * 0.3 + Math.sin(t * c + 2.1) * 0.1; // irregular sway
+function celebPose(c, t, P, u, m) {
+  const L = m > 0; // lead arm: right when m > 0
+  const setArm = (lead, sh, el, out) => { if (lead === L) { P.rs = sh; P.re = el; if (out !== undefined) P.rout = -out; } else { P.ls = sh; P.le = el; if (out !== undefined) P.lout = out; } };
+  if (c === 'pump') {
+    // crouch, explode up with a double fist pump, a few quick pumps with knee drive, then a roar to the crowd
+    const x = t % 2.6;
+    const dip = pulse(x, 0, 0.35);
+    const up = ease((x - 0.25) / 0.2) * (1 - ease((x - 2.2) / 0.4));
+    const beat = Math.max(0, Math.sin((x - 0.45) * 11)) * (x > 0.45 && x < 1.8 ? 1 : 0);
+    P.y = -0.18 * dip + 0.02 * up; P.spine = 0.35 * dip - 0.18 * up; P.head = 0.3 * up;
+    P.lh = 0.6 * dip + 0.5 * beat * (L ? 1 : 0.3); P.lk = 0.9 * dip + 0.9 * beat * (L ? 1 : 0.3);
+    P.rh = 0.6 * dip + 0.5 * beat * (L ? 0.3 : 1); P.rk = 0.9 * dip + 0.9 * beat * (L ? 0.3 : 1);
+    setArm(true, 0.4 + 2.3 * up - 0.5 * beat, 1.6 - 0.9 * up + 0.6 * beat, 0.2);
+    setArm(false, 0.4 + 1.8 * up * (x > 1.2 ? 1 : 0.4), 1.4, 0.35);
+    u.hop = Math.max(u.hop, pulse(x, 0.3, 0.45) * 0.45 + beat * 0.06);
+    P.ny = m * 0.4 * ease((x - 1.8) / 0.3); P.sy = m * 0.15 * up;
+  } else if (c === 'dance') {
+    // loose two-step: weight rolls hip to hip, shoulders shimmy off the beat, arms swing relaxed, knees bounce
+    const b = t * 7.2;
+    const sway = Math.sin(b * 0.5);
+    const bounce = Math.abs(Math.sin(b));
+    P.y = -0.1 - bounce * 0.06; P.rz = sway * 0.18; P.hy = sway * 0.35; P.sy = -sway * 0.25 + Math.sin(b * 2 + 0.6) * 0.08;
+    P.lh = Math.max(0, sway) * 0.55; P.lk = 0.35 + Math.max(0, sway) * 0.7; P.rh = Math.max(0, -sway) * 0.55; P.rk = 0.35 + Math.max(0, -sway) * 0.7;
+    P.ls = 0.9 + Math.sin(b * 0.5 + 0.8) * 0.7; P.rs = 0.9 - Math.sin(b * 0.5 + 0.8) * 0.7; P.le = 1.3 + bounce * 0.3; P.re = 1.3 + bounce * 0.3;
+    P.lout = 0.35 + Math.sin(b) * 0.1; P.rout = -0.35 - Math.sin(b) * 0.1; P.lw = 0.4; P.rw = 0.4;
+    P.head = 0.08 + Math.sin(b + 0.4) * 0.07; P.ny = sway * 0.25; P.spine = 0.12 + bounce * 0.05;
+    const spin = (t % 5.5) > 4.4 ? ease(((t % 5.5) - 4.4) / 0.9) : 0; // a little spin every so often
+    if (spin > 0) P.ry = m * spin * Math.PI * 2;
+  } else if (c === 'flex') {
+    // land into a wide base, hit the double-bicep pose with a squeeze, turn to show each arm, then a roar
+    const x = t % 3.4;
+    const set = ease(x / 0.3);
+    const squeeze = pulse(x, 0.35, 0.5) + pulse(x, 1.5, 0.5) * 0.8;
+    const look = x < 1.2 ? 1 : x < 2.2 ? -1 : 0;
+    const roar = pulse(x, 2.3, 1.0);
+    P.y = -0.14 * set - 0.05 * squeeze; P.lh = 0.45 * set; P.rh = -0.2 * set; P.lk = 0.55 * set; P.rk = 0.45 * set;
+    P.ls = 1.6 * set - 0.4 * roar; P.rs = 1.6 * set - 0.4 * roar; P.lout = 1.3 * set + 0.15 * squeeze; P.rout = -1.3 * set - 0.15 * squeeze;
+    P.le = 2.2 * set + 0.15 * squeeze - 0.8 * roar; P.re = 2.2 * set + 0.15 * squeeze - 0.8 * roar;
+    P.spine = -0.12 * set + 0.25 * roar; P.head = 0.25 * roar - 0.05; P.ny = look * m * 0.55 * set * (1 - roar);
+    P.sy = look * m * 0.12 * set; P.lw = -0.3; P.rw = -0.3;
+  } else if (c === 'flip') {
+    // crouch (anticipation), launch, tuck and rotate, land and absorb, then a fist pump while you catch your breath
+    const x = t % 2.8;
+    const crouch = pulse(x, 0, 0.5);
+    const air = (x - 0.32) / 0.75;
+    if (air > 0 && air < 1) {
+      P.rx = -ease(air) * Math.PI * 2; u.hop = Math.max(u.hop, Math.sin(air * Math.PI) * 1.4);
+      const tuck = Math.sin(air * Math.PI);
+      P.lh = 1.7 * tuck; P.rh = 1.7 * tuck; P.lk = 2.1 * tuck; P.rk = 2.1 * tuck; P.ls = 1.2 * tuck; P.rs = 1.2 * tuck; P.le = 1.4 * tuck; P.re = 1.4 * tuck;
+    } else {
+      const land = pulse(x, 1.07, 0.4);
+      P.y = -0.3 * crouch - 0.24 * land; P.lh = 0.9 * (crouch + land); P.rh = 0.9 * (crouch + land); P.lk = 1.5 * (crouch + land); P.rk = 1.5 * (crouch + land);
+      P.spine = 0.5 * (crouch + land); P.ls = -0.7 * crouch + 0.6 * land; P.rs = -0.7 * crouch + 0.6 * land;
+      const after = ease((x - 1.45) / 0.3) * (1 - ease((x - 2.5) / 0.3));
+      if (after > 0) { setArm(true, 0.4 + 2.2 * after, 0.8, 0.2); P.head = 0.25 * after; }
+    }
+  } else if (c === 'salute') {
+    // snap to attention, sharp salute held a beat, then drop it and pound the chest twice
+    const x = t % 3.0;
+    const att = ease(x / 0.25);
+    const sal = ease((x - 0.2) / 0.18) * (1 - ease((x - 1.6) / 0.25));
+    const pound = pulse(x, 1.9, 0.28) + pulse(x, 2.3, 0.28);
+    P.spine = -0.06 * att; P.head = 0.04 * att; P.y = 0.01 * att;
+    setArm(true, 0.2 + 2.4 * sal + 1.1 * (1 - sal) * ease((x - 1.75) / 0.15), 0.3 + 2.0 * sal + 1.6 * (1 - sal) * ease((x - 1.75) / 0.15) - 0.6 * pound, 0.1 + 0.5 * sal);
+    setArm(false, 0.05, 0.15);
+    P.ny = m * 0.2 * sal;
+  } else if (c === 'point') {
+    // both arms to the sky, look up, slowly turn to the crowd with one finger up, then the other
+    const x = t % 4.0;
+    const raise = ease(x / 0.4);
+    const swap = x > 2.0 ? ease((x - 2.0) / 0.35) : 0;
+    const sway = wob(t, 1.3, 2.1, 3.7);
+    setArm(true, 2.9 * raise * (1 - swap * 0.65), 0.05, 0.35);
+    setArm(false, 2.9 * raise * (0.4 + swap * 0.6), 0.05 + 0.6 * (1 - raise), 0.35);
+    P.head = 0.45 * raise - 0.2 * swap; P.spine = -0.12 * raise; P.ny = m * 0.35 * swap + sway * 0.08;
+    P.sy = sway * 0.08; P.rz = sway * 0.03; P.y = -0.03 * Math.abs(sway);
+  } else if (c === 'bow') {
+    // a slow theatrical bow with an arm sweep, rise, a little wave to the crowd
+    const x = t % 3.6;
+    const down = ease((x - 0.3) / 0.6) * (1 - ease((x - 1.6) / 0.5));
+    const sweep = ease(x / 0.5);
+    P.spine = 1.0 * down; P.head = -0.3 * down; P.y = -0.06 * down; P.rh = -0.25 * down; P.lk = 0.25 * down;
+    setArm(true, 1.2 * sweep * (1 - down) + 0.9 * down, 0.5 + 0.9 * down, 0.9 * sweep * (1 - down) + 0.2);
+    setArm(false, 0.25 + 0.4 * down, 1.3 * down, -0.1);
+    const wave = ease((x - 2.3) / 0.3) * (1 - ease((x - 3.3) / 0.3));
+    if (wave > 0) { setArm(true, 2.6 * wave, 0.4 + Math.sin(t * 13) * 0.35 * wave, 0.4); }
+  } else if (c === 'shuffle') {
+    // quick feet: side-to-side shuffle, arms swinging loose, then stop and point at the crowd
+    const x = t % 3.2;
+    const go = x < 2.2 ? 1 : 0;
+    const f = Math.sin(t * 15);
+    P.lh = go * Math.max(0, f) * 0.6; P.rh = go * Math.max(0, -f) * 0.6; P.lk = 0.35 + go * Math.max(0, f) * 0.9; P.rk = 0.35 + go * Math.max(0, -f) * 0.9;
+    P.y = -0.12 - go * Math.abs(f) * 0.04; P.sx = go * Math.sin(t * 3) * 0.06; P.rz = go * Math.sin(t * 3) * 0.08;
+    P.ls = go * f * 0.9 + 0.3; P.rs = -go * f * 0.9 + 0.3; P.le = 1.1; P.re = 1.1; P.spine = 0.18; P.hy = go * f * 0.2; P.sy = -go * f * 0.15;
+    if (!go) { const pt = ease((x - 2.2) / 0.2); setArm(true, 1.6 * pt, 0.05, 0.1); P.ny = m * 0.3 * pt; P.head = 0.1; }
+  } else if (c === 'heart') {
+    // hands come together into a heart over the chest, held up to the crowd, then a hand on the crest
+    const x = t % 3.6;
+    const up = ease((x - 0.1) / 0.4) * (1 - ease((x - 2.2) / 0.4));
+    const crest = ease((x - 2.5) / 0.3);
+    P.ls = 1.5 * up + 0.9 * crest * (L ? 0 : 1); P.rs = 1.5 * up + 0.9 * crest * (L ? 1 : 0); P.le = 1.5 * up + 2.0 * crest * (L ? 0 : 1); P.re = 1.5 * up + 2.0 * crest * (L ? 1 : 0);
+    P.lout = -0.55 * up; P.rout = 0.55 * up; P.lw = -0.6 * up; P.rw = -0.6 * up; P.head = 0.15 * up - 0.1 * crest;
+    const sway = wob(t, 1.1, 1.9, 3.1); P.ny = sway * 0.3 * up; P.rz = sway * 0.03;
+  } else if (c === 'leanback') {
+    // lean way back, arms spread wide, rocking with the crowd
+    const x = t % 3.0;
+    const lean = ease(x / 0.4) * (1 - ease((x - 2.5) / 0.4));
+    const rock = Math.sin(t * 4) * lean;
+    P.spine = -0.45 * lean; P.head = 0.35 * lean; P.y = -0.12 * lean; P.lk = 0.6 * lean; P.rk = 0.6 * lean; P.lh = 0.3 * lean; P.rh = 0.3 * lean;
+    P.ls = 0.6 * lean; P.rs = 0.6 * lean; P.lout = 1.3 * lean + rock * 0.12; P.rout = -1.3 * lean + rock * 0.12; P.le = 0.3; P.re = 0.3; P.rz = rock * 0.07;
+  } else {
+    celebPose('pump', t, P, u, m);
+  }
+}
+
 const ACTION_DUR = { slip: 0.55, stuck: 0.45, throw: 0.55, catch: 0.5, jump: 0.7, juke: 0.35, spin: 0.5, stiff: 0.6, dive: 0.7, tackle: 0.55, lunge: 0.4, fall: 0.5, getup: 0.7, wave: 1.2, spike: 0.9, release: 0.3, cut: 0.25 };
 
 /** Pose for this frame. Returns target joint angles. */
@@ -1949,10 +2076,28 @@ function computePose(u, dt) {
     // slow weight shift from foot to foot
     const w = Math.sin(u.idleT * 0.55);
     P.rz = w * 0.035; P.sx = w * 0.03; P.lh = Math.max(0, w) * 0.08; P.lk = Math.max(0, w) * 0.16; P.rh = Math.max(0, -w) * 0.08; P.rk = Math.max(0, -w) * 0.16;
-    // glance around every few seconds
+    // glance around every few seconds (eased, not snapped)
     if (!u.lookT || u.idleT > u.lookT) { u.lookT = u.idleT + 2 + Math.random() * 3; u.look = (Math.random() - 0.5) * 1.1; }
-    P.ny = u.look ?? 0;
+    u.lookS = (u.lookS ?? 0) + ((u.look ?? 0) - (u.lookS ?? 0)) * Math.min(1, dt * 3);
+    P.ny = u.lookS;
+    // fidgets now and then: hands on hips, bounce on the toes, shake the arms out, a clap
+    if (!u.hold && !u.action && !u.celebrate) {
+      if (!u.fidT) u.fidT = u.idleT + 3 + Math.random() * 5;
+      if (!u.fid && u.idleT > u.fidT) { u.fid = { k: ['hips', 'bounce', 'shake', 'clap', 'hips'][Math.floor(Math.random() * 5)], t: 0, dur: 1.6 + Math.random() * 1.6 }; }
+      if (u.fid) {
+        const f = u.fid; f.t += dt;
+        const w = smooth01(Math.min(f.t / 0.3, (f.dur - f.t) / 0.3));
+        const F = {};
+        if (f.k === 'hips') { F.ls = -0.15; F.rs = -0.15; F.lout = 0.75; F.rout = -0.75; F.le = 1.9; F.re = 1.9; F.spine = 0.0; }
+        else if (f.k === 'bounce') { F.y = -0.04 - Math.abs(Math.sin(f.t * 9)) * 0.04; F.lk = 0.25 + Math.abs(Math.sin(f.t * 9)) * 0.15; F.rk = F.lk; F.ls = 0.25; F.rs = 0.25; F.le = 0.9; F.re = 0.9; }
+        else if (f.k === 'shake') { F.ls = 0.15 + Math.sin(f.t * 21) * 0.25; F.rs = 0.15 - Math.sin(f.t * 23) * 0.25; F.lw = Math.sin(f.t * 30) * 0.6; F.rw = Math.cos(f.t * 28) * 0.6; F.lout = 0.25; F.rout = -0.25; F.head = -0.1; }
+        else if (f.k === 'clap') { const c = Math.max(0, Math.sin(f.t * 10)); F.ls = 1.0; F.rs = 1.0; F.le = 1.3; F.re = 1.3; F.lout = -0.25 - c * 0.3; F.rout = 0.25 + c * 0.3; }
+        for (const key in F) P[key] = P[key] + (F[key] - P[key]) * w;
+        if (f.t >= f.dur) { u.fid = null; u.fidT = u.idleT + 4 + Math.random() * 7; }
+      }
+    }
   }
+  if (s > 0.4 || u.hold || u.action || u.celebrate) u.fid = null;
   // ---- held poses
   const hold = u.hold;
   if (hold === 'stance') { P.y = -0.32; P.spine = 1.0; P.lh = 0.9; P.lk = 1.5; P.rh = 0.3; P.rk = 1.1; P.ls = 1.4; P.le = 0; P.rs = 0.5; P.re = 0.5; P.head = -0.6; }
@@ -1965,15 +2110,23 @@ function computePose(u, dt) {
   if (hold === 'wave') { P.rs = 2.8; P.re = 0.6 + Math.sin(u.phase * 6) * 0.4; }
   if (hold === 'reach') { P.spine = 0.38; P.rs = 1.05; P.re = 0.25; P.rout = 0.05; P.ls = 0.3; P.le = 0.4; P.head = -0.25; } // reach for something on a table
   if (hold === 'hatOn') { P.ls = 2.75; P.rs = 2.75; P.le = 1.75; P.re = 1.75; P.lout = -0.35; P.rout = 0.35; } // both hands up at the head
+  // nobody holds a stance like a statue: breathing, small weight shifts, eyes moving
+  if (hold === 'stance' || hold === 'block' || hold === 'tackle' || hold === 'sit') {
+    u.br = (u.br ?? Math.random() * 6) + dt * (hold === 'sit' ? 1.4 : 2.4);
+    P.spine += Math.sin(u.br) * 0.03; P.head += Math.sin(u.br * 0.37 + 1) * 0.04; P.ny += Math.sin(u.br * 0.21) * 0.12;
+    P.ls += Math.sin(u.br + 0.5) * 0.04; P.rs += Math.sin(u.br + 1.7) * 0.04; P.y += Math.sin(u.br) * 0.008;
+  }
   if (hold === 'getup') { P.y = -0.5; P.spine = 0.9; P.lh = 1.4; P.lk = 2; P.rh = 0.6; P.rk = 1.4; P.ls = 1; P.rs = 1; }
-  // ---- one-shot actions
+  // ---- one-shot actions (blended in and out of the pose underneath so they don't snap)
   const act = u.action;
+  const preAct = act ? { ...P } : null;
   if (act) {
     act.t += dt;
     const p = Math.min(1, act.t / act.dur);
     const k = Math.sin(p * Math.PI);
+    const e = smooth01(p); // eased progress
     switch (act.name) {
-      case 'throw': if (p < 0.45) { P.rs = -2.6 * (p / 0.45); P.re = 1.4; P.ry = 0.6; P.spine = -0.12; P.rw = -0.5; } else { P.rs = -2.6 + 4.2 * ((p - 0.45) / 0.55); P.re = 0.3; P.ry = -0.3; P.spine = 0.3; P.rw = 0.7; } P.ls = 0.8; break; // wrist cocks back, then snaps through the release
+      case 'throw': if (p < 0.45) { const w = smooth01(p / 0.45); P.rs = -2.6 * w; P.re = 1.4; P.ry = 0.6 * w; P.spine = -0.12 * w; P.rw = -0.5 * w; P.ls = 0.8 + 0.4 * w; P.lh = 0.25 * w; P.rk = 0.3 * w; } else { const w = 1 - Math.pow(1 - (p - 0.45) / 0.55, 3); P.rs = -2.6 + 4.2 * w; P.re = 1.4 - 1.1 * w; P.ry = 0.6 - 0.95 * w; P.spine = -0.12 + 0.45 * w; P.rw = -0.5 + 1.2 * w; P.ls = 1.2 - 1.0 * w; P.lout = 0.3 * w; P.rh = 0.3 * w; P.lk = 0.25 * w; } break; // step into it, the hips lead, the arm whips through // wrist cocks back, then snaps through the release
       case 'release': P.rs = 1.6; P.re = 0.2; P.spine = 0.3; P.ry = -0.3; break;
       case 'catch': P.ls = 1.6 + k * 0.6; P.rs = 1.6 + k * 0.6; P.le = 0.2; P.re = 0.2; P.lw = -0.45; P.rw = -0.45; break; // hands open toward the ball
       case 'jump': P.ls = 2.9; P.rs = 2.9; P.le = 0.1; P.re = 0.1; P.lh = 0.9 * k; P.lk = 1.6 * k; P.rh = 0.3; P.rk = 1.0 * k; u.hop = Math.max(u.hop, k * 0.9); break;
@@ -1982,31 +2135,41 @@ function computePose(u, dt) {
       case 'juke': case 'cut': P.rz = (act.dir ?? 1) * 0.45 * k; P.y = -0.15 * k; P.lh = 0.6 * k * (act.dir ?? 1); P.rh = -0.6 * k * (act.dir ?? 1); P.lk = 0.6; P.rk = 0.6; P.spine = 0.3; break;
       case 'spin': P.ry = p * Math.PI * 2; P.spine = 0.25; P.ls = 1.1; P.rs = 0.4; P.lout = 0.6; P.rout = -0.9; break;
       case 'stiff': P.ls = 1.55; P.le = 0; P.lout = -0.05; P.spine = 0.35; P.rs = 0.2; P.re = 1.5; break;
-      case 'dive': P.rx = 1.25 * Math.min(1, p * 2); P.y = -0.55 * Math.min(1, p * 2); P.ls = 2.8; P.rs = 2.8; P.le = 0; P.re = 0; P.lh = -0.3; P.rh = -0.4; break;
+      case 'dive': P.rx = 1.25 * smooth01(Math.min(1, p * 2)); P.y = -0.55 * smooth01(Math.min(1, p * 2)); P.ls = 2.8; P.rs = 2.8; P.le = 0; P.re = 0; P.lh = -0.3; P.rh = -0.4; break;
       case 'lunge': if (p < 0.5) { P.y = -0.25 * (p / 0.5); P.spine = 0.7; P.ls = -0.4; P.rs = -0.4; } else { P.y = -0.2; P.spine = 1.0; P.rx = 0.5 * ((p - 0.5) / 0.5); P.ls = 1.6; P.rs = 1.6; P.le = 0.3; P.re = 0.3; } break;
       case 'tackle': P.rx = 0.9 * k; P.y = -0.35 * k; P.ls = 1.5; P.rs = 1.5; P.lout = -0.4; P.rout = 0.4; P.le = 0.6; P.re = 0.6; P.spine = 0.6; break;
-      case 'fall': P.rx = -1.45 * p; P.y = -0.62 * p; P.ls = 1.8 * p; P.rs = 2.2 * p; P.lh = 0.8 * p; P.rh = 1.2 * p; break;
-      case 'getup': P.rx = -1.45 * (1 - p); P.y = -0.62 * (1 - p); P.lh = 1.2 * (1 - p); P.lk = 1.5 * (1 - p); break;
+      case 'fall': P.rx = -1.45 * e; P.y = -0.62 * e; P.ls = 1.8 * e; P.rs = 2.2 * e; P.lh = 0.8 * e; P.rh = 1.2 * e; P.lout = 0.5 * k; P.rout = -0.6 * k; P.head = 0.4 * k; break; // arms fly out to break the fall
+      case 'getup': { // roll to a knee, push off the ground with a hand, stand
+        const q = 1 - e;
+        P.rx = -1.45 * Math.max(0, 1 - p * 1.8) + 0.5 * Math.sin(Math.min(1, p * 1.6) * Math.PI); P.y = -0.62 * q;
+        P.lh = 1.5 * q; P.lk = 2.0 * q; P.rh = 0.5 * q; P.rk = 1.3 * Math.sin(p * Math.PI);
+        P.rs = 1.2 * Math.sin(Math.min(1, p * 1.5) * Math.PI); P.re = 0.2; P.ls = 0.4 * q; P.spine = 0.7 * k; P.head = -0.2 * k; break;
+      }
       case 'spike': if (p < 0.5) { P.rs = 2.8; P.re = 0.2; u.hop = Math.max(u.hop, k * 0.5); } else { P.rs = 2.8 - 4.2 * ((p - 0.5) / 0.5); P.spine = 0.6; } break;
       case 'wave': P.rs = 2.8; P.re = 0.6 + Math.sin(act.t * 14) * 0.4; break;
       default: break;
     }
+    // fade in over the first ~0.1 s; actions that return to normal also fade out over the last ~0.15 s
+    const keepEnd = act.then || act.name === 'fall' || act.name === 'dive' || act.name === 'spin';
+    const win = Math.min(1, act.t / Math.min(0.1, act.dur * 0.3), keepEnd ? 1 : Math.max(0, act.dur - act.t) / Math.min(0.15, act.dur * 0.35));
+    const bw = smooth01(win);
+    if (bw < 1 && act.name !== 'spin') for (const key in P) P[key] = preAct[key] + (P[key] - preAct[key]) * bw;
     if (p >= 1) {
       u.action = null;
       if (act.then === 'down') { u.down = true; u.downT = 0; }
       else if (act.then) u.hold = act.then;
     }
   }
-  // ---- celebrations (looping)
+  // ---- celebrations: multi-beat routines with anticipation and follow-through, eased in, every player at
+  // their own tempo and mirrored at random so a group of teammates doesn't move in lockstep
   if (u.celebrate && !u.down) {
     const t = (u.celebT = (u.celebT ?? 0) + dt);
-    const c = u.celebrate;
-    if (c === 'pump') { const a = Math.sin(t * 9); P.ls = 2.6 + a * 0.3; P.rs = 2.6 - a * 0.3; P.le = 0.6; P.re = 0.6; u.hop = Math.max(0, Math.sin(t * 9)) * 0.25; }
-    else if (c === 'dance') { const a = Math.sin(t * 8); P.rz = a * 0.25; P.ry = a * 0.3; P.ls = 1.2 + a * 0.8; P.rs = 1.2 - a * 0.8; P.le = 1.2; P.re = 1.2; P.lh = a * 0.4; P.rh = -a * 0.4; P.lk = 0.4; P.rk = 0.4; P.y = -0.08 - Math.abs(a) * 0.06; }
-    else if (c === 'flex') { P.ls = 1.6; P.rs = 1.6; P.lout = 1.3; P.rout = -1.3; P.le = 2.2; P.re = 2.2; P.y = -0.12; P.lh = 0.4; P.rh = -0.4; P.lk = 0.5; P.rk = 0.5; }
-    else if (c === 'flip') { const p = (t % 1.6) / 0.8; if (p < 1) { P.rx = -p * Math.PI * 2; u.hop = Math.sin(p * Math.PI) * 1.4; P.lh = 1.6; P.rh = 1.6; P.lk = 2; P.rk = 2; } }
-    else if (c === 'salute') { P.rs = 2.6; P.re = 2.3; P.rout = -0.6; P.spine = -0.05; }
-    else if (c === 'point') { P.rs = 2.9; P.re = 0; P.ls = 2.9; P.le = 0; P.lout = 0.4; P.rout = -0.4; P.head = 0.4; }
+    u.cs ??= 0.86 + Math.random() * 0.28; // personal tempo
+    u.cm ??= Math.random() < 0.5 ? 1 : -1; // lead side
+    const base = { ...P };
+    celebPose(u.celebrate, t * u.cs, P, u, u.cm);
+    const w = smooth01(Math.min(1, t / 0.35)); // ease into it from whatever they were doing
+    for (const key in P) P[key] = base[key] + (P[key] - base[key]) * w;
   }
   // ---- momentum: bank into turns, lean into acceleration, dip when planting a cut
   if (!u.down && !u.celebrate && !u.action && s > 1) {
@@ -2027,7 +2190,7 @@ function applyPose(p, P, dt) {
   // ease back any offset left from a ragdoll
   r.body.position.z += (0 - r.body.position.z) * Math.min(1, dt * 5);
   if (p.userData.shadow) { p.userData.shadow.position.x = r.body.position.x; p.userData.shadow.position.z = r.body.position.z; }
-  const k = 1 - Math.exp(-16 * dt);
+  const k = 1 - Math.exp(-12 * dt); // body offsets ease (a touch softer than the joints' springs)
   const L = (obj, prop, v) => { obj[prop] += (v - obj[prop]) * k; };
   // Joints ride on slightly under-damped springs: limbs overshoot a touch and settle, which reads as
   // weight and follow-through instead of snapping straight into each pose.
@@ -2059,6 +2222,7 @@ function applyPose(p, P, dt) {
   // body roll wobbles a little (bumps, cuts) on a softer spring
   u.rzv = (u.rzv ?? 0) + (95 * (P.rz - r.body.rotation.z) - 11 * (u.rzv ?? 0)) * sdt;
   r.body.rotation.z += u.rzv * sdt;
+  if (Math.abs(r.body.rotation.x) > Math.PI * 1.5 && Math.abs(P.rx) < 1) r.body.rotation.x -= Math.sign(r.body.rotation.x) * Math.PI * 2; // after a flip, don't unwind it backwards
   r.body.rotation.x += (-P.rx - r.body.rotation.x) * k; // pitch forward = negative x on this rig
   if (Math.abs(P.ry) > 3) r.body.rotation.y = P.ry; else L(r.body.rotation, 'y', P.ry);
   // smooth facing
@@ -2456,12 +2620,13 @@ export function playAction(p, name, opts = {}) {
   u.hold = null;
 }
 
-const CELEBRATIONS = ['pump', 'dance', 'flex', 'flip', 'salute', 'point'];
+const CELEBRATIONS = ['pump', 'dance', 'flex', 'flip', 'salute', 'point', 'bow', 'shuffle', 'heart', 'leanback'];
 export function celebrate(p, style) {
   const u = p.userData.u;
   u.down = false;
   u.hold = null;
   u.celebT = 0;
+  u.cs = 0.86 + Math.random() * 0.28; u.cm = Math.random() < 0.5 ? 1 : -1;
   u.celebrate = style ?? p.userData.look?.celebration ?? CELEBRATIONS[Math.floor(Math.random() * CELEBRATIONS.length)];
 }
 export function stopCelebrate(p) { p.userData.u.celebrate = null; }

@@ -112,16 +112,38 @@ export function reply(state, key, idx) {
   return { changes, back: r.back };
 }
 
-/** Send a templated text from a contact. who = coach/family/partner/agent/rival/mate. */
-function sendTemplate(state, tid) {
+const weekIndex = (state) => (state.career?.year ?? 0) * 60 + (state.league?.week ?? 0);
+
+/** A line nobody has sent you lately (the last ~40 lines are remembered). */
+function freshLine(state, lines) {
+  const ph = phone(state);
+  const recent = (ph.recentLines ??= []);
+  const fresh = lines.filter((l) => !recent.includes(l));
+  const line = pick(state, fresh.length ? fresh : lines);
+  recent.push(line);
+  if (recent.length > 40) recent.splice(0, recent.length - 40);
+  return line;
+}
+
+/**
+ * Send a templated text from a contact. who = coach/family/partner/agent/rival/mate.
+ * The same kind of text won't come again for a few weeks (`cool`, default 4). Returns true if sent.
+ */
+function sendTemplate(state, tid, { cool = 4, force = false } = {}) {
   const tpl = TEXTS[tid];
   const p = state.player;
-  if (!tpl) return;
-  if (tpl.who === 'partner' && !p.partnerName) return;
-  if (tpl.who === 'agent' && !p.agentName) return;
+  if (!tpl) return false;
+  if (tpl.who === 'partner' && !p.partnerName) return false;
+  if (tpl.who === 'agent' && !p.agentName) return false;
+  const ph = phone(state);
+  const now = weekIndex(state);
+  const last = (ph.sentAt ??= {})[tid];
+  if (!force && last !== undefined && now - last < cool && now >= last) return false;
   const key = tpl.who === 'mate' ? (p.teammates?.length ? pick(state, p.teammates).id : null) : tpl.who;
-  if (!key) return;
-  textFrom(state, key, pick(state, tpl.text), tid, resolveOptions(state, tid, tpl.replies));
+  if (!key) return false;
+  ph.sentAt[tid] = now;
+  textFrom(state, key, freshLine(state, tpl.text), tid, resolveOptions(state, tid, tpl.replies));
+  return true;
 }
 
 /** Someone tags you on Huddle. when: great / bad / any. Lands in the "Huddle Mentions" thread. */
@@ -133,7 +155,7 @@ export function sendTag(state, when = 'any') {
   const handle = pick(state, FAN_HANDLES).replace('@', '');
   const mate = p.teammates?.length ? pick(state, p.teammates).name.split(' ')[0] : pick(state, FIRST_NAMES);
   const me = `${p.first.toLowerCase()}${p.last.toLowerCase()}${p.number}`;
-  const text = fillTokens(pick(state, tg.text), { handle, first: p.first, me, mate, rival: p.rivalName });
+  const text = fillTokens(freshLine(state, tg.text), { handle, first: p.first, me, mate, rival: p.rivalName });
   const opts = tg.replies.map((r, k) => ({ label: pick(state, Array.isArray(r.label) ? r.label : [r.label]), back: null, i: k }));
   textFrom(state, 'tags', text, 'tag', opts);
   const t = phone(state).threads.tags;
@@ -162,57 +184,52 @@ export const commentReplyOptions = (c) => COMMENT_REPLIES[c.troll ? 'troll' : 'f
 
 // ------------------------------------------------------------------ automatic texts
 
-const GAME_TEXTS = {
-  coach: {
-    great: ['Film session was fun today. You were the best player on the field.', 'That\'s the standard. Keep it there.', 'Proud of you. Rest up.'],
-    good: ['Solid game. Clean up the details and you\'re dangerous.', 'Good work. Film at 8.'],
-    bad: ['We need more from you. My office, Monday.', 'Shake it off. Watch the tape, learn, move on.', 'That\'s not who you are. Bounce back.'],
-  },
-  family: {
-    win: ['WE WON!!! Your dad screamed so loud the neighbors called 😂', 'So proud of you, sweetie ❤️', 'Grandpa says that was your best game yet!'],
-    loss: ['Tough one. We love you no matter what ❤️', 'Head up, kiddo. Call us tonight?'],
-    hurt: ['We saw you get hurt. Are you okay?? Call us!', 'Please rest. Your health matters more than any game.'],
-  },
-  partner: {
-    win: ['You were amazing today 😍', 'Dinner\'s on me tonight, superstar.'],
-    loss: ['Come home, I made your favorite. Forget football tonight.', 'I\'m proud of you anyway ❤️'],
-  },
-  mate: {
-    great: ['BRO. 🔥🔥🔥', 'You were COOKING today', 'Wings on me. You earned it.'],
-    win: ['Big W 💪', 'Good win. Recovery tomorrow?'],
-  },
-  agent: {
-    great: ['Phones are ringing after that one. Keep it up.', 'That game just added zeros to your next deal.'],
-  },
-  rival: {
-    beat: ['Lucky day. See you next year.', 'Enjoy it while it lasts.'],
-    lost: ['Better luck next time 😘', 'Told you.'],
-  },
-};
 
-/** Texts after a game, based on how it went. */
+/**
+ * Texts after a game. Only games worth talking about get texts (great or awful games, injuries, rivalries,
+ * playoffs), at most two per game, and the same person doesn't send the same kind of text every week.
+ */
 export function postGameTexts(state, lg) {
   const p = state.player;
   if (!lg || lg.sitOut) return;
-  const tier = lg.grade >= 75 ? 'great' : lg.grade >= 55 ? 'good' : 'bad';
-  sendTemplate(state, AFTER_GAME.coach[tier]);
-  if (lg.injury) sendTemplate(state, AFTER_GAME.family.hurt);
-  else if (chance(state, 0.55)) sendTemplate(state, AFTER_GAME.family[lg.won ? 'win' : 'loss']);
-  if (p.partnerName && chance(state, 0.6)) sendTemplate(state, AFTER_GAME.partner[lg.won ? 'win' : 'loss']);
-  if (lg.won && p.teammates?.length && chance(state, 0.6)) sendTemplate(state, AFTER_GAME.mate[tier === 'great' ? 'great' : 'win']);
-  if (p.agentName && tier === 'great' && chance(state, 0.5)) sendTemplate(state, AFTER_GAME.agent.great);
-  if (lg.rivalry) sendTemplate(state, AFTER_GAME.rival[lg.won ? 'beat' : 'lost']);
-  if (chance(state, tier === 'bad' ? 0.6 : 0.7)) sendTag(state, tier === 'great' ? 'great' : tier === 'bad' ? 'bad' : 'any');
-  if (tier === 'great' && chance(state, 0.4)) sendTag(state, 'great');
+  const tier = lg.grade >= 82 ? 'great' : lg.grade >= 50 ? 'good' : 'bad';
+  const big = lg.playoff || lg.isTitle;
+  const cands = []; // [weight, tid, opts]
+  if (lg.injury) { cands.push([10, AFTER_GAME.family.hurt, { force: true }]); cands.push([6, AFTER_GAME.extra.coachHurt, {}]); }
+  if (lg.rivalry) cands.push([5, AFTER_GAME.rival[lg.won ? 'beat' : 'lost'], { cool: 8 }]);
+  if (tier === 'great') {
+    cands.push([4, AFTER_GAME.coach.great, { cool: 5 }]);
+    cands.push([3, AFTER_GAME.mate.great, {}]);
+    if (p.agentName) cands.push([2.5, AFTER_GAME.agent.great, { cool: 6 }]);
+  }
+  if (tier === 'bad') { cands.push([3.5, AFTER_GAME.coach.bad, { cool: 5 }]); if (!lg.won) cands.push([2, AFTER_GAME.mate.loss, {}]); }
+  if (big) cands.push([3, AFTER_GAME.family[lg.won ? 'win' : 'loss'], { cool: 2 }]);
+  // ordinary games: now and then someone checks in
+  if (tier === 'good' && !lg.injury && !lg.rivalry && !big && chance(state, 0.35)) {
+    const pool = [AFTER_GAME.family[lg.won ? 'win' : 'loss'], AFTER_GAME.coach.good];
+    if (p.partnerName) pool.push(AFTER_GAME.partner[lg.won ? 'win' : 'loss']);
+    if (lg.won) pool.push(AFTER_GAME.mate.win);
+    cands.push([1, pick(state, pool), { cool: 5 }]);
+  } else if (p.partnerName && chance(state, 0.25)) cands.push([1.5, AFTER_GAME.partner[lg.won ? 'win' : 'loss'], { cool: 4 }]);
+  cands.sort((a, b) => b[0] - a[0] + (rand(state) - 0.5) * 2);
+  const budget = lg.injury || big || tier === 'great' ? 2 : 1;
+  let sent = 0;
+  for (const [, tid, o] of cands) {
+    if (sent >= budget) break;
+    if (sendTemplate(state, tid, o)) sent++;
+  }
+  // Huddle mentions: big games get talked about, ordinary ones mostly don't
+  if (chance(state, tier === 'great' ? 0.5 : tier === 'bad' ? 0.3 : 0.12)) sendTag(state, tier === 'great' ? 'great' : tier === 'bad' ? 'bad' : 'any');
 }
 
-/** Occasional texts at the start of a week. */
+/** Occasional texts at the start of a week (not every week, never the same one twice in a row). */
 export function weeklyTexts(state) {
   const p = state.player;
-  if (!chance(state, 0.6)) return;
+  if (state.league?.phase === 'playoffs' && chance(state, 0.6) && sendTemplate(state, AFTER_GAME.extra.big, { cool: 3 })) return;
+  if (!chance(state, 0.35)) return;
   const options = WEEKLY.filter((tid) => (TEXTS[tid].who !== 'partner' || p.partnerName) && (TEXTS[tid].who !== 'agent' || p.agentName));
-  sendTemplate(state, pick(state, options));
-  if (chance(state, 0.35)) sendTag(state, 'any');
+  for (const tid of options.sort(() => rand(state) - 0.5)) if (sendTemplate(state, tid, { cool: 8 })) break;
+  if (chance(state, 0.12)) sendTag(state, 'any');
 }
 
 // ------------------------------------------------------------------ social media

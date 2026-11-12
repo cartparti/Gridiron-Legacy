@@ -1078,3 +1078,8 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 .screen .look-sticky { top: calc(64px + var(--safe-top)); }
 .view-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 .view-pick .subtab { min-height: 34px; }
+/* tush push tap counter */
+.tush-taps { position: absolute; left: 50%; top: 32%; transform: translate(-50%, -50%); font: 900 3.2rem/1 var(--pixel, Inter), sans-serif; color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,.45), 0 0 18px rgba(255,212,59,.6); pointer-events: none; z-index: 4; }
+.tush-taps:empty { display: none; }
+.tush-taps.pop { animation: tushPop .14s ease-out; }
+@keyframes tushPop { from { transform: translate(-50%, -50%) scale(1.25); } to { transform: translate(-50%, -50%) scale(1); } }

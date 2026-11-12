@@ -60,17 +60,23 @@ export const SPONSORS = [
 // Injuries: weeks out is a [min, max] range. `perm` permanently changes stats.
 // part = where it shows on the X-ray; severe = the limb visibly bends the wrong way on the field; bone = a break
 // that can break the skin (rare, only with Blood effects on).
+// tier: how bad it is and whether you can actually suit up.
+//   minor    = probable: you play through it (a small dip)
+//   moderate = questionable: you can play hurt, slower, with a real chance of making it worse
+//   out      = doctors won't clear you. `limited` = the last N weeks you're back as questionable
+//   season   = done for the year
+// noPlay: positions that can't play through it even when limited (a QB with a broken throwing hand).
 export const INJURIES = [
-  { id: 'bruise', label: 'Bruised Ribs', weeks: [1, 1], weight: 6, part: 'ribs' },
-  { id: 'hamstring', label: 'Hamstring Strain', weeks: [1, 3], weight: 5, part: 'thigh' },
-  { id: 'ankle', label: 'Sprained Ankle', weeks: [1, 3], weight: 5, part: 'ankle' },
-  { id: 'concussion', label: 'Concussion', weeks: [1, 3], weight: 3, part: 'head' },
-  { id: 'shoulder', label: 'Separated Shoulder', weeks: [2, 5], weight: 2, part: 'shoulder', severe: true },
-  { id: 'highankle', label: 'High Ankle Sprain', weeks: [3, 6], weight: 2, part: 'ankle' },
-  { id: 'hand', label: 'Broken Hand', weeks: [3, 5], weight: 2, part: 'hand', severe: true },
-  { id: 'elbow', label: 'Dislocated Elbow', weeks: [3, 6], weight: 1.2, part: 'arm', severe: true },
-  { id: 'arm', label: 'Broken Arm', weeks: [5, 8], weight: 1, part: 'arm', severe: true, bone: true },
-  { id: 'brokenankle', label: 'Broken Ankle', weeks: [6, 10], weight: 0.8, part: 'ankle', severe: true, bone: true },
-  { id: 'acl', label: 'Torn ACL', weeks: [30, 40], weight: 0.35, perm: { speed: -4 }, major: true, part: 'knee', severe: true },
-  { id: 'leg', label: 'Broken Leg', weeks: [12, 18], weight: 0.3, perm: { speed: -2 }, major: true, part: 'shin', severe: true, bone: true },
+  { id: 'bruise', label: 'Bruised Ribs', weeks: [1, 1], weight: 6, part: 'ribs', tier: 'minor' },
+  { id: 'hamstring', label: 'Hamstring Strain', weeks: [1, 3], weight: 5, part: 'thigh', tier: 'moderate' },
+  { id: 'ankle', label: 'Sprained Ankle', weeks: [1, 3], weight: 5, part: 'ankle', tier: 'moderate' },
+  { id: 'concussion', label: 'Concussion', weeks: [1, 3], weight: 3, part: 'head', tier: 'out' },
+  { id: 'shoulder', label: 'Separated Shoulder', weeks: [2, 5], weight: 2, part: 'shoulder', severe: true, tier: 'out', limited: 1, noPlay: ['QB'] },
+  { id: 'highankle', label: 'High Ankle Sprain', weeks: [3, 6], weight: 2, part: 'ankle', tier: 'out', limited: 2 },
+  { id: 'hand', label: 'Broken Hand', weeks: [3, 5], weight: 2, part: 'hand', severe: true, tier: 'out', limited: 2, noPlay: ['QB', 'WR'] },
+  { id: 'elbow', label: 'Dislocated Elbow', weeks: [3, 6], weight: 1.2, part: 'arm', severe: true, tier: 'out', limited: 1, noPlay: ['QB'] },
+  { id: 'arm', label: 'Broken Arm', weeks: [5, 8], weight: 1, part: 'arm', severe: true, bone: true, tier: 'out' },
+  { id: 'brokenankle', label: 'Broken Ankle', weeks: [6, 10], weight: 0.8, part: 'ankle', severe: true, bone: true, tier: 'out' },
+  { id: 'acl', label: 'Torn ACL', weeks: [30, 40], weight: 0.35, perm: { speed: -4 }, major: true, part: 'knee', severe: true, tier: 'season' },
+  { id: 'leg', label: 'Broken Leg', weeks: [12, 18], weight: 0.3, perm: { speed: -2 }, major: true, part: 'shin', severe: true, bone: true, tier: 'season' },
 ];

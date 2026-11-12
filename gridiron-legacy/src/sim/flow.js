@@ -29,6 +29,7 @@ import { createUserGame, letterGrade, chooseWeather, initWeather } from './game.
 import { rollEvent, chooseOption } from './events.js';
 import { newWeek, applyPlan } from './week.js';
 import { newInjury, applyInjury, genPersonName } from './effects.js';
+import { injuryInfo, injuryStatus } from './injury.js';
 import { addNews, postGamePress } from './press.js';
 import { addXp } from './progress.js';
 import { checkTraitUnlocks } from './traits.js';
@@ -155,8 +156,9 @@ export function resolveEvent(state, choiceIdx) {
 export function gameDayStatus(state) {
   const p = state.player;
   if (p.suspended > 0) return { canPlay: false, reason: `Suspended (${p.suspended} game${p.suspended > 1 ? 's' : ''})` };
-  if (p.injury?.major) return { canPlay: false, reason: `${p.injury.label}: ${p.injury.weeks} wk` };
-  if (p.injury) return { canPlay: true, hurt: true, reason: `${p.injury.label}: ${p.injury.weeks} wk` };
+  const info = injuryInfo(p.injury, p.position);
+  if (info && !info.play) return { canPlay: false, injury: info.status, reason: `${p.injury.label} (${info.label}): ${p.injury.weeks} wk` };
+  if (info) return { canPlay: true, hurt: true, injury: info.status, reason: `${p.injury.label} (${info.label}): ${p.injury.weeks} wk` };
   return { canPlay: true };
 }
 
@@ -176,7 +178,7 @@ export function submitPlan(state, plan, { playHurt = false } = {}) {
   const sched = findGame(league, state.career.teamId);
   const playoff = league.phase === 'playoffs';
   const round = playoff ? league.playoffs.round : 0;
-  state.game = initWeather(state, createUserGame(state, league, sched, { playoff, round, sitOut, playingHurt: !sitOut && !!state.player.injury }));
+  state.game = initWeather(state, createUserGame(state, league, sched, { playoff, round, sitOut, playingHurt: !sitOut && !!state.player.injury ? injuryStatus(state.player.injury, state.player.position) : false }));
   state.game.isTitle = playoff && league.playoffs.rounds[round].length === 1;
   state.game.roundName = playoff ? roundName(league, round) : `Week ${league.week + 1}`;
   state.week.summary = summary;
@@ -229,9 +231,11 @@ export function finishGame(state) {
     if (p.suspended > 0) p.suspended--;
   }
   // Injury recovery: a week passes.
-  if (hadInjury && p.injury && p.injury !== newInj) {
-    if (g.playingHurt && chance(state, 0.3)) {
-      p.injury.weeks += randInt(state, 1, 2);
+  if (hadInjury && p.injury && p.injury !== newInj && !g.freshInjury) {
+    const info = g.playingHurt ? injuryInfo(p.injury, p.position) : null;
+    if (info && chance(state, info.aggravate ?? 0.3)) {
+      p.injury.weeks += randInt(state, 1, info.status === 'questionable' ? 3 : 1);
+      p.health = clamp(p.health - 8, 5, 100);
       addNews(state, 'injury', `${p.last} aggravates the ${p.injury.label.toLowerCase()} playing through it.`);
     } else p.injury.weeks--;
     if (p.injury.weeks <= 0) {

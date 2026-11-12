@@ -12,8 +12,8 @@ import { openDrill, clutchChallenge, grade, DRILL_NAMES } from './drills.js';
 import { toast } from '../components.js';
 
 const BY_POS = {
-  QB: ['qb_throw', 'qb_scramble', 'qb_hailmary'],
-  RB: ['rb_run', 'rb_screen', 'rb_goalline'],
+  QB: ['qb_throw', 'qb_scramble', 'qb_hailmary', 'qb_sneak'],
+  RB: ['rb_run', 'rb_screen', 'rb_goalline', 'rb_push'],
   WR: ['wr_route', 'wr_jumpball', 'wr_toetap'],
   CB: ['cb_cover', 'cb_tackle'],
   DT: ['dt_rush', 'dt_run'],
@@ -25,6 +25,8 @@ const HOW = {
   rb_run: 'Follow your blocks, hit the hole, make people miss.',
   rb_screen: 'Catch the screen and get upfield behind your linemen.',
   rb_goalline: 'Drive the pile, then time your leap over the top.',
+  qb_sneak: '3rd and inches: sneak it and tap like crazy while your backs shove you over.',
+  rb_push: 'Tush push: shove your QB from behind. Tap as fast as you can.',
   wr_route: 'Run your route, get open, call for it and make the catch.',
   wr_jumpball: 'A deep ball up for grabs. Win it at the highest point.',
   wr_toetap: 'Catch it on the sideline and get both feet down.',
@@ -45,8 +47,11 @@ function buildMoment(type, spot, weather) {
   if (spot === 'goal' || type === 'rb_goalline') yardLine = 1 + Math.floor(Math.random() * 3);
   if (spot === 'own') yardLine = 88 + Math.floor(Math.random() * 8);
   if (type === 'qb_hailmary') yardLine = 40 + Math.floor(Math.random() * 15);
-  const down = spot === 'two' ? 1 : 1 + Math.floor(Math.random() * 3);
-  const distance = Math.min(yardLine, down === 1 ? 10 : 2 + Math.floor(Math.random() * 9));
+  let down = spot === 'two' ? 1 : 1 + Math.floor(Math.random() * 3);
+  let distance = Math.min(yardLine, down === 1 ? 10 : 2 + Math.floor(Math.random() * 9));
+  const pusher = type === 'rb_push';
+  if (pusher) type = 'qb_sneak';
+  if (type === 'qb_sneak') { down = Math.random() < 0.3 ? 4 : 3; distance = 1; }
   const ords = ['', '1st', '2nd', '3rd', '4th'];
   const side = yardLine > 50 ? `OWN ${100 - yardLine}` : yardLine === 50 ? '50' : `OPP ${yardLine}`;
   const ang = Math.random() * Math.PI * 2;
@@ -55,7 +60,7 @@ function buildMoment(type, spot, weather) {
     type, defense, down, distance, yardLine, quarter: spot === 'two' ? 4 : 1 + Math.floor(Math.random() * 4), clock: spot === 'two' ? '1:48' : '8:12',
     weather, wind: { x: Math.cos(ang) * wmph * 0.7, z: Math.sin(ang) * wmph * 0.7, mph: Math.round(wmph * 2.2) },
     label: `${ords[down]} and ${yardLine <= distance ? 'Goal' : distance} at ${side}`,
-    situation: spot === 'two' ? 'Two-minute drill' : 'Practice', practice: true,
+    situation: spot === 'two' ? 'Two-minute drill' : 'Practice', practice: true, pusher,
   };
 }
 
@@ -74,7 +79,7 @@ export function practiceScreen(app) {
     const oppK = OPPS[P.opp][1];
     const passy = ['qb_throw', 'qb_hailmary', 'wr_route', 'wr_jumpball', 'wr_toetap', 'rb_screen', 'cb_cover', 'dt_rush'].includes(type);
     const tol = Math.max(0.35, Math.min(1.8, ((0.5 + (v / 100) * 0.7) * w.tol * (passy ? w.pass : 1) * (1 - oppK * 0.09)) / PLAY_CALLS[P.call].difficulty));
-    const res = await runMinigame(type, {
+    const res = await runMinigame(m.type, {
       moment: m, call: P.call, tolerance: tol, stats, position: P.pos,
       teamColors: COLORS[0], oppColors: COLORS[1], homeColors: COLORS[0], userHome: true,
       look: defaultLook(P.pos), number: P.number, lastName: 'You', teamName: 'Practice', oppName: 'Scout Team', homeName: 'Practice',

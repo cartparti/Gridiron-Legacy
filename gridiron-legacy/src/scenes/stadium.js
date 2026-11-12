@@ -238,6 +238,7 @@ export function buildStadium(scene) {
   const hairCols = ['#1a1410', '#2b1d14', '#5a3a22', '#8a5a2b', '#c9a15a', '#e0c070', '#8a3b1f', '#9a9a9a', '#d8d8d8'].map((c) => new THREE.Color(c));
   const dummy = new THREE.Object3D();
   let crowdBuilt = false;
+  let lastCrowdT = -1;
   const skins = ['#f7dcc0', '#e0ab7f', '#cc9260', '#b07646', '#8f5a34', '#6e4126', '#4d2c1a'].map((c) => new THREE.Color(c));
   crowdPositions.forEach((p, i) => {
     dummy.position.copy(p);
@@ -662,6 +663,9 @@ export function buildStadium(scene) {
     /** How hyped the crowd is (more bouncing and camera flashes). */
     setExcitement(e) { flashRate = 0.003 + e * 0.02; },
     animateCrowd(t, excitement = 0.2, force = false) {
+      // the crowd only needs ~30 updates a second (each one re-uploads thousands of fans to the GPU)
+      if (!force && crowdBuilt && t >= lastCrowdT && t - lastCrowdT < 1 / 30) return;
+      lastCrowdT = t;
       grounds.animate(t);
       const base = crowd.userData.base;
       // camera flashes

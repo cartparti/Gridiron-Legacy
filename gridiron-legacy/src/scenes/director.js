@@ -6,10 +6,11 @@ import { speak } from '../audio/voice.js';
 import { buildStadium } from './stadium.js';
 import { startCrowd, stopCrowd, setCrowd, playMusic, stopMusic, react } from '../audio/stadium.js';
 import { buildInterlude } from './interludes.js';
-import { nextFrame, tickIdle, sweepActorCaches } from './actors.js';
+import { nextFrame, tickIdle, sweepActorCaches, setLiteMaterials } from './actors.js';
 import { buildWorld } from './world.js';
 import { surfaceFor } from '../data/surface.js';
 import { goalLine } from './minigames/goalLine.js';
+import { tushPush } from './minigames/tushPush.js';
 import { freePlay } from './play/engine.js';
 import { fallbackMeter } from './minigames/fallback.js';
 
@@ -19,6 +20,15 @@ let raf = 0;
 let loopFn = null;
 let elapsed = 0;
 let shake = 0;
+
+// Phones: a lower resolution cap, and the resolution adapts to how fast frames really render (a hot phone that
+// starts dropping frames goes a step blurrier instead of stuttering, and goes back up when it can).
+const PHONE = typeof matchMedia === 'function' && (matchMedia('(pointer: coarse)').matches || /iPhone|iPad|Android/i.test(navigator.userAgent ?? ''));
+const DPR_MAX = () => Math.min(window.devicePixelRatio || 1, PHONE ? 1.4 : 1.75);
+const DPR_MIN = 0.75;
+let dpr = 0;
+const perf = { acc: 0, n: 0, since: 0, calm: 0 };
+let lastRender = 0;
 
 function ensure() {
   if (R) return R;
@@ -66,7 +76,8 @@ function ensure() {
       const w = window.innerWidth;
       const h = window.innerHeight;
       // full resolution, capped so big phones don't overheat
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+      if (!dpr || dpr > DPR_MAX()) dpr = DPR_MAX();
+      renderer.setPixelRatio(dpr);
       renderer.setSize(w, h, false);
       renderer.domElement.style.width = '100%';
       renderer.domElement.style.height = '100%';
@@ -76,6 +87,7 @@ function ensure() {
     };
     window.addEventListener('resize', resize);
     resize();
+    R.resize = resize;
     return R;
   } catch (e) {
     console.warn('WebGL unavailable, using 2D fallback', e);
@@ -84,9 +96,27 @@ function ensure() {
   }
 }
 
-function frame() {
+/** Watch real frame times; step the resolution down when frames are slow, back up when there's headroom. */
+function adaptResolution(raw) {
+  if (raw > 0.25) return; // tab was in the background or a hitch: ignore
+  perf.acc += raw; perf.n++; perf.since += raw;
+  if (perf.since < 1.2) return;
+  const avg = perf.acc / perf.n;
+  perf.acc = 0; perf.n = 0; perf.since = 0;
+  const max = DPR_MAX();
+  if (avg > 1 / 42 && dpr > DPR_MIN) { dpr = Math.max(DPR_MIN, dpr - 0.15); perf.calm = 0; R.resize(); }
+  else if (avg < 1 / 57 && dpr < max) { if (++perf.calm >= 3) { dpr = Math.min(max, dpr + 0.1); perf.calm = 0; R.resize(); } }
+  else perf.calm = 0;
+}
+
+function frame(now) {
   raf = requestAnimationFrame(frame);
-  const dt = Math.min(0.05, R.clock.getDelta());
+  // menus with a 3D background only need 30 fps (saves battery and heat)
+  if (R.fpsCap && now - lastRender < 1000 / R.fpsCap - 2) return;
+  lastRender = now;
+  const raw = R.clock.getDelta();
+  const dt = Math.min(0.05, raw);
+  if (!R.fpsCap) adaptResolution(raw);
   const cine = R.cine;
   const slow = (cine ? 0.2 : R.slowmo > 0 ? 0.3 : 1) * (R.timeScale ?? 1) * (R.playSpeed ?? 1);
   R.slowmo = Math.max(0, (R.slowmo ?? 0) - dt);
@@ -245,6 +275,7 @@ export function startBackdrop() {
   const r = ensure();
   if (!r) return;
   backdropOn = true;
+  r.fpsCap = 30;
   r.stadium.setTeams(['#c1121f', '#ffd166'], ['#1d3557', '#f1c40f'], 'LEGACY', 'GRIDIRON');
   r.stadium.world.position.set(0, 0, 0);
   r.stadium.hideLines();
@@ -260,6 +291,7 @@ export function startBackdrop() {
 export function stopBackdrop() {
   if (!backdropOn) return;
   backdropOn = false;
+  if (R) R.fpsCap = 0;
   stop();
 }
 
@@ -300,14 +332,14 @@ export function makeHud() {
       el2.innerHTML = `${side(i.away, i.awayPts, i.awayColors, false)}<div class="sb-mid">${i.clock ?? ''}</div>${side(i.home, i.homePts, i.homeColors, true)}`;
     },
     /** Update just the game clock in the score bug (ticks during the play). */
-    clock: (text) => { const m = q('.sb-mid'); if (m) m.textContent = text; },
+    clock: (text) => { const m = q('.sb-mid'); if (m && m.textContent !== text) m.textContent = text; },
     /** Play clock box: a number shows it (red at 5 and under), null hides it. */
     playClock: (n) => {
       const pc = q('.hud-pclock');
       if (n === null || n === undefined) { pc.classList.remove('show'); return; }
       pc.classList.add('show');
       pc.classList.toggle('low', n <= 5);
-      pc.querySelector('b').textContent = String(Math.max(0, n)).padStart(2, '0');
+      const v = String(Math.max(0, n)).padStart(2, '0'); const b = pc.querySelector('b'); if (b.textContent !== v) b.textContent = v;
     },
     /** Name tag for your player. */
     tag: (num, name, size = '') => { const t2 = q('.hud-tag'); t2.innerHTML = `<b>${num}</b><span>${String(name).toUpperCase()}${size ? `<small>${size}</small>` : ''}</span>`; },
@@ -339,7 +371,7 @@ export function makeHud() {
 
 const GAMES = {
   qb_throw: freePlay, qb_hailmary: freePlay, qb_scramble: freePlay,
-  rb_run: freePlay, rb_screen: freePlay, rb_goalline: goalLine,
+  rb_run: freePlay, rb_screen: freePlay, rb_goalline: goalLine, qb_sneak: tushPush,
   wr_route: freePlay, wr_jumpball: freePlay, wr_toetap: freePlay,
   cb_cover: freePlay, cb_tackle: freePlay, dt_rush: freePlay, dt_run: freePlay,
 };
@@ -350,6 +382,7 @@ const GAMES = {
 export function runMinigame(type, opts) {
   stopBackdrop();
   try { sweepActorCaches(); } catch (err) { console.error('cache sweep', err); } // free last play's faces/kits (phones run out of memory)
+  setLiteMaterials(PHONE);
   const r = ensure();
   const app = document.getElementById('app');
   const hud = makeHud();
@@ -359,6 +392,7 @@ export function runMinigame(type, opts) {
     startCrowd(0.3);
     if (R) R.playSpeed = opts.gameSpeed ?? 0.85; // plays run a bit slower than real time for a realistic feel
     const finish = (result) => {
+      setLiteMaterials(false);
       if (R) { R.timeScale = 1; R.playSpeed = 1; }
       stopCrowd();
       stopMusic();

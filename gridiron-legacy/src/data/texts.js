@@ -5,7 +5,7 @@
 export const TEXTS = {
   // ---------------- after games
   coach_great: {
-    who: 'coach', text: ['Film session was fun today. You were the best player on the field.', 'That\'s the standard. Keep it there.', 'Proud of you. Rest up.'],
+    who: 'coach', text: ['Film session was fun today. You were the best player on the field.', 'That\'s the standard. Keep it there.', 'Proud of you. Rest up.', "That's the kind of game that gets you noticed. Don't stop now.", 'Hell of a game. Same time tomorrow.', 'Watched the tape twice. Clean. Really clean.', 'Keep stacking days like that.'],
     replies: [
       { label: 'Thanks coach. Just doing my job.', bond: 3, back: 'That humility will take you far.' },
       { label: 'I want more. What should I work on?', bond: 4, effects: { train: { iq: 0.3 } }, back: 'Come in early tomorrow. We\'ll break down your footwork.' },
@@ -13,14 +13,14 @@ export const TEXTS = {
     ],
   },
   coach_good: {
-    who: 'coach', text: ['Solid game. Clean up the details and you\'re dangerous.', 'Good work. Film at 8.'],
+    who: 'coach', text: ['Solid game. Clean up the details and you\'re dangerous.', 'Good work. Film at 8.', 'Decent. Not great. You know the difference.', 'Nice work out there. A few things to clean up.', "We'll take it. Back at it Monday."],
     replies: [
       { label: 'I\'ll be there at 7:45.', bond: 3, back: 'Early is on time.' },
       { label: 'Which details?', bond: 2, effects: { train: { skill: 0.2 } }, back: 'Your second step. We\'ll show you.' },
     ],
   },
   coach_bad: {
-    who: 'coach', text: ['We need more from you. My office, Monday.', 'Shake it off. Watch the tape, learn, move on.', 'That\'s not who you are. Bounce back.'],
+    who: 'coach', text: ['We need more from you. My office, Monday.', 'Shake it off. Watch the tape, learn, move on.', 'That\'s not who you are. Bounce back.', 'Not your day. Film room, Monday, 7am.', "I've seen you do better. A lot better.", 'Short memory. But learn from that one first.'],
     replies: [
       { label: 'My fault. It won\'t happen again.', bond: 3, effects: { mood: -1 }, back: 'That\'s what I want to hear.' },
       { label: 'The line didn\'t block for me.', bond: -4, effects: { rel: { teammates: -3 } }, back: 'We win and lose as a TEAM. Remember that.' },
@@ -28,7 +28,7 @@ export const TEXTS = {
     ],
   },
   family_win: {
-    who: 'family', text: ['WE WON!!! Your dad screamed so loud the neighbors called 😂', 'So proud of you, sweetie ❤️', 'Grandpa says that was your best game yet!'],
+    who: 'family', text: ['WE WON!!! Your dad screamed so loud the neighbors called 😂', 'So proud of you, sweetie ❤️', 'Grandpa says that was your best game yet!', 'Mom cried. Again 😂', 'Your little cousin was wearing your number today!', 'Dad wants the game ball for the mantle 🏈', 'The whole group chat is going crazy 🎉'],
     replies: [
       { label: '❤️ love you guys', bond: 2, effects: { mood: 2 }, back: 'Love you more!!' },
       { label: 'Tell grandpa I said thanks!', bond: 3, back: 'He\'s telling the whole neighborhood 😂' },
@@ -36,35 +36,35 @@ export const TEXTS = {
     ],
   },
   family_loss: {
-    who: 'family', text: ['Tough one. We love you no matter what ❤️', 'Head up, kiddo. Call us tonight?'],
+    who: 'family', text: ['Tough one. We love you no matter what ❤️', 'Head up, kiddo. Call us tonight?', "Can't win them all. We're proud of you.", 'Rough game. Want us to bring food over?', 'Your dad says the refs were blind 😤'],
     replies: [
       { label: 'Thanks mom ❤️ I\'ll call', bond: 3, effects: { mood: 3 }, back: 'Talk tonight. Proud of you.' },
       { label: 'I don\'t want to talk about it', bond: -1, effects: { mood: -1 }, back: 'Okay. We\'re here when you\'re ready.' },
     ],
   },
   family_hurt: {
-    who: 'family', text: ['We saw you get hurt. Are you okay?? Call us!', 'Please rest. Your health matters more than any game.'],
+    who: 'family', text: ['We saw you get hurt. Are you okay?? Call us!', 'Please rest. Your health matters more than any game.', 'Mom is worried sick. Text back please!', 'Saw them help you off. How bad is it?'],
     replies: [
       { label: 'I\'m okay, don\'t worry', bond: 2, back: 'Promise me you\'ll listen to the trainers.' },
       { label: 'Honestly it hurts a lot', bond: 3, effects: { mood: 2 }, back: 'We\'re driving up this weekend. No arguments.' },
     ],
   },
   partner_win: {
-    who: 'partner', text: ['You were amazing today 😍', 'Dinner\'s on me tonight, superstar.'],
+    who: 'partner', text: ['You were amazing today 😍', 'Dinner\'s on me tonight, superstar.', 'Watching you play never gets old 😍', 'Okay that last play?? I screamed 😭', "Can't wait to see you tonight 💕"],
     replies: [
       { label: 'Dinner sounds perfect ❤️', bond: 4, effects: { mood: 3 }, back: 'It\'s a date 😘' },
       { label: 'Celebrating with the team tonight', bond: -3, effects: { rel: { teammates: 3 } }, back: 'Oh... have fun I guess.' },
     ],
   },
   partner_loss: {
-    who: 'partner', text: ['Come home, I made your favorite. Forget football tonight.', 'I\'m proud of you anyway ❤️'],
+    who: 'partner', text: ['Come home, I made your favorite. Forget football tonight.', 'I\'m proud of you anyway ❤️', 'Tough one. Want to get out of the house tonight?', 'Saved you a seat on the couch. No football talk allowed.'],
     replies: [
       { label: 'Best news all day. On my way', bond: 4, effects: { mood: 4 }, back: 'Couch, blanket, food. Ready for you.' },
       { label: 'I need to be alone tonight', bond: -2, back: 'Okay. I\'m here if you need me.' },
     ],
   },
   mate_great: {
-    who: 'mate', text: ['BRO. 🔥🔥🔥', 'You were COOKING today', 'Wings on me. You earned it.'],
+    who: 'mate', text: ['BRO. 🔥🔥🔥', 'You were COOKING today', 'Wings on me. You earned it.', 'Coach was smiling on the bus. Coach never smiles 😂', 'Highlight reel material, my guy', 'How you do that bro??'],
     replies: [
       { label: 'Couldn\'t do it without you', bond: 3, effects: { rel: { teammates: 2 } }, back: 'Facts. We eat together 🍗' },
       { label: 'Wings on YOU then 😂', bond: 2, back: 'Deal. Don\'t order the whole menu.' },
@@ -72,21 +72,21 @@ export const TEXTS = {
     ],
   },
   mate_win: {
-    who: 'mate', text: ['Big W 💪', 'Good win. Recovery tomorrow?'],
+    who: 'mate', text: ['Big W 💪', 'Good win. Recovery tomorrow?', 'W. Locker room was LOUD', 'Recovery day, then we go again', "That's how we do it 😤"],
     replies: [
       { label: 'Ice bath at 10. Let\'s go', bond: 3, effects: { health: 2 }, back: 'Bring towels this time 🥶' },
       { label: '💪', bond: 1, back: '💪💪' },
     ],
   },
   agent_great: {
-    who: 'agent', text: ['Phones are ringing after that one. Keep it up.', 'That game just added zeros to your next deal.'],
+    who: 'agent', text: ['Phones are ringing after that one. Keep it up.', 'That game just added zeros to your next deal.', 'Two brands called me during the 4th quarter.', 'Every scout in the building saw that.', "Keep games like that coming and I'll keep the offers coming."],
     replies: [
       { label: 'Get me that bag 💰', bond: 2, back: 'That\'s my job. You keep balling.' },
       { label: 'Football first. Money later.', bond: 1, effects: { rel: { coach: 1 } }, back: 'Respect. That attitude sells too.' },
     ],
   },
   rival_beat: {
-    who: 'rival', text: ['Lucky day. See you next year.', 'Enjoy it while it lasts.'],
+    who: 'rival', text: ['Lucky day. See you next year.', 'Enjoy it while it lasts.', "You got lucky. Don't get used to it.", 'One game. Means nothing.'],
     replies: [
       { label: 'Scoreboard. 😘', bond: 6, effects: { fame: 0.8 }, back: '...' },
       { label: 'Good game, honestly.', bond: -4, effects: { fame: 0.4, mood: 1 }, back: '...respect. Still coming for you.' },
@@ -94,11 +94,32 @@ export const TEXTS = {
     ],
   },
   rival_lost: {
-    who: 'rival', text: ['Better luck next time 😘', 'Told you.'],
+    who: 'rival', text: ['Better luck next time 😘', 'Told you.', 'Scoreboard says it all.', 'Same time next year? 😂'],
     replies: [
       { label: 'Enjoy it. Next time is mine.', bond: 3, back: 'We\'ll see.' },
       { label: 'Refs helped you lol', bond: 5, effects: { rel: { coach: -1 } }, back: 'Cry about it 😂' },
       { label: 'GG.', bond: -4, effects: { mood: 1 }, back: 'GG.' },
+    ],
+  },
+  mate_loss: {
+    who: 'mate', text: ['Rough one. We go again next week.', 'Bus ride home was quiet. Shake it off bro.', 'Not on you. We all played bad.', 'Film is gonna hurt tomorrow 😬'],
+    replies: [
+      { label: 'Next week is ours', bond: 3, effects: { mood: 2 }, back: 'Facts. Extra reps Tuesday?' },
+      { label: 'Yeah... that one hurt', bond: 2, back: 'Wings fix everything. Thursday.' },
+    ],
+  },
+  family_big: {
+    who: 'family', text: ['We\'ll be in the stands for the big one! 📣', 'The whole family is coming to the playoff game!', 'Grandma bought a foam finger. Win this for her 😂'],
+    replies: [
+      { label: 'Can\'t wait to see you there ❤️', bond: 3, effects: { mood: 3 }, back: 'We\'ll be the loud ones!' },
+      { label: 'Don\'t make me nervous 😅', bond: 1, back: 'Just go have fun!' },
+    ],
+  },
+  coach_hurt: {
+    who: 'coach', text: ['Trainers told me. Do exactly what they say.', 'Don\'t rush back. We need you healthy, not tough.', 'Get in the training room every day. That\'s your job now.'],
+    replies: [
+      { label: 'I\'ll be there every day', bond: 3, effects: { health: 3 }, back: 'Good. Rehab is practice now.' },
+      { label: 'I can play through it', bond: -1, back: 'That\'s not your call. Listen to the doctors.' },
     ],
   },
   // ---------------- weekly
@@ -172,7 +193,8 @@ export const AFTER_GAME = {
   coach: { great: 'coach_great', good: 'coach_good', bad: 'coach_bad' },
   family: { win: 'family_win', loss: 'family_loss', hurt: 'family_hurt' },
   partner: { win: 'partner_win', loss: 'partner_loss' },
-  mate: { great: 'mate_great', win: 'mate_win' },
+  mate: { great: 'mate_great', win: 'mate_win', loss: 'mate_loss' },
+  extra: { big: 'family_big', coachHurt: 'coach_hurt' },
   agent: { great: 'agent_great' },
   rival: { beat: 'rival_beat', lost: 'rival_lost' },
 };

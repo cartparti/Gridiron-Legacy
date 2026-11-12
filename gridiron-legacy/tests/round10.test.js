@@ -78,8 +78,8 @@ test('every position is balanced over full careers (awards and legacy within ran
   const avg = {};
   for (const pos of ['QB', 'RB', 'WR', 'CB', 'DT']) {
     let aw = 0, lg = 0;
-    for (let i = 0; i < 10; i++) { const st = simulateCareer(randomCareerOpts(5000 + i, pos), STRATEGIES.balanced, 0.6); aw += st.player.awards.length; lg += st.legacy?.score ?? 0; }
-    avg[pos] = { aw: aw / 10, lg: lg / 10 };
+    for (let i = 0; i < 40; i++) { const st = simulateCareer(randomCareerOpts(5000 + i, pos), STRATEGIES.balanced, 0.6); aw += st.player.awards.length; lg += st.legacy?.score ?? 0; }
+    avg[pos] = { aw: aw / 40, lg: lg / 40 };
   }
   const aws = Object.values(avg).map((v) => v.aw), lgs = Object.values(avg).map((v) => v.lg);
   assert.ok(Math.max(...aws) / Math.min(...aws) < 1.7, `awards spread ${JSON.stringify(avg)}`);

@@ -560,3 +560,29 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - actors.js: `setSurface`; ragdoll restitution/slide from SURF (turf bounces up to 3 times, slick ground keeps sliding after
   settling via g.slideV); IK planted feet sink by footSink; dustPuff(scene, origin, n, kind = SURF.debris) with DEBRIS colors.
 - UI: pregame venue card FIELD chip; HUD weather tag adds Turf/Mud/Slick turf/Snow; Practice has a FIELD option.
+
+## v0.47: injuries that matter, tush push, smoother animation, phone performance
+- Injuries: INJURIES have `tier` (minor/moderate/out/season), `limited` (last N weeks back as questionable) and `noPlay`
+  positions. `src/sim/injury.js`: `injuryStatus(inj, pos)` -> probable/questionable/out/season, `INJURY_STATUS` (tol, speed,
+  aggravate), `injuryNote`, `inGameOutcome` (in-play injury: minor = back after a series via g.skipNext, moderate 35% back,
+  else g.userOut). gameDayStatus uses it; g.playingHurt stores the status (tolerance mult, `opts.hurt` user speed in the
+  engine, aggravation odds in finishGame). `g.freshInjury` skips the same-week recovery tick. Hub/profile/results show it.
+- Engine: `stillDown(e, dt)` handles e.out (on the ground) -> getup action + e.rise (0.7 s, can't act) -> e.ramp (speed
+  ramp in moveToward). AI whiffed lunges lie 1.4-2.3 s, user 1.0 s. Rollouts: only zone LBs come up (contain, then attack
+  once the QB is near/past the line); man/CB/S coverage stays until the QB crosses (z < -0.4 makes him the carrier).
+  Hand-fighting also during receiver improv.
+- Tush push: moment `qb_sneak` (MOMENT_NAMES 'Tush Push'), `src/scenes/minigames/tushPush.js`. buildMoment sets
+  `d.shortYd` on 3rd/4th and 1 (5%) or 1st and goal from the 1 (35%) for QB/RB; pickType picks it (QB 75%, RB 30%, RB =
+  `m.pusher`). Tap rate over 0.6 s * perTap (strength) vs defense push with random surges; 3 s; result yards/first down/TD.
+  QB gets rushing stats, RB pushers none. Practice: QB 'qb_sneak', RB 'rb_push'.
+- Animation (actors.js): actions blend in/out of the pose underneath (preAct, eased progress `e`), better fall/getup/throw;
+  `celebPose()` multi-beat routines with personal tempo u.cs and mirror u.cm, eased in over 0.35 s; new styles bow, shuffle,
+  heart, leanback (looks.js CELEBRATIONS); breathing in stance/block/sit; idle fidgets (hands on hips, bounce, shake, clap);
+  flip no longer unwinds; body offsets ease at 12.
+- Texts (phone.js): `sendTemplate(state, tid, { cool, force })` with per-template cooldown (`ph.sentAt`, week index) and
+  `freshLine` (last 40 lines not repeated). postGameTexts: candidates by notability, budget 1-2; weekly 35%; new templates
+  mate_loss, family_big (playoffs), coach_hurt; more lines per template.
+- Performance (director.js): PHONE detection, DPR cap 1.4 on phones (1.75 desktop), `adaptResolution` steps DPR 0.75..max
+  from measured frame times; `R.fpsCap` 30 for the title backdrop; `setLiteMaterials(PHONE)` during plays (skin = plain
+  MeshStandardMaterial, keys get '|lite'); crowd animation throttled to 30 Hz; HUD clocks only write on change.
+- Tests: `tests/round13.test.js`; balance test now 40 careers per position (10 was too noisy).

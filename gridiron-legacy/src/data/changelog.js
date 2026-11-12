@@ -1,5 +1,16 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.47', date: 'Nov 12', title: 'Tush push, real injuries, smoother players', items: [
+    'Injuries are serious now. Each one is Probable (play through it), Questionable (you can play, but slower, and it could get worse), Out (doctors won\'t clear you: broken bones, concussions, dislocations) or Out for the season. Some come back as Questionable in a brace or cast for the last weeks, but not if your position can\'t play with it (a QB with a broken hand sits).',
+    'Get hurt during a play and it depends on what happened: shaken up, you\'re back after a series; anything worse and you\'re done for the day.',
+    'Missed tackles cost something: a defender who whiffs ends up on the ground, has to get up, and takes a couple of strides to get back to full speed. Juked and run-over defenders stay down longer too.',
+    'When you\'re QB, defenders covering receivers stay with them until you actually cross the line of scrimmage. Linebackers come up to contain you instead, and receivers keep battling their defenders for space during a scramble.',
+    'New: the Tush Push. On 3rd or 4th and inches (or a yard from the end zone) you sometimes sneak it as the QB while your backs shove you from behind. As a running back you\'re the one pushing. Tap as fast as you can to drive the pile past the line.',
+    'Smoother, less robotic movement: actions blend in and out, falls and get-ups look like real people, throws step into it, players breathe and shift in their stance and fidget when they stand around.',
+    'Celebrations are full routines now (wind-up, jump, pump, roar), every teammate moving at their own pace. Four new ones: Take a bow, Shuffle, Heart hands and Lean back.',
+    'Texts are less repetitive: people text after games that matter (big games, bad games, injuries, rivalries), one or two at most, and no one sends the same message over and over.',
+    'Runs better on phones: a lower, adaptive resolution (it steps down if your phone starts to struggle), lighter skin shading during plays, a 30 fps title screen and a lighter crowd.',
+  ] },
   { v: '0.46', date: 'Nov 12', title: 'The ground fights back', items: [
     'Every stadium has natural grass or artificial turf, shown on the pregame card and the in-game weather tag. Painted fields are always turf.',
     'Dry turf is fast and grippy: quicker starts and sharper cuts, and bodies bounce off the hard surface on big hits.',

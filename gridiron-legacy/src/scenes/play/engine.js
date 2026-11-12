@@ -94,7 +94,7 @@ export function freePlay(ctx) {
     const sizeSpeed = Math.max(0.86, Math.min(1.1, 1 - ((wLb - w0) / w0) * 0.45 + (hIn - h0) * 0.004));
     const e = {
       team, role, slot, mesh, pos: { x, z }, vel: { x: 0, z: 0 }, start: { x, z }, hIn, wLb, mass: wLb / 210,
-      maxSpeed: BASE_SPEED[role] * (team === 'def' ? defBoost : wfx.speed * (m.defense && !isUser ? 1 + oppK * 0.035 : 1)) * rnd(0.97, 1.03) * (isUser ? 1 : sizeSpeed) * (1 - surf.sink),
+      maxSpeed: BASE_SPEED[role] * (team === 'def' ? defBoost : wfx.speed * (m.defense && !isUser ? 1 + oppK * 0.035 : 1)) * rnd(0.97, 1.03) * (isUser ? (opts.hurt ?? 1) : sizeSpeed) * (1 - surf.sink),
       user: isUser, route: null, s: 0, engaged: null, out: 0, tell: 0, lunge: 0, lungeDir: null, down: false, ...extra,
     };
     ents.push(e);
@@ -422,7 +422,7 @@ export function freePlay(ctx) {
         playAction(user.mesh, flight && flight.H > 4 ? 'jump' : 'catch');
         sfx.click();
       }
-      if (id === 'tackle' && user.team === 'def' && user.lunge <= 0 && user.out <= 0) {
+      if (id === 'tackle' && user.team === 'def' && user.lunge <= 0 && user.out <= 0 && !(user.rise > 0)) {
         user.lunge = 0.38; user.lungeDir = carrier ? norm(carrier.pos.x - user.pos.x, carrier.pos.z - user.pos.z) : norm(controls.state.x, controls.state.z || 1);
         playAction(user.mesh, 'tackle');
       }
@@ -487,7 +487,22 @@ export function freePlay(ctx) {
   };
 
   // ---------------- movement helpers
+  /**
+   * On the ground after a whiff, a juke or a broken tackle: lie there (e.out), then a real get-up (e.rise, the
+   * getup animation) before running again, and a couple of strides to get back to full speed (e.ramp).
+   */
+  const stillDown = (e, dt) => {
+    if (e.out > 0) {
+      e.out -= dt; e.vel.x *= 0.85; e.vel.z *= 0.85;
+      if (e.out <= 0) { if (isDown(e.mesh)) { knockDown(e.mesh, 0); e.rise = 0.7; } e.ramp = 0.6; }
+      return true;
+    }
+    if (e.rise > 0) { e.rise -= dt; e.vel.x *= 0.7; e.vel.z *= 0.7; return true; }
+    if (e.ramp > 0) e.ramp -= dt;
+    return false;
+  };
   const moveToward = (e, tx, tz, speed, dt, accel = 14) => {
+    if (e.ramp > 0) speed *= 1 - e.ramp * 0.9; // getting back up to speed
     const dx = tx - e.pos.x;
     const dz = tz - e.pos.z;
     const d = Math.hypot(dx, dz);
@@ -559,7 +574,7 @@ export function freePlay(ctx) {
   };
 
   const aiOffense = (e, dt) => {
-    if (e.out > 0) { e.out -= dt; if (e.out <= 0 && isDown(e.mesh)) knockDown(e.mesh, 0); return; }
+    if (stillDown(e, dt)) return;
     if (e.role === 'OL') {
       if (e.blockTarget && !e.engaged) {
         const d = e.blockTarget;
@@ -764,7 +779,7 @@ export function freePlay(ctx) {
 
   const aiDefense = (e, dt) => {
     if (e.burst > 0) e.burst -= dt;
-    if (e.out > 0) { e.out -= dt; if (e.out <= 0 && isDown(e.mesh)) knockDown(e.mesh, 0); return; }
+    if (stillDown(e, dt)) return;
     if (e.engagedBy) {
       // Blocked: try to shed the block over time.
       e.shed += dt * ((mode === 'run' ? 0.2 : mode === 'pass' || mode === 'route' ? 0.2 : 0.32) + (mode === 'pass' && user === qb ? 0.1 : 0) + (call === 'risky' ? 0.1 : 0) + (m.defense ? -0.05 : 0.03 + oppK * 0.04) + (e.blitz ? 0.1 : 0));
@@ -793,12 +808,18 @@ export function freePlay(ctx) {
       backpedalFace(e, false, qb);
       return;
     }
-    // QB rolls out of the pocket: linebackers and anyone close by break off coverage and run him down
+    // QB rolls out of the pocket: zone linebackers come up to contain him. Anyone covering a receiver stays on
+    // that receiver until the QB actually crosses the line (then he's a runner and everyone pursues).
     if (mode === 'pass' && holder === qb && !flight && t > 0.8 && Math.abs(qb.pos.x - qb.start.x) > 4.5) {
       e.qbRead ??= t + 0.3 + Math.random() * 0.35; // see it, then go
-      // linebackers, anyone close, and the defenders on the side he's rolling to (they give up their receiver: throw it!)
-      const sameSide = Math.sign(e.pos.x || 1) === Math.sign(qb.pos.x || 1) && dist(e.pos, qb.pos) < 14;
-      if (t > e.qbRead && (e.role === 'LB' || dist(e.pos, qb.pos) < 8 || sameSide)) { pursueAndTackle(e, qb, dt, 0.97); return; }
+      const covering = (e.man && !e.zone) || e.role === 'CB' || e.role === 'S';
+      if (t > e.qbRead && e.role === 'LB' && !covering) {
+        // contain, don't fly past him: sit on the line between him and the sideline, a few yards off
+        if (qb.pos.z < 1.5 || dist(e.pos, qb.pos) < 4) { pursueAndTackle(e, qb, dt, 0.95); return; }
+        moveToward(e, qb.pos.x + Math.sign(qb.pos.x || 1) * 1.5, Math.min(-1, qb.pos.z - 3), e.maxSpeed * 0.9, dt);
+        faceToward(e.mesh, qb.pos.x, qb.pos.z);
+        return;
+      }
     }
     if (e.role === 'S') {
       const deepZ = Math.min(e.start.z, -12, ...receivers.map((r) => r.pos.z - 4));
@@ -815,7 +836,7 @@ export function freePlay(ctx) {
       const r = e.man;
       if ((play.press || call === 'risky') && t < 0.6 && dist(e.pos, r.pos) < 1.6) r.jam = 0.4;
       // hand-fighting at the line and on the route
-      if (t < 1.6 && dist(e.pos, r.pos) < 1.4 && !(e.handT > 0)) {
+      if ((t < 1.6 || r.improv) && dist(e.pos, r.pos) < 1.4 && !(e.handT > 0)) { // on the route, and again in the scramble drill
         e.handT = 0.5 + Math.random() * 0.4;
         playAction(e.mesh, 'stiff', { dur: 0.3 });
         if (!r.user) playAction(r.mesh, 'stiff', { dur: 0.3 });
@@ -1144,7 +1165,7 @@ export function freePlay(ctx) {
   };
   /** Everyone near a loose ball races to it (blocks hold, anyone down stays down). */
   const chaseLoose = (e, dt) => {
-    if (e.out > 0) { e.out -= dt; if (e.out <= 0 && isDown(e.mesh)) knockDown(e.mesh, 0); return; }
+    if (stillDown(e, dt)) return;
     if (e.engaged || e.engagedBy) { e.vel.x *= 0.9; e.vel.z *= 0.9; return; }
     if (loose.rec) { e.vel.x *= 0.9; e.vel.z *= 0.9; return; }
     const bp = ball.position;
@@ -1814,8 +1835,8 @@ export function freePlay(ctx) {
       const [uh0, uw0] = POS_SIZE[opts.position] ?? POS_SIZE[user.role] ?? [73, 210];
       const userSize = Math.max(0.9, Math.min(1.06, 1 - ((user.wLb - uw0) / uw0) * 0.3 + (user.hIn - uh0) * 0.003));
       const traitSpeed = (has('gear2') && c.sprint ? 1.08 : 1) * (has('escape') && user === qb && carrier === qb ? 1.08 : 1) * (has('deep') && mode === 'route' && user.pos.z < -10 ? 1.07 : 1) * (has('closing') && flight && user.team === 'def' ? 1.1 : 1);
-      const userSpeed = traitSpeed * BASE_SPEED[user.role] * userSize * (0.86 + (st.speed ?? 60) / 100 * 0.28) * wfx.speed * (1 - surf.sink) * (c.sprint ? 1.15 : 0.95) * (moves.slow > 0 ? 0.55 : 1) * (moves.spin > 0 ? 0.8 : 1);
-      if (user.out > 0) { user.out -= dt; if (user.out <= 0 && isDown(user.mesh)) knockDown(user.mesh, 0); user.vel.x *= 0.8; user.vel.z *= 0.8; }
+      const userSpeed = traitSpeed * BASE_SPEED[user.role] * userSize * (0.86 + (st.speed ?? 60) / 100 * 0.28) * wfx.speed * (1 - surf.sink) * (c.sprint ? 1.15 : 0.95) * (moves.slow > 0 ? 0.55 : 1) * (moves.spin > 0 ? 0.8 : 1) * (opts.hurt ?? 1);
+      if (user.out > 0 || user.rise > 0) { stillDown(user, dt); user.vel.x *= 0.8; user.vel.z *= 0.8; }
       else if (moves.dive) {
         moves.dive += dt;
         const dir = norm(user.vel.x, user.vel.z || -1);
@@ -1837,7 +1858,7 @@ export function freePlay(ctx) {
             });
           } else finishSack();
         }
-        if (user.lunge <= 0 && phase === 'live' && !qteActive) { user.out = 0.7; knockDown(user.mesh, 1); }
+        if (user.lunge <= 0 && phase === 'live' && !qteActive) { user.out = 1.0; knockDown(user.mesh, 1); }
       } else if (user.engagedBy) {
         // locked up with a blocker: drive into him to build leverage, use moves to break free
         rush.cd = Math.max(0, rush.cd - dt);
@@ -1930,7 +1951,7 @@ export function freePlay(ctx) {
           } else tryTackle(e, target);
           e.lunge = 0;
         }
-        if (e.lunge <= 0 && phase === 'live' && e.out <= 0) { e.out = 0.6; knockDown(e.mesh, 1); }
+        if (e.lunge <= 0 && phase === 'live' && e.out <= 0) { e.out = 1.4 + Math.random() * 0.9; knockDown(e.mesh, 1); } // whiffed: face down in the grass
       }
       for (const [e, r] of tellRings) { r.visible = e.tell > 0 || e.lunge > 0; r.scale.setScalar(1 + Math.sin(t * 30) * 0.15); }
       updateWrap(dt);

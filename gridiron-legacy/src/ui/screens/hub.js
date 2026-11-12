@@ -1,4 +1,5 @@
 // Main career hub: top bar with meters, bottom tabs, and the five tab views.
+import { injuryInfo, injuryNote } from '../../sim/injury.js';
 import { h, clear } from '../dom.js';
 import { maybeTour } from '../onboarding.js';
 import { seasonStakes, awardRace, depthScore } from '../../sim/career.js';
@@ -270,11 +271,12 @@ function weekView(app) {
   let playHurt = app.ui.playHurt ?? false;
   const hurtToggle = status.hurt
     ? h('div.card.flat', { style: { borderColor: 'var(--warn)' } },
-      h('p', h('b.warn', `Injured: ${status.reason}.`), ' Play through it? Your timing windows shrink and you risk making it worse.'),
+      h('p', h('b.warn', `Injured: ${status.reason}.`), ` ${injuryNote(st.player.injury, st.player.position)} `, status.injury === 'questionable' ? 'Playing shrinks your timing windows a lot and slows you down.' : 'Playing costs you a little timing.'),
       h('div.row', h(`button.subtab${!playHurt ? '.on' : ''}`, { onclick: () => { app.ui.playHurt = false; app.render(); } }, 'Sit out & heal'),
         h(`button.subtab${playHurt ? '.on' : ''}`, { onclick: () => { app.ui.playHurt = true; app.render(); } }, 'Play hurt')))
     : null;
   if (hurtToggle) container.append(hurtToggle);
+  else if (!status.canPlay && status.injury) container.append(h('div.card.flat', { style: { borderColor: 'var(--bad)' } }, h('p', h('b.bad', `${status.reason}.`), ` ${injuryNote(st.player.injury, st.player.position)}`)));
   const cantPlay = !status.canPlay;
   container.append(h('button.btn.primary.block', {
     style: { minHeight: '58px', fontSize: '1.2rem' },
@@ -555,7 +557,7 @@ function profileView(app) {
         p.look?.heightIn ? h('span.small', fmtSize(p.look)) : null,
         h('span.small', `${team.city} ${team.name}`),
         p.draft ? h('span.small.muted', p.draft.undrafted ? 'Undrafted free agent' : `Drafted ${ordinal(p.draft.pick)} overall (${p.draft.year})`) : null,
-        p.injury ? h('span.chip.bad', icon('bandage'), `${p.injury.label} · ${p.injury.weeks} wk`) : null,
+        p.injury ? h('span.chip.bad', icon('bandage'), `${p.injury.label} · ${injuryInfo(p.injury, p.position)?.label} · ${p.injury.weeks} wk`) : null,
         p.suspended ? h('span.chip.bad', `Suspended ${p.suspended}`) : null))),
     h('div.card', h('div.card-title', h('h3', 'Ratings'), h('span.display', { style: { fontSize: '1.4rem' } }, `${Math.round(p.ovr)} OVR`)), statBars(p.stats, POSITIONS[p.position].statNotes)),
     h('div.card', h('h3', 'Overall by Season'), ratingChart(p.history, Math.round(p.ovr * 10) / 10)),

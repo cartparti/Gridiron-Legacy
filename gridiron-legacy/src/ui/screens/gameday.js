@@ -1,5 +1,6 @@
 // Game day: scoreboard with momentum, drive ticker, key moments (play call -> minigame),
 // 4th-down decisions and mid-game events.
+import { INJURY_STATUS } from '../../sim/injury.js';
 import { h, clear } from '../dom.js';
 import { PLAY_CALLS, WEATHER } from '../../data/config.js';
 import { getTeam } from '../../sim/league.js';
@@ -420,6 +421,7 @@ export function gamedayScreen(app) {
       gameSpeed: app.settings.gameSpeed ?? 0.85,
       traits: equippedTraits(st),
       health: st.player.health,
+      hurt: g.playingHurt ? (INJURY_STATUS[g.playingHurt]?.speed ?? 1) : 1,
       oppStrength: matchup(st).k,
       // uniforms + field get dirtier as the game goes on
       wear: { key: `${gid}-${st.career.year}`, progress: Math.min(1, (g.cursor + 1) / Math.max(1, g.drives.length)) },
