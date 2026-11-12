@@ -1,5 +1,12 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.51', date: 'Nov 12', title: 'Your own mascot costume', items: [
+    'Mascots get their own costume editor instead of football gear: pick the animal (or keep your team\'s mascot), the fur colors, a mascot name, the eyes (googly, fierce, sleepy, star-struck, hearts, shades), the mouth (grin, fangs, tongue out, mustache...), a hat (crown, top hat, propeller, viking, chef...), an extra (cape, bow tie, gold chain, foam finger, scarf, tutu) and shoes, clown size included. The jersey, helmet, gear, swag and touchdown celebration tabs are gone for mascots.',
+    'The costume you design is the one you wear in every game-day moment, at every team.',
+    'My Career shows your costume, your mascot name and a MASCOT badge, and so do the top bar, the lineup and the pregame matchup (your costume vs. their mascot).',
+    'Mascot skills: your ratings are Hustle, Showmanship, Crowd IQ and Stamina, and training is mascot training (Cardio in the Suit, Heat Training, Routine Rehearsal, Study Crowd Tapes, Double Rehearsals, Meet the Spirit Director).',
+    'Mascot-only traits: Born Showman, Cannon Arm, Smooth Moves, Acrobat, plus new Crowd Whisperer (bigger momentum swings), Fan Favorite (extra fame), Tireless Foam (less energy drain) and Velcro Head (your head stays on and flops hurt less).',
+  ] },
   { v: '0.50', date: 'Nov 12', title: 'Be the Mascot', items: [
     'New position: Mascot. Start a career inside the big foam costume of your school, then college, then the pros. You never take a snap; the crowd is your field.',
     'Four game-day moments: Hype the Crowd (tap on the beat as the rings close in; every hit is a dance move and combos make the stadium roar), T-Shirt Cannon (tap fans waving in the stands; gold VIPs are worth double), Mascot Showdown (copy the other team\'s mascot\'s dance combo, three rounds, then the winner flattens the loser) and the Halftime Stunt (trampoline: power, flips, stick the landing).',

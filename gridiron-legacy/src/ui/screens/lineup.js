@@ -1,4 +1,6 @@
 // Team → Lineup: your unit's starting 11 as player cards on a field, plus the bench.
+import { costumeSpec, mascotDisplayName } from '../../data/mascots.js';
+import { mascotKind } from '../crest.js';
 import { h } from '../dom.js';
 import { getTeam } from '../../sim/league.js';
 import { randomLook, seededRandom } from '../../data/looks.js';
@@ -63,8 +65,8 @@ export function lineupView(app) {
   });
   if (p.position === 'MS') { // the mascot works the sideline
     cards.push(h('div.lu-card.you', { style: { left: '50%', top: '95%' } },
-      h('div.lu-pic', portraitImg({ uniform: uni, look: p.look, number: p.number, helmet: false }, 58), h('span.lu-pos.pix', 'MASCOT'), h('span.lu-ovr.pix', Math.round(p.ovr)), captain ? h('span.lu-c.pix', 'C') : null),
-      h('div.lu-name', p.last)));
+      h('div.lu-pic', portraitImg({ mascot: costumeSpec(p.look, mascotKind(team), team.colors) }, 58), h('span.lu-pos.pix', 'MASCOT'), h('span.lu-ovr.pix', Math.round(p.ovr)), captain ? h('span.lu-c.pix', 'C') : null),
+      h('div.lu-name', mascotDisplayName(p).split(' ').slice(-1)[0])));
   }
   const bench = all.filter((r) => !used.has(r)).slice(0, 10);
   return h('div.col', { style: { gap: '14px' } },

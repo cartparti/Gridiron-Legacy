@@ -47,3 +47,19 @@ test('mascot careers reach retirement with mascot awards, in range of the footba
   assert.equal(awardLabel('Most Valuable Player', 'MS'), 'Mascot of the Year');
   assert.equal(awardLabel('Most Valuable Player', 'QB'), 'Most Valuable Player');
 });
+
+test('mascots have their own skills, traits and costume', async () => {
+  const { statLabel } = await import('../src/data/positions.js');
+  const { traitList } = await import('../src/sim/traits.js');
+  const { costumeSpec, mascotDisplayName } = await import('../src/data/mascots.js');
+  const { activityFor, ACTIVITIES } = await import('../src/data/activities.js');
+  assert.equal(statLabel('skill', 'MS'), 'Showmanship');
+  assert.equal(statLabel('skill', 'QB'), 'Skill');
+  const st = flow.newCareer(randomCareerOpts(5, 'MS'));
+  const traits = traitList(st);
+  assert.ok(traits.length >= 8 && traits.every((t) => t.pos === 'MS'), traits.map((t) => t.id).join());
+  const cs = costumeSpec({ costume: { kind: 'team', fur: 'gold', hat: 'crown' } }, 'wolf', ['#000', '#fff']);
+  assert.equal(cs.kind, 'wolf'); assert.deepEqual(cs.costume.fur, ['#e8b730', '#7a4a10']); assert.equal(cs.costume.hat, 'crown');
+  assert.ok(mascotDisplayName(st.player).length > 3);
+  assert.equal(activityFor(ACTIVITIES.find((a) => a.id === 'drills'), 'MS').label, 'Routine Rehearsal');
+});

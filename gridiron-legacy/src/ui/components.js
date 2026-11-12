@@ -1,7 +1,7 @@
 // Reusable UI pieces: badges, jerseys, charts, stat bars, modals, toasts.
 import { crest } from './crest.js';
 import { h, clear } from './dom.js';
-import { STAT_KEYS, STAT_LABELS } from '../data/positions.js';
+import { STAT_KEYS, STAT_LABELS, statLabel } from '../data/positions.js';
 import { sfx } from '../audio/sfx.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -53,10 +53,10 @@ export function ratingChart(history, current) {
       h('span', h('span.swatch', { style: { background: col.pro } }), 'Pro')));
 }
 
-export function statBars(stats, notes) {
+export function statBars(stats, notes, pos = null) {
   return h('div.col', { style: { gap: '8px' } }, STAT_KEYS.map((k) =>
     h('div', h('div.statbar',
-      h('span', STAT_LABELS[k]),
+      h('span', statLabel(k, pos)),
       h('div.track', h('div.fill', { style: { width: `${stats[k]}%` } })),
       h('span.val', Math.round(stats[k]))),
     notes ? h('div.tiny.muted', { style: { marginLeft: '100px' } }, notes[k]) : null)));

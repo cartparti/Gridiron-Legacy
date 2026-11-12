@@ -124,3 +124,15 @@ export const ACTIVITIES = [
     effects: { mood: 4 },
   },
 ];
+
+// The mascot trains differently: same effects, its own routine.
+export const MASCOT_ACTIVITIES = {
+  sprints: { label: 'Cardio in the Suit', desc: 'Laps around the field in 40 lbs of foam. Builds Hustle.' },
+  weights: { label: 'Heat Training', desc: 'Push-ups and planks in a sauna, in costume. Builds Stamina.' },
+  drills: { label: 'Routine Rehearsal', desc: 'Dance routines, cannon aim, trampoline flips. Builds Showmanship.' },
+  film: { label: 'Study Crowd Tapes', desc: 'Watch what got the loudest cheers last week. Builds Crowd IQ.' },
+  doubles: { label: 'Double Rehearsals', desc: 'Everything, twice, in the suit. Big gains, real risk of overheating.' },
+  meetcoach: { label: 'Meet the Spirit Director', desc: 'Go over game-day plans with the person who runs the show.' },
+};
+/** An activity as this position sees it (the mascot gets its own names and blurbs). */
+export const activityFor = (a, pos) => (a && pos === 'MS' && MASCOT_ACTIVITIES[a.id] ? { ...a, ...MASCOT_ACTIVITIES[a.id] } : a);

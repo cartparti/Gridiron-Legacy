@@ -490,7 +490,7 @@ export function resolveMoment(state, result) {
 
   // energy and live rating
   const eq = state.player.traits?.equipped ?? [];
-  g.energy = Math.max(0, (g.energy ?? 80) - (INTENSITY[g.plan?.intensity ?? 'mid'].drain + (g.userSide === 'away' ? TRAITS[g.homeTrait]?.awayDrain ?? 0 : 0)) * (eq.includes('workhorse') ? 0.7 : 1));
+  g.energy = Math.max(0, (g.energy ?? 80) - (INTENSITY[g.plan?.intensity ?? 'mid'].drain + (g.userSide === 'away' ? TRAITS[g.homeTrait]?.awayDrain ?? 0 : 0)) * (eq.includes('workhorse') || eq.includes('tireless') ? 0.7 : 1));
   {
     const big = result.td || result.int || result.defTD || result.sack && m.defense;
     const bad = (!m.defense && (result.turnover || result.sack)) || result.tdAllowed;
@@ -636,7 +636,9 @@ function resolveMascotMoment(state, g, d, m, result) {
   if (result.danceWin) s.danceWins = (s.danceWins ?? 0) + 1;
   if (result.stunt) s.stunts = (s.stunts ?? 0) + 1;
   if (m.clutch && q > 0.7) s.clutch++;
-  momentumShift(g, (q - 0.5) * 0.5);
+  const eqm = state.player.traits?.equipped ?? [];
+  momentumShift(g, (q - 0.5) * 0.5 * (eqm.includes('crowdwhisper') ? 1.3 : 1));
+  if (eqm.includes('fanfav') && q > 0.65) state.player.fame = clamp(state.player.fame + 0.15, 0, 100);
   if (m.type === 'ms_rival' && result.danceWin) state.player.fame = clamp(state.player.fame + 0.3, 0, 100);
   g.moments.push({ ...m, call: result.call, quality: q, yards: 0, td: false, turnover: false, text: result.text, outcome: null, played: !!result.played });
   const rec = g.moments[g.moments.length - 1];

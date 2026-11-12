@@ -1,6 +1,6 @@
 // Offseason screens: training camp focus, college recruiting, early draft entry, draft night, free agency.
 import { h } from '../dom.js';
-import { STAT_KEYS, STAT_LABELS, POSITIONS } from '../../data/positions.js';
+import { STAT_KEYS, STAT_LABELS, POSITIONS, statLabel } from '../../data/positions.js';
 import { getTeam } from '../../sim/league.js';
 import * as flow from '../../sim/flow.js';
 import { fmtMoney, ordinal, signed } from '../../core/util.js';
@@ -28,7 +28,7 @@ export function campScreen(app) {
     h('p.muted', 'Pick one focus for the summer. A big boost to one rating, or rest to fully heal and recharge.'),
     st.lastEventResult && st.phase === 'camp' ? h('div.card.flat', h('div.small.muted', st.lastEventResult.title), h('p.small', st.lastEventResult.result)) : null,
     h('div.col', STAT_KEYS.map((k) => h('button.btn.block', { style: { justifyContent: 'space-between' }, onclick: () => choose(k) },
-      h('span', `${STAT_LABELS[k]} camp`), h('span.small', `${Math.round(p.stats[k])} · ${Math.round(w[k] * 100)}% of OVR`))),
+      h('span', `${statLabel(k, p.position)} camp`), h('span.small', `${Math.round(p.stats[k])} · ${Math.round(w[k] * 100)}% of OVR`))),
     h('button.btn.block.team', { onclick: () => choose('rest') }, `Rest and recover (health ${Math.round(p.health)} → 100)`)),
     flow.canRetire(st) ? h('button.btn.danger.block', {
       onclick: async () => { if (await confirmDialog('Retire?', 'Hang up the cleats and see your legacy. This ends your career.', 'Retire')) { flow.chooseCamp(st, 'retire'); app.commit(); } },

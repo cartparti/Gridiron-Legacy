@@ -9,7 +9,7 @@ import { crest } from '../crest.js';
 import { icon } from '../icons.js';
 import { levelInfo, spendPoint, pointCost } from '../../sim/progress.js';
 import { traitList, toggleTrait, equipSlots } from '../../sim/traits.js';
-import { STAT_KEYS, STAT_LABELS } from '../../data/positions.js';
+import { STAT_KEYS, STAT_LABELS, statLabel } from '../../data/positions.js';
 import { sfx } from '../../audio/sfx.js';
 
 const STAGE = { hs: 'High School', college: 'College', pro: 'Pro' };
@@ -45,7 +45,7 @@ export function careerStatsSections(app) {
     h('div.col', { style: { gap: '6px', marginTop: '8px' } }, STAT_KEYS.map((k) => {
       const v = Math.round(p.stats[k]);
       const cost = pointCost(v);
-      return h('div.sp-row', h('span.grow', STAT_LABELS[k]), h('b.pix', v),
+      return h('div.sp-row', h('span.grow', statLabel(k, p.position)), h('b.pix', v),
         h('button.btn.small.sp-plus', { disabled: lv.points < cost || v >= 99, onclick: () => { if (spendPoint(st, k)) { sfx.levelUp(); app.save(); app.render(); } } }, cost > 1 ? `+1 (${cost})` : '+1'));
     }))));
 
@@ -161,7 +161,7 @@ export function traitsPage(app) {
   const card = (t) => h(`div.trait${t.unlocked ? '' : '.locked'}${t.equipped ? '.on' : ''}`,
     h('div.row', { style: { gap: '10px' } },
       h('span.tr-ic', icon(t.icon)),
-      h('div.grow', h('b', t.name), h('div.tiny.muted', t.pos === 'ANY' ? 'Any position' : t.pos)),
+      h('div.grow', h('b', t.name), h('div.tiny.muted', t.pos === 'ANY' ? 'Any position' : t.pos === 'MS' ? 'Mascot' : t.pos)),
       t.unlocked ? h(`button.btn.small${t.equipped ? '.primary' : ''}`, { onclick: () => {
         const r = toggleTrait(st, t.id);
         if (!r.ok) { sfx.error?.(); return; }

@@ -1,5 +1,6 @@
 // Game day: scoreboard with momentum, drive ticker, key moments (play call -> minigame),
 // 4th-down decisions and mid-game events.
+import { costumeSpec, mascotDisplayName } from '../../data/mascots.js';
 import { INJURY_STATUS } from '../../sim/injury.js';
 import { h, clear } from '../dom.js';
 import { PLAY_CALLS, WEATHER } from '../../data/config.js';
@@ -404,7 +405,8 @@ export function gamedayScreen(app) {
       position: st.player.position,
       teamColors: me.colors,
       oppColors: opp.colors,
-      myMascot: mascotKind(me), oppMascot: mascotKind(opp), myTeamName: me.name, oppTeamName: opp.name,
+      myMascot: mascotKind(me), oppMascot: mascotKind(opp),
+      costume: st.player.position === 'MS' ? costumeSpec(st.player.look, mascotKind(me), me.colors) : null, mascotName: st.player.position === 'MS' ? mascotDisplayName(st.player) : null, myTeamName: me.name, oppTeamName: opp.name,
       teamUniform: kitUniform(gameKits(st, me, opp).mine),
       oppUniform: kitUniform(gameKits(st, me, opp).theirs),
       look: st.player.look,
@@ -543,6 +545,14 @@ export function gamedayScreen(app) {
       const { myId, mine, theirs } = gameKits(st, me, opp);
       const kits = teamKits(me);
       const star = randomLook(`${opp.id}-star`, { position: { CB: 'WR', DT: 'OL', QB: 'DL', RB: 'LB', WR: 'CB', MS: 'WR' }[st.player.position] ?? 'CB' });
+      if (st.player.position === 'MS') { // the costume vs their mascot; no uniform to pick
+        box.append(h('div.lineup',
+          h('div.lineup-side', portraitImg({ mascot: costumeSpec(st.player.look, mascotKind(me), me.colors) }, 120, { full: true, big: true, yaw: -0.5 }), h('span.lineup-size.pix', `"${mascotDisplayName(st.player)}"`)),
+          h('div.lineup-vs.pix', 'VS'),
+          h('div.lineup-side', portraitImg({ mascot: { kind: mascotKind(opp), colors: opp.colors } }, 120, { full: true, big: true, yaw: 0.5 }), h('span.lineup-size.pix', `${opp.name} mascot`))),
+          h('div.row', { style: { gap: '10px', alignItems: 'center' } }, positionDiagram('MS'), h('div.grow', h('div.section-label', 'Where you work'), h('p.tiny.muted', 'On the sideline in the costume. The crowd is your field.'))));
+        return;
+      }
       box.append(
         h('div.lineup',
           h('div.lineup-side', portraitImg({ uniform: kitUniform(mine), look: st.player.look, number: st.player.number, helmet: false }, 120, { full: true, big: true, yaw: -0.5 }), h('span.lineup-size.pix', fmtSize(st.player.look))),

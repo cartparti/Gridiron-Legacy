@@ -4,7 +4,7 @@ import { clamp } from '../core/util.js';
 import { rand, randInt, pick, weightedPick, chance } from '../core/rng.js';
 import { INJURIES, PERKS, SPONSORS } from '../data/lifestyle.js';
 import { PARTNER_NAMES, AGENT_NAMES, FIRST_NAMES, LAST_NAMES } from '../data/names.js';
-import { STAT_LABELS } from '../data/positions.js';
+import { STAT_LABELS, statLabel } from '../data/positions.js';
 import { applyTraining, refreshOverall } from './player.js';
 import { addNews } from './press.js';
 
@@ -83,12 +83,12 @@ export function applyEffects(state, eff, ctx = {}) {
   }
   if (eff.energy && state.week) { state.week.energyBonus = (state.week.energyBonus ?? 0) + eff.energy; push('Energy (this week)', eff.energy); }
   if (eff.stats) {
-    for (const [k, v] of Object.entries(eff.stats)) { p.stats[k] = clamp(p.stats[k] + v, 20, 99); push(STAT_LABELS[k], v); }
+    for (const [k, v] of Object.entries(eff.stats)) { p.stats[k] = clamp(p.stats[k] + v, 20, 99); push(statLabel(k, p.position), v); }
     refreshOverall(p);
   }
   if (eff.train) {
     const gains = applyTraining(p, eff.train);
-    for (const [k, v] of Object.entries(gains)) push(STAT_LABELS[k], v, (d) => `${d > 0 ? '+' : ''}${d.toFixed(1)}`);
+    for (const [k, v] of Object.entries(gains)) push(statLabel(k, p.position), v, (d) => `${d > 0 ? '+' : ''}${d.toFixed(1)}`);
   }
   if (eff.rel) {
     for (const [k, v] of Object.entries(eff.rel)) {

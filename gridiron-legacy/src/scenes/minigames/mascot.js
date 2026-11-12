@@ -44,7 +44,7 @@ function poseMascot(m, move, k, t) {
 /** A scene with the two of you (and the cannon / trampoline as needed). */
 function setup(ctx) {
   const { group, opts, stadium } = ctx;
-  const me = makeMascot(opts.myMascot ?? 'shield', opts.teamColors);
+  const me = opts.costume ? makeMascot(opts.costume.kind, opts.costume.colors, opts.costume.costume) : makeMascot(opts.myMascot ?? 'shield', opts.teamColors);
   me.position.set(X0, 0, 0);
   me.userData.baseYaw = -Math.PI / 2; // facing the field (-x) by default
   group.add(me);
@@ -53,7 +53,7 @@ function setup(ctx) {
   if (sm) { const v = sm.visible; sm.visible = false; ctx.addCleanup(() => { sm.visible = v; }); }
   const tag = document.createElement('div');
   tag.className = 'ms-tag pix';
-  tag.textContent = `#${opts.number ?? ''} ${String(opts.lastName ?? 'YOU').toUpperCase()} · IN THE SUIT`;
+  tag.textContent = opts.mascotName ? `"${String(opts.mascotName).toUpperCase()}" · ${String(opts.lastName ?? 'YOU').toUpperCase()} IN THE SUIT` : `#${opts.number ?? ''} ${String(opts.lastName ?? 'YOU').toUpperCase()} · IN THE SUIT`;
   ctx.hud.el.append(tag);
   ctx.addCleanup(() => tag.remove());
   return me;
@@ -75,6 +75,7 @@ const tapAnywhere = (ctx, fn) => {
 };
 /** Head pops off and bounces away (every mascot's nightmare). */
 function headOff(ctx, m) {
+  if (has(ctx.opts, 'velcro')) { ctx.hud.big('HEAD STAYS ON!', '#ffd43b', 700); return () => false; } // velcro head
   const head = m.userData.head;
   const wp = new THREE.Vector3(); head.getWorldPosition(wp);
   head.parent.remove(head);
@@ -91,7 +92,7 @@ function headOff(ctx, m) {
     return t < 3;
   };
 }
-const done = (ctx, m, r) => endPlay(ctx, finalize({ complete: false, yards: 0, ...r, quality: Math.max(0, Math.min(1, r.quality)) }, m), { delay: 1700 });
+const done = (ctx, m, r) => endPlay(ctx, finalize({ complete: false, yards: 0, ...r, quality: Math.max(0, Math.min(1, r.quality + (has(ctx.opts, 'velcro') && r.quality < 0.4 ? 0.1 : 0))) }, m), { delay: 1700 });
 
 // ------------------------------------------------------------------ 1. Hype the crowd
 export function mascotHype(ctx) {

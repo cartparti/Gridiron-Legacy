@@ -1,4 +1,6 @@
 // Main career hub: top bar with meters, bottom tabs, and the five tab views.
+import { activityFor } from '../../data/activities.js';
+import { costumeSpec, mascotDisplayName } from '../../data/mascots.js';
 import { awardLabel } from '../../sim/awards.js';
 import { injuryInfo, injuryNote } from '../../sim/injury.js';
 import { h, clear } from '../dom.js';
@@ -63,7 +65,7 @@ export function topBar(app) {
       h('div.ovr-badge', Math.round(p.ovr), h('small', 'OVR')),
       h('div.grow',
         h('div.name', `${p.first} ${p.last}`),
-        h('div.sub', `#${p.number} ${p.position === 'MS' ? 'Mascot' : p.position} · Age ${p.age} · ${team ? team.name : ''}`),
+        h('div.sub', `${p.position === 'MS' ? `"${mascotDisplayName(p)}" · Mascot` : `#${p.number} ${p.position}`} · Age ${p.age} · ${team ? team.name : ''}`),
         h('div.sub', `${stageLbl} · ${st.career.year} · ${wk} · LV ${p.level ?? 1}${p.skillPoints ? ` · ${p.skillPoints} pts` : ''}`)),
       h('button.icon-btn.phone-btn', { 'aria-label': 'Phone', onclick: () => openPhone(app) }, icon('chat'), phoneBadge(st) ? h('span.app-badge', phoneBadge(st)) : null),
       h('button.icon-btn', { 'aria-label': 'Settings', onclick: () => { app.ui.back = 'career'; app.go('settings'); } }, icon('gear'))),
@@ -214,7 +216,7 @@ function weekView(app) {
         return h('button.slot.filled.done', { 'aria-label': `${d}: ${e.label}`, title: 'Already done this week' },
           h('span.day', d), icon(DONE_ICONS[e.icon] ?? 'check'), h('span', e.label), h('span.tiny', e.cost ? `−${e.cost} energy` : 'done'));
       }
-      const a = e ? ACTIVITY_BY_ID[e] : null;
+      const a = e ? activityFor(ACTIVITY_BY_ID[e], st.player.position) : null;
       return h(`button.slot${a ? '.filled' : ''}${app.ui.activeSlot === i ? '.active' : ''}`, {
         'aria-label': `${d}: ${a ? a.label : 'empty'}`,
         onclick: () => { sfx.click(); if (a) { plan[i] = null; if (st.week.drills) delete st.week.drills[i]; app.ui.activeSlot = i; app.save(); } else app.ui.activeSlot = i; app.render(); },
@@ -231,7 +233,7 @@ function weekView(app) {
         const q = st.week.drills?.[i];
         return h('div.row.drill-row',
           activityIcon(id),
-          h('div.grow', h('b.small', `${DAYS[i]} · ${ACTIVITY_BY_ID[id].label}`), h('div.tiny.muted', DRILL_NAMES[DRILLS[id]])),
+          h('div.grow', h('b.small', `${DAYS[i]} · ${activityFor(ACTIVITY_BY_ID[id], st.player.position).label}`), h('div.tiny.muted', DRILL_NAMES[DRILLS[id]])),
           q !== undefined ? h('span.chip.gold.pix', `GRADE ${grade(q)}`) : null,
           h(`button.btn.small${q === undefined ? '.primary' : ''}`, { onclick: () => {
             sfx.click();
@@ -258,11 +260,12 @@ function weekView(app) {
     for (const [g, list] of Object.entries(groups)) {
       grid.append(h('div.group-label', g));
       for (const a of list) {
+        const a2 = activityFor(a, st.player.position);
         const ok = a.cost <= left;
         grid.append(h('button.act', { disabled: !ok, onclick: () => { sfx.select(); setSlot(app.ui.activeSlot, a.id); } },
           activityIcon(a.id),
-          h('span.t', h('span', a.label), h('span.cost', a.cost ? `${a.cost}⚡` : 'FREE')),
-          h('span.d', fillTokens(a.desc, tokens))));
+          h('span.t', h('span', a2.label), h('span.cost', a.cost ? `${a.cost}⚡` : 'FREE')),
+          h('span.d', fillTokens(a2.desc, tokens))));
       }
     }
     container.append(h('div.card', h('h3', `Pick an activity for ${DAYS[app.ui.activeSlot]}`), grid));
@@ -551,17 +554,20 @@ function profileView(app) {
   return h('div.col', { style: { gap: '14px' } },
     h('div.card', h('div.row',
       h('div.col', { style: { alignItems: 'center', gap: '6px' } },
-        (people(st), portraitImg({ uniform: teamKits(team).home, look: p.look, number: p.number, helmet: false }, 130, { full: true, big: true })),
-        h('button.btn.small', { onclick: () => { sfx.click(); openLookModal(app, { uniform: teamKits(team).home }); } }, icon('star'), 'Edit look')),
+        (people(st), p.position === 'MS'
+          ? h('div.ms-profile', portraitImg({ mascot: costumeSpec(p.look, mascotKind(team), team.colors) }, 130, { full: true, big: true }), h('span.chip.gold.pix', 'MASCOT'))
+          : portraitImg({ uniform: teamKits(team).home, look: p.look, number: p.number, helmet: false }, 130, { full: true, big: true })),
+        h('button.btn.small', { onclick: () => { sfx.click(); openLookModal(app, { uniform: teamKits(team).home }); } }, icon('star'), p.position === 'MS' ? 'Edit costume' : 'Edit look')),
       h('div.col.grow', { style: { gap: '4px' } },
         h('h2', `${p.first} ${p.last}`),
+        p.position === 'MS' ? h('span.small', h('b', `"${mascotDisplayName(p)}"`), ` · ${team.name} mascot`) : null,
         h('span.small.muted', `${POSITIONS[p.position].label} · ${p.hometown}`),
         p.look?.heightIn ? h('span.small', fmtSize(p.look)) : null,
         h('span.small', `${team.city} ${team.name}`),
         p.draft ? h('span.small.muted', p.position === 'MS' ? `Hired as the team mascot (${p.draft.year})` : p.draft.undrafted ? 'Undrafted free agent' : `Drafted ${ordinal(p.draft.pick)} overall (${p.draft.year})`) : null,
         p.injury ? h('span.chip.bad', icon('bandage'), `${p.injury.label} · ${injuryInfo(p.injury, p.position)?.label} · ${p.injury.weeks} wk`) : null,
         p.suspended ? h('span.chip.bad', `Suspended ${p.suspended}`) : null))),
-    h('div.card', h('div.card-title', h('h3', 'Ratings'), h('span.display', { style: { fontSize: '1.4rem' } }, `${Math.round(p.ovr)} OVR`)), statBars(p.stats, POSITIONS[p.position].statNotes)),
+    h('div.card', h('div.card-title', h('h3', 'Ratings'), h('span.display', { style: { fontSize: '1.4rem' } }, `${Math.round(p.ovr)} OVR`)), statBars(p.stats, POSITIONS[p.position].statNotes, p.position)),
     h('div.card', h('h3', 'Overall by Season'), ratingChart(p.history, Math.round(p.ovr * 10) / 10)),
     h('div.card', h('h3', `This Season (${s.games} games)`), h('p.small', posLine(s)),
       s.games ? h('p.tiny.muted', `Average grade ${Math.round(s.grades / s.games)} · Season rating ${Math.round(seasonPerf(p.position, s))}`) : null),

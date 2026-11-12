@@ -1109,3 +1109,5 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 .ms-seq span { font-size: 1.6rem; margin: 0 2px; display: inline-block; }
 .ms-seq span.ok { filter: drop-shadow(0 0 6px #4ade80); }
 .ms-pad .fc-btn { width: 76px; height: 76px; grid-column: auto; }
+.ms-profile { position: relative; display: grid; place-items: center; }
+.ms-profile .chip { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); font-size: .6rem; }

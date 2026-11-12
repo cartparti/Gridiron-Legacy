@@ -1,5 +1,6 @@
 import { h, clear } from '../dom.js';
-import { POSITIONS, BACKGROUNDS, STAT_KEYS, STAT_LABELS } from '../../data/positions.js';
+import { mascotKind } from '../crest.js';
+import { POSITIONS, BACKGROUNDS, STAT_KEYS, STAT_LABELS, statLabel } from '../../data/positions.js';
 import { HS_TEAMS, CITIES } from '../../data/teams.js';
 import { FIRST_NAMES, LAST_NAMES } from '../../data/names.js';
 import { calcOverall } from '../../sim/player.js';
@@ -56,13 +57,13 @@ export function createScreen(app) {
           h('div.pos-stats', STAT_KEYS.slice().sort((a, b) => POSITIONS[f.position].weights[b] - POSITIONS[f.position].weights[a]).map((k) => {
             const w = POSITIONS[f.position].weights[k];
             return h('div.pos-stat',
-              h('div.pos-stat-row', h('span.pos-stat-name', STAT_LABELS[k]), h('div.pos-bar', h('i', { style: { width: `${Math.round(w * 100 / 0.4 * 100) / 100}%` } })), h('span.pos-stat-pct', `${Math.round(w * 100)}%`)),
+              h('div.pos-stat-row', h('span.pos-stat-name', statLabel(k, f.position)), h('div.pos-bar', h('i', { style: { width: `${Math.round(w * 100 / 0.4 * 100) / 100}%` } })), h('span.pos-stat-pct', `${Math.round(w * 100)}%`)),
               h('div.tiny.muted', POSITIONS[f.position].statNotes[k]));
           })))),
       h('div.card',
         h('h2', 'Look'),
         h('p.small.muted', 'Make them yours: skin, hair, face, tattoos, gear, size and touchdown celebration. You can change everything except height and weight later.'),
-        lookEditor({ look: f.look, uniform: teamKits(school).home, number: f.number, position: f.position })),
+        lookEditor({ look: f.look, uniform: teamKits(school).home, number: f.number, position: f.position, mascotKind: mascotKind(school), teamColors: school.colors, seed: `${f.first}${f.last}` })),
       h('div.card',
         h('h2', 'Background'),
         h('div.bg-cards', BACKGROUNDS.map((b) =>

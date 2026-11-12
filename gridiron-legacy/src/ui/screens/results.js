@@ -4,7 +4,7 @@ import { injuryInfo, injuryNote } from '../../sim/injury.js';
 import { h } from '../dom.js';
 import { backupModal } from './slots.js';
 import { STAGES, PLAY_CALLS } from '../../data/config.js';
-import { STAT_KEYS, STAT_LABELS } from '../../data/positions.js';
+import { STAT_KEYS, STAT_LABELS, statLabel } from '../../data/positions.js';
 import { getTeam } from '../../sim/league.js';
 import * as flow from '../../sim/flow.js';
 import { fmtMoney, signed } from '../../core/util.js';
@@ -107,7 +107,7 @@ export function reviewScreen(app) {
     r.leaders && p.position !== 'MS' ? h('div.card', h('h3', 'League Leaders'), leadersTable(r.leaders, p)) : null,
     h('div.card', h('h3', 'Aging & Growth'),
       h('p', `Overall ${Math.round(r.ovrBefore)} → `, h(`b.${delta >= 0 ? 'good' : 'bad'}`, `${Math.round(r.ovrAfter)} (${signed(delta, 1)})`), ` · now age ${p.age}`),
-      h('div.changes', STAT_KEYS.map((k) => h(`span.chip.${r.ageChanges[k] >= 0 ? 'good' : 'bad'}`, `${STAT_LABELS[k]} ${signed(r.ageChanges[k], 1)}`)))),
+      h('div.changes', STAT_KEYS.map((k) => h(`span.chip.${r.ageChanges[k] >= 0 ? 'good' : 'bad'}`, `${statLabel(k, p.position)} ${signed(r.ageChanges[k], 1)}`)))),
     r.invest.length ? h('div.card', h('h3', 'Investments'), r.invest.map((x) => h('div.row.between.small', h('span', x.label), h(`b.${x.r >= 0 ? 'good' : 'bad'}`, `${fmtMoney(x.from)} → ${fmtMoney(x.to)} (${signed(x.r * 100, 0)}%)`)))) : null,
     h('div.card.flat.backup-nudge', h('div.row', { style: { gap: '10px', alignItems: 'center' } }, h('span', { style: { fontSize: '1.4rem' } }, '💾'),
       h('div.grow', h('b', 'Back up your career'), h('p.tiny.muted', 'Saves live only on this phone. A backup code keeps your career safe.')),

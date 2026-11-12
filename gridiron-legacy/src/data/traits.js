@@ -36,7 +36,11 @@ export const TRAITS = [
   { id: 'cannonarm', pos: 'MS', name: 'Cannon Arm', icon: 'target', desc: 'One extra T-shirt and bigger targets.', goal: { stat: 'shirts', n: 40, label: 'Career shirts landed' } },
   { id: 'smoothmoves', pos: 'MS', name: 'Smooth Moves', icon: 'bolt', desc: 'More time to answer in mascot showdowns.', goal: { stat: 'danceWins', n: 5, label: 'Career showdown wins' } },
   { id: 'acrobat', pos: 'MS', name: 'Acrobat', icon: 'flame', desc: 'The trampoline power zone is 40% bigger.', goal: { stat: 'stunts', n: 4, label: 'Career stunts landed' } },
-  // ---------------- everyone
+  { id: 'crowdwhisper', pos: 'MS', name: 'Crowd Whisperer', icon: 'crown', desc: 'Your moments swing momentum 30% harder.', goal: { level: 6, label: 'Player level' } },
+  { id: 'fanfav', pos: 'MS', name: 'Fan Favorite', icon: 'star', desc: 'Great moments earn extra fame.', goal: { stat: 'games', n: 25, label: 'Career games' } },
+  { id: 'tireless', pos: 'MS', name: 'Tireless Foam', icon: 'bandage', desc: 'The suit drains 30% less energy.', goal: { stat: 'games', n: 45, label: 'Career games' } },
+  { id: 'velcro', pos: 'MS', name: 'Velcro Head', icon: 'shield', desc: 'Your head stays on, and flops hurt less.', goal: { stat: 'stunts', n: 2, label: 'Career stunts landed' } },
+  // ---------------- everyone (football players; the mascot has its own versions above)
   { id: 'captain', pos: 'ANY', name: 'Team Captain', icon: 'crown', desc: 'Momentum swings your way 25% harder.', goal: { rel: 'teammates', n: 75, label: 'Teammate relationship' } },
   { id: 'clutchgene', pos: 'ANY', name: 'Clutch Gene', icon: 'trophy', desc: 'All quick-time events are 25% easier.', goal: { level: 8, label: 'Player level' } },
   { id: 'ironman', pos: 'ANY', name: 'Iron Man', icon: 'bandage', desc: 'Injuries from big hits are half as likely.', goal: { stat: 'games', n: 40, label: 'Career games' } },

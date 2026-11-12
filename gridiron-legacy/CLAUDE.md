@@ -622,3 +622,17 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   hidden during the moment. gameday passes myMascot/oppMascot/team names; no interludes for mascot moments; CALL_DESC_MS.
 - Traits MS: showman, cannonarm, smoothmoves, acrobat. Practice: position chip 'Mascot'. Create: 3-column position grid
   (🐾 card). Lineup shows the mascot card on the sideline; position diagram marks the sideline. Tests: `tests/round14.test.js`.
+
+## v0.51: mascot costume, skills, traits
+- `look.costume` { kind 'team'|glyph kind, fur 'team'|'swap'|palette id, eyes, mouth, hat, extra, shoes, shoesBig, name } —
+  lists/defaults + `costumeOf`, `costumeSpec(look, teamKind, teamColors)` -> { kind, colors, costume }, `mascotName(seed)`,
+  `mascotDisplayName(p)` in src/data/mascots.js. `makeMascot(kind, colors, costume)` (sideline.js) applies fur, eyes, mouth,
+  hat, extra, shoes. Portraits: `portraitURL({ mascot: costumeSpec(...) }, { full })` (mascotPortrait in portrait.js).
+- Look editor for position MS: groups You / Costume (suit, cface, cextra) / Off the field; no jersey/helmet/gear/swag/celeb.
+  lookEditor opts mascotKind, teamColors, seed (create.js passes the school, openLookModal the current team).
+- Mascot shows on: hub top bar + profile (costume portrait, MASCOT chip, "name" · team mascot, Edit costume), lineup card,
+  gameday pregame (costume vs their mascot, no kit picker), minigames (`opts.costume`, `opts.mascotName` in the HUD tag).
+- Skills: `statLabel(k, pos)` (MASCOT_STAT_LABELS Hustle/Showmanship/Crowd IQ/Stamina) used by statBars, skill points,
+  camp, aging, create, look editor, effect chips. `activityFor(a, pos)` renames training activities (MASCOT_ACTIVITIES).
+- Traits: MS gets only MS traits (ANY traits hidden): + crowdwhisper (momentum x1.3), fanfav (+0.15 fame per q>0.65 moment),
+  tireless (energy drain x0.7), velcro (no head pop, +0.1 quality on flops).

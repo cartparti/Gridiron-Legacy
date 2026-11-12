@@ -2,6 +2,7 @@
 // Uses one shared offscreen renderer and caches each image.
 import * as THREE from 'three';
 import { makePerson, makePlayer, animateRun } from './actors.js';
+import { makeMascot } from './sideline.js';
 
 let R = null;
 const cache = new Map();
@@ -44,6 +45,7 @@ export function portraitURL(spec, { full = false, face = false, view = null, yaw
   if (cache.has(key)) return cache.get(key);
   const r = ensure();
   if (!r) return null;
+  if (spec.mascot) return mascotPortrait(r, key, spec.mascot, { full: full || view === 'full', yaw, big });
   const isPlayer = spec.colors || spec.uniform;
   const model = isPlayer
     ? makePlayer(spec.colors ?? [spec.uniform.jersey, spec.uniform.trim], { number: spec.number ?? 1, uniform: spec.uniform, look: spec.look ?? { skin: spec.skin ?? 2 }, helmet: spec.helmet ?? false })
@@ -69,6 +71,23 @@ export function portraitURL(spec, { full = false, face = false, view = null, yaw
   r.renderer.render(r.scene, r.camera);
   const url = r.renderer.domElement.toDataURL('image/png');
   r.scene.remove(model);
+  cache.set(key, url);
+  return url;
+}
+
+/** The foam costume (makeMascot): full body, or the big head up close. */
+function mascotPortrait(r, key, m, { full, yaw, big }) {
+  const model = makeMascot(m.kind ?? 'bear', m.colors ?? ['#1d3557', '#f1c40f'], m.costume ?? null);
+  r.renderer.setSize(big ? 320 : 160, big ? 400 : 200, false);
+  model.rotation.y = -yaw * 1.4; // faces +z (toward the camera)
+  r.scene.add(model);
+  if (full) { r.camera.position.set(0, 2.0, 9.6); r.camera.lookAt(0, 1.85, 0); }
+  else { r.camera.position.set(0, 3.0, 5.4); r.camera.lookAt(0, 2.75, 0); }
+  r.renderer.setClearColor(0x000000, 0);
+  r.renderer.render(r.scene, r.camera);
+  const url = r.renderer.domElement.toDataURL('image/png');
+  r.scene.remove(model);
+  model.traverse((o) => { o.geometry?.dispose?.(); });
   cache.set(key, url);
   return url;
 }

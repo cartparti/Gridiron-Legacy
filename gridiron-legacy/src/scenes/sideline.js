@@ -48,13 +48,16 @@ const SKINS = ['#f7dcc0', '#e0ab7f', '#cc9260', '#b07646', '#8f5a34', '#6e4126']
 const HAIR = ['#2b1d14', '#5a3a22', '#c9a15a', '#1a1a1a', '#8a3b1f'];
 
 /** A big-headed voxel mascot. kind matches the crest mascots (cat, wolf, bird, ...). */
-export function makeMascot(kind = 'shield', colors = ['#1d3557', '#f1c40f']) {
-  const [c0, c1] = colors;
+export function makeMascot(kind = 'shield', colors = ['#1d3557', '#f1c40f'], costume = null) {
+  // costume (the mascot player's own): { fur: 'team' | 'swap' | [c0, c1], eyes, mouth, hat, extra, shoes }
+  const C = costume ?? {};
+  const [c0, c1] = Array.isArray(C.fur) ? C.fur : C.fur === 'swap' ? [colors[1], colors[0]] : colors;
+  const shoeC = C.shoes ?? '#f4f4f4';
   const g = new THREE.Group();
   const hips = new THREE.Group(); hips.position.y = 1.0; g.add(hips);
   const legL = box(0.42, 1.0, 0.42, c0, -0.28, -0.5, 0); const legR = box(0.42, 1.0, 0.42, c0, 0.28, -0.5, 0);
   hips.add(legL, legR);
-  const shoeL = box(0.5, 0.25, 0.7, '#f4f4f4', -0.28, -0.95, 0.1); const shoeR = box(0.5, 0.25, 0.7, '#f4f4f4', 0.28, -0.95, 0.1);
+  const big = C.shoesBig ? 1.35 : 1; const shoeL = box(0.5 * big, 0.25, 0.7 * big, shoeC, -0.28, -0.95, 0.1 * big); const shoeR = box(0.5 * big, 0.25, 0.7 * big, shoeC, 0.28, -0.95, 0.1 * big);
   hips.add(shoeL, shoeR);
   const torso = new THREE.Group(); hips.add(torso);
   torso.add(box(1.25, 1.2, 0.9, c0, 0, 0.6, 0));
@@ -82,11 +85,25 @@ export function makeMascot(kind = 'shield', colors = ['#1d3557', '#f1c40f']) {
   const armL = arm(-1); const armR = arm(1);
   const head = new THREE.Group(); head.position.y = 1.95; torso.add(head);
   head.add(box(1.5, 1.35, 1.35, c0, 0, 0, 0));
-  // googly eyes
-  for (const sx of [-0.33, 0.33]) { head.add(box(0.38, 0.42, 0.08, '#ffffff', sx, 0.18, 0.7)); head.add(box(0.16, 0.2, 0.06, '#111111', sx, 0.14, 0.75)); }
-  head.add(box(0.7, 0.14, 0.06, '#111111', 0, -0.32, 0.7)); // grin
-  head.add(box(0.5, 0.08, 0.04, '#ffffff', 0, -0.27, 0.72)); // teeth
-  for (const sx of [-0.33, 0.33]) head.add(box(0.36, 0.08, 0.06, '#111111', sx, 0.45, 0.71)); // eyebrows
+  // eyes
+  const eyes = C.eyes ?? 'googly';
+  for (const sx of [-0.33, 0.33]) {
+    if (eyes === 'googly') { head.add(box(0.38, 0.42, 0.08, '#ffffff', sx, 0.18, 0.7)); head.add(box(0.16, 0.2, 0.06, '#111111', sx, 0.14, 0.75)); }
+    else if (eyes === 'angry') { head.add(box(0.36, 0.26, 0.08, '#ffffff', sx, 0.12, 0.7)); head.add(box(0.14, 0.16, 0.06, '#111111', sx * 0.85, 0.1, 0.75)); const b = box(0.42, 0.1, 0.06, '#111111', sx, 0.33, 0.73); b.rotation.z = sx > 0 ? 0.45 : -0.45; head.add(b); }
+    else if (eyes === 'sleepy') { head.add(box(0.36, 0.2, 0.08, '#ffffff', sx, 0.1, 0.7)); head.add(box(0.4, 0.14, 0.09, c0 === '#16181c' ? '#333' : c0, sx, 0.2, 0.71)); head.add(box(0.12, 0.08, 0.06, '#111111', sx, 0.06, 0.75)); }
+    else if (eyes === 'star') { head.add(box(0.34, 0.12, 0.08, '#ffd43b', sx, 0.14, 0.72)); head.add(box(0.12, 0.34, 0.08, '#ffd43b', sx, 0.14, 0.72)); const d = box(0.24, 0.24, 0.07, '#ffd43b', sx, 0.14, 0.71); d.rotation.z = Math.PI / 4; head.add(d); }
+    else if (eyes === 'hearts') { const a = box(0.18, 0.18, 0.08, '#ff4d8d', sx - 0.07, 0.18, 0.72); const b = box(0.18, 0.18, 0.08, '#ff4d8d', sx + 0.07, 0.18, 0.72); const d = box(0.22, 0.22, 0.08, '#ff4d8d', sx, 0.09, 0.71); d.rotation.z = Math.PI / 4; head.add(a, b, d); }
+  }
+  if (eyes === 'shades') { head.add(box(1.2, 0.3, 0.08, '#111111', 0, 0.16, 0.74), box(1.55, 0.06, 0.06, '#111111', 0, 0.26, 0.74), box(0.2, 0.06, 0.04, '#4dabf7', -0.38, 0.22, 0.79), box(0.2, 0.06, 0.04, '#4dabf7', 0.26, 0.22, 0.79)); }
+  if (eyes === 'googly') for (const sx of [-0.33, 0.33]) head.add(box(0.36, 0.08, 0.06, '#111111', sx, 0.45, 0.71)); // eyebrows
+  // mouth
+  const mouth = C.mouth ?? 'grin';
+  if (mouth === 'grin') { head.add(box(0.7, 0.14, 0.06, '#111111', 0, -0.32, 0.7), box(0.5, 0.08, 0.04, '#ffffff', 0, -0.27, 0.72)); }
+  else if (mouth === 'fangs') { head.add(box(0.72, 0.18, 0.06, '#111111', 0, -0.32, 0.7)); for (const sx of [-0.24, 0.24]) head.add(box(0.1, 0.16, 0.05, '#ffffff', sx, -0.3, 0.74)); }
+  else if (mouth === 'tongue') { head.add(box(0.62, 0.16, 0.06, '#111111', 0, -0.3, 0.7), box(0.26, 0.26, 0.06, '#ff6b8a', 0.08, -0.44, 0.72)); }
+  else if (mouth === 'o') { head.add(box(0.32, 0.32, 0.06, '#111111', 0, -0.32, 0.7), box(0.16, 0.12, 0.04, '#ff6b8a', 0, -0.4, 0.72)); }
+  else if (mouth === 'smirk') { const sm = box(0.58, 0.1, 0.06, '#111111', 0.08, -0.3, 0.7); sm.rotation.z = 0.2; head.add(sm); }
+  else if (mouth === 'mustache') { head.add(box(0.6, 0.12, 0.06, '#111111', 0, -0.36, 0.7), box(0.9, 0.14, 0.08, '#3a2a1e', 0, -0.2, 0.73), box(0.18, 0.18, 0.08, '#3a2a1e', -0.48, -0.26, 0.73), box(0.18, 0.18, 0.08, '#3a2a1e', 0.48, -0.26, 0.73)); }
   for (const sx of [-0.55, 0.55]) head.add(box(0.2, 0.14, 0.04, '#ff9aa8', sx, -0.12, 0.69)); // cheeks
   const feat = {
     cat: () => { head.add(box(0.34, 0.4, 0.2, c0, -0.52, 0.82, 0), box(0.34, 0.4, 0.2, c0, 0.52, 0.82, 0), box(0.2, 0.2, 0.08, c1, -0.52, 0.8, 0.12), box(0.2, 0.2, 0.08, c1, 0.52, 0.8, 0.12), box(0.24, 0.16, 0.1, '#ff8fa3', 0, -0.06, 0.72), box(1.9, 0.04, 0.04, '#eeeeee', 0, -0.14, 0.74)); },
@@ -111,6 +128,25 @@ export function makeMascot(kind = 'shield', colors = ['#1d3557', '#f1c40f']) {
     snake: () => { head.add(box(0.12, 0.12, 0.5, '#d61f3a', 0, -0.48, 0.9), box(0.3, 0.12, 0.12, '#d61f3a', 0, -0.48, 1.15), box(1.6, 0.14, 1.45, c1, 0, 0.72, 0)); },
   };
   (feat[kind] ?? feat.shield)();
+  // hat
+  const hat = C.hat ?? 'none';
+  const ht = { crown: () => { head.add(box(1.3, 0.3, 1.2, '#f1c40f', 0, 0.82, 0)); for (const x of [-0.5, 0, 0.5]) head.add(box(0.22, 0.34, 0.22, '#f1c40f', x, 1.1, 0.4)); },
+    tophat: () => head.add(box(1.0, 0.1, 1.0, '#111111', 0, 0.74, 0), box(0.7, 0.8, 0.7, '#111111', 0, 1.18, 0), box(0.72, 0.14, 0.72, c1, 0, 0.88, 0)),
+    cap: () => head.add(box(1.5, 0.36, 1.4, c1, 0, 0.82, 0), box(1.2, 0.08, 0.7, c1, 0, 0.66, 0.95)),
+    headband: () => head.add(box(1.56, 0.2, 1.42, '#f4f4f4', 0, 0.42, 0), box(0.3, 0.36, 0.06, c1, 0.5, 0.3, -0.74)),
+    propeller: () => { head.add(box(1.5, 0.36, 1.4, c1, 0, 0.82, 0), box(0.08, 0.4, 0.08, '#888', 0, 1.18, 0)); const pr = box(1.0, 0.04, 0.16, '#ff4d4d', 0, 1.4, 0); pr.rotation.y = 0.6; head.add(pr); },
+    viking: () => { head.add(box(1.56, 0.4, 1.42, '#9aa3ad', 0, 0.78, 0)); for (const sx of [-1, 1]) { const hn = box(0.2, 0.6, 0.2, '#f2ead8', sx * 0.95, 1.05, 0); hn.rotation.z = -sx * 0.5; head.add(hn); } },
+    chef: () => head.add(box(1.1, 0.7, 1.1, '#ffffff', 0, 1.05, 0), box(1.3, 0.3, 1.3, '#ffffff', 0, 1.4, 0)),
+  }[hat];
+  if (ht) ht();
+  // extras
+  const extra = C.extra ?? 'none';
+  if (extra === 'cape') { const cape = box(1.3, 1.6, 0.08, C.capeColor ?? '#c92a2a', 0, 0.45, -0.52); cape.rotation.x = 0.15; torso.add(cape); }
+  else if (extra === 'bowtie') torso.add(box(0.5, 0.22, 0.1, '#c92a2a', 0, 1.08, 0.48), box(0.14, 0.14, 0.12, '#8a1c1c', 0, 1.08, 0.5));
+  else if (extra === 'chain') { torso.add(box(0.9, 0.08, 0.06, '#f1c40f', 0, 1.0, 0.47), box(0.3, 0.36, 0.08, '#f1c40f', 0, 0.75, 0.5)); }
+  else if (extra === 'finger') armR.add(box(0.5, 0.9, 0.2, c1, 0, -1.3, 0), box(0.16, 0.5, 0.16, c1, 0, -1.9, 0)); // foam #1 finger
+  else if (extra === 'tutu') { const tu = box(1.6, 0.22, 1.2, '#ff9ad5', 0, 0.02, 0); torso.add(tu); }
+  else if (extra === 'scarf') torso.add(box(1.1, 0.24, 1.0, c1, 0, 1.12, 0), box(0.3, 0.7, 0.08, c1, 0.3, 0.8, 0.5));
   g.userData = { hips, torso, armL, armR, head, legL, legR, kind };
   if (kind === 'skull') head.children[0].material = head.children[0].material.clone();
   return bake(g);

@@ -1,4 +1,5 @@
 // Character look editor: body, hair, face, tattoos, gear and celebration, with a live 3D pixel preview.
+import { mascotKind } from '../crest.js';
 import { h, clear } from '../dom.js';
 import { openModal, toast } from '../components.js';
 import {
@@ -8,14 +9,19 @@ import {
 } from '../../data/looks.js';
 import { portraitImg } from '../../scenes/portrait.js';
 import { sfx } from '../../audio/sfx.js';
-import { STAT_LABELS } from '../../data/positions.js';
+import { STAT_LABELS, statLabel } from '../../data/positions.js';
+import { COSTUME_ANIMALS, COSTUME_FURS, COSTUME_EYES, COSTUME_MOUTHS, COSTUME_HATS, COSTUME_EXTRAS, COSTUME_SHOES, costumeOf, costumeSpec, mascotName } from '../../data/mascots.js';
 
 // tabs in three groups: you, your uniform, off the field
 const TABS = [
   ['body', 'Body', '🧍'], ['face', 'Face', '🙂'], ['hair', 'Hair', '💇'], ['ink', 'Ink', '🖋️'],
   ['jersey', 'Jersey', '👕'], ['helmet', 'Helmet', '🏈'], ['gear', 'Gear', '👟'], ['swag', 'Swag', '⌚'],
   ['casual', 'Casual', '🧢'], ['gala', 'Gala', '🤵'], ['celeb', 'Celebrate', '🎉'],
+  ['suit', 'Costume', '🐾'], ['cface', 'Mask face', '😜'], ['cextra', 'Extras', '🎩'],
 ];
+// the mascot doesn't wear football gear: the costume replaces the uniform tabs (and there's no TD celebration)
+const MASCOT_GROUPS = [['You (out of the suit)', ['body', 'face', 'hair', 'ink']], ['Costume', ['suit', 'cface', 'cextra']], ['Off the field', ['casual', 'gala']]];
+const COSTUME_TABS = new Set(['suit', 'cface', 'cextra']);
 const TAB_GROUPS = [['You', ['body', 'face', 'hair', 'ink']], ['Uniform', ['jersey', 'helmet', 'gear', 'swag']], ['Off the field', ['casual', 'gala', 'celeb']]];
 const CLOTHES = ['#f4f4f4', '#16181c', '#3a86ff', '#e63946', '#2a9d8f', '#f4a261', '#6d597a', '#ff006e', '#8ac926', '#264653', '#c8b38a', '#6c757d', '#1d3557', '#9c3d2b'];
 // What the preview shows: each tab has a default view, and changing an option moves the camera to that part
@@ -37,7 +43,13 @@ const SUITS = ['#16181f', '#1d2a44', '#3b3f48', '#5a1e2a', '#f2f2f2', '#2f4a3a',
  */
 export function lookEditor(opts) {
   const L = opts.look;
-  const st = { tab: 'body', helmet: false, yaw: 0.35 };
+  const mascot = opts.position === 'MS';
+  const st = { tab: mascot ? 'suit' : 'body', helmet: false, yaw: 0.35 };
+  if (mascot) L.costume = costumeOf(L);
+  const groups = mascot ? MASCOT_GROUPS : TAB_GROUPS;
+  const setC = (k, v) => { sfx.click(); L.costume = { ...costumeOf(L), [k]: v }; changed(); };
+  const cchips = (label, list, key) => h('div.look-row', h('div.section-label', label),
+    h('div.chip-row', list.map((o) => h(`button.opt${costumeOf(L)[key] === o.id ? '.on' : ''}`, { onclick: () => setC(key, o.id) }, o.label))));
   if (opts.lockBody) st.tab = 'hair';
   const wrap = h('div.look-editor');
   const changed = () => { opts.onChange?.(L); draw(); };
@@ -75,6 +87,21 @@ export function lookEditor(opts) {
 
   const view = () => st.view ?? TAB_VIEW[st.tab] ?? 'full';
   const preview = () => {
+    if (mascot && COSTUME_TABS.has(st.tab)) {
+      const cs = costumeSpec(L, opts.mascotKind ?? 'bear', opts.teamColors ?? [opts.uniform?.jersey ?? '#1d3557', opts.uniform?.trim ?? '#f1c40f']);
+      return h('div.look-preview',
+        h('div.look-stage', portraitImg({ mascot: cs }, 200, { full: st.tab !== 'cface', big: true, yaw: st.yaw })),
+        h('div.tiny.muted', { style: { textAlign: 'center' } }, `"${costumeOf(L).name || mascotName(opts.seed ?? 'x')}"`),
+        h('div.row', { style: { justifyContent: 'center', gap: '6px' } },
+          h('button.btn.small', { 'aria-label': 'Turn left', onclick: () => { st.yaw -= 0.8; draw(); } }, '⟲'),
+          h('button.btn.small', { 'aria-label': 'Turn right', onclick: () => { st.yaw += 0.8; draw(); } }, '⟳'),
+          h('button.btn.small', { onclick: () => {
+            sfx.click();
+            const pick = (list) => list[Math.floor(Math.random() * list.length)].id;
+            L.costume = { ...costumeOf(L), kind: pick(COSTUME_ANIMALS), fur: pick(COSTUME_FURS), eyes: pick(COSTUME_EYES), mouth: pick(COSTUME_MOUTHS), hat: pick(COSTUME_HATS), extra: pick(COSTUME_EXTRAS), shoes: COSTUME_SHOES[Math.floor(Math.random() * COSTUME_SHOES.length)] };
+            changed();
+          } }, '🎲')));
+    }
     const spec = st.tab === 'casual' ? { ...L, outfit: 'casual' } : st.tab === 'gala' ? { ...L, outfit: 'gala' } : { uniform: opts.uniform, look: { ...L }, number: opts.number ?? 1, helmet: st.helmet };
     return h('div.look-preview',
       h('div.look-stage', portraitImg(spec, 200, { view: view(), big: true, yaw: st.yaw })),
@@ -94,7 +121,7 @@ export function lookEditor(opts) {
 
   const body = () => {
     const mods = sizeStatMods(L, opts.position);
-    const modTxt = Object.entries(mods).filter(([, v]) => v).map(([k, v]) => `${STAT_LABELS[k]} ${v > 0 ? '+' : ''}${v}`).join(' · ');
+    const modTxt = Object.entries(mods).filter(([, v]) => v).map(([k, v]) => `${statLabel(k, opts.position)} ${v > 0 ? '+' : ''}${v}`).join(' · ');
     return [
       sec('Skin', swatches('Skin tone', SKIN_TONES, 'skin', { index: true })),
       sec('Build', chips('Body type', BODY_TYPES, 'bodyType'),
@@ -155,6 +182,22 @@ export function lookEditor(opts) {
     ],
     casual: () => [sec('Around town', swatches('Shirt', CLOTHES, 'shirt'), swatches('Pants', CLOTHES, 'pants'), swatches('Shoes', CLOTHES, 'shoe')), h('p.tiny.muted', 'What you wear around town, at home and on your phone.')],
     gala: () => [sec('Formal', swatches('Suit', SUITS, 'suit'), swatches('Tie', ['#c92a2a', '#1c7ed6', '#e8b730', '#16181c', '#f4f4f4', '#2f9e44', '#ae3ec9'], 'tie')), h('p.tiny.muted', 'Worn on draft night, award shows and the Hall of Fame.')],
+    suit: () => [
+      sec('Your mascot name', h('div.look-row', h('input', { type: 'text', maxLength: 22, placeholder: mascotName(opts.seed ?? 'x'), value: costumeOf(L).name,
+        onchange: (e) => { L.costume = { ...costumeOf(L), name: e.target.value.trim().slice(0, 22) }; opts.onChange?.(L); } })),
+        h('p.tiny.muted', 'What the PA announcer and the fans call you.')),
+      sec('Costume', cchips('Animal', COSTUME_ANIMALS, 'kind'), cchips('Fur', COSTUME_FURS, 'fur')),
+      h('p.tiny.muted', 'Team mascot = whatever your school or team is. Your costume follows you to every team you join.'),
+    ],
+    cface: () => [sec('Eyes', cchips('Eyes', COSTUME_EYES, 'eyes')), sec('Mouth', cchips('Mouth', COSTUME_MOUTHS, 'mouth'))],
+    cextra: () => [
+      sec('On your head', cchips('Hat', COSTUME_HATS, 'hat')),
+      sec('Accessories', cchips('Extra', COSTUME_EXTRAS, 'extra')),
+      sec('Feet', h('div.look-row', h('div.section-label', 'Shoes'), h('div.swatch-row', COSTUME_SHOES.map((c) => h(`button.sw${costumeOf(L).shoes === c ? '.on' : ''}`, { style: { background: c }, 'aria-label': c, onclick: () => setC('shoes', c) })))),
+        h('div.look-row', h('div.section-label', 'Shoe size'), h('div.chip-row',
+          h(`button.opt${!costumeOf(L).shoesBig ? '.on' : ''}`, { onclick: () => setC('shoesBig', false) }, 'Normal'),
+          h(`button.opt${costumeOf(L).shoesBig ? '.on' : ''}`, { onclick: () => setC('shoesBig', true) }, 'Clown size')))),
+    ],
     celeb: () => [sec('Touchdown celebration', chips('Celebration', CELEBRATIONS, 'celebration')), h('p.tiny.muted', 'Shown in the end zone after you score.')],
   };
 
@@ -162,7 +205,7 @@ export function lookEditor(opts) {
     clear(wrap);
     wrap.append(
       h('div.look-sticky', preview()),
-      h('div.look-tabgroups', TAB_GROUPS.map(([gname, ids]) => h('div.look-tabgroup',
+      h('div.look-tabgroups', groups.map(([gname, ids]) => h('div.look-tabgroup',
         h('div.look-tabgroup-name', gname),
         h('div.look-tabgrid', ids.map((id) => { const [, l, icon] = TABS.find((t) => t[0] === id);
           return h(`button.look-tab${st.tab === id ? '.on' : ''}`, { onclick: () => { sfx.click(); st.tab = id; st.view = null; st.helmet = id === 'helmet'; draw(); } }, h('span.ico', icon), h('span', l)); }))))),
@@ -172,6 +215,10 @@ export function lookEditor(opts) {
   return wrap;
 }
 
+const mascotOf = (app) => {
+  const t = app.state?.league?.teams?.find((x) => x.id === app.state.career.teamId);
+  return t ? { mascotKind: mascotKind(t), teamColors: t.colors } : {};
+};
 /** Modal editor for an existing athlete (body size is locked after creation). */
 export function openLookModal(app, { uniform, onDone } = {}) {
   const p = app.state.player;
@@ -180,7 +227,7 @@ export function openLookModal(app, { uniform, onDone } = {}) {
   const m = openModal(content, { dismissable: true });
   content.append(
     h('div.row.between', h('h2', 'Your Look'), h('span.tiny.muted', 'Free to change')),
-    lookEditor({ look, uniform, number: p.number, position: p.position, lockBody: true }),
+    lookEditor({ look, uniform, number: p.number, position: p.position, lockBody: true, seed: p.first + p.last, ...mascotOf(app) }),
     h('div.row', { style: { marginTop: '12px' } },
       h('button.btn.grow', { onclick: () => m.close() }, 'Cancel'),
       h('button.btn.primary.grow', { onclick: () => { p.look = look; app.save(); sfx.select(); toast('Look saved'); m.close(); onDone?.(); app.render(); } }, 'Save')));

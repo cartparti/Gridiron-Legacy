@@ -11,6 +11,11 @@ export const STAT_LABELS = {
 
 export const STAT_SHORT = { speed: 'SPD', skill: 'SKL', iq: 'IQ', strength: 'STR' };
 
+// The mascot's own skills (same four numbers underneath, so careers, training and balance all still work).
+export const MASCOT_STAT_LABELS = { speed: 'Hustle', skill: 'Showmanship', iq: 'Crowd IQ', strength: 'Stamina' };
+/** What a stat is called for this position. */
+export const statLabel = (k, pos) => (pos === 'MS' ? MASCOT_STAT_LABELS[k] : STAT_LABELS[k]) ?? k;
+
 export const POSITIONS = {
   QB: {
     label: 'Quarterback',

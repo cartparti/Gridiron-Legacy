@@ -22,7 +22,7 @@ export function traitProgress(state, t) {
 export function traitList(state) {
   const p = state.player;
   const b = bag(p);
-  return TRAITS.filter((t) => t.pos === p.position || t.pos === 'ANY').map((t) => ({ ...t, unlocked: b.unlocked.includes(t.id), equipped: b.equipped.includes(t.id), progress: traitProgress(state, t) }));
+  return TRAITS.filter((t) => t.pos === p.position || (t.pos === 'ANY' && p.position !== 'MS')).map((t) => ({ ...t, unlocked: b.unlocked.includes(t.id), equipped: b.equipped.includes(t.id), progress: traitProgress(state, t) }));
 }
 
 /** Check goals; unlock new traits. Returns newly unlocked traits. */
@@ -31,7 +31,7 @@ export function checkTraitUnlocks(state) {
   const b = bag(p);
   const fresh = [];
   for (const t of TRAITS) {
-    if (t.pos !== p.position && t.pos !== 'ANY') continue;
+    if (t.pos !== p.position && (t.pos !== 'ANY' || p.position === 'MS')) continue;
     if (b.unlocked.includes(t.id)) continue;
     if (traitProgress(state, t).pct >= 1) {
       b.unlocked.push(t.id);
