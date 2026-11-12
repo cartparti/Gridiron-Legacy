@@ -17,7 +17,8 @@ export function relLabel(k) {
 export function newInjury(state, { allowMajor = false, id = null } = {}) {
   const pool = INJURIES.filter((i) => allowMajor || !i.major);
   // id: the injury you just watched happen on the field (so the report matches the X-ray)
-  const inj = INJURIES.find((i) => i.id === id) ?? weightedPick(state, pool, (i) => i.weight);
+  // simulated injuries (no hit you watched) are mostly knocks and strains; broken bones are rare
+  const inj = INJURIES.find((i) => i.id === id) ?? weightedPick(state, pool, (i) => i.weight * (i.severe ? 0.35 : 1));
   return { id: inj.id, label: inj.label, weeks: randInt(state, inj.weeks[0], inj.weeks[1]), major: !!inj.major, perm: inj.perm ?? null };
 }
 

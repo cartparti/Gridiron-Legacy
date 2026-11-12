@@ -593,3 +593,16 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Confetti 140 -> 55 particles; trophy-lift bursts every 2.4 s.
 - Receiver improv: deep phase first (candidates fan downfield, deeper scores higher, within 34 yd of the QB); check back
   after `e.checkT` (3.1-3.9 s) or when the QB is scrambling behind the line after 2.4 s (closer to the QB scores higher).
+
+## v0.49: extreme hits + live X-ray
+- hardHit: `impact = relV * sqrt(massRatio)`; big > 10 (or 12% random); `extreme` = big && (impact > 12.5 || 14% random,
+  hitstick x1.6); test hooks `__forceExtreme` (also skips the wrap-up), `__forceInjury`. Injuries: user target big 3.5% x hf
+  (minor/moderate pool only), extreme 30% x hf (severe weights x2.5); user tackler extreme 6% (shoulder/concussion/hand/elbow);
+  AI target extreme 14% (big 1%). Simulated injuries (newInjury without id) weight severe x0.35.
+- `extremeXray` (engine) + `src/scenes/play/xraylive.js` `liveXray(scene, [two meshes], others)`: shell material on the two
+  (re-applied every frame because addWear swaps uniforms), ghost material on everyone else, bone cylinders/knobs/skull placed
+  from rig world positions each frame (depthTest off, renderOrder 999), ribcage rings parented to the spine, `crack(mesh,
+  part, bone)` turns the part red and splits the bone. Close cinematic (`cinematic(target, s, { dist, height, spin, look,
+  force })`), setTimeScale 0.45, timed in play time (0.07 crack, 0.23 end). Injury report / X-ray card / AI injury line wait
+  in `afterXray` until it ends. One per play; always when you're involved, 35% for AI hits; off with reduced motion.
+- CSS `.xray-fx` overlay (vignette, scanlines, X-RAY tag, red flash + FRACTURE/CONCUSSION/INJURY label). sfx.crack.

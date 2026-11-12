@@ -1,5 +1,11 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.49', date: 'Nov 12', title: 'Extreme hits and live X-rays', items: [
+    'Extreme hits: a full-speed, square collision (or now and then a big hit that lands just right) goes into slow motion, the camera swoops in tight, and both players turn into a live X-ray with their skeletons moving inside them as the hit happens. If something breaks, you see the bone light up red and snap.',
+    'It happens whatever position you play: getting tackled, laying the hit yourself as a corner or a lineman, getting sacked or sacking the QB. Sometimes you see it on hits between other players too.',
+    'Serious injuries (broken bones, dislocations, torn ligaments) now only come from extreme hits. Ordinary big hits cause bumps, strains and sometimes a concussion. Injuries in simulated games are mostly knocks and strains too, so broken arms are much rarer.',
+    'Laying an extreme hit yourself can hurt you once in a while too (shoulder, hand, elbow or a concussion).',
+  ] },
   { v: '0.48', date: 'Nov 12', title: 'Sharp again, deeper routes', items: [
     'Graphics are back to full sharpness on phones (the lower resolution from 0.47 is gone).',
     'Less confetti on touchdowns and in celebrations.',

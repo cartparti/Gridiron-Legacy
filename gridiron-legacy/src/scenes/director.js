@@ -107,13 +107,13 @@ function frame(now) {
     // dramatic low orbit around the action, then hand the camera back
     cine.t += dt;
     const tg = cine.target();
-    const a = cine.ang + cine.t * 0.55;
+    const a = cine.ang + cine.t * (cine.spin ?? 0.55);
     const k = Math.min(1, cine.t * 3);
-    const cx = tg.x + Math.sin(a) * 6.5;
-    const cz = tg.z + Math.cos(a) * 6.5;
+    const cx = tg.x + Math.sin(a) * (cine.dist ?? 6.5);
+    const cz = tg.z + Math.cos(a) * (cine.dist ?? 6.5);
     if (!cine.from) cine.from = R.camera.position.clone();
-    R.camera.position.set(cine.from.x + (cx - cine.from.x) * k, cine.from.y + (2.4 - cine.from.y) * k, cine.from.z + (cz - cine.from.z) * k);
-    R.camera.lookAt(tg.x, 0.9, tg.z);
+    R.camera.position.set(cine.from.x + (cx - cine.from.x) * k, cine.from.y + ((cine.height ?? 2.4) - cine.from.y) * k, cine.from.z + (cz - cine.from.z) * k);
+    R.camera.lookAt(tg.x, cine.look ?? 0.9, tg.z);
     if (cine.t > cine.dur) { R.cine = null; document.body.classList.remove('cine'); }
   }
   R.weather.update(dt, R.camera);
@@ -164,9 +164,9 @@ export function cameraShake(s = 0.3) {
 }
 
 /** Slow-motion replay camera on a target: target() returns {x, z} each frame. */
-export function cinematic(target, seconds = 1.6) {
-  if (!R || R.cine) return;
-  R.cine = { target: typeof target === 'function' ? target : () => target, dur: seconds, t: 0, ang: Math.random() * Math.PI * 2, from: null };
+export function cinematic(target, seconds = 1.6, { dist = 6.5, height = 2.4, spin = 0.55, look = 0.9, force = false } = {}) {
+  if (!R || (R.cine && !force)) return;
+  R.cine = { target: typeof target === 'function' ? target : () => target, dur: seconds, t: 0, ang: Math.random() * Math.PI * 2, from: force && R.cine ? R.camera.position.clone() : null, dist, height, spin, look };
   document.body.classList.add('cine');
 }
 

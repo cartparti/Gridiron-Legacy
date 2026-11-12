@@ -84,6 +84,7 @@ export const sfx = {
   throw: () => noise(0.35, { vol: 0.25, freq: 900, q: 0.8, attack: 0.08 }),
   catch: () => { noise(0.08, { vol: 0.5, freq: 300, q: 2 }); tone(140, 0.1, { type: 'sine', vol: 0.3 }); },
   hit: () => { noise(0.18, { vol: 0.7, freq: 180, q: 1, type: 'lowpass' }); tone(70, 0.2, { type: 'sine', vol: 0.4, slide: -30 }); },
+  crack: () => { noise(0.06, { vol: 0.9, freq: 2400, q: 2, type: 'bandpass' }); setTimeout(() => noise(0.12, { vol: 0.6, freq: 900, q: 1, type: 'bandpass' }), 40); tone(55, 0.35, { type: 'sine', vol: 0.45, slide: -25 }); },
   bounce: (k = 1) => { noise(0.06, { vol: 0.25 * k, freq: 420, q: 1.5, type: 'lowpass' }); tone(120, 0.07, { type: 'sine', vol: 0.18 * k, slide: -30 }); },
   juke: () => noise(0.18, { vol: 0.25, freq: 2400, q: 3, attack: 0.02 }),
   cheer: (big = false) => {

@@ -1083,3 +1083,11 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 .tush-taps:empty { display: none; }
 .tush-taps.pop { animation: tushPop .14s ease-out; }
 @keyframes tushPop { from { transform: translate(-50%, -50%) scale(1.25); } to { transform: translate(-50%, -50%) scale(1); } }
+/* live X-ray on extreme hits */
+.xray-fx { position: fixed; inset: 0; pointer-events: none; z-index: 30; background: radial-gradient(ellipse at center, rgba(20,90,160,0) 35%, rgba(4,20,45,.55) 100%); mix-blend-mode: normal; animation: xrayIn .25s ease-out; }
+.xray-fx.hit { animation: xrayHit .35s ease-out; }
+.xray-scan { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(120,200,255,.06) 0 2px, transparent 2px 5px); }
+.xray-tag { position: absolute; left: 16px; top: calc(70px + env(safe-area-inset-top)); font: 900 1rem/1 var(--pixel, Inter), sans-serif; letter-spacing: .25em; color: #9fd8ff; text-shadow: 0 0 10px #3fa8ff; padding: 4px 8px; border: 1px solid rgba(159,216,255,.6); border-radius: 4px; }
+.xray-crack { position: absolute; left: 50%; top: 24%; transform: translateX(-50%); font: 900 2rem/1 var(--pixel, Inter), sans-serif; color: #ff5d5d; text-shadow: 0 0 16px rgba(255,60,60,.8), 0 3px 0 rgba(0,0,0,.5); letter-spacing: .08em; animation: tushPop .2s ease-out; }
+@keyframes xrayIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes xrayHit { 0% { background-color: rgba(255,60,60,.35); } 100% { background-color: rgba(255,60,60,0); } }

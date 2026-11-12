@@ -11,6 +11,7 @@ import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, kno
 import { surfaceFor } from '../../data/surface.js';
 import { INJURIES } from '../../data/lifestyle.js';
 import { xrayCard } from './xray.js';
+import { liveXray } from './xraylive.js';
 import { createBallPhysics, orientInFlight } from './ballphys.js';
 import { rig, endPlay, finalize, weatherFx, gaussR } from '../minigames/common.js';
 import { makeControls } from './controls.js';
@@ -1132,6 +1133,30 @@ export function freePlay(ctx) {
 
   const fxList = [];
   let cineUsed = 0;
+  let xrayUsed = 0;
+  const afterXray = []; // injury report etc. waits until the X-ray is over
+  /** Extreme hit: slow motion, the camera swoops in tight and both players go see-through to the bone. */
+  const extremeXray = (tackler, target, cracked) => {
+    let xr = null;
+    try { xr = liveXray(scene, [tackler.mesh, target.mesh], ents.filter((x) => x !== tackler && x !== target).map((x) => x.mesh)); } catch (err) { console.warn('xray', err); for (const f of afterXray.splice(0)) f(); return; }
+    const mid = () => ({ x: (tackler.pos.x + target.pos.x) / 2, z: (tackler.pos.z + target.pos.z) / 2 });
+    ctx.cinematic?.(mid, 2.6, { dist: 3.3, height: 1.7, spin: 0.9, look: 0.7, force: true });
+    ctx.setTimeScale?.(0.45); // on top of the cinematic's own slow motion: a crawl
+    sfx.hit(); setTimeout(() => sfx.hit(), 90);
+    let el = 0; // in play time (slowed ~10x while this runs): ~0.23 play-seconds is ~2.5 real seconds
+    let crackDone = !cracked;
+    let done = false;
+    const end = () => { if (done) return; done = true; try { xr.off(); } catch { /* ignore */ } ctx.setTimeScale?.(1); for (const f of afterXray.splice(0)) { try { f(); } catch { /* ignore */ } } };
+    ctx.addCleanup?.(end);
+    fxList.push((dt) => {
+      if (done) return false;
+      el += dt;
+      xr.update();
+      if (!crackDone && el > 0.07) { crackDone = true; xr.crack(cracked[0].mesh, cracked[1].part, !!cracked[1].bone); (sfx.crack ?? sfx.hit)(); ctx.shake(0.4); }
+      if (el > 0.23) { end(); return false; }
+      return true;
+    });
+  };
   let scuffle = null;
   let trail = null;
   let dustT = 0;
@@ -1254,53 +1279,79 @@ export function freePlay(ctx) {
       const dd = pushDir(tackler, target);
       setTimeout(() => { if (tackler.mesh.userData.u && !tackler.down) { ragdoll(tackler.mesh, dd, 0.35 + Math.random() * 0.25); tackler.out = Math.max(tackler.out ?? 0, 1.3); } }, 120);
     }
-    const big = globalThis.__forceBigHit || rel * Math.sqrt(tackler.mass / target.mass) > 10 || Math.random() < 0.12 * Math.min(1.6, tackler.mass / target.mass) * (tackler.user && has('hitstick') ? 1.8 : 1);
+    const impact = rel * Math.sqrt(tackler.mass / target.mass);
+    const big = globalThis.__forceBigHit || globalThis.__forceExtreme || impact > 10 || Math.random() < 0.12 * Math.min(1.6, tackler.mass / target.mass) * (tackler.user && has('hitstick') ? 1.8 : 1);
+    // EXTREME: a full-speed, square collision (or now and then a big hit that just lands perfectly)
+    const extreme = !!globalThis.__forceExtreme || (big && (impact > 12.5 || Math.random() < 0.14 * (tackler.user && has('hitstick') ? 1.6 : 1)));
     const sizeK = Math.max(0.7, Math.min(1.5, tackler.mass / target.mass));
-    flatten(target, tackler, (big ? 1.5 + Math.random() * 0.5 : 0.55 + Math.random() * 0.3) * sizeK);
+    flatten(target, tackler, (extreme ? 1.9 + Math.random() * 0.4 : big ? 1.5 + Math.random() * 0.5 : 0.55 + Math.random() * 0.3) * sizeK);
     fxList.push(dustPuff(group, target.pos, big ? 16 : 9));
     if (!big) return false;
     const involved = target.user || tackler.user;
-    hud.big(tackler.user ? 'BOOM!' : 'BIG HIT!', '#ff6b6b', 900);
-    ctx.hype?.(0.8, 2);
-    crowd('hit', tackler.team === (m.defense ? 'def' : 'off'));
-    ctx.shake(0.6);
-    if (involved && cineUsed < 1 && !opts.reducedMotion && (globalThis.__forceBigHit || Math.random() < 0.6)) {
-      cineUsed++;
-      ctx.cinematic?.(() => target.pos, 1.4);
-      snap(tackler.user ? 'Big hit!' : 'Leveled', 450);
-    }
-    if (opts.blood !== false && (globalThis.__forceBigHit || Math.random() < 0.3)) {
+    hud.big(extreme ? (tackler.user ? 'DESTROYED!' : 'OHHHH!') : tackler.user ? 'BOOM!' : 'BIG HIT!', '#ff6b6b', extreme ? 1300 : 900);
+    ctx.hype?.(extreme ? 1 : 0.8, extreme ? 3 : 2);
+    crowd(extreme ? 'big' : 'hit', tackler.team === (m.defense ? 'def' : 'off'));
+    ctx.shake(extreme ? 0.9 : 0.6);
+    if (opts.blood !== false && (globalThis.__forceBigHit || Math.random() < (extreme ? 0.55 : 0.3))) {
       const d = pushDir(tackler, target);
       fxList.push(bloodBurst(group, { x: target.pos.x, y: 1.6, z: target.pos.z }, d));
     }
-    // the hit can hurt you (more likely when already banged up)
-    const pickInjury = () => {
+    // Injuries depend on how hard the hit was: ordinary big hits only cause knocks and strains (bruised ribs,
+    // a tweaked hamstring or ankle, sometimes a concussion). Broken bones, dislocations and torn ligaments
+    // come from EXTREME hits.
+    const pickInjury = (severe) => {
       const forced = INJURIES.find((i) => i.id === globalThis.__forceInjury);
       if (forced) return forced;
-      let tot = 0; for (const i of INJURIES) tot += i.weight;
+      const pool = INJURIES.map((i) => [i, severe ? (i.severe ? i.weight * 2.5 : i.weight * 0.6) : (i.severe || i.major || i.tier === 'out' && i.id !== 'concussion' ? 0 : i.weight)]);
+      let tot = 0; for (const [, w] of pool) tot += w;
       let x = Math.random() * tot;
-      for (const i of INJURIES) { x -= i.weight; if (x <= 0) return i; }
+      for (const [i, w] of pool) { x -= w; if (x <= 0) return i; }
       return INJURIES[0];
     };
-    if (target.user && !target.injured && (globalThis.__forceInjury || Math.random() < 0.07 * (1.6 - (opts.health ?? 100) / 100) * (has('ironman') ? 0.5 : 1))) {
-      const inj = pickInjury();
+    const hf = (1.6 - (opts.health ?? 100) / 100) * (has('ironman') ? 0.5 : 1);
+    const hurtUser = (who, inj) => {
       const boneOut = !!inj.bone && opts.blood !== false && Math.random() < 0.4;
-      target.injured = true;
-      target.injury = { id: inj.id, label: inj.label, part: inj.part, boneOut };
-      target.out = 30; // you are not getting up from this one
-      if (inj.severe) applyInjuryLook(target.mesh, inj.part, { bone: boneOut, blood: opts.blood !== false });
-      setTimeout(() => {
+      who.injured = true;
+      who.injury = { id: inj.id, label: inj.label, part: inj.part, boneOut };
+      who.out = 30; // you are not getting up from this one
+      if (inj.severe) applyInjuryLook(who.mesh, inj.part, { bone: boneOut, blood: opts.blood !== false });
+      const report = () => {
         hud.big('INJURED', '#ff6b6b', 1600);
         hud.say?.(`${opts.lastName ?? 'He'} is down and not getting up... trainers are running out.`, 3600);
-        if (!opts.reducedMotion) ctx.cinematic?.(() => target.pos, 1.6);
-      }, 700);
-      setTimeout(() => { const card = xrayCard(target.injury); document.body.append(card); setTimeout(() => card.remove(), 3700); sfx.error?.(); }, 1900);
-    } else if (!target.user && big && !target.hurt && Math.random() < 0.03) {
+        if (!opts.reducedMotion && !showXray) ctx.cinematic?.(() => who.pos, 1.6);
+      };
+      const card = () => { const c = xrayCard(who.injury); document.body.append(c); setTimeout(() => c.remove(), 3700); sfx.error?.(); };
+      if (showXray) afterXray.push(() => setTimeout(report, 200), () => setTimeout(card, 1100));
+      else { setTimeout(report, 700); setTimeout(card, 1900); }
+      return inj;
+    };
+    const showXray = extreme && xrayUsed < 1 && !opts.reducedMotion && (involved || !!globalThis.__forceExtreme || Math.random() < 0.35);
+    let cracked = null; // [entity, injury] shown breaking in the X-ray
+    if (target.user && !target.injured && (globalThis.__forceInjury || Math.random() < (extreme ? 0.3 : 0.035) * hf)) {
+      cracked = [target, hurtUser(target, pickInjury(extreme))];
+    } else if (tackler.user && extreme && !tackler.injured && Math.random() < 0.06 * hf) {
+      // leading with the shoulder or the head costs the hitter sometimes too
+      const inj = INJURIES.find((i) => i.id === ['shoulder', 'concussion', 'hand', 'elbow'][Math.floor(Math.random() * 4)]);
+      cracked = [tackler, hurtUser(tackler, inj)];
+    } else if (!target.user && !target.hurt && Math.random() < (extreme ? 0.14 : 0.01)) {
       // every so often someone else stays down too
-      const inj = INJURIES.filter((i) => i.severe)[Math.floor(Math.random() * INJURIES.filter((i) => i.severe).length)];
+      const sev = INJURIES.filter((i) => i.severe);
+      const inj = sev[Math.floor(Math.random() * sev.length)];
       target.hurt = true; target.out = 30;
       applyInjuryLook(target.mesh, inj.part, { bone: !!inj.bone && opts.blood !== false && Math.random() < 0.3, blood: opts.blood !== false });
-      setTimeout(() => hud.say?.(`A player is down for ${target.team === (m.defense ? 'def' : 'off') ? usName : themName}. That looked like his ${inj.part === 'shin' ? 'leg' : inj.part}.`, 3200), 900);
+      cracked = [target, inj];
+      const say = () => hud.say?.(`A player is down for ${target.team === (m.defense ? 'def' : 'off') ? usName : themName}. That looked like his ${inj.part === 'shin' ? 'leg' : inj.part}.`, 3200);
+      if (showXray) afterXray.push(() => setTimeout(say, 300)); else setTimeout(say, 900);
+    }
+    // the slow-motion, zoomed-in live X-ray: always when you're in an extreme hit, sometimes for other players
+    if (showXray) {
+      xrayUsed++; cineUsed++;
+      extremeXray(tackler, target, cracked);
+      snap(tackler.user ? 'Destroyed him' : target.user ? 'Got leveled' : 'Huge hit', 350);
+    } else if (involved && cineUsed < 1 && !opts.reducedMotion && (globalThis.__forceBigHit || Math.random() < 0.6)) {
+      cineUsed++;
+      ctx.cinematic?.(() => target.pos, 1.4);
+      snap(tackler.user ? 'Big hit!' : 'Leveled', 450);
     }
     return true;
   };
@@ -1356,7 +1407,7 @@ export function freePlay(ctx) {
     // Tackled. Ordinary contact becomes a wrap-up where momentum decides the yards after contact;
     // only a big collision drops the carrier on the spot.
     const relV = Math.hypot(tackler.vel.x - target.vel.x, tackler.vel.z - target.vel.z);
-    if (!globalThis.__forceBigHit && !globalThis.__forceFumble && relV * Math.sqrt(tackler.mass / target.mass) < 9 && Math.random() > 0.12) { startWrap(tackler, target); return; }
+    if (!globalThis.__forceBigHit && !globalThis.__forceExtreme && !globalThis.__forceFumble && relV * Math.sqrt(tackler.mass / target.mass) < 9 && Math.random() > 0.12) { startWrap(tackler, target); return; }
     finishTackle(tackler, target);
   };
   /** Wrap-up: carrier and tackler(s) move together with their combined momentum until the pile stops. */
