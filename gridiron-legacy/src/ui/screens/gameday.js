@@ -422,6 +422,10 @@ export function gamedayScreen(app) {
       oppStrength: matchup(st).k,
       // uniforms + field get dirtier as the game goes on
       wear: { key: `${gid}-${st.career.year}`, progress: Math.min(1, (g.cursor + 1) / Math.max(1, g.drives.length)) },
+    }).catch((err) => { // never leave the match stuck if a play fails to load: sim it
+      console.error('play', err);
+      document.getElementById('app').style.visibility = '';
+      return { fallbackQuality: 0.5 };
     });
     ui.busy = false;
     // keep highlight pictures for the menus (last 8)

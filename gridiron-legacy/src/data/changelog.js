@@ -1,5 +1,10 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.41', date: 'Nov 12', title: 'No more freezing on phones', items: [
+    'Fixed: picking a play call (Safe, Balanced or Risky) could freeze the game on phones, especially iPhones, after you had played for a while.',
+    'The game now clears out old players\' faces and uniforms after each play, so memory stays steady however long you play.',
+    'If a play ever fails to load, the game sims it and takes you back to the match instead of freezing.',
+  ] },
   { v: '0.40', date: 'Nov 11', title: 'Every team has its own look', items: [
     'Helmets wear the team logo: its mascot (wildcat, wolf, eagle, horse, bear, shark, flame, skull, crown and more) or its letter.',
     'Each team has its own helmet stripe (single, double, triple, wide, tri-color or none), shell finish (gloss, matte, satin, metallic or chrome) and facemask color.',

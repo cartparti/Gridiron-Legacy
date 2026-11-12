@@ -483,3 +483,15 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   outlines; scale 9), `helmetMat` (logo on both sides, mirrored glyph on the left; stripes incl. wide/tri; scale 16),
   `pantsStripeMat` on thighs (lathe u 0.25/0.75), armMat sleeve stripes. Helmet stripe/finish come from the team (removed from
   the Helmet tab); facemask = team color unless the player picked a non-default one. Back plate moved to the jersey hem.
+
+## v0.41: phone memory fix (play-call freeze)
+- Owner report: tapping Safe/Balanced/Risky froze the game (iPhone). Cause: every play builds 22 new random players and
+  each unique face texture / head / hair / beard geometry (keys include the continuous face sliders) was cached forever:
+  ~18 MB of canvases per play (450 MB after 30 plays, over iOS Safari's canvas limit), plus GPU textures never disposed.
+  Old versions leaked the same way.
+- actors.js: `trackedMap` / `trackedObj` caches stamp the generation each entry was last used; `sweepActorCaches(keep=1)`
+  (called at the start of runMinigame / runCutscene / runSetCutscene) disposes entries unused for a play, disposes owned
+  textures and empties their canvases (Safari frees canvas memory only then). Memory now stays ~50-60 MB. `actorCacheSize()`.
+- Robustness: pixMat returns a plain material if getContext fails; runMinigame wraps each stadium setup step (`safe`) and
+  the play build (sims it with fallbackQuality on failure); gameday's play() catches a rejected runMinigame.
+- Don't keep actor meshes alive across plays in persistent scenes (a swept texture's canvas is emptied).

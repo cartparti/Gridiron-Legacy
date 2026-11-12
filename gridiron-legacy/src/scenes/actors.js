@@ -27,7 +27,69 @@ function toonGradient() {
   gradient.needsUpdate = true;
   return gradient;
 }
-const matCache = new Map();
+// ---- cache housekeeping ----
+// Every play builds 22 new random players, and each unique face, head, hair and beard used to be cached
+// forever. On phones (iPhone Safari above all) that filled the graphics memory after a few games and the
+// 3D view froze when the next play loaded. Caches now remember when each entry was last used, and
+// `sweepActorCaches()` (called before each play / cutscene) frees what the last play didn't use.
+let cacheGen = 0;
+const trackedCaches = [];
+/** Map that stamps each entry with the generation it was last read or written in. */
+function trackedMap(owned) {
+  const m = new Map(); const gen = new Map();
+  const get = m.get.bind(m), set = m.set.bind(m), has = m.has.bind(m);
+  m.get = (k) => { if (has(k)) gen.set(k, cacheGen); return get(k); };
+  m.set = (k, v) => { gen.set(k, cacheGen); return set(k, v); };
+  trackedCaches.push({ m, gen, owned, isMap: true });
+  return m;
+}
+/** Plain-object cache (obj[key], obj[key] ??= ...) with the same last-used stamps. */
+function trackedObj() {
+  const gen = new Map(); const t = {};
+  const p = new Proxy(t, {
+    get(o, k) { if (typeof k === 'string' && k in o) gen.set(k, cacheGen); return o[k]; },
+    set(o, k, v) { gen.set(k, cacheGen); o[k] = v; return true; },
+  });
+  trackedCaches.push({ m: t, gen, isMap: false });
+  return p;
+}
+function disposeCached(v, owned) {
+  if (!v) return;
+  if (Array.isArray(v)) { for (const x of v) disposeCached(x, owned); return; }
+  if (v.isBufferGeometry) { v.dispose(); return; }
+  if (v.isMaterial) {
+    if (owned && v.map) {
+      v.map.dispose();
+      // Safari only gives canvas memory back when the canvas is emptied, not when it is garbage collected
+      const img = v.map.image; if (img && typeof img.width === 'number' && img.getContext) { img.width = 0; img.height = 0; }
+    }
+    v.dispose(); return;
+  }
+  if (v.shell || v.extras) { disposeCached(v.shell); for (const e of v.extras ?? []) disposeCached(e.geo); }
+}
+/**
+ * Free cached textures, materials and geometry that weren't used in the last `keep` generations.
+ * Call between plays: anything still on screen gets re-uploaded by three.js if it is ever drawn again.
+ */
+export function sweepActorCaches(keep = 1) {
+  cacheGen++;
+  let freed = 0;
+  for (const c of trackedCaches) {
+    for (const [k, g] of c.gen) {
+      if (g >= cacheGen - keep) continue;
+      const v = c.isMap ? c.m.get(k) : c.m[k];
+      if (c.isMap) c.m.delete(k); else delete c.m[k];
+      c.gen.delete(k);
+      disposeCached(v, c.owned);
+      freed++;
+    }
+  }
+  return freed;
+}
+/** Number of live cache entries (for tests and debugging). */
+export const actorCacheSize = () => trackedCaches.reduce((n, c) => n + c.gen.size, 0);
+
+const matCache = trackedMap(false);
 /** Shaded material for a flat color (name kept from the cel-shaded days). Realistic, slightly soft fabric/skin. */
 export function toon(color, rough = 0.72) {
   const key = `${color}|${rough}`;
@@ -67,7 +129,7 @@ export function shiny(color, { rough = 0.28, metal = 0 } = {}) {
   return matCache.get(key);
 }
 
-const texCache = new Map();
+const texCache = trackedMap(true);
 /** Pixel texture: draw(g, w, h) on a tiny canvas; cached by key. Returns a toon material. */
 // Textures are drawn on a small logical grid (w x h) and then rendered smooth:
 //   crisp (default): drawn at TEX_SCALE x, so stripes and numbers have clean, sharp edges;
@@ -79,6 +141,7 @@ function pixMat(key, w, h, draw, { transparent = false, soft = false, rough = 0.
   c.width = w * scale;
   c.height = h * scale;
   const g = c.getContext('2d');
+  if (!g) return toon('#888888', rough); // no canvas memory left (Safari): a plain material instead of a crash
   if (soft) {
     const small = document.createElement('canvas');
     small.width = w; small.height = h;
@@ -174,7 +237,7 @@ function geo() {
 // (v0.35: a little shorter and less rounded: tall, soft heads read as pudgy balloons)
 const HEAD_DIMS = { oval: [0.3, 0.375, 0.335, 0.1, 0.74], round: [0.315, 0.36, 0.34, 0.12, 0.84], square: [0.31, 0.375, 0.33, 0.08, 0.92],
   long: [0.29, 0.405, 0.33, 0.095, 0.74], wide: [0.325, 0.36, 0.34, 0.095, 0.86], heart: [0.305, 0.375, 0.33, 0.1, 0.62] };
-const headCache = {};
+const headCache = trackedObj();
 const EYE_COLS = [3.1, 8.9]; // eye centres on the 12-wide face texture (wider set than before: features were bunched up)
 const gss = (dx, dy, sx, sy) => Math.exp(-(dx * dx) / (2 * sx * sx) - (dy * dy) / (2 * sy * sy));
 const sst = (e0, e1, x) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
@@ -1411,7 +1474,7 @@ const HAIR_SPEC = {
   dreads: { F: 1.0, S: 1.55, B: 2.0, thick: () => 0.026, kind: 'curl', rough: 0.85 },
   twists: { F: 1.0, S: 1.5, B: 1.95, thick: () => 0.026, kind: 'curl', rough: 0.8 },
 };
-const hairGeoCache = {};
+const hairGeoCache = trackedObj();
 function hairShellGeo(shape, style, spec) {
   const [w0, h, d] = HEAD_DIMS[shape] ?? HEAD_DIMS.oval;
   const w = w0 * (FACEW_K[spec.fp?.faceW] ?? 1);
@@ -1608,7 +1671,7 @@ function eyeMat(color) {
 }
 const EYE_R = 0.033; // a natural eye is about a fifth of the face's width (smaller read as beady)
 const EYE_OPEN = { round: [1.2, 2.04], wide: [1.1, 2.1], narrow: [1.27, 2.0], sleepy: [1.34, 2.05] }; // almond, not round
-const eyeGeoCache = {};
+const eyeGeoCache = trackedObj();
 function lidGeo(top, edge) {
   const key = `${top}|${edge}`;
   if (eyeGeoCache[key]) return eyeGeoCache[key];
@@ -1655,7 +1718,7 @@ function blink(p, u, dt) {
   for (const l of lids) l.rotation.x = -0.95 * k;
 }
 /** Neck: sternocleidomastoid taper, flaring into the traps at the base. k = thickness. */
-const neckCache = {};
+const neckCache = trackedObj();
 function neckGeo(k = 1) {
   const key = k.toFixed(2);
   if (neckCache[key]) return neckCache[key];
@@ -1694,7 +1757,7 @@ const BEARD_MASK = {
   handlebar: (X, Y, Z) => mustache(X, Y, Z),
   soulpatch: (X, Y, Z) => sst(0.09, 0.05, Math.abs(X)) * sst(-0.64, -0.67, Y) * sst(-0.73, -0.7, Y) * sst(-0.5, -0.8, Z),
 };
-const beardCache = {};
+const beardCache = trackedObj();
 function addBeard(neck, L, hairC) {
   const mask = BEARD_MASK[L.beard];
   if (!mask) return;

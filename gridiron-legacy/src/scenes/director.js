@@ -6,7 +6,7 @@ import { speak } from '../audio/voice.js';
 import { buildStadium } from './stadium.js';
 import { startCrowd, stopCrowd, playMusic, stopMusic, react } from '../audio/stadium.js';
 import { buildInterlude } from './interludes.js';
-import { nextFrame, tickIdle } from './actors.js';
+import { nextFrame, tickIdle, sweepActorCaches } from './actors.js';
 import { buildWorld } from './world.js';
 import { goalLine } from './minigames/goalLine.js';
 import { freePlay } from './play/engine.js';
@@ -348,6 +348,7 @@ const GAMES = {
  */
 export function runMinigame(type, opts) {
   stopBackdrop();
+  try { sweepActorCaches(); } catch (err) { console.error('cache sweep', err); } // free last play's faces/kits (phones run out of memory)
   const r = ensure();
   const app = document.getElementById('app');
   const hud = makeHud();
@@ -378,17 +379,22 @@ export function runMinigame(type, opts) {
     // On defense, the opponent attacks toward the far end zone (ours).
     const myName = opts.teamName ?? 'HOME';
     const oppName = opts.oppName ?? 'OPP';
-    if (opts.culture) r.stadium.setEnvironment?.(opts.culture.biome, opts.culture.seed, { night: m.weather === 'night' });
-    if (m.defense) r.stadium.setTeams(opts.teamColors, opts.oppColors, myName, oppName, opts.homeColors, opts.culture);
-    else r.stadium.setTeams(opts.oppColors, opts.teamColors, oppName, myName, opts.homeColors, opts.culture);
-    if (opts.scoreInfo) { r.stadium.setScoreboard(opts.scoreInfo); hud.score(opts.scoreInfo); }
-    if (opts.lastName) hud.tag(opts.number ?? '', opts.lastName, opts.look?.heightIn ? `${Math.floor(opts.look.heightIn / 12)}'${opts.look.heightIn % 12}" · ${opts.look.weightLb} lb` : '');
-    r.stadium.setBigGame?.(opts.bigGame);
-    r.stadium.setLevel?.(opts.stage ?? 'pro');
-    r.stadium.setYardLine(m.yardLine, m.distance);
-    applyAtmosphere(r, m.weather ?? 'clear');
+    // dress the stadium for this game; each step on its own so one failure (e.g. a phone out of canvas memory)
+    // only skips that bit instead of freezing the play
+    const safe = (f) => { try { f(); } catch (err) { console.error('stadium setup', err); } };
+    safe(() => { if (opts.culture) r.stadium.setEnvironment?.(opts.culture.biome, opts.culture.seed, { night: m.weather === 'night' }); });
+    safe(() => {
+      if (m.defense) r.stadium.setTeams(opts.teamColors, opts.oppColors, myName, oppName, opts.homeColors, opts.culture);
+      else r.stadium.setTeams(opts.oppColors, opts.teamColors, oppName, myName, opts.homeColors, opts.culture);
+    });
+    safe(() => { if (opts.scoreInfo) { r.stadium.setScoreboard(opts.scoreInfo); hud.score(opts.scoreInfo); } });
+    safe(() => { if (opts.lastName) hud.tag(opts.number ?? '', opts.lastName, opts.look?.heightIn ? `${Math.floor(opts.look.heightIn / 12)}'${opts.look.heightIn % 12}" · ${opts.look.weightLb} lb` : ''); });
+    safe(() => { r.stadium.setBigGame?.(opts.bigGame); });
+    safe(() => { r.stadium.setLevel?.(opts.stage ?? 'pro'); });
+    safe(() => { r.stadium.setYardLine(m.yardLine, m.distance); });
+    safe(() => { applyAtmosphere(r, m.weather ?? 'clear'); });
     // field weathering for this game (footprints, mud, churned snow)
-    if (opts.wear?.key) r.stadium.fieldWear?.set(opts.wear.key, m.weather ?? 'clear', opts.wear.progress ?? 0); else r.stadium.fieldWear?.clear();
+    safe(() => { if (opts.wear?.key) r.stadium.fieldWear?.set(opts.wear.key, m.weather ?? 'clear', opts.wear.progress ?? 0); else r.stadium.fieldWear?.clear(); });
     const group = new THREE.Group();
     r.scene.add(group);
     cleanups.push(() => {
@@ -419,7 +425,9 @@ export function runMinigame(type, opts) {
     };
     let errors = 0;
     const begin = () => {
-    const update = GAMES[type](ctx);
+    let update;
+    // if the play can't be built (e.g. a phone out of graphics memory), sim it instead of freezing on a blank field
+    try { update = GAMES[type](ctx); } catch (err) { console.error('play setup', err); finish({ fallbackQuality: 0.5 }); return; }
     start((dt, t) => {
       nextFrame();
       try { update(dt, t); } catch (err) {
@@ -477,6 +485,7 @@ export function runMinigame(type, opts) {
  */
 export function runCutscene(build, { setup } = {}) {
   stopBackdrop();
+  try { sweepActorCaches(); } catch (err) { console.error('cache sweep', err); } // free last play's faces/kits (phones run out of memory)
   const r = ensure();
   if (!r) return Promise.resolve();
   const app = document.getElementById('app');
@@ -609,6 +618,7 @@ export function openSet(build, { bg } = {}) {
  */
 export function runSetCutscene(build, { bg, music = 'groove' } = {}) {
   stopBackdrop();
+  try { sweepActorCaches(); } catch (err) { console.error('cache sweep', err); } // free last play's faces/kits (phones run out of memory)
   const r = ensure();
   if (!r) return Promise.resolve();
   const app = document.getElementById('app');
