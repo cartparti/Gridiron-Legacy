@@ -8,9 +8,10 @@ import { teamBadge, stars, confirmDialog } from '../components.js';
 import { sfx } from '../../audio/sfx.js';
 import { eventModal } from './event.js';
 import { topBar } from './hub.js';
-import { draftCutscene } from '../../scenes/cutscenes.js';
 import { runSetCutscene } from '../../scenes/director.js';
-import { commitScene } from '../../scenes/sets.js';
+import { commitScene, draftNightScene } from '../../scenes/sets.js';
+import { teamKits, kitUniform } from '../../data/kits.js';
+import { COLLEGE_TEAMS } from '../../data/teams.js';
 import { crestURL } from '../crest.js';
 import { people } from '../../sim/social.js';
 import { openModal, closeAllModals } from '../components.js';
@@ -135,8 +136,13 @@ export function draftScreen(app) {
   if (!d.undrafted && !d.cutPlayed && !app.settings.reducedMotion) {
     d.cutPlayed = true;
     app.save();
-    setTimeout(() => draftCutscene({ colors: team.colors, teamName: `${team.city} ${team.name}`, look: p.look, number: p.number,
-      pickText: `With pick #${d.pick} in round ${d.round}...`, playerName: `${p.first} ${p.last}`, sub: `${p.position} · ${team.name}` }), 50);
+    // the full draft night: the theater, the commissioner, your name on the big screen, the walk, the hat, the jersey
+    const col = COLLEGE_TEAMS.find((t) => t.id === d.board?.find((x) => x.user)?.college);
+    setTimeout(() => runSetCutscene((ctx) => draftNightScene(ctx, {
+      look: p.look, name: `${p.first} ${p.last}`, last: p.last, number: p.number, pos: p.position, college: col ? `${col.city} ${col.name}` : '',
+      team: { city: team.city, name: team.name, colors: team.colors }, kit: kitUniform(teamKits(team).home), crest: crestURL(team),
+      round: d.round, pick: d.pick, year: st.career.year, momLook: p.familyLook, fanColors: st.league.teams.map((t) => t.colors),
+    }), { music: 'anthem', crowd: 0.3 }), 50);
   }
   return h('div.screen',
     h('h1', 'Draft Night'),

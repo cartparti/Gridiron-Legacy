@@ -60,6 +60,9 @@ export function teamKits(team) {
   else if (style === 'gray') alt = { jersey: '#7b828c', trim: p, numbers: '#ffffff', pants: '#5b616a', helmet: '#5b616a', stripe: p, socks: '#7b828c' };
   else if (style === 'cream') alt = { jersey: '#efe3c8', trim: p, numbers: p, pants: '#efe3c8', helmet: shade(p, -0.2), stripe: '#efe3c8', socks: p };
   else alt = { jersey: shade(p, -0.5), trim: s, numbers: contrast(shade(p, -0.5), s), pants: shade(p, -0.5), helmet: shade(p, -0.5), stripe: s, socks: shade(p, -0.5) };
+  // a few pro teams pick their own number color (e.g. buckskin numbers for the Trappers)
+  const accent = proTeamDef(team.id)?.accent;
+  if (accent) { home.numbers = accent; home.trim = accent; home.stripe = accent; }
   const third = { id: 'third', label: style === 'cream' ? 'Throwback' : style === 'black' ? 'Blackout' : 'Alternate', ...alt };
   const id = teamIdentity(team);
   // throwbacks go old school: serif numbers, sleeve stripes, no fancy pattern, a plain matte shell

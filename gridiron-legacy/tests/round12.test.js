@@ -15,7 +15,7 @@ test('pro league: 20 teams, five divisions of four, the requested cities', () =>
   assert.deepEqual(PRO_DIVISIONS, ['Northwest', 'Southwest', 'Northeast', 'Southeast', 'Heartland']);
   for (const d of PRO_DIVISIONS) assert.equal(PRO_TEAMS.filter((t) => t.div === d).length, 4, d);
   const cities = (d) => PRO_TEAMS.filter((t) => t.div === d).map((t) => t.city).sort();
-  assert.deepEqual(cities('Northwest'), ['Portland', 'Salt Lake City', 'San Francisco', 'Seattle']);
+  assert.deepEqual(cities('Northwest'), ['Portland', 'Salt Lake', 'San Francisco', 'Seattle']);
   assert.deepEqual(cities('Southwest'), ['Dallas', 'Las Vegas', 'Los Angeles', 'Phoenix']);
   assert.deepEqual(cities('Northeast'), ['Chicago', 'Detroit', 'New York', 'Washington']);
   assert.deepEqual(cities('Southeast'), ['Charlotte', 'Miami', 'Nashville', 'New Orleans']);

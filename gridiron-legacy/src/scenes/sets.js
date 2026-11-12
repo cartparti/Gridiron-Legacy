@@ -2,7 +2,7 @@
 // pro, in your team's colors with its crest and mascot) and short life cutscenes (awards banquet, date night,
 // hanging out with friends, gaming). Built from the same rounded props and characters as the rest of the game.
 import * as THREE from 'three';
-import { makePlayer, makePerson, setPose, faceToward, celebrate, animateRun, applyWear } from './actors.js';
+import { makePlayer, makePerson, setPose, faceToward, celebrate, animateRun, applyWear, confetti } from './actors.js';
 import { roundedBox, M, makeProp } from './props.js';
 import { makeMascot } from './sideline.js';
 import { randomLook } from '../data/looks.js';
@@ -518,5 +518,179 @@ export function commitScene(ctx, opts) {
     const look = attached || t > grabT ? headTarget().pos : new THREE.Vector3(0, 1.05, -1.6);
     camera.lookAt(lerp(0, look.x, push), lerp(1.2, look.y - 0.3, push), lerp(-1.6, look.z, push));
     return t < onT + 4.2;
+  };
+}
+
+// ------------------------------------------------------------------ pro draft night
+
+/** A jersey to hold up for the cameras: team color, your name across the back and your number (front faces +z). */
+function draftJersey(kit, name, number) {
+  const t = canvasTex(256, 300, (g, W, H) => {
+    g.fillStyle = kit.jersey;
+    g.beginPath(); g.moveTo(70, 8); g.lineTo(186, 8); g.lineTo(250, 50); g.lineTo(226, 110); g.lineTo(200, 96); g.lineTo(200, 296); g.lineTo(56, 296); g.lineTo(56, 96); g.lineTo(30, 110); g.lineTo(6, 50); g.closePath(); g.fill();
+    g.fillStyle = kit.trim; g.fillRect(6, 84, 60, 8); g.fillRect(190, 84, 60, 8); // sleeve stripes
+    g.strokeStyle = kit.trim; g.lineWidth = 6; g.beginPath(); g.moveTo(96, 10); g.quadraticCurveTo(128, 30, 160, 10); g.stroke();
+    g.fillStyle = kit.numbers; g.textAlign = 'center'; g.textBaseline = 'middle';
+    let fs = 30; g.font = `900 ${fs}px "Arial Black", Impact, sans-serif`;
+    const nm = String(name).toUpperCase();
+    while (g.measureText(nm).width > 136 && fs > 12) { fs -= 2; g.font = `900 ${fs}px "Arial Black", Impact, sans-serif`; }
+    g.fillText(nm, 128, 60);
+    g.font = '900 130px "Arial Black", Impact, sans-serif';
+    g.lineWidth = 8; g.strokeStyle = kit.trim; g.strokeText(String(number), 128, 190);
+    g.fillText(String(number), 128, 190);
+  });
+  return new THREE.Mesh(new THREE.PlaneGeometry(0.95, 1.12), new THREE.MeshBasicMaterial({ map: t, transparent: true, side: THREE.DoubleSide, toneMapped: false }));
+}
+
+/**
+ * Draft night in a packed theater: the commissioner at the podium, the big screen, fans from every team. Your name is
+ * called, you hug your family, walk up on stage, shake hands, get your team's hat and hold up your jersey under the
+ * flashes. opts: { look, name, last, number, pos, college, team: { city, name, colors }, kit, crest, round, pick, year,
+ * momLook, fanColors: [[c0, c1], ...] }
+ */
+export function draftNightScene(ctx, opts) {
+  const { scene, camera } = ctx;
+  const A = ctx.audio ?? {};
+  const [t0, t1] = opts.team.colors;
+  const W = 30; const D = 24;
+  room(scene, { w: W, d: D, h: 10, floorDraw: carpet('#141a2a'), floorRough: 0.95, wall: '#0f1320', band: t0, light: '#e6ecff', lightK: 0.55 });
+  scene.background = new THREE.Color('#05070d');
+  // the stage, its glowing front edge, stairs on the right
+  rb(scene, 18, 1.0, 5.5, M('#1a1e2b', 0.5, 0.2), 0, 0, -D / 2 + 3.2, 0.04);
+  const edge = new THREE.Mesh(new THREE.BoxGeometry(18, 0.08, 0.06), new THREE.MeshBasicMaterial({ color: t0, toneMapped: false })); edge.position.set(0, 0.95, -D / 2 + 5.98); scene.add(edge);
+  for (let k = 0; k < 4; k++) rb(scene, 1.6, 0.25 * (k + 1), 0.35, M('#22283a', 0.6), 6.2, 0, -D / 2 + 7.3 - k * 0.35, 0.02);
+  // the big screen and LED pillars in team colors
+  let screenMode = 'intro';
+  const hiText = (() => { const hsl = {}; new THREE.Color(t1).getHSL(hsl); return hsl.l > 0.4 ? t1 : '#f2c12e'; })(); // team color text only if it shows up
+  let crestImg = null;
+  const draw = (g, Wd, Hd) => {
+    const gr = g.createLinearGradient(0, 0, Wd, Hd);
+    if (screenMode === 'intro') { gr.addColorStop(0, '#0b1c3d'); gr.addColorStop(1, '#2a0d3d'); } else { gr.addColorStop(0, shade(t0, -0.1)); gr.addColorStop(1, shade(t0, -0.35)); }
+    g.fillStyle = gr; g.fillRect(0, 0, Wd, Hd);
+    g.fillStyle = 'rgba(255,255,255,0.05)'; for (let x = 0; x < Wd; x += 8) g.fillRect(x, 0, 1, Hd); // LED grid
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const txt = (s, y, size, col = '#ffffff', w = 900) => { let fs = size; g.font = `${w} ${fs}px Inter, "Arial Black", sans-serif`; while (g.measureText(s).width > Wd * 0.84 && fs > 12) { fs -= 3; g.font = `${w} ${fs}px Inter, "Arial Black", sans-serif`; } g.fillStyle = col; g.fillText(s, Wd / 2, y); };
+    if (screenMode === 'intro') { txt('GRAND GRIDIRON LEAGUE', Hd * 0.3, 74, '#f2c12e'); txt(`DRAFT ${opts.year ?? ''}`.trim(), Hd * 0.54, 150); txt(`ROUND ${opts.round}`, Hd * 0.78, 56, '#9fb4ff', 700); return; }
+    if (crestImg) { const cs = Hd * 0.34; g.drawImage(crestImg, Wd / 2 - cs / 2, Hd * 0.04, cs, cs); }
+    if (screenMode === 'clock') { txt(`THE ${opts.team.name.toUpperCase()}`, Hd * 0.5, 96, hiText); txt('ARE ON THE CLOCK', Hd * 0.67, 80); txt('THE PICK IS IN', Hd * 0.85, 56, '#f2c12e', 700); return; }
+    txt(String(opts.name).toUpperCase(), Hd * 0.53, 130);
+    txt(`${opts.pos}${opts.college ? ` · ${opts.college}` : ''}`, Hd * 0.7, 52, '#e8ecff', 700);
+    txt(`ROUND ${opts.round} · PICK ${opts.pick}`, Hd * 0.86, 52, hiText, 800);
+  };
+  const scrTex = canvasTex(1024, 512, draw);
+  const redraw = (mode) => { screenMode = mode; draw(scrTex.image.getContext('2d'), 1024, 512); scrTex.needsUpdate = true; };
+  if (opts.crest) { const im = new Image(); im.onload = () => { crestImg = im; if (screenMode !== 'intro') redraw(screenMode); }; im.src = opts.crest; }
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(11, 5.5), new THREE.MeshBasicMaterial({ map: scrTex, toneMapped: false })); screen.position.set(0, 4.7, -D / 2 + 0.15); scene.add(screen);
+  rb(scene, 11.6, 6.1, 0.2, M('#0a0c12', 0.4), 0, 1.65, -D / 2 + 0.05, 0.03);
+  const pillars = [-8.5, 8.5].map((x) => { const p = new THREE.Mesh(new THREE.BoxGeometry(1.2, 7, 0.3), new THREE.MeshBasicMaterial({ color: '#2a3a8a', toneMapped: false })); p.position.set(x, 4.5, -D / 2 + 0.3); scene.add(p); return p; });
+  // podium with the league shield
+  const podX = -3.2; const podZ = -D / 2 + 4.0;
+  rb(scene, 1.3, 1.2, 0.8, M('#151925', 0.4, 0.3), podX, 1.0, podZ, 0.06);
+  const shieldTex = canvasTex(128, 128, (g) => { g.fillStyle = '#0b1c3d'; g.beginPath(); g.moveTo(14, 10); g.lineTo(114, 10); g.lineTo(114, 60); g.quadraticCurveTo(64, 128, 64, 128); g.quadraticCurveTo(14, 100, 14, 60); g.closePath(); g.fill(); g.strokeStyle = '#f2c12e'; g.lineWidth = 6; g.stroke(); g.fillStyle = '#ffffff'; g.font = '900 34px Inter, sans-serif'; g.textAlign = 'center'; g.fillText('GGL', 64, 66); });
+  const sh = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.7), new THREE.MeshBasicMaterial({ map: shieldTex, transparent: true })); sh.position.set(podX, 1.65, podZ + 0.42); scene.add(sh);
+  // light: a follow spot, colored washes, sweeping beams
+  const spot = new THREE.SpotLight('#fff3d6', 90, 30, 0.22, 0.5); spot.position.set(0, 9.5, -2); scene.add(spot, spot.target);
+  const wash = [new THREE.PointLight(t0, 30, 16), new THREE.PointLight('#5a6dff', 24, 16)]; wash[0].position.set(-6, 5, -8); wash[1].position.set(6, 5, -8); scene.add(...wash);
+  const beams = [-6, -2, 2, 6].map((x) => { const c = new THREE.Mesh(new THREE.ConeGeometry(1.6, 11, 16, 1, true), new THREE.MeshBasicMaterial({ color: '#dfe8ff', transparent: true, opacity: 0.07, depthWrite: false, side: THREE.DoubleSide })); c.position.set(x, 4.5, -D / 2 + 3); scene.add(c); return c; });
+  // the crowd: fans from all over the league, seated in rows facing the stage
+  const fans = [];
+  const cols = opts.fanColors?.length ? opts.fanColors : [[t0, t1]];
+  let n = 0;
+  for (let row = 0; row < 4; row++) for (let i = 0; i < 9; i++) {
+    const x = -11 + i * 2.6 + (row % 2) * 1.2; const z = -2 + row * 2.4;
+    if (x < -2 && row < 2) continue; // the green room tables sit front-left
+    const fc = n % 3 === 0 ? [t0, t1] : cols[(n * 7) % cols.length]; n++;
+    chair(scene, x, z, 0, '#2a2f3d');
+    const p = makePerson({ ...randomLook(`dfan${row}${i}${opts.year}`, { gender: (row + i) % 3 ? 'm' : 'f' }), outfit: 'casual', shirt: fc[0], pants: '#23262e' });
+    seat(shadows(p), x, z - 0.05, x * 0.3, -12); scene.add(p); fans.push(p);
+  }
+  // the green room: your table with family and your agent
+  const gx = -6.5; const gz = -3.6;
+  roundTable(scene, gx, gz, 1.0);
+  const me = makePerson({ ...opts.look, outfit: 'gala' }); seat(shadows(me), gx + 0.9, gz + 0.9, 0, -12); scene.add(me);
+  const mom = makePerson({ ...(opts.momLook ?? randomLook(`mom${opts.name}`, { gender: 'f' })), outfit: 'gala', suit: '#5a1e3a' }); seat(shadows(mom), gx - 0.9, gz + 0.9, 0, -12); scene.add(mom);
+  const agent = makePerson(gala(`agent${opts.name}`, { gender: 'm' })); seat(shadows(agent), gx, gz + 1.25, 0, -12); scene.add(agent);
+  for (const [x, z, yaw] of [[gx + 0.9, gz + 0.9, 0], [gx - 0.9, gz + 0.9, 0], [gx, gz + 1.25, 0]]) chair(scene, x, z + 0.2, yaw, '#3a2f2a');
+  // the commissioner and photographers in the pit
+  const commish = makePerson({ ...randomLook('commissioner', { gender: 'm' }), hairColor: 8, outfit: 'gala', suit: '#20232b', tie: '#1d3a8a' });
+  stand(shadows(commish), podX, podZ - 0.55, podX, 10); commish.position.y = 1.0; scene.add(commish);
+  const photogs = [-3.5, -1.2, 1.6, 3.8].map((x, i) => { const ph = makePerson({ ...randomLook(`dphoto${i}`, { gender: i % 2 ? 'f' : 'm' }), outfit: 'casual', shirt: '#1b1d22' }); stand(shadows(ph), x, -D / 2 + 6.7, 0, -12); setPose(ph, 'catch'); rb(ph, 0.16, 0.11, 0.12, M('#141414', 0.4), 0, 1.4, -0.32, 0.02); scene.add(ph); return ph; });
+  const flash = new THREE.PointLight('#ffffff', 0, 12); flash.position.set(0, 2.5, -5.5); scene.add(flash);
+  // props for the handoff
+  const cap = schoolCap(opts.team.colors, opts.crest); cap.visible = false; scene.add(cap);
+  const jersey = draftJersey(opts.kit ?? { jersey: t0, trim: t1, numbers: '#ffffff' }, opts.last ?? opts.name, opts.number ?? 1); jersey.visible = false; scene.add(jersey);
+  let fx = null;
+  // your walk: up from the table, across the front, up the stairs, over to the commissioner
+  const meetX = -0.6; const stageZ = -D / 2 + 4.6;
+  const path = [[gx + 0.9, gz + 0.9, 0], [gx + 0.9, gz + 2.3, 0], [5.0, -D / 2 + 7.9, 0], [6.2, -D / 2 + 7.6, 0], [6.2, -D / 2 + 5.9, 1], [meetX + 0.75, stageZ, 1]];
+  const segLen = path.slice(1).map((p, i) => Math.hypot(p[0] - path[i][0], p[1] - path[i][1]));
+  const total = segLen.reduce((a, b) => a + b, 0);
+  const T = { clock: 2.6, call: 5.2, name: 7.6, walk: 9.0, walkEnd: 14.6, shake: 14.8, cap: 16.0, capOn: 17.1, jersey: 17.6, end: 22.5 };
+  const pointAt = (d) => { let k = 0; while (k < segLen.length - 1 && d > segLen[k]) { d -= segLen[k]; k++; } const a = path[k]; const b = path[k + 1]; const f = Math.min(1, d / segLen[k]); return [lerp(a[0], b[0], f), lerp(a[1], b[1], f), lerp(a[2], b[2], f), b[0] - a[0], b[1] - a[1]]; };
+  const headTarget = () => { const box = new THREE.Box3().setFromObject(me.userData.rig.headG); const size = box.getSize(new THREE.Vector3()); return { pos: new THREE.Vector3((box.min.x + box.max.x) / 2, box.max.y - size.y * 0.33, (box.min.z + box.max.z) / 2 + size.z * 0.05), scale: (Math.max(size.x, size.z) * 0.52) / 0.16 }; };
+  // camera keys: [time, position, look-at] (a 'follow' key looks at you while you walk)
+  const keys = [
+    [0, [0, 6.5, 15], [0, 3.2, -9]], [2.4, [0.5, 4.6, 17], [0, 4.4, -10]], [T.call - 0.2, [podX + 2.4, 2.5, podZ + 1.6], [podX, 2.2, podZ - 0.5]], [T.name - 0.5, [podX + 2.1, 2.45, podZ + 1.4], [podX, 2.2, podZ - 0.5]],
+    [T.name - 0.1, [gx + 3.2, 1.9, gz + 4.6], [gx + 0.4, 1.1, gz + 0.6]], [T.walk + 0.6, [gx + 4, 2.6, gz + 6], 'follow'], [T.walkEnd - 0.4, [6, 3.0, -2], 'follow'],
+    [T.shake, [meetX + 0.4, 2.5, stageZ + 4.4], [meetX + 0.4, 2.0, stageZ]], [T.jersey, [meetX + 0.4, 2.3, stageZ + 3.6], [meetX + 0.4, 2.15, stageZ]], [T.end, [meetX + 0.4, 3.4, stageZ + 7.5], [meetX + 0.4, 2.2, stageZ]],
+  ];
+  const lookOf = (k) => (k[2] === 'follow' ? [me.position.x, me.position.y + 1.4, me.position.z] : k[2]);
+  let step = 0; let capFrom = null; let capOn = false;
+  ctx.caption('Draft Night', `Round ${opts.round} · Pick ${opts.pick}`);
+  A.setCrowd?.(0.35);
+  return (dt, t) => {
+    // the show
+    if (step === 0 && t > T.clock) { step = 1; redraw('clock'); A.music?.('tension', { vol: 0.7 }); A.react?.('ooh'); ctx.caption(`The ${opts.team.city} ${opts.team.name} are on the clock`, 'The pick is in'); }
+    if (step === 1 && t > T.call) { step = 2; setPose(commish, 'wave'); A.setCrowd?.(0.15); ctx.caption(`"With pick #${opts.pick} in the ${opts.year ?? ''} draft,`.replace('  ', ' '), `the ${opts.team.city} ${opts.team.name} select..."`); }
+    if (step === 2 && t > T.name) {
+      step = 3; redraw('name'); setPose(commish, null);
+      A.music?.('fanfare', { vol: 0.8 }); A.react?.('roar');
+      ctx.caption(String(opts.name).toUpperCase(), `${opts.pos}${opts.college ? ` · ${opts.college}` : ''}`);
+      setPose(me, null); celebrate(me, 'pump'); setPose(mom, null); celebrate(mom, 'pump'); setPose(agent, null); celebrate(agent, 'point');
+      fans.forEach((f, i) => setTimeout(() => { setPose(f, null); celebrate(f, i % 4 ? 'pump' : 'dance'); }, 80 + i * 35));
+    }
+    // walk to the stage
+    if (t > T.walk && t < T.walkEnd) {
+      const d = ease((t - T.walk) / (T.walkEnd - T.walk)) * total;
+      const [x, z, y, dx, dz] = pointAt(d);
+      me.position.set(x, y, z); faceToward(me, x + dx, z + dz); me.rotation.y = me.userData.u.targetYaw;
+      animateRun(me, dt, 2.1);
+      if (step === 3) { step = 4; me.userData.u.celebrate = null; A.react?.('applause'); }
+    }
+    // handshake
+    if (t >= T.walkEnd && step === 4) { step = 5; me.position.set(meetX + 0.75, 1, stageZ); commish.position.set(meetX - 0.15, 1, stageZ); faceToward(me, meetX - 2, stageZ); faceToward(commish, meetX + 3, stageZ); setPose(me, 'reach'); setPose(commish, 'reach'); A.react?.('applause'); }
+    if (t > T.walkEnd - 2.5 && t < T.walkEnd) { faceToward(commish, me.position.x, me.position.z); commish.position.x = lerp(commish.position.x, meetX - 0.15, Math.min(1, dt * 1.5)); commish.position.z = lerp(commish.position.z, stageZ, Math.min(1, dt * 1.5)); animateRun(commish, dt, 1.2); }
+    // the hat: the commissioner hands it over, you pull it on
+    if (t >= T.cap && !capOn) {
+      if (!capFrom) { cap.visible = true; capFrom = new THREE.Vector3(meetX + 0.2, 2.0, stageZ + 0.35); faceToward(me, me.position.x, 10); faceToward(commish, commish.position.x, 10); setPose(commish, null); setPose(me, 'hatOn'); }
+      const k = ease(Math.min(1, (t - T.cap) / (T.capOn - T.cap)));
+      const tg = headTarget();
+      const p = capFrom.clone().lerp(tg.pos, k); p.y += Math.sin(k * Math.PI) * 0.3;
+      cap.position.copy(p); cap.rotation.set(-0.4 * Math.sin(k * Math.PI), 0, 0); cap.scale.setScalar(1 + (tg.scale - 1) * k);
+      if (k >= 1) { me.userData.rig.headG.attach(cap); capOn = true; A.react?.('applause'); }
+    }
+    // hold up the jersey together under the flashes
+    if (t >= T.jersey) {
+      if (!jersey.visible) { jersey.visible = true; setPose(me, 'catch'); setPose(commish, 'catch'); fx = confetti(scene, new THREE.Vector3(meetX + 0.3, 6, stageZ + 1), [t0, t1, '#ffffff']); A.react?.('roar'); ctx.caption(`Welcome to ${opts.team.city}!`, `${opts.team.name} · Round ${opts.round}, Pick ${opts.pick}`); }
+      jersey.position.set(meetX + 0.3, 2.05 + Math.sin(t * 2) * 0.01, stageZ + 0.55);
+    }
+    if (fx && !fx(dt)) fx = null;
+    // lights: the follow spot tracks you, beams sweep, pillars pulse, photographers fire away
+    spot.target.position.copy(me.position); spot.target.updateMatrixWorld();
+    beams.forEach((b, i) => { b.rotation.z = Math.sin(t * 0.7 + i * 1.3) * 0.35; b.rotation.x = Math.cos(t * 0.5 + i) * 0.2; });
+    const pulse = step >= 3 ? 0.5 + 0.5 * Math.sin(t * 6) : 0.3;
+    pillars.forEach((p, i) => p.material.color.set(step >= 3 ? (Math.sin(t * 4 + i * 2) > 0 ? t0 : t1) : '#2a3a8a').multiplyScalar(0.6 + pulse * 0.4));
+    edge.material.color.set(t0).multiplyScalar(0.7 + pulse * 0.5);
+    const firing = step >= 5 || (step >= 3 && t < T.name + 1.2);
+    flash.intensity = firing && Math.random() < 0.09 ? 40 : Math.max(0, flash.intensity - dt * 260);
+    if (flash.intensity > 30) flash.position.set(photogs[Math.floor(Math.random() * 4)].position.x, 2.4, -D / 2 + 6.4);
+    // camera
+    let i = 0; while (i < keys.length - 2 && t > keys[i + 1][0]) i++;
+    const a = keys[i]; const b = keys[i + 1];
+    const k = ease(Math.min(1, Math.max(0, (t - a[0]) / (b[0] - a[0]))));
+    const la = lookOf(a); const lb = lookOf(b);
+    camera.position.set(lerp(a[1][0], b[1][0], k), lerp(a[1][1], b[1][1], k), lerp(a[1][2], b[1][2], k));
+    camera.lookAt(lerp(la[0], lb[0], k), lerp(la[1], lb[1], k), lerp(la[2], lb[2], k));
+    return t < T.end;
   };
 }

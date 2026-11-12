@@ -103,6 +103,7 @@ export function makeMascot(kind = 'shield', colors = ['#1d3557', '#f1c40f']) {
     crown: () => { head.add(box(1.3, 0.3, 1.2, '#f1c40f', 0, 0.82, 0)); for (const x of [-0.5, 0, 0.5]) head.add(box(0.22, 0.34, 0.22, '#f1c40f', x, 1.1, 0.4)); },
     shield: () => { head.add(box(1.6, 0.18, 1.45, '#c0c6cf', 0, 0.72, 0), box(0.24, 0.8, 1.2, c1, 0, 1.1, 0)); },
     // v0.42 mascots
+    coonskin: () => { head.add(box(1.6, 0.5, 1.45, '#6b4a2e', 0, 0.85, 0), box(1.2, 0.3, 1.1, '#6b4a2e', 0, 1.2, 0), box(1.0, 0.24, 0.06, '#3a2a1e', 0, -0.48, 0.72)); for (let i = 0; i < 5; i++) head.add(box(0.26, 0.24, 0.26, i % 2 ? '#2a1d14' : '#8a6a4a', 0.55, 0.65 - i * 0.24, -0.72)); }, // coonskin cap with a ringed tail + beard
     axe: () => { head.add(box(1.56, 0.2, 1.4, '#7a1f1f', 0, 0.74, 0), box(1.0, 0.3, 1.0, '#7a1f1f', 0, 0.92, 0), box(0.9, 0.22, 0.06, '#5a3b28', 0, -0.48, 0.72)); armR.add(box(0.12, 1.1, 0.12, '#6b4423', 0, -0.9, 0.35), box(0.5, 0.4, 0.08, '#c8ccd2', 0.22, -0.4, 0.35)); }, // flannel cap, beard, axe
     star: () => { for (const [x, y, rz] of [[0, 1.05, 0], [-0.55, 0.85, 0.9], [0.55, 0.85, -0.9]]) { const b = box(0.32, 0.62, 0.2, '#ffd23a', x, y, 0); b.rotation.z = rz; head.add(b); } },
     gear: () => { head.add(box(1.0, 0.26, 1.0, '#5a636d', 0, 0.8, 0)); for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; head.add(box(0.22, 0.22, 0.22, '#5a636d', Math.cos(a) * 0.62, 0.8, Math.sin(a) * 0.62)); } head.add(box(1.2, 0.22, 0.4, '#3a3f46', 0, 0.22, 0.6)); }, // gear hat + goggles

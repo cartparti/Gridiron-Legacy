@@ -8,8 +8,9 @@ export const PRO_DIVISIONS = ['Northwest', 'Southwest', 'Northeast', 'Southeast'
 const P = (id, city, name, colors, div, base, extra) => ({ id, city, name, colors, div, base, conf: null, ...extra });
 export const PRO_TEAMS = [
   // Northwest: mountains, fog, rain forests
-  P('SLC', 'Salt Lake City', 'Bighorns', ['#2b3a4a', '#d0703a'], 'Northwest', 72, { glyph: 'bison', biome: 'mountain', landmarks: ['saltflat', 'temple'], trait: 'altitude',
-    kit: { pattern: 'yoke', font: 'block', stripe: 'wide', finish: 'matte', mask: 'trim', sleeve: 2, pants: 'single', collar: 'v', chestLogo: true, logo: 'glyph' } }),
+  P('SLC', 'Salt Lake', 'Trappers', ['#4e3220', '#15110d'], 'Northwest', 72, { glyph: 'coonskin', accent: '#d8b98a', biome: 'mountain', landmarks: ['saltflat', 'temple', 'cabins'], trait: 'altitude',
+    // mountain men: leather brown and black, buckskin numbers, fringed yoke, matte leather helmet, coonskin cap logo
+    kit: { pattern: 'fringe', font: 'serif', stripe: 'wide', finish: 'matte', mask: 'dark', sleeve: 0, pants: 'single', collar: 'round', chestLogo: true, logo: 'glyph' } }),
   P('SFO', 'San Francisco', 'Sea Lions', ['#a3232c', '#c9ced6'], 'Northwest', 77, { glyph: 'sea', biome: 'coast', landmarks: ['bridge', 'hills'], trait: 'wind',
     kit: { pattern: 'tvStripe', font: 'varsity', stripe: 'double', finish: 'gloss', mask: 'gray', sleeve: 2, pants: 'double', collar: 'round', chestLogo: false, logo: 'glyph' } }),
   P('SEA', 'Seattle', 'Sasquatch', ['#1f4d3a', '#8fb3d1'], 'Northwest', 75, { glyph: 'bear', biome: 'mountain', landmarks: ['needle', 'skyline', 'volcano'], trait: 'loud',

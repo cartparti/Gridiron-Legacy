@@ -113,6 +113,9 @@ export function react(kind, homeGood = true) {
     case 'hit': ooh(); if (homeGood) cheer(0.4); break;
     case 'sack': if (homeGood) { cheer(1.1); swell(0.75); } else groan(); break;
     case 'incomplete': if (homeGood) cheer(0.35); else groan(); break;
+    case 'ooh': ooh(); break; // a hall full of people reacting (draft night)
+    case 'applause': cheer(0.6); claps(16, 0.16); break;
+    case 'roar': cheer(1.8); airHorn(); swell(0.95); claps(14, 0.35, 1.2); break;
     default: break;
   }
 }
@@ -121,6 +124,9 @@ export function react(kind, homeGood = true) {
 
 const N = (n) => 440 * Math.pow(2, (n - 69) / 12); // MIDI note -> Hz
 const SONGS = {
+  // Draft night: a low suspense pulse while the pick comes in, then a big brass-style fanfare.
+  tension: { bpm: 84, bass: [36, 0, 36, 0, 36, 0, 37, 0], lead: [0, 0, 63, 0, 0, 0, 62, 0], drums: ['k', 0, 0, 0, 'k', 0, 0, 'h'] },
+  fanfare: { bpm: 126, bass: [48, 0, 55, 0, 52, 0, 55, 0], lead: [72, 76, 79, 0, 76, 79, 84, 0], drums: ['k', 'h', 's', 'h', 'k', 'k', 's', 'h'] },
   // Stomp-stomp-clap style pump-up loop.
   hype: { bpm: 112, bass: [40, 0, 40, 0, 43, 0, 45, 0], lead: [64, 0, 67, 0, 69, 67, 64, 0], drums: ['k', 0, 'k', 's', 'k', 0, 'k', 's'] },
   // Organ "charge"-style rising riff.

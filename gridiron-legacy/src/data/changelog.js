@@ -1,5 +1,10 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.43', date: 'Nov 12', title: 'Draft Night and the Salt Lake Trappers', items: [
+    'Draft Night is a full event now: a packed theater with fans from every team, the commissioner at the podium and your team "on the clock" on the big screen, with suspense music.',
+    'When your name is called the hall erupts and your family celebrates with you. You walk up on stage, shake the commissioner\'s hand, pull on your new team\'s hat and hold up your jersey under the camera flashes and confetti.',
+    'Salt Lake is now the Salt Lake Trappers: mountain men in leather brown and black with buckskin numbers, a fringed buckskin yoke on the jersey, a leather-look helmet and a coonskin cap logo. Their stadium looks out on log cabins and a trading-post fort.',
+  ] },
   { v: '0.42', date: 'Nov 12', title: 'Signing Day and a new pro league', items: [
     'Signing Day: when you commit to a college, hats from your top 3 schools sit on a table in your high school gym. You reach for the others first, then grab your school\'s hat and put it on while your family and teammates go wild.',
     'The pro league now has 20 teams in real cities, in five divisions: Northwest (Salt Lake City, San Francisco, Seattle, Portland), Southwest (Los Angeles, Phoenix, Dallas, Las Vegas), Northeast (New York, Chicago, Washington, Detroit), Southeast (Miami, New Orleans, Charlotte, Nashville) and Heartland (Denver, Kansas City, Minneapolis, St. Louis).',

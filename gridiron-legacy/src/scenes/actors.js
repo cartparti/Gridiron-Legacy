@@ -821,6 +821,13 @@ function jerseyMat(un, number, side) {
       g.globalAlpha = 0.55; for (let x = 0; x < 22; x += 5.5) px(g, x, 0, dk, 2.6, 26); for (let y = 0; y < 26; y += 5.5) px(g, 0, y, dk, 22, 2.6);
       g.globalAlpha = 0.5; for (let x = 4; x < 22; x += 5.5) px(g, x, 0, T, 0.25, 26); for (let y = 4; y < 26; y += 5.5) px(g, 0, y, T, 22, 0.25); g.globalAlpha = 1;
     }
+    if (P === 'fringe' && side !== 'side') { // buckskin yoke with leather fringe hanging off it
+      poly([[0, 0], [22, 0], [22, 4], [11, 7.5], [0, 4]], T);
+      g.strokeStyle = T; g.lineWidth = 0.32;
+      for (let x = 0.5; x < 22; x += 0.9) { const y0 = x < 11 ? 4 + (x / 11) * 3.5 : 7.5 - ((x - 11) / 11) * 3.5; g.beginPath(); g.moveTo(x, y0 - 0.2); g.lineTo(x + 0.15, y0 + 2.4); g.stroke(); }
+      g.strokeStyle = shade(T, -0.35); g.lineWidth = 0.25; g.setLineDash([0.5, 0.5]); g.beginPath(); g.moveTo(0, 3.6); g.lineTo(11, 7.1); g.lineTo(22, 3.6); g.stroke(); g.setLineDash([]); // stitching
+    }
+    if (P === 'fringe' && side === 'side') { px(g, 0, 0, T, 22, 4); g.strokeStyle = T; g.lineWidth = 0.32; for (let x = 0.5; x < 22; x += 0.9) { g.beginPath(); g.moveTo(x, 3.8); g.lineTo(x, 6.2); g.stroke(); } }
     if (P === 'scales') { // snake scales: rows of small arcs
       g.strokeStyle = shade(J, 0.14); g.lineWidth = 0.22; g.globalAlpha = 0.7;
       for (let y = 0, row = 0; y < 27; y += 1.4, row++) for (let x = (row % 2) * 1.2; x < 23; x += 2.4) { g.beginPath(); g.arc(x, y, 1.2, 0, Math.PI); g.stroke(); }

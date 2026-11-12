@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { speak } from '../audio/voice.js';
 import { buildStadium } from './stadium.js';
-import { startCrowd, stopCrowd, playMusic, stopMusic, react } from '../audio/stadium.js';
+import { startCrowd, stopCrowd, setCrowd, playMusic, stopMusic, react } from '../audio/stadium.js';
 import { buildInterlude } from './interludes.js';
 import { nextFrame, tickIdle, sweepActorCaches } from './actors.js';
 import { buildWorld } from './world.js';
@@ -616,7 +616,7 @@ export function openSet(build, { bg } = {}) {
  * Play a short scripted scene on its own set. build(ctx) returns update(dt, t) -> false when done.
  * ctx: { THREE, scene, camera, caption(text, sub) }. Resolves when it ends or the player taps Skip.
  */
-export function runSetCutscene(build, { bg, music = 'groove' } = {}) {
+export function runSetCutscene(build, { bg, music = 'groove', crowd = 0 } = {}) {
   stopBackdrop();
   try { sweepActorCaches(); } catch (err) { console.error('cache sweep', err); } // free last play's faces/kits (phones run out of memory)
   const r = ensure();
@@ -636,10 +636,12 @@ export function runSetCutscene(build, { bg, music = 'groove' } = {}) {
     R.active = scene;
     let done = false;
     if (music) playMusic(music, { vol: 0.6 });
+    if (crowd) startCrowd(crowd); // a live audience (draft night): ctx.audio.react / setCrowd drive it
     const finish = () => {
       if (done) return;
       done = true;
       stopMusic();
+      if (crowd) stopCrowd();
       ui.remove();
       document.body.classList.remove('cine');
       app.style.visibility = prevVis;
@@ -652,6 +654,7 @@ export function runSetCutscene(build, { bg, music = 'groove' } = {}) {
     const sub = ui.querySelector('.cut-sub');
     const ctx = {
       THREE, scene, camera: r.camera,
+      audio: { react, setCrowd, music: (name, o) => playMusic(name, o), stopMusic },
       caption(text, subText = '') {
         main.textContent = text; sub.textContent = subText;
         const c = ui.querySelector('.cut-caption'); c.classList.remove('show'); void main.offsetWidth; c.classList.add('show');

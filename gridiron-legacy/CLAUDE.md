@@ -511,3 +511,13 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   then 3 wild cards); seedPlayoffs 1v8/4v5 + 2v7/3v6; rounds Wild Card / Semifinal / Legacy Bowl. Old saves (Summit/Coastal confs)
   keep the old rules. seasonStakes returns { div } and division rank; hub standings by division; rivals from the same division.
 - Tests: `tests/round12.test.js`.
+
+## v0.43: draft night event + Salt Lake Trappers
+- `draftNightScene` (sets.js) replaces the old stadium `draftCutscene` (still in cutscenes.js, unused): theater set, LED screen
+  canvas (`redraw('intro'|'clock'|'name')`, crest drawn when loaded), commissioner, fans in league colors, green-room table
+  (you, mom, agent), photographers, follow spot, beams; timeline T.clock/call/name/walk/shake/cap/jersey with a path up the stairs.
+  Cap = `schoolCap` in team colors attached to `rig.headG`; `draftJersey` canvas with name + number from the home kit.
+- runSetCutscene({ crowd }) starts the crowd bed; ctx.audio = { react, setCrowd, music, stopMusic }. New react kinds ooh /
+  applause / roar; new songs tension + fanfare (audio/stadium.js).
+- SLC = Salt Lake Trappers (glyph `coonskin`, def `accent` = home numbers/trim/stripe in teamKits, jersey pattern `fringe`,
+  landmark `cabins`: log cabins + palisade fort; sideline mascot with coonskin cap).

@@ -142,6 +142,17 @@ export function buildEnvironment(world) {
   };
   const LANDMARKS = {
     skyline: (r, night) => skyline(r, 46, 95, night),
+    cabins: (r, night) => { // log cabins and a trading-post fort with a log palisade (mountain men)
+      const logs = []; const roofs = []; const lit = [];
+      ring(r, 14, 150, 280, (x, z) => { if (z > -40) return null; const ry = r() * 3; logs.push({ x, z, sx: 12, sy: 7, sz: 9, ry, color: ['#6b4423', '#5a3a1e', '#7a5030'][Math.floor(r() * 3)] }); roofs.push({ x, y: 7, z, sx: 9.5, sy: 5, sz: 7.5, ry: ry + Math.PI / 4 }); if (night) lit.push({ x, y: 2.5, z, sx: 12.3, sy: 1.6, sz: 1.5, ry }); return null; });
+      inst(unitBox(), lam('#ffffff'), logs); inst(unitCone(4), lam('#3a2a1c'), roofs); inst(unitBox(), glow('#ffb347'), lit);
+      const fx = -40; const fz = -330; const posts = [];
+      for (let i = 0; i < 64; i++) { const a = (i / 64) * Math.PI * 2; posts.push({ x: fx + Math.cos(a) * 48, z: fz + Math.sin(a) * 34, sx: 2.4, sy: 13 + (i % 3), sz: 2.4 }); }
+      inst(unitCyl(6), lam('#6b4a2e'), posts);
+      for (const [dx, dz] of [[-48, 0], [48, 0]]) { one(unitBox(), lam('#5a3a1e'), fx + dx, 0, fz + dz, 10, 22, 10); one(unitCone(4), lam('#3a2a1c'), fx + dx, 22, fz + dz, 8.5, 7, 8.5, Math.PI / 4); }
+      one(unitBox(), lam('#7a5030'), fx, 0, fz, 26, 12, 16); one(unitCone(4), lam('#3a2a1c'), fx, 12, fz, 19, 9, 12, Math.PI / 4);
+      one(unitBox(), lam('#3b2a1e'), fx + 14, 21, fz, 0.6, 14, 0.6); one(unitBox(), lam('#c0362c'), fx + 17.5, 31, fz, 7, 4, 0.3); // flag
+    },
     bridge: () => { // a red suspension bridge across the bay past the far end zone
       const red = lam('#c0362c'); const z = -430;
       water(0, z, 1600, 120);
