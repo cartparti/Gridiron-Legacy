@@ -588,6 +588,11 @@ export function freePlay(ctx) {
       return;
     }
     if (e.route && !(mode === 'run' && e.role !== 'RB')) {
+      // Route finished (or the QB is scrambling): stop running to the sideline and work to get open.
+      e.routeLen ??= e.route.slice(1).reduce((a, b, i) => a + Math.hypot(b.x - e.route[i].x, b.z - e.route[i].z), 0);
+      const scrambling = holder === qb && !flight && t > 1.2 && Math.abs(qb.vel.x) > 3 && Math.abs(qb.pos.x - qb.start.x) > 2.5;
+      if (!e.improv && !flight && (e.s > e.routeLen + (e.sit ? e.maxSpeed * 1.1 : 0.4) || (scrambling && e.s > e.routeLen * 0.55))) e.improv = { at: 0, tx: e.pos.x, tz: e.pos.z, burst: 0 };
+      if (e.improv) { improvise(e, dt); return; }
       // receivers throttle down to plant and cut at the breaks (that's when the defender is a step late)
       const ahead = routePoint(e, e.s + 1.6);
       const hx = ahead.x - e.pos.x, hz = ahead.z - e.pos.z, hl = Math.hypot(hx, hz) || 1, vl = Math.hypot(e.vel.x, e.vel.z);
@@ -610,6 +615,45 @@ export function freePlay(ctx) {
       const d = nearest(e, defenders.filter((x) => x.role === 'CB' || x.role === 'S'));
       if (d) moveToward(e, d.pos.x, d.pos.z + 0.8, e.maxSpeed * 0.7, dt);
     }
+  };
+
+  /**
+   * Getting open after the route: every ~0.6 s pick a nearby spot with the most room from the defenders (where they will be
+   * a moment from now), spread out from the other receivers, stay in bounds and downfield of the line, don't drift too far
+   * from the QB, and work toward the side he is scrambling to. A spot that opens real room gets a hard break.
+   */
+  const improvise = (e, dt) => {
+    const I = e.improv;
+    I.at -= dt;
+    const def = defenders.filter((d) => d.out <= 0 && !d.down && d.role !== 'DL' && !d.engagedBy);
+    const sepAt = (x, z) => Math.min(99, ...def.map((d) => Math.hypot(d.pos.x + d.vel.x * 0.45 - x, d.pos.z + d.vel.z * 0.45 - z)));
+    if (I.at <= 0) {
+      I.at = 0.5 + Math.random() * 0.4;
+      const qp = qb.pos;
+      const lim = FIELD_X - 2.2;
+      const minZ = Math.max(backLine + 1.2, goalZ - 8.5); // inside the end zone at most
+      const maxZ = Math.min(-1.5, goalZ < -2 ? -1.5 : goalZ); // downfield of the line
+      const drift = holder === qb && Math.abs(qb.vel.x) > 2 ? Math.sign(qb.vel.x) : 0; // scramble drill
+      const here = sepAt(e.pos.x, e.pos.z);
+      let best = null;
+      for (let k = 0; k < 14; k++) {
+        const a = (k / 14) * Math.PI * 2 + Math.random() * 0.3;
+        const rr = 2.5 + Math.random() * 4.5;
+        const x = Math.max(-lim, Math.min(lim, e.pos.x + Math.cos(a) * rr));
+        const z = Math.max(minZ, Math.min(maxZ, e.pos.z + Math.sin(a) * rr));
+        let sc = Math.min(sepAt(x, z), 8);
+        sc -= Math.max(0, Math.hypot(x - qp.x, z - qp.z) - 22) * 0.25; // stay in throwing range
+        sc += drift * Math.sign(x - e.pos.x) * 0.6;
+        if (Math.abs(x) > lim - 2.5) sc -= 1; // off the sideline, back toward the middle
+        for (const o of receivers) if (o !== e && o.improv) { const dd = Math.hypot(o.pos.x - x, o.pos.z - z); if (dd < 5) sc -= (5 - dd) * 0.5; } // spread out
+        if (!best || sc > best.sc) best = { x, z, sc };
+      }
+      I.tx = best.x; I.tz = best.z;
+      I.burst = best.sc > here + 1 ? 0.5 : 0;
+    }
+    if (I.burst > 0) I.burst -= dt;
+    moveToward(e, I.tx, I.tz, e.maxSpeed * (I.burst > 0 ? 1 : 0.82), dt, 18);
+    if (Math.hypot(e.pos.x - I.tx, e.pos.z - I.tz) < 1 && holder === qb) faceToward(e.mesh, qb.pos.x, qb.pos.z); // settle, eyes on the QB
   };
 
   /** AI quarterback read (when you play WR or CB). Throws to the most open receiver, favoring the key player. */
@@ -737,6 +781,25 @@ export function freePlay(ctx) {
       moveToward(e, px, pz, spd, dt, onUser ? 22 : 26);
       backpedalFace(e, pedal, r);
       return;
+    }
+    // Once receivers are freelancing (route done / scramble drill), zone players pick one up and stay on him,
+    // preferring a receiver nobody else is covering.
+    const loose = receivers.filter((r) => r.improv && !r.down && r.out <= 0);
+    if (loose.length && !flight) {
+      let pickR = null; let bs = Infinity;
+      for (const r of loose) {
+        const d = dist(e.pos, r.pos);
+        if (d > 13) continue;
+        const others = defenders.filter((o) => o !== e && !o.engagedBy && dist(o.pos, r.pos) < 2.5).length;
+        const sc = d + others * 4.5;
+        if (sc < bs) { bs = sc; pickR = r; }
+      }
+      if (pickR) {
+        const lag = 0.3 + Math.random() * 0.15; // read and react, a step behind the receiver's break
+        moveToward(e, pickR.pos.x + pickR.vel.x * lag, pickR.pos.z + pickR.vel.z * lag - 0.9, e.maxSpeed * 0.93, dt, 20);
+        backpedalFace(e, false, pickR);
+        return;
+      }
     }
     // Zone: hold an area and squeeze whoever enters it.
     const home = { x: e.start.x * 0.9, z: e.role === 'LB' ? -6.5 : e.start.z - 6 };

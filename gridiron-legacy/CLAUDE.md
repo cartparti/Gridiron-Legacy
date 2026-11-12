@@ -521,3 +521,10 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   applause / roar; new songs tension + fanfare (audio/stadium.js).
 - SLC = Salt Lake Trappers (glyph `coonskin`, def `accent` = home numbers/trim/stripe in teamKits, jersey pattern `fringe`,
   landmark `cabins`: log cabins + palisade fort; sideline mascot with coonskin cap).
+
+## v0.44: receivers improvise after their routes
+- engine.js aiOffense: `e.improv` starts once `e.s` passes the route length (+1.1 s for sit routes) or during a QB scramble
+  (after 55% of the route). `improvise()` re-picks a spot every ~0.6 s from 14 candidates scored by predicted separation,
+  throwing range, scramble side, sideline penalty and spacing from other receivers; hard break when it opens room. Stays in
+  bounds and downfield of the line. aiDefense: zone defenders cover loose (improvising) receivers within 13 yds, preferring
+  uncovered ones; man coverage unchanged (keeps trailing its man). Test: hold.cjs-style probe with the rush disabled.

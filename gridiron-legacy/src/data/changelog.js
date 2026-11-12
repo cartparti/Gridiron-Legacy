@@ -1,5 +1,10 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.44', date: 'Nov 12', title: 'Receivers keep working to get open', items: [
+    'When you hold the ball as QB, receivers no longer drift out of bounds after their routes. They break off and look for open grass, spread out and come back toward you.',
+    'When you scramble, receivers run with you to that side of the field (the scramble drill).',
+    'Defenders stay on them: man coverage keeps chasing its man and zone defenders pick up any receiver who comes free, so you still have to read who is open.',
+  ] },
   { v: '0.43', date: 'Nov 12', title: 'Draft Night and the Salt Lake Trappers', items: [
     'Draft Night is a full event now: a packed theater with fans from every team, the commissioner at the podium and your team "on the clock" on the big screen, with suspense music.',
     'When your name is called the hall erupts and your family celebrates with you. You walk up on stage, shake the commissioner\'s hand, pull on your new team\'s hat and hold up your jersey under the camera flashes and confetti.',
