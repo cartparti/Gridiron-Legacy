@@ -698,14 +698,20 @@ export function freePlay(ctx) {
       const maxZ = Math.min(-1.5, goalZ < -2 ? -1.5 : goalZ); // downfield of the line
       const drift = holder === qb && Math.abs(qb.vel.x) > 2 ? Math.sign(qb.vel.x) : 0; // scramble drill
       const here = sepAt(e.pos.x, e.pos.z);
+      // First job: get down the field and find open grass deep. Only when the ball still hasn't come out after a
+      // while (or the QB is in trouble and scrambling) do they check back toward the quarterback.
+      const checkBack = t > (e.checkT ??= 3.1 + Math.random() * 0.8) || (holder === qb && qb.pos.z < 3 && Math.abs(qb.vel.x) > 3 && t > 2.4);
       let best = null;
       for (let k = 0; k < 14; k++) {
-        const a = (k / 14) * Math.PI * 2 + Math.random() * 0.3;
-        const rr = 2.5 + Math.random() * 4.5;
+        // deep phase: candidates fan out ahead (downfield is -z); check-back phase: all around, mostly back
+        const a = checkBack ? (k / 14) * Math.PI * 2 + Math.random() * 0.3 : -Math.PI / 2 + ((k / 13) - 0.5) * Math.PI * 1.1;
+        const rr = checkBack ? 2.5 + Math.random() * 4.5 : 3 + Math.random() * 5;
         const x = Math.max(-lim, Math.min(lim, e.pos.x + Math.cos(a) * rr));
-        const z = Math.max(minZ, Math.min(maxZ, e.pos.z + Math.sin(a) * rr));
+        const z = Math.max(minZ, Math.min(checkBack ? Math.min(maxZ, -5) : maxZ, e.pos.z + Math.sin(a) * rr)); // check back to ~5-8 yds, not to the line
         let sc = Math.min(sepAt(x, z), 8);
-        sc -= Math.max(0, Math.hypot(x - qp.x, z - qp.z) - 22) * 0.25; // stay in throwing range
+        const qd = Math.hypot(x - qp.x, z - qp.z);
+        if (!checkBack) { sc += (e.pos.z - z) * 0.35; sc -= Math.max(0, qd - 34) * 0.25; } // deeper is better, within a deep ball's range
+        else { if (z < -8) sc += (z - e.pos.z) * 0.3; sc -= Math.max(0, qd - 16) * 0.3; } // come back to the QB, give him a short throw
         sc += drift * Math.sign(x - e.pos.x) * 0.6;
         if (Math.abs(x) > lim - 2.5) sc -= 1; // off the sideline, back toward the middle
         for (const o of receivers) if (o !== e && o.improv) { const dd = Math.hypot(o.pos.x - x, o.pos.z - z); if (dd < 5) sc -= (5 - dd) * 0.5; } // spread out

@@ -1,5 +1,10 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.48', date: 'Nov 12', title: 'Sharp again, deeper routes', items: [
+    'Graphics are back to full sharpness on phones (the lower resolution from 0.47 is gone).',
+    'Less confetti on touchdowns and in celebrations.',
+    'Receivers\' first job is getting down the field and open deep. If the ball still hasn\'t come out after a few seconds (or you\'re scrambling for your life) they check back toward you for a short throw, still with defenders on them.',
+  ] },
   { v: '0.47', date: 'Nov 12', title: 'Tush push, real injuries, smoother players', items: [
     'Injuries are serious now. Each one is Probable (play through it), Questionable (you can play, but slower, and it could get worse), Out (doctors won\'t clear you: broken bones, concussions, dislocations) or Out for the season. Some come back as Questionable in a brace or cast for the last weeks, but not if your position can\'t play with it (a QB with a broken hand sits).',
     'Get hurt during a play and it depends on what happened: shaken up, you\'re back after a series; anything worse and you\'re done for the day.',

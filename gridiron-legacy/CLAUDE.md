@@ -586,3 +586,10 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   from measured frame times; `R.fpsCap` 30 for the title backdrop; `setLiteMaterials(PHONE)` during plays (skin = plain
   MeshStandardMaterial, keys get '|lite'); crowd animation throttled to 30 Hz; HUD clocks only write on change.
 - Tests: `tests/round13.test.js`; balance test now 40 careers per position (10 was too noisy).
+
+## v0.48
+- Owner found 0.47's phone resolution blurry: DPR is back to min(devicePixelRatio, 1.75) everywhere, no adaptive resolution,
+  no lite skin during plays (`setLiteMaterials` still exists, unused). Keep the 30 fps title cap and 30 Hz crowd.
+- Confetti 140 -> 55 particles; trophy-lift bursts every 2.4 s.
+- Receiver improv: deep phase first (candidates fan downfield, deeper scores higher, within 34 yd of the QB); check back
+  after `e.checkT` (3.1-3.9 s) or when the QB is scrambling behind the line after 2.4 s (closer to the QB scores higher).

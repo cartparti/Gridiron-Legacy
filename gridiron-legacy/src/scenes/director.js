@@ -6,7 +6,7 @@ import { speak } from '../audio/voice.js';
 import { buildStadium } from './stadium.js';
 import { startCrowd, stopCrowd, setCrowd, playMusic, stopMusic, react } from '../audio/stadium.js';
 import { buildInterlude } from './interludes.js';
-import { nextFrame, tickIdle, sweepActorCaches, setLiteMaterials } from './actors.js';
+import { nextFrame, tickIdle, sweepActorCaches } from './actors.js';
 import { buildWorld } from './world.js';
 import { surfaceFor } from '../data/surface.js';
 import { goalLine } from './minigames/goalLine.js';
@@ -21,13 +21,8 @@ let loopFn = null;
 let elapsed = 0;
 let shake = 0;
 
-// Phones: a lower resolution cap, and the resolution adapts to how fast frames really render (a hot phone that
-// starts dropping frames goes a step blurrier instead of stuttering, and goes back up when it can).
-const PHONE = typeof matchMedia === 'function' && (matchMedia('(pointer: coarse)').matches || /iPhone|iPad|Android/i.test(navigator.userAgent ?? ''));
-const DPR_MAX = () => Math.min(window.devicePixelRatio || 1, PHONE ? 1.4 : 1.75);
-const DPR_MIN = 0.75;
+const DPR_MAX = () => Math.min(window.devicePixelRatio || 1, 1.75); // full sharpness (phones too)
 let dpr = 0;
-const perf = { acc: 0, n: 0, since: 0, calm: 0 };
 let lastRender = 0;
 
 function ensure() {
@@ -96,27 +91,13 @@ function ensure() {
   }
 }
 
-/** Watch real frame times; step the resolution down when frames are slow, back up when there's headroom. */
-function adaptResolution(raw) {
-  if (raw > 0.25) return; // tab was in the background or a hitch: ignore
-  perf.acc += raw; perf.n++; perf.since += raw;
-  if (perf.since < 1.2) return;
-  const avg = perf.acc / perf.n;
-  perf.acc = 0; perf.n = 0; perf.since = 0;
-  const max = DPR_MAX();
-  if (avg > 1 / 42 && dpr > DPR_MIN) { dpr = Math.max(DPR_MIN, dpr - 0.15); perf.calm = 0; R.resize(); }
-  else if (avg < 1 / 57 && dpr < max) { if (++perf.calm >= 3) { dpr = Math.min(max, dpr + 0.1); perf.calm = 0; R.resize(); } }
-  else perf.calm = 0;
-}
-
 function frame(now) {
   raf = requestAnimationFrame(frame);
   // menus with a 3D background only need 30 fps (saves battery and heat)
   if (R.fpsCap && now - lastRender < 1000 / R.fpsCap - 2) return;
   lastRender = now;
-  const raw = R.clock.getDelta();
-  const dt = Math.min(0.05, raw);
-  if (!R.fpsCap) adaptResolution(raw);
+  const dt = Math.min(0.05, R.clock.getDelta());
+
   const cine = R.cine;
   const slow = (cine ? 0.2 : R.slowmo > 0 ? 0.3 : 1) * (R.timeScale ?? 1) * (R.playSpeed ?? 1);
   R.slowmo = Math.max(0, (R.slowmo ?? 0) - dt);
@@ -382,7 +363,6 @@ const GAMES = {
 export function runMinigame(type, opts) {
   stopBackdrop();
   try { sweepActorCaches(); } catch (err) { console.error('cache sweep', err); } // free last play's faces/kits (phones run out of memory)
-  setLiteMaterials(PHONE);
   const r = ensure();
   const app = document.getElementById('app');
   const hud = makeHud();
@@ -392,7 +372,6 @@ export function runMinigame(type, opts) {
     startCrowd(0.3);
     if (R) R.playSpeed = opts.gameSpeed ?? 0.85; // plays run a bit slower than real time for a realistic feel
     const finish = (result) => {
-      setLiteMaterials(false);
       if (R) { R.timeScale = 1; R.playSpeed = 1; }
       stopCrowd();
       stopMusic();

@@ -248,7 +248,7 @@ export function trophyCutscene(opts) {
       const lift = Math.min(1, Math.max(0, (T - 0.6) / 1.2));
       trophy.position.set(0, lerp(1.4, 2.8, ease(lift)) + Math.sin(T * 6) * 0.05 * lift, -0.1);
       trophy.rotation.y = Math.sin(T * 1.5) * 0.25;
-      if (T > next) { next += 1.1; bursts.push(confetti(ctx.scene, new THREE.Vector3((Math.random() - 0.5) * 6, 3, (Math.random() - 0.5) * 6), [opts.colors[0], opts.colors[1], '#ffd43b', '#ffffff'])); }
+      if (T > next) { next += 2.4; bursts.push(confetti(ctx.scene, new THREE.Vector3((Math.random() - 0.5) * 6, 3, (Math.random() - 0.5) * 6), [opts.colors[0], opts.colors[1], '#ffd43b', '#ffffff'])); }
       for (let i = bursts.length - 1; i >= 0; i--) if (!bursts[i](dt)) bursts.splice(i, 1);
       animateRun(me, dt, 0);
       for (const m of mates) animateRun(m, dt, 0);

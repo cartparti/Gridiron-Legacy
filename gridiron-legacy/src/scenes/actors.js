@@ -2739,7 +2739,7 @@ export function makeRouteLine(points, color = '#ffffff', opacity = 0.75) {
 
 /** Confetti burst. Returns an updater (false when done). */
 export function confetti(scene, origin, colors) {
-  const n = 140;
+  const n = 55;
   const geoP = new THREE.BufferGeometry();
   const pos = new Float32Array(n * 3);
   const col = new Float32Array(n * 3);
