@@ -45,6 +45,7 @@ export function postGamePress(state, g, oppName, teamName) {
 
 /** Short stat phrase for headlines, e.g. "312 yards, 3 TD" or "2 INT, 7 tackles". */
 export function statPhrase(pos, s) {
+  if (pos === 'K') return `${s.fgMade ?? 0}-of-${s.fgAtt ?? 0} Field Goals${(s.fgLong ?? 0) >= 50 ? `, a ${s.fgLong}-Yarder` : ''}`;
   if (pos === 'MS') return `${s.hype ?? 0} Hype, ${s.shirts ?? 0} Shirts Fired Into the Stands`;
   if (pos === 'DT') return `${s.defSacks ?? 0} Sacks, ${s.tfl ?? 0} TFL, ${s.tackles} Tackles`;
   if (pos === 'CB') return `${s.defInt} INT, ${s.pd} PD, ${s.tackles} Tackles`;

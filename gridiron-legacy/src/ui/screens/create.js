@@ -50,7 +50,7 @@ export function createScreen(app) {
             f.position = id;
             draw();
           } },
-            h('span.big', id === 'MS' ? '🐾' : id), h('span.lbl', p.label)))),
+            h('span.big', id === 'MS' ? '🐾' : id === 'K' ? '🦶' : id), h('span.lbl', p.label)))),
         h('div.pos-detail',
           h('div.pos-detail-head', h('b', POSITIONS[f.position].label), h('span.tiny.muted', 'What matters most')),
           h('p.small.muted', POSITIONS[f.position].blurb),

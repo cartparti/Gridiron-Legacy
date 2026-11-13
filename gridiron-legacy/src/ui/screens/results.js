@@ -1,5 +1,6 @@
 // Postgame report and end-of-season review.
 import { awardLabel } from '../../sim/awards.js';
+import { achUnlockRows, goalsReview } from './achievements.js';
 import { injuryInfo, injuryNote } from '../../sim/injury.js';
 import { h } from '../dom.js';
 import { backupModal } from './slots.js';
@@ -24,6 +25,7 @@ export function statLine(pos, s) {
   if (pos === 'RB') return [[s.rushAtt, 'Carries'], [s.rushYds, 'Rush Yds'], [s.rushTD, 'TD']];
   if (pos === 'DT') return [[s.defSacks ?? 0, 'Sacks'], [s.tfl ?? 0, 'TFL'], [s.tackles ?? 0, 'Tackles']];
   if (pos === 'CB') return [[s.defInt ?? 0, 'INT'], [s.pd ?? 0, 'Pass Def'], [s.tackles ?? 0, 'Tackles']];
+  if (pos === 'K') return [[`${s.fgMade ?? 0}/${s.fgAtt ?? 0}`, 'Field Goals'], [`${s.xpMade ?? 0}/${s.xpAtt ?? 0}`, 'Extra Points'], [s.fgLong ?? 0, 'Longest']];
   if (pos === 'MS') return [[s.hype ?? 0, 'Crowd Hype'], [s.shirts ?? 0, 'Shirts Landed'], [`${s.danceWins ?? 0}/${s.stunts ?? 0}`, 'Showdowns/Stunts']];
   return [[`${s.rec}/${s.targets}`, 'Rec/Tgt'], [s.recYds, 'Rec Yds'], [s.recTD, 'TD']];
 }
@@ -59,7 +61,7 @@ export function postgameScreen(app) {
         h('div.grow', h('b', 'Your game'), h('div.small.muted', `Grade ${g.grade}/100`)), g.potg ? h('span.chip.gold.pix', 'PLAYER OF THE GAME') : null),
       h('div.bigstat', { style: { marginTop: '10px' } }, statLine(p.position, g.userStats).map(([v, l]) => h('div', h('b', v), h('span', l))))),
     g.moments.length ? h('div.card', h('h3', 'Key Moments'), h('div.list', g.moments.map((m) =>
-      h('div.li', h('span.chip', PLAY_CALLS[m.call]?.label ?? m.call), h('div.grow', h('div.small', m.label), h('div.tiny.muted', `${m.text} → ${m.outcome === 'TD' ? 'Touchdown' : m.outcome === 'FG' ? 'Field goal' : m.outcome === 'TO' ? 'Turnover' : 'Punt'}`)),
+      h('div.li', h('span.chip', PLAY_CALLS[m.call]?.label ?? m.call), h('div.grow', h('div.small', m.label), h('div.tiny.muted', `${m.text} → ${m.outcome === 'TD' ? 'Touchdown' : m.outcome === 'FG' ? 'Field goal' : m.outcome === 'MISS' ? 'No good' : m.outcome === 'KICK' ? 'Kickoff' : m.outcome === 'TO' ? 'Turnover' : m.outcome === 'DOWNS' ? 'Turnover on downs' : 'Punt'}`)),
         h('b', { style: { color: m.quality > 0.7 ? 'var(--good)' : m.quality < 0.35 ? 'var(--bad)' : 'inherit' } }, `${Math.round(m.quality * 100)}%`))))) : null,
     h('div.card', h('h3', 'Fallout'), h('div.changes',
       h(`span.chip.${d.fame >= 0 ? 'good' : 'bad'}`, `Fame ${signed(d.fame, 1)}`),
@@ -69,6 +71,7 @@ export function postgameScreen(app) {
     g.newTraits?.length || g.levelUps ? h('div.card.unlock-card',
       g.levelUps ? h('div.row', { style: { gap: '8px' } }, h('span.chip.gold.pix', 'LEVEL UP'), h('span.small', `Level ${st.player.level}. You have ${st.player.skillPoints} skill point${st.player.skillPoints === 1 ? '' : 's'} to spend (Career tab).`)) : null,
       (g.newTraits ?? []).map((n) => h('div.row', { style: { gap: '8px', marginTop: '6px' } }, h('span.chip.good.pix', 'NEW TRAIT'), h('b', n), h('span.tiny.muted', 'Equip it in Career → Traits')))) : null,
+    g.newAch?.length ? h('div.card.unlock-card', h('h3', 'Achievement unlocked'), h('div.col', { style: { gap: '8px' } }, achUnlockRows(g.newAch))) : null,
     h('button.btn.primary.block', { onclick: () => { sfx.click(); flow.continueAfterGame(st); app.hubTab = 'week'; app.commit(); } }, 'Continue'));
 }
 
@@ -104,7 +107,9 @@ export function reviewScreen(app) {
     r.records.length ? h('div.card', { style: { borderColor: 'var(--accent)' } }, h('h3', 'Records Broken'), r.records.map((x) => h('p', h('b', x)))) : null,
     h('div.card', h('h3', 'Season Stats'), h('div.bigstat', statLine(p.position, r.seasonStats).map(([v, l]) => h('div', h('b', v), h('span', l)))),
       h('p.tiny.muted', { style: { marginTop: '6px' } }, `${r.seasonStats.games} games played`)),
-    r.leaders && p.position !== 'MS' ? h('div.card', h('h3', 'League Leaders'), leadersTable(r.leaders, p)) : null,
+    goalsReview(r.goals),
+    r.newAch?.length ? h('div.card.unlock-card', h('h3', 'Achievements unlocked'), h('div.col', { style: { gap: '8px' } }, achUnlockRows(r.newAch))) : null,
+    r.leaders && p.position !== 'MS' && p.position !== 'K' ? h('div.card', h('h3', 'League Leaders'), leadersTable(r.leaders, p)) : null,
     h('div.card', h('h3', 'Aging & Growth'),
       h('p', `Overall ${Math.round(r.ovrBefore)} → `, h(`b.${delta >= 0 ? 'good' : 'bad'}`, `${Math.round(r.ovrAfter)} (${signed(delta, 1)})`), ` · now age ${p.age}`),
       h('div.changes', STAT_KEYS.map((k) => h(`span.chip.${r.ageChanges[k] >= 0 ? 'good' : 'bad'}`, `${statLabel(k, p.position)} ${signed(r.ageChanges[k], 1)}`)))),

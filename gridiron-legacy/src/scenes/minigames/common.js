@@ -85,6 +85,11 @@ export function follow(camera, tx, tz, off, look, dt, k = 4) {
 export function endPlay(ctx, result, { color, delay = 1600, beforeDone = null } = {}) {
   if (ctx.ended) return;
   ctx.ended = true;
+  if (result.kick) { // the kick scene shows its own call (IT'S GOOD / NO GOOD / TOUCHBACK)
+    ctx.hud.instr('');
+    setTimeout(() => (beforeDone ? beforeDone(() => ctx.done(result)) : ctx.done(result)), ctx.opts.reducedMotion ? 500 : delay);
+    return;
+  }
   let big;
   let good;
   if (result.defense) {

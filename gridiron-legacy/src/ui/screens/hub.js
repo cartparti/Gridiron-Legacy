@@ -1,5 +1,6 @@
 // Main career hub: top bar with meters, bottom tabs, and the five tab views.
 import { friendsPage } from './friends.js';
+import { achievementsPage, goalsCard } from './achievements.js';
 import { activityFor } from '../../data/activities.js';
 import { costumeSpec, mascotDisplayName } from '../../data/mascots.js';
 import { awardLabel } from '../../sim/awards.js';
@@ -196,6 +197,9 @@ function weekView(app) {
         h('span', `Their OFF ${Math.round(opp.off)} · DEF ${Math.round(opp.def)}`)),
       forecastRow(st)));
   }
+
+  // the coach's goals for this season
+  { const gc = goalsCard(app); if (gc) container.append(gc); }
 
   // Season stakes: your role on the depth chart, the playoff race and the award race
   container.append(seasonCard(st));
@@ -479,7 +483,7 @@ function lifeView(app) {
 
 function careerView(app) {
   const sub = app.ui.careerSub ?? 'profile';
-  const tabs = h('div.subtabs', [['profile', 'Career'], ['friends', 'Friends'], ['traits', 'Traits'], ['awards', 'Trophies'], ['race', 'Award Race'], ['legends', 'Legends'], ['league', 'League Awards']].map(([id, l]) =>
+  const tabs = h('div.subtabs', [['profile', 'Career'], ['achievements', 'Achievements'], ['friends', 'Friends'], ['traits', 'Traits'], ['awards', 'Trophies'], ['race', 'Award Race'], ['legends', 'Legends'], ['league', 'League Awards']].map(([id, l]) =>
     h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { sfx.click(); app.ui.careerSub = id; app.render(); } }, l)));
   let body;
   if (sub === 'awards') body = awardsView(app);
@@ -488,6 +492,7 @@ function careerView(app) {
   else if (sub === 'race') body = racePage(app);
   else if (sub === 'traits') body = traitsPage(app);
   else if (sub === 'friends') body = friendsPage(app);
+  else if (sub === 'achievements') body = achievementsPage(app);
   else { body = profileView(app); body.append(...careerStatsSections(app)); }
   return h('div.col', { style: { gap: '14px' } }, tabs, body);
 }
@@ -546,6 +551,7 @@ function profileView(app) {
   const team = getTeam(st.league, st.career.teamId);
   const s = p.seasonStats;
   const posLine = (x) => (p.position === 'QB' ? `${x.passComp}/${x.passAtt}, ${x.passYds} yds, ${x.passTD} TD, ${x.int} INT`
+    : p.position === 'K' ? `${x.fgMade ?? 0}/${x.fgAtt ?? 0} FG (long ${x.fgLong ?? 0}), ${x.xpMade ?? 0}/${x.xpAtt ?? 0} XP, ${x.touchbacks ?? 0} touchbacks`
     : p.position === 'MS' ? `${x.hype ?? 0} hype, ${x.shirts ?? 0} shirts, ${x.danceWins ?? 0} showdown wins, ${x.stunts ?? 0} stunts`
     : p.position === 'DT' ? `${x.defSacks ?? 0} sacks, ${x.tfl ?? 0} TFL, ${x.tackles ?? 0} tkl`
     : p.position === 'CB' ? `${x.defInt ?? 0} INT, ${x.pd ?? 0} PD, ${x.tackles ?? 0} tkl, ${x.defTD ?? 0} TD · ${x.ydsAllowed ?? 0} yds allowed`

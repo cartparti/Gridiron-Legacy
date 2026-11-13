@@ -660,3 +660,31 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   full leverage sheds (blocker out 0.35 s).
 - Carrier: cuts back away from you when you're within 4.5 yd and in front; juke vs your lunge 45%. Your tackles in runD:
   pBreak + 0.12 - (str-60)/400 + oppK*0.04 (was -0.1). Probe (perfect chase bot, 5 reps): 1 TFL, 3x 1-5 yd, 1 fumble kept.
+
+## v0.54: Kicker position, achievements, coach's goals
+- `POSITIONS.K` (Kicker; `isKickerPos`), POS_SIZE.K, POS_MASK.K 'single'. Moments `k_fg` / `k_pat` / `k_kickoff` / `k_onside` (`KICK_TYPES`,
+  `isKicker`, `fgDistance(yl) = yl + 17`, `patYardLine(stage)` 15 pro / 3 below, `kickRange(state)` = 40 + str*0.22 + stage adj).
+  createUserGame marks no moment drives for K; stepGame calls `kickerDrive` on each user drive: simulates it first (driveOutcome +
+  planRisk, PUNT -> FG 10%), TD -> k_pat, FG -> k_fg (yard line skewed by range), else stores `d.kOut` for the normal path. Capped by
+  `g.kMax` (momentCount; event extra moments add to it). Last drive, down 1-3 or tied -> forced game-winning FG (`gw`, situation
+  'For the win!'). `resolveKickerMoment`: FG/MISS (new drive outcome 'MISS' = 0 pts, opp toBonus 0.04) or TD with `ptsAdj` -1 on a
+  missed PAT (finishDrive takes momentInfo.verb/ptsAdj); after a score 45% a kickoff moment (onside when Q4, trailing 1-10 with <= 2 opp
+  drives left): kickoff q -> opp toBonus, touchbacks; onside recovery flips the next opp drive to yours. `g.kGw` + win -> gameWinners.
+  K never gets presnap/clutch events or autoDriveStats; gameRatings lifts offense 4% (not 8%) for K.
+- Stats: fgAtt, fgMade, fgLong, xpAtt, xpMade, kickoffs, touchbacks, onsideRec, gameWinners. `addStats` keeps the max for keys ending
+  in 'Long'. gameGrade/seasonPerf K calibrated (40 careers: ~11 awards / ~350-370 legacy, ~84% FG). STAT_CATS/records fgMade + fgLong,
+  awardLabel K: OPOY/DPOY -> Special Teams Player of the Year. K traits: bigleg, automatic, icewater, windreader, hangtime.
+- Scene `src/scenes/minigames/kick.js` (`kick` for all four types): AIM (pink bullseye over the crossbar / ring+beam on the turf sweeps,
+  period 2.4 s x tol; nerves wobble on clutch/gw unless icewater, scaled by IQ) then POWER (ping-pong meter, green sweet spot from
+  `need` = carry needed to clear the bar incl. headwind; band scales with tol/skill/call/automatic). Real ball physics (G 10.7 yd/s2,
+  wind x 0.35, hook from over-swing, launch 35 deg FG), uprights (POST_HALF 3.08) and crossbar (BAR 3.33) doinks, blocks on weak kicks.
+  Kickoff: landing spot -> touchback / pinned / return (returner + tackle) / out of bounds; onside: 10 yards, recovery odds. Results
+  carry `kick: true` (endPlay skips its own banner). Holder 'kneel' hold + 'kick' action in actors.js; `stadium.setPosts(o)`.
+  sfx.kick / sfx.doink. Debug: `globalThis.__kick` when __playDebug (aim/power/zone/cam override). Practice: Kicker chip.
+- Achievements: `src/sim/achievements.js` (`ACHIEVEMENTS` with when game|season|career|retire, tier 1-3 = 25/60/120 XP + fame,
+  `checkAchievements(state, moment, { g, team })`, `achievementSummary`). Called in finishGame (lastGame.newAch, lastGame.comeback from
+  g.half), endSeason (review.newAch) and retire (legacy.newAch). UI `src/ui/screens/achievements.js`: Career > Achievements page,
+  `achUnlockRows` on postgame/review. Friend cards carry `ach` + an Achievements leaderboard.
+- Coach's goals: `src/sim/goals.js` `setSeasonGoals` (beginWeek at week 0 of a new year/stage: main stat from PER_GAME x games x ovr
+  factor (backup x0.35), second stat or grade goal (backup: win the job), team goal wins/playoffs), `goalProgress`, `resolveGoals`
+  (endSeason: XP, coach, fame, pro $40K each; all missed = coach -3). Week tab `goalsCard`, review `goalsReview`. Tests: round16.

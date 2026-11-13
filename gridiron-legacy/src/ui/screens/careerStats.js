@@ -62,7 +62,7 @@ export function careerStatsSections(app) {
     card('trophy', t.ind, 'Individual awards', `${t.team} team title${t.team === 1 ? '' : 's'}`),
     card('scroll', seasons, 'Seasons', `${teams} team${teams === 1 ? '' : 's'}`),
     card('bolt', bestPerf ? Math.round(bestPerf) : '-', 'Best season rating', ''),
-    card('flame', p.position === 'MS' ? (cs.stunts ?? 0) : ['CB', 'DT'].includes(p.position) ? bigPlaysD(cs) : totalTD(cs), p.position === 'MS' ? 'Halftime stunts landed' : ['CB', 'DT'].includes(p.position) ? 'Big plays (INT + sacks)' : 'Total touchdowns', ''))));
+    card('flame', p.position === 'K' ? (cs.fgMade ?? 0) * 3 + (cs.xpMade ?? 0) : p.position === 'MS' ? (cs.stunts ?? 0) : ['CB', 'DT'].includes(p.position) ? bigPlaysD(cs) : totalTD(cs), p.position === 'K' ? 'Points kicked' : p.position === 'MS' ? 'Halftime stunts landed' : ['CB', 'DT'].includes(p.position) ? 'Big plays (INT + sacks)' : 'Total touchdowns', ''))));
 
   // by season
   const rows = p.history.map((x) => ({ year: x.year, stage: x.stage, team: x.teamId, colors: x.colors, s: x.seasonStats, perf: x.perf, champ: x.champion }));

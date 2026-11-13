@@ -147,7 +147,8 @@ export function gameRatings(state, league, teamId, { userPlaying = true } = {}) 
       // A cornerback lifts the defense instead of the offense.
       if (userPlaying) def = def * 0.92 + p.ovr * 0.08 + chem;
       else def = def * 0.96 + chem - 2;
-    } else if (userPlaying) off = off * 0.92 + p.ovr * 0.08 + chem;
+    } else if (userPlaying && p.position === 'K') off = off * 0.96 + p.ovr * 0.04 + chem * 0.5; // a kicker matters, but less than a QB
+    else if (userPlaying) off = off * 0.92 + p.ovr * 0.08 + chem;
     else off = off * 0.96 + chem - 2;
   }
   return { off, def };

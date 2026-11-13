@@ -16,6 +16,7 @@ export function mainStats(pos, s = {}) {
     case 'WR': return [['recYds', 'Rec Yds', s.recYds ?? 0], ['recTD', 'Rec TD', s.recTD ?? 0]];
     case 'CB': return [['defInt', 'INT', s.defInt ?? 0], ['tackles', 'Tackles', s.tackles ?? 0]];
     case 'DT': return [['defSacks', 'Sacks', s.defSacks ?? 0], ['tackles', 'Tackles', s.tackles ?? 0]];
+    case 'K': return [['fgMade', 'FG', s.fgMade ?? 0], ['fgLong', 'Long', s.fgLong ?? 0]];
     case 'MS': return [['hype', 'Hype', s.hype ?? 0], ['danceWins', 'Showdown Wins', s.danceWins ?? 0]];
     default: return [['tackles', 'Tackles', s.tackles ?? 0], ['games', 'Games', s.games ?? 0]];
   }

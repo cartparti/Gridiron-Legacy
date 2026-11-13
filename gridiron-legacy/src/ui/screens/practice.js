@@ -18,6 +18,7 @@ const BY_POS = {
   CB: ['cb_cover', 'cb_tackle'],
   DT: ['dt_rush', 'dt_run'],
   MS: ['ms_hype', 'ms_tshirt', 'ms_rival', 'ms_stunt'],
+  K: ['k_fg', 'k_pat', 'k_kickoff', 'k_onside'],
 };
 const HOW = {
   qb_throw: 'Read the coverage and hit the open man before the rush gets you.',
@@ -39,6 +40,10 @@ const HOW = {
   ms_tshirt: 'Fire the T-shirt cannon at fans waving in the stands.',
   ms_rival: 'Copy the other mascot\'s dance combo, then settle it.',
   ms_stunt: 'Trampoline backflips at halftime. Stick the landing.',
+  k_fg: 'Read the wind, set your aim, then nail the power sweet spot. Field position sets the distance.',
+  k_pat: 'The extra point. Should be automatic... should be.',
+  k_kickoff: 'Boom it deep: a touchback or a high kick that pins them inside the 20.',
+  k_onside: 'Down late: a short, bouncing kick your team has to recover.',
 };
 const LEVELS = { rookie: ['Rookie', 55], starter: ['Starter', 70], star: ['Star', 84], legend: ['Legend', 96] };
 const OPPS = { weak: ['Weak', -1.1], even: ['Even', 0], tough: ['Tough', 0.7], elite: ['Elite', 1.4] };
@@ -54,6 +59,9 @@ function buildMoment(type, spot, weather) {
   if (type === 'qb_hailmary') yardLine = 40 + Math.floor(Math.random() * 15);
   let down = spot === 'two' ? 1 : 1 + Math.floor(Math.random() * 3);
   let distance = Math.min(yardLine, down === 1 ? 10 : 2 + Math.floor(Math.random() * 9));
+  if (type === 'k_fg') yardLine = spot === 'red' ? 3 + Math.floor(Math.random() * 12) : spot === 'goal' ? 1 + Math.floor(Math.random() * 4) : spot === 'own' ? 33 + Math.floor(Math.random() * 12) : 5 + Math.floor(Math.random() * 30);
+  if (type === 'k_pat') yardLine = 15;
+  if (type === 'k_kickoff' || type === 'k_onside') yardLine = 65;
   const pusher = type === 'rb_push';
   if (pusher) type = 'qb_sneak';
   if (type === 'qb_sneak') { down = Math.random() < 0.3 ? 4 : 3; distance = 1; }
@@ -64,7 +72,7 @@ function buildMoment(type, spot, weather) {
   return {
     type, defense, down, distance, yardLine, quarter: spot === 'two' ? 4 : 1 + Math.floor(Math.random() * 4), clock: spot === 'two' ? '1:48' : '8:12',
     weather, wind: { x: Math.cos(ang) * wmph * 0.7, z: Math.sin(ang) * wmph * 0.7, mph: Math.round(wmph * 2.2) },
-    label: type.startsWith('ms_') ? 'In the costume' : `${ords[down]} and ${yardLine <= distance ? 'Goal' : distance} at ${side}`,
+    label: type === 'k_fg' ? `${yardLine + 17}-yard field goal` : type === 'k_pat' ? 'Extra point' : type === 'k_kickoff' ? 'Kickoff' : type === 'k_onside' ? 'Onside kick' : type.startsWith('ms_') ? 'In the costume' : `${ords[down]} and ${yardLine <= distance ? 'Goal' : distance} at ${side}`,
     situation: spot === 'two' ? 'Two-minute drill' : 'Practice', practice: true, pusher,
   };
 }
@@ -119,7 +127,7 @@ export function practiceScreen(app) {
           h('span.tiny.muted', `${reps} rep${reps === 1 ? '' : 's'} · avg ${grade(avg)}`))) : null,
       h('div.card',
         h('h2', 'Position'),
-        chips('pos', { QB: 'QB', RB: 'RB', WR: 'WR', CB: 'CB', DT: 'DT', MS: 'Mascot' }),
+        chips('pos', { QB: 'QB', RB: 'RB', WR: 'WR', CB: 'CB', DT: 'DT', K: 'Kicker', MS: 'Mascot' }),
         h('div.col', { style: { gap: '8px', marginTop: '12px' } }, types.map((t) =>
           h('button.practice-ev', { onclick: () => play(t) },
             h('div.grow', h('b', MOMENT_NAMES[t]), h('div.tiny.muted', HOW[t])),

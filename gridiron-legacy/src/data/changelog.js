@@ -1,5 +1,14 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.54', date: 'Nov 13', title: 'Kicker, achievements and coach\'s goals', items: [
+    'New position: Kicker. Start a career as your school\'s kicker and kick your way to the pros. You come on when your offense scores or stalls in range: field goals, extra points, kickoffs and, when you\'re behind late, onside kicks. Tied or down by 3 at the end? The game is on your foot.',
+    'Kicking is two taps: AIM (a pink marker slides across the goalposts; aim into the wind) and POWER (tap in the green sweet spot; too weak falls short, past the green you hook it). The ball really flies: wind drift, hooks, doinks off the uprights and the crossbar, and low kicks get blocked.',
+    'Kickoffs: pick a landing spot and boom it. A touchback, pinning them deep or a short return all change their next drive, and kicking it out of bounds hands them the 40. Onside kicks have to go 10 yards, then your team fights for it.',
+    'Kicker stats (field goals, extra points, longest, touchbacks, game-winners), kicker awards (Special Teams Player of the Year), records for most field goals and the longest kick, and five kicker traits: Big Leg, Automatic, Ice Water, Wind Reader and Hang Time. Try every kick in Practice (pick Kicker).',
+    'New: Achievements. 50+ career milestones for every position: your first win, an A+ game, beating your rival, a comeback, 300-yard games, pick sixes, 50-yard field goals, a perfect season, titles, records, the Hall of Fame. Each pays XP (Bronze, Silver, Gold) and shows up after the game. See them all in Career, then Achievements, and compare counts with friends on the leaderboard.',
+    'New: Coach\'s Goals. Before every season your coach sets three goals (a stat target that fits your position and level, a second stat or a game-grade goal, and a team goal; backups are told to win the job). Watch your progress on the Week tab. Every goal you hit pays XP, coach trust, fame and, in the pros, a bonus check.',
+    'Smaller fixes: the game log names missed field goals, the key-moment list on the postgame report says what happened on every kind of play.',
+  ] },
   { v: '0.53', date: 'Nov 13', title: 'Tougher run defense at corner', items: [
     'Cornerback run plays are harder. The receiver across from you usually comes to block you instead of running a route, and the playside guard pulls to lead the sweep and looks for you too.',
     'When you\'re blocked, a LEVERAGE meter shows up: keep pushing to fight through, or tap TACKLE to try to shed him. Mashing doesn\'t work: a missed shed costs you a beat. Stronger corners shed faster, and size matters.',

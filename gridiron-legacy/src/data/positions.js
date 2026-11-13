@@ -96,6 +96,22 @@ POSITIONS.MS = {
 };
 export const isMascotPos = (pos) => pos === 'MS';
 
+// The kicker: field goals, extra points, kickoffs and the odd onside kick. You only come on when the offense
+// has done its job (or stalled close enough), but the game is often on your foot.
+POSITIONS.K = {
+  label: 'Kicker',
+  short: 'K',
+  weights: { speed: 0.1, skill: 0.38, iq: 0.2, strength: 0.32 },
+  blurb: 'Split the uprights. Read the wind, nail the extra points, boom kickoffs out of the end zone and win games with your foot.',
+  statNotes: {
+    speed: 'Tackling returners (rarely)',
+    skill: 'Accuracy: a steadier aim and a bigger sweet spot',
+    iq: 'Composure: nerves in clutch kicks',
+    strength: 'Leg strength: range and kickoff distance',
+  },
+};
+export const isKickerPos = (pos) => pos === 'K';
+
 /** Background picked at character creation: shapes starting stats. */
 export const BACKGROUNDS = [
   { id: 'natural', label: 'Natural Athlete', desc: 'Born fast. Everything else is a work in progress.', stats: { speed: 8, skill: 0, iq: -3, strength: 1 } },

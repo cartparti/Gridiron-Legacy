@@ -17,6 +17,10 @@ export function seasonPerf(pos, s) {
     prod = ((s.defSacks ?? 0) / g / 0.75) * 36 + ((s.tfl ?? 0) / g / 1.2) * 20 + (s.tackles / g / 4.5) * 16 + (s.pd / g / 1.5) * 4 + 8;
   } else if (pos === 'CB') {
     prod = (s.defInt / g / 0.4) * 32 + (s.pd / g / 1.4) * 22 + (s.tackles / g / 4.5) * 18 + (s.defTD / g / 0.1) * 8 - (s.ydsAllowed / g / 60) * 12 - (s.tdAllowed / g / 0.4) * 8 + 10;
+  } else if (pos === 'K') {
+    const pct = s.fgAtt ? s.fgMade / s.fgAtt : 0.75;
+    const xp = s.xpAtt ? s.xpMade / s.xpAtt : 0.95;
+    prod = ((s.fgMade ?? 0) / g / 2.0) * 30 + (pct - 0.75) * 120 + (xp - 0.93) * 50 + Math.max(0, (s.fgLong ?? 0) - 48) * 0.5 + ((s.touchbacks ?? 0) / g / 1.5) * 5 + ((s.gameWinners ?? 0) / g / 0.1) * 4 + 24;
   } else if (pos === 'MS') {
     prod = ((s.hype ?? 0) / g / 72) * 55 + ((s.danceWins ?? 0) / g / 0.6) * 15 + ((s.stunts ?? 0) / g / 0.35) * 10 + ((s.shirts ?? 0) / g / 5) * 8;
   } else {
@@ -33,6 +37,7 @@ const STAT_CATS = {
   CB: [['defInt', 'Interceptions'], ['defTD', 'Defensive TDs']],
   DT: [['defSacks', 'Sacks'], ['tfl', 'Tackles for Loss']],
   MS: [['hype', 'Crowd Hype'], ['danceWins', 'Mascot Showdown Wins']],
+  K: [['fgMade', 'Field Goals Made'], ['fgLong', 'Longest Field Goal']],
 };
 
 // Mascots win the same awards under their own names (the internal names keep legacy and history working).
@@ -44,14 +49,15 @@ const MASCOT_AWARDS = {
   'Legacy Bowl MVP': 'Legacy Bowl Halftime Hero',
 };
 /** What an award is called for this position (mascots get their own names). */
-export const awardLabel = (name, pos) => (pos === 'MS' ? MASCOT_AWARDS[name] ?? name : name);
+const KICKER_AWARDS = { 'Offensive Player of the Year': 'Special Teams Player of the Year', 'Defensive Player of the Year': 'Special Teams Player of the Year' };
+export const awardLabel = (name, pos) => (pos === 'MS' ? MASCOT_AWARDS[name] ?? name : pos === 'K' ? KICKER_AWARDS[name] ?? name : name);
 
 /** Generated stat leaders for the pro league (the competition you're measured against). */
 export function genLeaders(state, league) {
   const leaders = {};
   const scale = { passYds: [3600, 70], passTD: [26, 0.7], rushYds: [1150, 30], rushTD: [10, 0.4], recYds: [1150, 30], recTD: [9, 0.35], defInt: [6, 0.2], defTD: [1.5, 0.06], defSacks: [12, 0.35], tfl: [15, 0.35] };
   for (const [pos, cats] of Object.entries(STAT_CATS)) {
-    if (pos === 'MS') continue; // no generated rival mascots in the stat tables
+    if (pos === 'MS' || pos === 'K') continue; // no generated rival mascots / kickers in the stat tables
     const top = league.players.filter((p) => p.pos === (pos === 'DT' ? 'DL' : pos)).sort((a, b) => b.ovr - a.ovr).slice(0, 3);
     for (const [key] of cats) {
       leaders[key] = top.map((pl) => {
@@ -78,6 +84,8 @@ export function seedRecords(state) {
       tfl: { value: 39, holder: 'Hollis "Hammer" Grant', year: 2013 },
       hype: { value: 1240, holder: 'Sir Growls-a-Lot', year: 2008 },
       danceWins: { value: 9, holder: 'Big Red Bertie', year: 2015 },
+      fgMade: { value: 44, holder: 'Sven Ostrander', year: 2003 },
+      fgLong: { value: 64, holder: 'Paco Villaseñor', year: 2013 },
     },
     career: {
       passYds: { value: 68400, holder: 'Ty Prescott', year: 2019 },
@@ -92,13 +100,15 @@ export function seedRecords(state) {
       tfl: { value: 230, holder: 'Hollis "Hammer" Grant', year: 2020 },
       hype: { value: 15800, holder: 'Sir Growls-a-Lot', year: 2017 },
       danceWins: { value: 96, holder: 'Big Red Bertie', year: 2022 },
+      fgMade: { value: 599, holder: 'Sven Ostrander', year: 2016 },
+      fgLong: { value: 64, holder: 'Paco Villaseñor', year: 2013 },
     },
   };
 }
 
 export const RECORD_LABELS = {
   passYds: 'Passing Yards', passTD: 'Passing TDs', rushYds: 'Rushing Yards',
-  rushTD: 'Rushing TDs', recYds: 'Receiving Yards', recTD: 'Receiving TDs', defInt: 'Interceptions', defTD: 'Defensive TDs', defSacks: 'Sacks', tfl: 'Tackles for Loss', hype: 'Crowd Hype', danceWins: 'Mascot Showdown Wins',
+  rushTD: 'Rushing TDs', recYds: 'Receiving Yards', recTD: 'Receiving TDs', defInt: 'Interceptions', defTD: 'Defensive TDs', defSacks: 'Sacks', tfl: 'Tackles for Loss', hype: 'Crowd Hype', danceWins: 'Mascot Showdown Wins', fgMade: 'Field Goals Made', fgLong: 'Longest Field Goal',
 };
 
 /** Check the user's (and the league leaders') numbers against the record book. */

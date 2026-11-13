@@ -620,6 +620,8 @@ export function buildStadium(scene) {
       // Fade the goalposts when the play is close enough for them to block the view.
       postMat.opacity = yardLine < 35 ? 0.3 : 1;
     },
+    /** Goalpost opacity (kicks want them solid). */
+    setPosts(o = 1) { postMat.opacity = o; },
     hideLines() { los.visible = false; fd.visible = false; losStick.visible = false; fdStick.visible = false; },
     /** Update the big screen: { home, away, homePts, awayPts, homeColors, awayColors, clock } */
     setScoreboard(info) { drawJumbo(info); },

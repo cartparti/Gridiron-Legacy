@@ -33,6 +33,8 @@ import { injuryInfo, injuryStatus } from './injury.js';
 import { addNews, postGamePress } from './press.js';
 import { addXp } from './progress.js';
 import { checkTraitUnlocks } from './traits.js';
+import { checkAchievements } from './achievements.js';
+import { setSeasonGoals, resolveGoals } from './goals.js';
 import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf, recordLeagueAwards } from './awards.js';
 import { computeLegacy } from './legacy.js';
 import { genTeammates } from './social.js';
@@ -108,6 +110,8 @@ function newCoach(state) {
 export function beginWeek(state) {
   const p = state.player;
   const c = state.career;
+  // a new season: the coach sets your goals before week 1
+  if (state.league?.phase === 'regular' && (state.league.week ?? 0) === 0 && (state.goals?.year !== c.year || state.goals?.stage !== c.stage)) setSeasonGoals(state);
   // Trades and transfers only take effect during the regular season, never mid-playoffs.
   if (c.pendingMove && !getTeam(state.league, c.pendingMove)) delete c.pendingMove; // stale (changed leagues)
   if (c.pendingMove && state.league.phase === 'regular') {
@@ -274,6 +278,8 @@ export function finishGame(state) {
     log: g.log,
     weather: g.weather,
   };
+  state.lastGame.comeback = !!g.half && (g.half.score[g.userSide === 'home' ? 'away' : 'home'] - g.half.score[g.userSide]) >= 10;
+  state.lastGame.newAch = checkAchievements(state, 'game', { g: state.lastGame }).map((a) => a.id);
   postGameTexts(state, state.lastGame);
   state.game = null;
   state.phase = 'postgame';
@@ -320,6 +326,8 @@ export function endSeason(state) {
   const titleGrade = champion && state.lastGame?.isTitle ? state.lastGame.grade : 0;
   const aw = seasonAwards(state, { champion, titleGrade, rookie: c.stage === 'pro' && proSeasonsBefore === 0, missedLastSeason });
   const records = c.stage === 'pro' ? checkRecords(state, league) : [];
+  const goals = resolveGoals(state);
+  const newAch = checkAchievements(state, 'season', { team }).map((a) => a.id);
   recordLeagueAwards(state, aw.awards);
   addXp(state, aw.awards.length * 60 + (champion ? 120 : 0));
   const entry = {
@@ -385,6 +393,8 @@ export function endSeason(state) {
     ovrAfter: Math.round(p.ovr * 10) / 10,
     seasonStats: { ...p.seasonStats },
     leaders: league.leaders,
+    goals,
+    newAch,
     standings: standings(league).map((t) => ({ id: t.id, w: t.w, l: t.l })),
   };
   state.phase = 'review';
@@ -717,6 +727,7 @@ export function retire(state, reason) {
   state.career.stage = 'retired';
   state.legacy = computeLegacy(state);
   state.legacy.reason = reason;
+  state.legacy.newAch = checkAchievements(state, 'retire').map((a) => a.id);
   state.phase = 'retired';
   addNews(state, 'story', `${p.first} ${p.last} retires. Legacy: ${state.legacy.tier.label}.`);
 }

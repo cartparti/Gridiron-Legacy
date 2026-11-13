@@ -2026,7 +2026,7 @@ function celebPose(c, t, P, u, m) {
   }
 }
 
-const ACTION_DUR = { slip: 0.55, stuck: 0.45, throw: 0.55, catch: 0.5, jump: 0.7, juke: 0.35, spin: 0.5, stiff: 0.6, dive: 0.7, tackle: 0.55, lunge: 0.4, fall: 0.5, getup: 0.7, wave: 1.2, spike: 0.9, release: 0.3, cut: 0.25 };
+const ACTION_DUR = { slip: 0.55, stuck: 0.45, throw: 0.55, catch: 0.5, jump: 0.7, juke: 0.35, spin: 0.5, stiff: 0.6, dive: 0.7, tackle: 0.55, lunge: 0.4, fall: 0.5, getup: 0.7, wave: 1.2, spike: 0.9, release: 0.3, cut: 0.25, kick: 0.85 };
 
 /** Pose for this frame. Returns target joint angles. */
 function computePose(u, dt) {
@@ -2109,6 +2109,7 @@ function computePose(u, dt) {
   if (hold === 'sit') { P.y = -0.45; P.lh = 1.55; P.rh = 1.55; P.lk = 1.55; P.rk = 1.55; P.ls = 0.4; P.rs = 0.4; P.le = 1.1; P.re = 1.1; }
   if (hold === 'wave') { P.rs = 2.8; P.re = 0.6 + Math.sin(u.phase * 6) * 0.4; }
   if (hold === 'reach') { P.spine = 0.38; P.rs = 1.05; P.re = 0.25; P.rout = 0.05; P.ls = 0.3; P.le = 0.4; P.head = -0.25; } // reach for something on a table
+  if (hold === 'kneel') { P.y = -0.52; P.lh = 1.45; P.lk = 1.55; P.rh = -0.15; P.rk = 1.95; P.spine = 0.35; P.ls = 1.0; P.rs = 1.0; P.le = 0.5; P.re = 0.5; P.lout = -0.15; P.rout = 0.15; P.head = -0.2; } // the holder: one knee down, hands out for the snap
   if (hold === 'hatOn') { P.ls = 2.75; P.rs = 2.75; P.le = 1.75; P.re = 1.75; P.lout = -0.35; P.rout = 0.35; } // both hands up at the head
   // nobody holds a stance like a statue: breathing, small weight shifts, eyes moving
   if (hold === 'stance' || hold === 'block' || hold === 'tackle' || hold === 'sit') {
@@ -2147,6 +2148,14 @@ function computePose(u, dt) {
       }
       case 'spike': if (p < 0.5) { P.rs = 2.8; P.re = 0.2; u.hop = Math.max(u.hop, k * 0.5); } else { P.rs = 2.8 - 4.2 * ((p - 0.5) / 0.5); P.spine = 0.6; } break;
       case 'wave': P.rs = 2.8; P.re = 0.6 + Math.sin(act.t * 14) * 0.4; break;
+      case 'kick': { // plant the left foot, right leg cocks back, then whips through and follows up high
+        const lead = act.dir ?? 1; // 1 = right-footed
+        const H = lead > 0 ? 'rh' : 'lh', K = lead > 0 ? 'rk' : 'lk', PH = lead > 0 ? 'lh' : 'rh', PK = lead > 0 ? 'lk' : 'rk';
+        const AS = lead > 0 ? 'ls' : 'rs', AO = lead > 0 ? 'lout' : 'rout', BS = lead > 0 ? 'rs' : 'ls';
+        if (p < 0.38) { const w = smooth01(p / 0.38); P[H] = -0.95 * w; P[K] = 1.6 * w; P[PH] = 0.25 * w; P[PK] = 0.35 * w; P.spine = -0.12 * w; P[AS] = 1.0 * w; P[AO] = (lead > 0 ? 0.9 : -0.9) * w; P[BS] = -0.5 * w; P.y = -0.05 * w; }
+        else { const w = 1 - Math.pow(1 - Math.min(1, (p - 0.38) / 0.3), 3); const f = Math.max(0, (p - 0.68) / 0.32); P[H] = -0.95 + 2.75 * w - 0.5 * f; P[K] = 1.6 - 1.5 * w + 0.3 * f; P[PH] = 0.25 - 0.1 * w; P[PK] = 0.35 - 0.2 * w; P.spine = -0.12 - 0.12 * w; P[AS] = 1.0 + 0.6 * w; P[AO] = (lead > 0 ? 0.9 : -0.9); P[BS] = -0.5 + 0.4 * w; P.y = -0.05 + 0.05 * w; u.hop = Math.max(u.hop, 0.25 * Math.sin(Math.min(1, (p - 0.45) / 0.45) * Math.PI)); }
+        break;
+      }
       default: break;
     }
     // fade in over the first ~0.1 s; actions that return to normal also fade out over the last ~0.15 s
@@ -2419,7 +2428,7 @@ function groundContact(p, dt) {
   const u = p.userData.u;
   const r = p.userData.rig;
   const act = u.action?.name;
-  const need = !u.rag && (u.down || Math.abs(r.body.rotation.x) > 0.45 || act === 'dive' || act === 'tackle' || act === 'fall' || act === 'getup' || act === 'lunge' || u.hold === 'dive' || u.hold === 'getup' || u.hold === 'stance');
+  const need = !u.rag && (u.down || Math.abs(r.body.rotation.x) > 0.45 || act === 'dive' || act === 'tackle' || act === 'fall' || act === 'getup' || act === 'lunge' || u.hold === 'dive' || u.hold === 'getup' || u.hold === 'stance' || u.hold === 'kneel');
   if (!need) { if (u.gfix) u.gfix *= Math.max(0, 1 - dt * 6); if (Math.abs(u.gfix ?? 0) < 0.002) u.gfix = 0; return; }
   // only the joints we measure (and their parents) need fresh matrices, not every mesh on the body
   r.body.updateWorldMatrix(true, false);

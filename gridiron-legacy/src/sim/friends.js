@@ -8,6 +8,7 @@ import { HOME_UPGRADES } from '../data/home.js';
 import { placeFor } from '../data/places.js';
 import { mascotKind, mascotDisplayName } from '../data/mascots.js';
 import { POSITIONS } from '../data/positions.js';
+import { achievementSummary } from './achievements.js';
 
 export const CARD_VERSION = 1;
 export const MAX_FRIENDS = 60;
@@ -43,7 +44,7 @@ export function friendCard(state) {
     ovr: Math.round(p.ovr ?? 0), level: p.level ?? 1, fame: Math.round(p.fame ?? 0), money: Math.round(p.money ?? 0),
     legacy: L.score, tier: L.tier?.label ?? '',
     awards: Object.entries(counts).map(([n, c]) => [awardLabel(n, p.position), c]),
-    ind: myTrophies(p).ind, titles: (p.titles ?? []).length, records: (p.records ?? []).length,
+    ind: myTrophies(p).ind, titles: (p.titles ?? []).length, records: (p.records ?? []).length, ach: achievementSummary(p).done,
     games: cs.games ?? 0, wins: cs.wins ?? 0,
     stats: mainStats(p.position, cs).map(([, label, v]) => [label, Math.round(v)]),
     seasons: (p.history ?? []).length,
@@ -69,7 +70,7 @@ export function cleanCard(c) {
     ovr: num(c.ovr, 0, 99), level: num(c.level, 1, 999), fame: num(c.fame, 0, 100), money: num(c.money, -1e12, 1e12),
     legacy: num(c.legacy, -1e6, 1e6), tier: str(c.tier, 30),
     awards: Array.isArray(c.awards) ? c.awards.slice(0, 40).filter(Array.isArray).map(([n, k]) => [str(n, 50), num(k, 0, 999)]).filter(([n]) => n) : [],
-    ind: num(c.ind, 0, 999), titles: num(c.titles, 0, 99), records: num(c.records, 0, 99),
+    ind: num(c.ind, 0, 999), titles: num(c.titles, 0, 99), records: num(c.records, 0, 99), ach: num(c.ach, 0, 999),
     games: num(c.games, 0, 9999), wins: num(c.wins, 0, 9999),
     stats: Array.isArray(c.stats) ? c.stats.slice(0, 4).filter(Array.isArray).map(([l, v]) => [str(l, 20), num(v, -1e6, 1e7)]) : [],
     seasons: num(c.seasons, 0, 60),
@@ -98,6 +99,7 @@ export const BOARDS = {
   ovr: { label: 'Overall', value: (c) => c.ovr, fmt: (v) => `${v} OVR` },
   awards: { label: 'Awards', value: (c) => c.ind, fmt: (v) => `${v} awards` },
   titles: { label: 'Titles', value: (c) => c.titles, fmt: (v) => `${v} titles` },
+  ach: { label: 'Achievements', value: (c) => c.ach ?? 0, fmt: (v) => `${v} unlocked` },
   fame: { label: 'Fame', value: (c) => c.fame, fmt: (v) => `${v} fame` },
   money: { label: 'Money', value: (c) => c.money, fmt: money },
 };

@@ -31,6 +31,12 @@ export const TRAITS = [
   { id: 'motor', pos: 'DT', name: 'Relentless Motor', icon: 'flame', desc: 'Leverage builds 40% faster.', goal: { stat: 'tackles', n: 60, label: 'Career tackles' } },
   { id: 'batter', pos: 'DT', name: 'Batting Practice', icon: 'target', desc: 'Batting passes at the line is much easier.', goal: { stat: 'games', n: 20, label: 'Career games' } },
   { id: 'closer', pos: 'DT', name: 'Sack Artist', icon: 'star', desc: 'Your sack lunge reaches 30% farther.', goal: { stat: 'defSacks', n: 5, label: 'Career sacks' } },
+  // ---------------- K
+  { id: 'bigleg', pos: 'K', name: 'Big Leg', icon: 'dumbbell', desc: '+5 yards of field goal range and longer kickoffs.', goal: { stat: 'fgLong', n: 50, label: 'Longest field goal (yards)' } },
+  { id: 'automatic', pos: 'K', name: 'Automatic', icon: 'target', desc: 'The sweet spot on your power meter is 30% bigger.', goal: { stat: 'fgMade', n: 30, label: 'Career field goals' } },
+  { id: 'icewater', pos: 'K', name: 'Ice Water', icon: 'snow', desc: 'No shaky aim on clutch and game-winning kicks.', goal: { stat: 'gameWinners', n: 1, label: 'Game-winning kicks' } },
+  { id: 'windreader', pos: 'K', name: 'Wind Reader', icon: 'clipboard', desc: 'See exactly where the wind will carry the ball.', goal: { stat: 'games', n: 20, label: 'Career games' } },
+  { id: 'hangtime', pos: 'K', name: 'Hang Time', icon: 'star', desc: 'Kickoffs and onside kicks are easier to place.', goal: { stat: 'touchbacks', n: 20, label: 'Career touchbacks' } },
   // ---------------- mascot
   { id: 'showman', pos: 'MS', name: 'Born Showman', icon: 'star', desc: 'Beat windows in Hype the Crowd are 30% bigger.', goal: { stat: 'hype', n: 400, label: 'Career crowd hype' } },
   { id: 'cannonarm', pos: 'MS', name: 'Cannon Arm', icon: 'target', desc: 'One extra T-shirt and bigger targets.', goal: { stat: 'shirts', n: 40, label: 'Career shirts landed' } },

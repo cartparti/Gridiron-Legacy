@@ -28,6 +28,7 @@ const MOMENT_POOL = {
   CB: [['cb_cover', 6], ['cb_tackle', 3]],
   DT: [['dt_rush', 6], ['dt_run', 3]],
   MS: [['ms_hype', 5], ['ms_tshirt', 3], ['ms_rival', 2.5], ['ms_stunt', 2]],
+  K: [['k_fg', 1]], // kicker moments come from scoring drives (see kickerDrive)
 };
 export const MOMENT_NAMES = {
   qb_throw: 'Pass Play', qb_scramble: 'Scramble', qb_hailmary: 'Hail Mary',
@@ -36,6 +37,7 @@ export const MOMENT_NAMES = {
   cb_cover: 'Coverage', cb_tackle: 'Open-Field Tackle',
   dt_rush: 'Pass Rush', dt_run: 'Run Stop',
   ms_hype: 'Hype the Crowd', ms_tshirt: 'T-Shirt Cannon', ms_rival: 'Mascot Showdown', ms_stunt: 'Halftime Stunt',
+  k_fg: 'Field Goal', k_pat: 'Extra Point', k_kickoff: 'Kickoff', k_onside: 'Onside Kick',
 };
 const PASS_TYPES = new Set(['qb_throw', 'qb_hailmary', 'wr_route', 'wr_jumpball', 'wr_toetap', 'rb_screen', 'cb_cover', 'dt_rush']);
 const DEEP_TYPES = new Set(['qb_hailmary', 'wr_jumpball']);
@@ -46,6 +48,12 @@ export const DEF_POSITIONS = new Set(['CB', 'DT']);
 export const isDefense = (state) => DEF_POSITIONS.has(state.player.position);
 export const isMascot = (state) => state.player.position === 'MS';
 export const MASCOT_TYPES = new Set(['ms_hype', 'ms_tshirt', 'ms_rival', 'ms_stunt']);
+export const isKicker = (state) => state.player.position === 'K';
+export const KICK_TYPES = new Set(['k_fg', 'k_pat', 'k_kickoff', 'k_onside']);
+/** Field goal distance in yards from the ball's yard line (snap 7 yards back + 10 yard end zone). */
+export const fgDistance = (yardLine) => yardLine + 17;
+/** Extra point spot: the 15 in the pros, the 3 below. */
+export const patYardLine = (stage) => (stage === 'pro' ? 15 : 3);
 
 export function momentCount(state, { playoff, rivalry }) {
   // backups only get a couple of late snaps (earn the job to get more)
@@ -117,6 +125,7 @@ export function createUserGame(state, league, sched, { playoff = false, round = 
   if (n > 0) chosen.add(candidates.length - 2 - randInt(state, 0, 1)); // something late for drama
   let guard = 0;
   while (chosen.size < Math.min(n, candidates.length - 1) && guard++ < 200) chosen.add(randInt(state, 0, candidates.length - 2));
+  if (state.player.position === 'K') chosen.clear(); // the kicker comes on when a drive scores (kickerDrive)
   for (const idx of chosen) candidates[idx].moment = true;
 
   return {
@@ -126,7 +135,7 @@ export function createUserGame(state, league, sched, { playoff = false, round = 
     score: { home: 0, away: 0 },
     toBonus: { home: 0, away: 0 },
     drives, cursor: 0, log: [], pending: null, pendingDecision: null, pendingEvent: null,
-    moments: [], userStats: emptyStats(), finished: false, week: state.league.week,
+    moments: [], userStats: emptyStats(), finished: false, week: state.league.week, kMax: n, kUsed: 0,
     momentum: 0, tolMod: 1, extraPending: sitOut ? 0 : (state.week?.extraMoments ?? 0), skipNext: false, flagNext: false, userOut: false,
     eventsFired: [], pregameDone: false, halfDone: false, twoMinDone: false,
     // game plan, energy and live rating (shown on the match screen)
@@ -172,7 +181,11 @@ export function stepGame(state) {
     if (g.halfDone && g.halftimeUI && !g.halftimeShown) { g.halftimeShown = true; return { type: 'halftime' }; }
     const active = !g.sitOut && !g.userOut;
     // Two-minute drill / final defensive stand.
-    if (active && !g.twoMinDone && d.quarter === 4 && isLastDriveFor(g, g.cursor, d.side) && d.side === g.momentSide) {
+    if (active && isKicker(state) && d.side === g.userSide && !d.kDone) {
+      d.kDone = true;
+      if (kickerDrive(state, g, d)) return { type: 'moment', moment: g.pending };
+    }
+    if (active && !isKicker(state) && !g.twoMinDone && d.quarter === 4 && isLastDriveFor(g, g.cursor, d.side) && d.side === g.momentSide) {
       const diff = userScore(g) - oppScore(g);
       const needed = isDefense(state) ? diff >= 1 && diff <= 8 : diff <= 0 && diff >= -8;
       if (needed) {
@@ -183,6 +196,7 @@ export function stepGame(state) {
         g.log.push({ q: 4, clock: '2:00', team: '', user: true, out: 'INFO', text: isDefense(state) ? 'Final stand: stop them to win!' : 'Two-minute drill: it\'s on you!', score: `${g.score.away}-${g.score.home}`, key: true });
       }
     }
+    if (active && g.extraPending > 0 && isKicker(state)) { g.kMax += g.extraPending; g.extraPending = 0; }
     if (active && g.extraPending > 0 && !d.moment && d.side === g.momentSide && g.cursor > 0) {
       d.moment = true;
       g.extraPending--;
@@ -201,8 +215,11 @@ export function stepGame(state) {
         return { type: 'moment', moment: g.pending };
       }
     }
-    let out = driveOutcome(state, g.ratings[d.side].off, g.ratings[otherSide(d.side)].def, g.toBonus[d.side] + momentumBonus(g, d.side) + planBonus(state, g, d.side));
-    out = planRisk(state, g, d.side, out);
+    let out = d.kOut;
+    if (!out) {
+      out = driveOutcome(state, g.ratings[d.side].off, g.ratings[otherSide(d.side)].def, g.toBonus[d.side] + momentumBonus(g, d.side) + planBonus(state, g, d.side));
+      out = planRisk(state, g, d.side, out);
+    }
     if (active && d.side === (isDefense(state) ? otherSide(g.userSide) : g.userSide)) g.energy = Math.max(0, (g.energy ?? 80) - 0.8);
     g.toBonus[d.side] = 0;
     finishDrive(state, g, d, out, null);
@@ -292,7 +309,7 @@ function buildMoment(state, g, d, over = {}) {
   // ...and now and then you're backed up deep in your own end
   else if (over.yardLine === undefined && !d.twoMin && chance(state, 0.06)) yardLine = randInt(state, 88, 97);
   let label = '';
-  if (g.flagNext && !isDefense(state)) {
+  if (g.flagNext && !isDefense(state) && !KICK_TYPES.has(over.type)) {
     yardLine = Math.min(95, yardLine + 15);
     g.flagNext = false;
     label = 'Penalty! ';
@@ -320,9 +337,10 @@ function buildMoment(state, g, d, over = {}) {
     twoMin: !!d.twoMin,
     weather: g.weather,
     wind: g.wind,
-    label: MASCOT_TYPES.has(type) ? `Q${d.quarter} · ${{ ms_hype: 'TV timeout: get them loud', ms_tshirt: 'Break in play: T-shirt time', ms_rival: 'Their mascot is coming over...', ms_stunt: 'Halftime show' }[type]}` : `${label}${ords[down]} and ${yardLine <= distance ? 'Goal' : distance} at ${yardText(yardLine)}`,
+    label: KICK_TYPES.has(type) ? kickLabel(state, type, yardLine, d.quarter) : MASCOT_TYPES.has(type) ? `Q${d.quarter} · ${{ ms_hype: 'TV timeout: get them loud', ms_tshirt: 'Break in play: T-shirt time', ms_rival: 'Their mascot is coming over...', ms_stunt: 'Halftime show' }[type]}` : `${label}${ords[down]} and ${yardLine <= distance ? 'Goal' : distance} at ${yardText(yardLine)}`,
     trailing: userScore(g) < oppScore(g),
-    situation: d.twoMin ? (isDefense(state) ? 'Final stand' : 'Two-minute drill') : clutch ? 'Clutch' : type === 'qb_sneak' ? 'Short yardage' : null,
+    situation: over.gw ? 'For the win!' : d.twoMin ? (isDefense(state) ? 'Final stand' : 'Two-minute drill') : clutch ? 'Clutch' : type === 'qb_sneak' ? 'Short yardage' : null,
+    gw: !!over.gw,
     pusher: type === 'qb_sneak' && state.player.position === 'RB',
   };
 }
@@ -384,6 +402,7 @@ export function outcomeFromQuality(state, m, q, call) {
   const res = { quality: q, yards: 0, td: false, turnover: false, sack: false, complete: false, call };
   if (m.defense) return defenseOutcome(state, m, q, call, res);
   if (MASCOT_TYPES.has(m.type)) return mascotOutcome(state, m, q, res);
+  if (KICK_TYPES.has(m.type)) return kickerOutcome(state, m, q, res);
   if (m.type === 'qb_sneak') {
     const need = Math.min(m.distance, m.yardLine);
     if (q > 0.42 || (q > 0.28 && chance(state, 0.35))) { res.complete = true; res.yards = need >= m.yardLine ? m.yardLine : need + (q > 0.8 ? 1 : 0); res.td = res.yards >= m.yardLine; res.text = res.td ? 'Pushed over the top! TOUCHDOWN!' : 'Tush push. First down!'; res.quality = Math.max(q, 0.68); }
@@ -500,6 +519,7 @@ export function resolveMoment(state, result) {
     (g.ratingHist ??= [6]).push(Math.round(g.rating * 10) / 10);
   }
   if (MASCOT_TYPES.has(m.type)) return resolveMascotMoment(state, g, d, m, result);
+  if (KICK_TYPES.has(m.type)) return resolveKickerMoment(state, g, d, m, result);
 
   if (m.defense) {
     s.tgtAgainst += m.type === 'cb_cover' ? 1 : 0;
@@ -651,6 +671,140 @@ function resolveMascotMoment(state, g, d, m, result) {
   return { outcome: out };
 }
 
+// ---------------- kicker
+function kickLabel(state, type, yl, q) {
+  if (type === 'k_fg') return `Q${q} · ${fgDistance(yl)}-yard field goal`;
+  if (type === 'k_pat') return `Q${q} · Extra point`;
+  if (type === 'k_onside') return `Q${q} · Onside kick: you need the ball back`;
+  return `Q${q} · Kickoff`;
+}
+/** How far this kicker can reach (yards) before misses get likely: strength = leg. */
+export function kickRange(state) {
+  const st = state.player.stats;
+  const lvl = { hs: -6, college: -2, pro: 0 }[state.career?.stage] ?? 0;
+  return Math.round(40 + (st.strength ?? 50) * 0.22 + lvl);
+}
+/**
+ * A user drive with a kicker: simulate it first. If it scores (TD -> extra point, FG -> field goal) you come on.
+ * Late and trailing by 1-3 (or tied), the last drive ends in a game-winning try. Returns true when a moment is pending.
+ */
+function kickerDrive(state, g, d) {
+  const diff = userScore(g) - oppScore(g);
+  const last = d.quarter === 4 && isLastDriveFor(g, g.cursor, d.side);
+  let out;
+  let gw = false;
+  if (last && diff <= 0 && diff >= -3) { out = 'FG'; gw = true; }
+  else {
+    out = driveOutcome(state, g.ratings[d.side].off, g.ratings[otherSide(d.side)].def, g.toBonus[d.side] + momentumBonus(g, d.side) + planBonus(state, g, d.side));
+    out = planRisk(state, g, d.side, out);
+    if (out === 'PUNT' && chance(state, 0.1)) out = 'FG'; // stalled near midfield: the coach sends you out for a long one
+    if (g.kUsed >= g.kMax || (out !== 'TD' && out !== 'FG')) { d.kOut = out; return false; }
+  }
+  g.toBonus[d.side] = 0;
+  g.kUsed++;
+  let yardLine;
+  if (out === 'TD') yardLine = patYardLine(state.career.stage);
+  else {
+    // where the drive stalled: mostly 20-45 yarders, sometimes a bomb
+    const range = kickRange(state);
+    const maxYl = Math.max(14, range - 17 + 6);
+    yardLine = Math.round(2 + Math.pow(rand(state), 0.85) * (maxYl - 2));
+    if (gw) yardLine = randInt(state, 12, Math.min(38, maxYl));
+  }
+  d.kScore = out;
+  g.pending = buildMoment(state, g, d, { type: out === 'TD' ? 'k_pat' : 'k_fg', yardLine, down: out === 'TD' ? 1 : 4, distance: out === 'TD' ? yardLine : 10, gw });
+  return true;
+}
+/** Chance-based kick result for sims and the bot (q 0..1). */
+function kickerOutcome(state, m, q, res) {
+  res.kick = true;
+  if (m.type === 'k_fg' || m.type === 'k_pat') {
+    const dist = fgDistance(m.yardLine);
+    const over = Math.max(0, dist - kickRange(state));
+    const need = m.type === 'k_pat' ? 0.1 : 0.1 + (dist - 20) * 0.0075 + over * 0.03;
+    res.made = res.made ?? q > need;
+    res.dist = dist;
+    res.text = res.text ?? (res.made ? (m.type === 'k_pat' ? 'Extra point is good.' : `${dist}-yard field goal is GOOD!`) : (m.type === 'k_pat' ? 'Extra point is NO GOOD!' : `${dist}-yarder is no good, ${chance(state, 0.5) ? 'wide left' : 'wide right'}.`));
+  } else if (m.type === 'k_onside') {
+    res.recovered = res.recovered ?? q > 0.68;
+    res.text = res.text ?? (res.recovered ? 'ONSIDE KICK RECOVERED! It\'s your ball!' : 'They fall on the onside kick.');
+  } else {
+    res.touchback = res.touchback ?? q > 0.62;
+    res.text = res.text ?? (res.touchback ? 'Booming kick. Touchback.' : q > 0.35 ? 'Good hang time. Tackled at the 22.' : 'Short kick. They return it to the 38.');
+  }
+  return res;
+}
+/**
+ * Resolve a kicker moment. Field goals and extra points finish the drive (the TD itself was already scored by the
+ * offense); kickoffs after your scores tilt the other team's next drive, and an onside recovery steals it.
+ */
+function resolveKickerMoment(state, g, d, m, result) {
+  const s = g.userStats;
+  const q = result.quality;
+  const kickoff = m.type === 'k_kickoff' || m.type === 'k_onside';
+  g.moments.push({ ...m, call: result.call, quality: q, yards: 0, td: false, turnover: false, text: result.text, outcome: null, played: !!result.played });
+  const rec = g.moments[g.moments.length - 1];
+  const opp = otherSide(g.userSide);
+  if (kickoff) {
+    s.kickoffs = (s.kickoffs ?? 0) + 1;
+    if (m.type === 'k_onside') {
+      if (result.recovered) {
+        s.onsideRec = (s.onsideRec ?? 0) + 1;
+        // the other team's next drive becomes yours
+        const next = g.drives.slice(g.cursor).find((x) => x.side === opp);
+        if (next) { next.side = g.userSide; next.onside = true; next.kDone = false; }
+        momentumShift(g, 0.35);
+      } else { g.toBonus[opp] += 0.1; momentumShift(g, -0.1); }
+    } else {
+      if (result.touchback) s.touchbacks = (s.touchbacks ?? 0) + 1;
+      g.toBonus[opp] += -(q - 0.5) * 0.08 + (result.returnTD ? 0.3 : 0);
+      momentumShift(g, (q - 0.5) * 0.12);
+    }
+    rec.outcome = 'KICK';
+    g.log.push({ q: m.quarter, clock: m.clock, team: '', user: true, out: 'INFO', text: `${state.player.last}: ${result.text}`, score: `${g.score.away}-${g.score.home}`, key: true });
+    afterMomentEvents(state, result, m);
+    return { outcome: 'KICK' };
+  }
+  let out;
+  let verb;
+  let ptsAdj = 0;
+  if (m.type === 'k_pat') {
+    s.xpAtt = (s.xpAtt ?? 0) + 1;
+    if (result.made) s.xpMade = (s.xpMade ?? 0) + 1; else ptsAdj = -1;
+    out = 'TD';
+    verb = `Touchdown! ${state.player.last}: ${result.text}`;
+    momentumShift(g, result.made ? 0.03 : -0.12);
+  } else {
+    s.fgAtt = (s.fgAtt ?? 0) + 1;
+    if (result.made) {
+      s.fgMade = (s.fgMade ?? 0) + 1;
+      s.fgLong = Math.max(s.fgLong ?? 0, fgDistance(m.yardLine));
+      if (m.clutch) s.clutch++;
+    }
+    out = result.made ? 'FG' : 'MISS';
+    verb = `${state.player.last}: ${result.text}`;
+    momentumShift(g, result.made ? 0.08 + (q - 0.5) * 0.1 : -0.18);
+  }
+  rec.outcome = out;
+  finishDrive(state, g, d, out, { moment: m, result, verb, ptsAdj });
+  g.cursor++;
+  // a game-winner with no time left: count it once the game is decided
+  if (m.gw && result.made) g.kGw = true;
+  // you scored: now kick off (onside when you're behind late)
+  if (out !== 'MISS' && !g.finished) {
+    const diff = userScore(g) - oppScore(g);
+    const late = m.quarter === 4 && g.drives.slice(g.cursor).filter((x) => x.side === opp).length <= 2;
+    const onside = late && diff < 0 && diff >= -10;
+    const more = g.drives.slice(g.cursor).some((x) => x.side === opp);
+    if (more && (onside || chance(state, 0.45))) {
+      g.pending = buildMoment(state, g, d, { type: onside ? 'k_onside' : 'k_kickoff', yardLine: 65, down: 1, distance: 10 });
+      g.pending.label = kickLabel(state, g.pending.type, 65, m.quarter);
+    }
+  }
+  afterMomentEvents(state, result, m);
+  return { outcome: out };
+}
+
 /** Rest of a drive after a moment that neither scored nor turned it over. */
 function continueDrive(state, g, d, m, yl, converted, q) {
   const off = g.ratings[d.side].off;
@@ -698,8 +852,9 @@ function momentumShift(g, v) {
 }
 
 function finishDrive(state, g, d, out, momentInfo) {
-  const pts = out === 'DOWNS' ? 0 : POINTS[out];
+  const pts = (out === 'DOWNS' || out === 'MISS' ? 0 : POINTS[out]) + (momentInfo?.ptsAdj ?? 0);
   g.score[d.side] += pts;
+  if (out === 'MISS') g.toBonus[otherSide(d.side)] = 0.04; // they take over at the spot
   if (out === 'TO' || out === 'DOWNS') g.toBonus[otherSide(d.side)] = 0.07;
   const team = d.side === 'home' ? g.homeId : g.awayId;
   const isUserTeam = d.side === g.userSide;
@@ -715,8 +870,8 @@ function finishDrive(state, g, d, out, momentInfo) {
     }
   }
   (g.chart ??= []).push({ m: g.momentum, out, user: isUserTeam, q: d.quarter });
-  const verb = { TD: 'Touchdown', FG: 'Field goal', TO: 'Turnover', PUNT: 'Punt', DOWNS: 'Turnover on downs' }[out];
-  const who = momentInfo ? `${state.player.last}: ${momentInfo.result.text} → ` : '';
+  const verb = momentInfo?.verb ?? { TD: 'Touchdown', FG: 'Field goal', TO: 'Turnover', PUNT: 'Punt', DOWNS: 'Turnover on downs', MISS: 'Missed field goal' }[out];
+  const who = momentInfo && !momentInfo.verb ? `${state.player.last}: ${momentInfo.result.text} → ` : '';
   // penalties happen on the simulated drives too, for both teams
   let flagNote = '';
   if (!momentInfo && chance(state, 0.06)) {
@@ -739,7 +894,7 @@ function autoDriveStats(state, g, out, partial = false) {
   const p = state.player;
   const s = g.userStats;
   const o = p.ovr;
-  if (p.position === 'MS') return; // the mascot doesn't pile up football stats on simulated drives
+  if (p.position === 'MS' || p.position === 'K') return; // the mascot / kicker don't pile up football stats on simulated drives
   if (partial && (p.position === 'WR' || (p.position === 'RB' && chance(state, 0.5)) || (out !== 'TD' ? chance(state, 0.5) : chance(state, 0.45)))) return;
   if (p.position === 'QB') {
     const att = partial ? randInt(state, 1, 3) : randInt(state, 2, 5);
@@ -790,6 +945,7 @@ function endGame(state, g) {
   }
   g.finished = true;
   g.won = userScore(g) > oppScore(g);
+  if (g.kGw && g.won) g.userStats.gameWinners = (g.userStats.gameWinners ?? 0) + 1;
   g.grade = gameGrade(state, g);
 }
 
@@ -804,6 +960,7 @@ export function gameGrade(state, g) {
   else if (pos === 'RB') prod = 4 + s.rushYds * 0.55 + s.rushTD * 16 + s.recYds * 0.35 + (s.rushAtt >= 5 ? (s.rushYds / s.rushAtt - 3.5) * 6 : 0) - s.fumbles * 12;
   else if (pos === 'CB') prod = 46 + s.tackles * 3 + s.defInt * 22 + s.pd * 8 + s.defTD * 18 - s.tdAllowed * 12 - s.ydsAllowed * 0.35;
   else if (pos === 'DT') prod = 27 + s.tackles * 3 + (s.defSacks ?? 0) * 20 + (s.tfl ?? 0) * 7 + s.pd * 5;
+  else if (pos === 'K') prod = 39 + (s.fgMade ?? 0) * 11 + Math.max(0, (s.fgLong ?? 0) - 40) * 0.6 + (s.xpMade ?? 0) * 3 - ((s.fgAtt ?? 0) - (s.fgMade ?? 0)) * 13 - ((s.xpAtt ?? 0) - (s.xpMade ?? 0)) * 9 + (s.touchbacks ?? 0) * 2 + (s.onsideRec ?? 0) * 10 + (s.gameWinners ?? 0) * 14;
   else if (pos === 'MS') { const ms = g.moments.filter((x) => MASCOT_TYPES.has(x.type)); prod = ms.length ? 12 + (ms.reduce((a, x) => a + x.quality, 0) / ms.length) * 88 : 40; }
   else prod = s.recYds / 1.1 * 0.55 + s.recTD * 16 + s.rec * 2 - s.drops * 4;
   prod = clamp(prod, 0, 100);
@@ -844,7 +1001,7 @@ function maybeEvent(state, trigger, p) {
   if (g.eventsFired.length >= MAX_EVENTS || g.pendingEvent) return false;
   if (!chance(state, p)) return false;
   // the mascot never takes a snap: no presnap reads or two-minute heroics, just pregame/halftime/random life
-  if (state.player.position === 'MS' && (trigger === 'presnap' || trigger === 'clutch')) return false;
+  if ((state.player.position === 'MS' || state.player.position === 'K') && (trigger === 'presnap' || trigger === 'clutch')) return false;
   const pool = GAME_EVENTS.filter((e) => e.trigger === trigger && eventEligible(state, g, e));
   if (!pool.length) return false;
   const ev = pick(state, pool);

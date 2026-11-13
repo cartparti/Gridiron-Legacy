@@ -78,13 +78,15 @@ export function emptyStats() {
     targets: 0, rec: 0, recYds: 0, recTD: 0, drops: 0,
     tackles: 0, defInt: 0, pd: 0, defTD: 0, defSacks: 0, tfl: 0, tgtAgainst: 0, recAllowed: 0, ydsAllowed: 0, tdAllowed: 0,
     hype: 0, shirts: 0, danceWins: 0, stunts: 0, // mascot
+    fgAtt: 0, fgMade: 0, fgLong: 0, xpAtt: 0, xpMade: 0, kickoffs: 0, touchbacks: 0, onsideRec: 0, gameWinners: 0, // kicker
     grades: 0, // sum of game grades (average = grades / games)
     clutch: 0,
   };
 }
 
 export function addStats(into, from) {
-  for (const k of Object.keys(from)) into[k] = (into[k] ?? 0) + from[k];
+  // "long" stats (longest field goal) keep the best, everything else adds up
+  for (const k of Object.keys(from)) into[k] = k.endsWith('Long') ? Math.max(into[k] ?? 0, from[k] ?? 0) : (into[k] ?? 0) + from[k];
 }
 
 function perkTrainBonus(p, stat) {

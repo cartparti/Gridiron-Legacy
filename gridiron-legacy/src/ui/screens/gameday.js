@@ -55,11 +55,12 @@ export function positionDiagram(pos) {
   const off = { QB: [50, 70], RB: [50, 82], WR1: [8, 57], WR2: [92, 57], SL: [24, 59], TE: [66, 58], OL1: [38, 57], OL2: [44, 57], OL3: [50, 57], OL4: [56, 57], OL5: [62, 57] };
   const def = { DT1: [44, 50], DT2: [56, 50], DE1: [34, 50], DE2: [66, 50], LB1: [40, 40], LB2: [60, 40], CB1: [8, 46], CB2: [92, 46], NB: [24, 44], SS: [36, 26], FS: [64, 22] };
   const me = { QB: 'QB', RB: 'RB', WR: 'WR2', CB: 'CB2', DT: 'DT2' }[pos];
+  const kk = pos === 'K' ? '<rect x="47.5" y="75.5" width="5" height="5" fill="#ffd43b" stroke="#000" stroke-width="0.8"/><rect x="45" y="73" width="10" height="10" fill="none" stroke="#ffd43b" stroke-width="1"/>' : '';
   const ms = pos === 'MS' ? '<rect x="45" y="92" width="10" height="6" fill="#ffd43b" stroke="#000" stroke-width="0.8"/><rect x="42" y="89.5" width="16" height="11" fill="none" stroke="#ffd43b" stroke-width="1"/>' : '';
   const dots = (set, color) => Object.entries(set).map(([k, [x, y]]) => `<rect x="${x - 2.5}" y="${y - 2.5}" width="5" height="5" fill="${k === me ? '#ffd43b' : color}" stroke="#000" stroke-width="0.8"/>${k === me ? `<rect x="${x - 5}" y="${y - 5}" width="10" height="10" fill="none" stroke="#ffd43b" stroke-width="1"/>` : ''}`).join('');
   const svg = `<svg viewBox="0 0 100 100" width="100%" height="100%" shape-rendering="crispEdges">
     <rect width="100" height="100" fill="#2f6f35"/>${[10, 20, 30, 40, 60, 70, 80, 90].map((y) => `<rect x="0" y="${y}" width="100" height="0.6" fill="rgba(255,255,255,0.35)"/>`).join('')}
-    <rect x="0" y="53.5" width="100" height="1" fill="#4dabf7"/>${dots(off, '#e9ecef')}${dots(def, '#ff6b6b')}${ms}</svg>`;
+    <rect x="0" y="53.5" width="100" height="1" fill="#4dabf7"/>${dots(off, '#e9ecef')}${dots(def, '#ff6b6b')}${ms}${kk}</svg>`;
   return h('div.pos-diagram', { html: svg });
 }
 
@@ -77,6 +78,11 @@ const CALL_DESC_MS = {
   balanced: 'Your usual routine.',
   risky: 'Go big. Bigger hype, bigger flops.',
 };
+const CALL_DESC_K = {
+  safe: 'Smooth and controlled. A bigger sweet spot, a little less leg.',
+  balanced: 'Your normal swing.',
+  risky: 'Swing for the fences. More distance, a smaller sweet spot.',
+};
 const CALL_DESC_DEF = {
   safe: 'Play soft. Fewer big plays, fewer picks.',
   balanced: 'Mirror and react.',
@@ -89,6 +95,7 @@ function statLineOf(pos, s) {
   if (pos === 'DT') return [[s.defSacks ?? 0, 'Sacks'], [s.tfl ?? 0, 'TFL'], [s.tackles ?? 0, 'Tackles']];
   if (pos === 'CB') return [[s.defInt ?? 0, 'INT'], [s.pd ?? 0, 'Pass def'], [s.tackles ?? 0, 'Tackles']];
   if (pos === 'MS') return [[s.hype ?? 0, 'Hype'], [s.shirts ?? 0, 'Shirts'], [s.danceWins ?? 0, 'Showdowns']];
+  if (pos === 'K') return [[`${s.fgMade ?? 0}/${s.fgAtt ?? 0}`, 'FG'], [`${s.xpMade ?? 0}/${s.xpAtt ?? 0}`, 'XP'], [s.fgLong ?? 0, 'Long']];
   return [[`${s.rec}/${s.targets}`, 'Rec/Tgt'], [s.recYds, 'Rec yds'], [s.recTD, 'TD']];
 }
 
@@ -162,7 +169,7 @@ export function gamedayScreen(app) {
     const pts = g.chart ?? [];
     const n = Math.max(20, g.drives.length);
     const bw = W / n;
-    const H_OUT = { TD: 1, FG: 0.62, PUNT: 0.28, TO: 0.45, DOWNS: 0.38 };
+    const H_OUT = { TD: 1, FG: 0.62, PUNT: 0.28, TO: 0.45, DOWNS: 0.38, MISS: 0.5 };
     pts.forEach((p, i) => {
       // one bar per drive: up = your team's drive, down = theirs; height = how it ended
       const up = p.user;
@@ -245,7 +252,7 @@ export function gamedayScreen(app) {
     drawBar();
   }
 
-  const FEED_IC = { TD: ['trophy', '#4ade80'], FG: ['target', '#ffd43b'], TO: ['alert', '#ff5d5d'], DOWNS: ['alert', '#ff5d5d'], PUNT: ['ball', '#9aa3ad'], INFO: ['whistle', '#4da3ff'], HALF: ['clipboard', '#9aa3ad'] };
+  const FEED_IC = { TD: ['trophy', '#4ade80'], FG: ['target', '#ffd43b'], MISS: ['target', '#ff5d5d'], TO: ['alert', '#ff5d5d'], DOWNS: ['alert', '#ff5d5d'], PUNT: ['ball', '#9aa3ad'], INFO: ['whistle', '#4da3ff'], HALF: ['clipboard', '#9aa3ad'] };
   const tickEl = (e) => h(`div.tick${e.out === 'TD' ? '.td' : e.out === 'TO' || e.out === 'DOWNS' ? '.to' : ''}${e.key ? '.key' : ''}${e.out === 'INFO' || e.out === 'HALF' ? '.info' : ''}`,
     h('span.f-ic', { style: { color: (FEED_IC[e.out] ?? FEED_IC.INFO)[1] } }, icon((FEED_IC[e.out] ?? FEED_IC.INFO)[0])),
     h('span.q', e.q === 'OT' ? 'OT' : e.q ? `Q${e.q} ${e.clock}` : ''),
@@ -305,8 +312,8 @@ export function gamedayScreen(app) {
   };
 
   const resultCard = (result, m) => {
-    const good = m.defense ? result.int || result.pd || result.forcedFumble || (result.tackle && (result.yardsAllowed ?? 99) < m.distance) : result.td || (result.complete && result.yards >= m.distance);
-    const bad = m.defense ? result.tdAllowed || (result.yardsAllowed ?? 0) >= 15 : result.turnover || result.sack;
+    const good = result.kick ? result.made || result.recovered || result.touchback : m.defense ? result.int || result.pd || result.forcedFumble || (result.tackle && (result.yardsAllowed ?? 99) < m.distance) : result.td || (result.complete && result.yards >= m.distance);
+    const bad = result.kick ? result.made === false || result.recovered === false || result.returnTD : m.defense ? result.tdAllowed || (result.yardsAllowed ?? 0) >= 15 : result.turnover || result.sack;
     return h('div.card.flat', { style: { boxShadow: `inset 4px 0 0 ${good ? 'var(--good)' : bad ? 'var(--bad)' : 'var(--line2)'}` } },
       h('b', result.text ?? ''), result.played ? h('span.small.muted', ` · execution ${Math.round(result.quality * 100)}%`) : null);
   };
@@ -334,7 +341,7 @@ export function gamedayScreen(app) {
       h('h2', { style: { marginTop: '10px' } }, m.label),
       h('p.small.muted', `${MOMENT_NAMES[m.type] ?? 'Key moment'}${m.trailing ? ' · you are trailing' : ''}${g.weather !== 'clear' && g.weather !== 'night' ? ` · ${w.label.toLowerCase()}` : ''}. Pick a play call:`),
       h('div.calls', Object.entries(PLAY_CALLS).map(([id, c]) => h(`button.btn.call.${id}`, { onclick: () => play(m, id) },
-        c.label, h('span.cd', st.player.position === 'MS' ? CALL_DESC_MS[id] : defense ? CALL_DESC_DEF[id] : c.desc), h('span.tw', tolTxt(id))))),
+        c.label, h('span.cd', st.player.position === 'MS' ? CALL_DESC_MS[id] : st.player.position === 'K' ? CALL_DESC_K[id] : defense ? CALL_DESC_DEF[id] : c.desc), h('span.tw', tolTxt(id))))),
       h('button.btn.small.ghost.block', { style: { marginTop: '8px' }, onclick: () => { sfx.click(); finishMoment(autoMoment(st, 'balanced')); } }, 'Sim this play'));
     const tip = tipCard(app, 'moment', 'Key moments', 'Safe plays are easier with smaller gains. Risky plays are harder but can break open. Your ratings, health, freshness, weather and momentum set the timing window.');
     if (tip) momentSlot.append(tip);
@@ -544,7 +551,7 @@ export function gamedayScreen(app) {
       clear(box);
       const { myId, mine, theirs } = gameKits(st, me, opp);
       const kits = teamKits(me);
-      const star = randomLook(`${opp.id}-star`, { position: { CB: 'WR', DT: 'OL', QB: 'DL', RB: 'LB', WR: 'CB', MS: 'WR' }[st.player.position] ?? 'CB' });
+      const star = randomLook(`${opp.id}-star`, { position: { CB: 'WR', DT: 'OL', QB: 'DL', RB: 'LB', WR: 'CB', MS: 'WR', K: 'CB' }[st.player.position] ?? 'CB' });
       if (st.player.position === 'MS') { // the costume vs their mascot; no uniform to pick
         box.append(h('div.lineup',
           h('div.lineup-side', portraitImg({ mascot: costumeSpec(st.player.look, mascotKind(me), me.colors) }, 120, { full: true, big: true, yaw: -0.5 }), h('span.lineup-size.pix', `"${mascotDisplayName(st.player)}"`)),

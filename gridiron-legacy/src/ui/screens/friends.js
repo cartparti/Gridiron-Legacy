@@ -59,7 +59,7 @@ function openCard(app, c, { me = false, onRemove } = {}) {
         h('span.chip.gold.pix', c.tier || 'Rookie'),
         h('span.tiny.muted', me ? 'Your card right now' : `Card from ${ago(c.at)}`))),
     h('div.fr-stats',
-      [['Legacy', c.legacy], ['Overall', c.ovr], ['Level', c.level], ['Fame', c.fame], ['Games', c.games], ['Wins', c.wins], ...c.stats, ['Titles', c.titles], ['Records', c.records], ['Bank', fmtMoney(c.money)]]
+      [['Legacy', c.legacy], ['Overall', c.ovr], ['Level', c.level], ['Fame', c.fame], ['Games', c.games], ['Wins', c.wins], ...c.stats, ['Titles', c.titles], ['Records', c.records], ['Achievements', c.ach ?? 0], ['Bank', fmtMoney(c.money)]]
         .map(([l, v]) => h('div', h('b', String(v)), h('span', l)))),
     h('div.card.flat', h('h3', `Awards (${c.ind})`),
       c.awards.length ? h('div.chip-row', c.awards.map(([n, k]) => h('span.chip', `${k > 1 ? `${k}× ` : ''}${n}`))) : h('p.small.muted', 'No hardware yet.')),

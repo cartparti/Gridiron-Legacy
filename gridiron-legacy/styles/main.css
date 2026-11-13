@@ -1124,3 +1124,34 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 .fr-pips { color: #ffd43b; letter-spacing: 2px; }
 .fr-card .card.flat { margin-top: 10px; }
 .fr-screen { background: var(--bg); min-height: 100vh; }
+
+/* ---- kicker: aim / power meter */
+.kick-meter { width: min(440px, calc(100vw - 32px)); margin: 0 auto; background: var(--glass); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 10px 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.12); color: #fff; }
+.km-label { display: flex; justify-content: space-between; font: 800 0.72rem/1 var(--pixel, Inter, sans-serif); letter-spacing: 0.08em; margin-bottom: 7px; }
+.km-label span { opacity: 0.75; }
+.km-bar { position: relative; height: 18px; border-radius: 6px; background: linear-gradient(90deg, rgba(255,255,255,0.12), rgba(255,255,255,0.22) 85%, rgba(248,113,113,0.55)); overflow: hidden; }
+.km-zone { position: absolute; top: 0; bottom: 0; background: #3ddc84; box-shadow: 0 0 12px #3ddc84aa; }
+.km-need { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #fff; opacity: 0.85; }
+.km-cur { position: absolute; top: -3px; bottom: -3px; width: 4px; margin-left: -2px; background: #ffd43b; border-radius: 2px; box-shadow: 0 0 8px #ffd43b; left: 0; }
+.km-steps { display: flex; gap: 8px; margin-top: 8px; }
+.km-steps b { flex: 1; text-align: center; font: 800 0.66rem/1 var(--pixel, Inter, sans-serif); letter-spacing: 0.1em; padding: 6px 0; border-radius: 8px; background: rgba(255,255,255,0.08); opacity: 0.55; }
+.km-steps b.on { background: #ffd43b; color: #111; opacity: 1; }
+
+/* ---- achievements + coach's goals */
+.ach-bar, .goal-bar { height: 8px; border-radius: 4px; background: rgba(255,255,255,0.1); overflow: hidden; margin: 6px 0 4px; }
+.ach-bar i, .goal-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent, #ffd43b), #3ddc84); border-radius: 4px; }
+.ach-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+@media (min-width: 560px) { .ach-grid { grid-template-columns: 1fr 1fr; } }
+.ach-card, .ach-new { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--card2, rgba(255,255,255,0.04)); border: 1px solid var(--line, rgba(255,255,255,0.08)); }
+.ach-card:not(.on) { opacity: 0.55; filter: grayscale(0.7); }
+.ach-ic { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 10px; background: #a0622d33; color: #d08a4c; }
+.ach-ic svg { width: 20px; height: 20px; }
+.t2 .ach-ic { background: #c0c8d433; color: #c9d1dc; }
+.t3 .ach-ic { background: #ffd43b2e; color: #ffd43b; }
+.ach-card.on.t3 { border-color: #ffd43b66; }
+.ach-tier { font-size: 0.7rem; opacity: 0.8; }
+.ach-new { animation: achpop 0.5s ease-out both; }
+@keyframes achpop { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.goal .goal-bar i { background: linear-gradient(90deg, #4dabf7, #74c0fc); }
+.goal.done .goal-bar i { background: #3ddc84; }
+.goal.done b { color: var(--good, #3ddc84); }

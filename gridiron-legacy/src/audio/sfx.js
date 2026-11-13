@@ -101,4 +101,6 @@ export const sfx = {
   error: () => tone(160, 0.2, { type: 'square', vol: 0.08, slide: -40 }),
   thunder: () => { noise(2.2, { vol: 0.5, freq: 90, q: 0.6, type: 'lowpass', attack: 0.05 }); noise(1.4, { vol: 0.3, freq: 160, q: 0.8, type: 'lowpass', attack: 0.3, delay: 0.25 }); },
   tick: () => tone(1200, 0.02, { type: 'square', vol: 0.04 }),
+  kick: () => { noise(0.07, { vol: 0.85, freq: 260, q: 1.4, type: 'lowpass' }); tone(95, 0.16, { type: 'sine', vol: 0.5, slide: -40 }); },
+  doink: () => { tone(1480, 0.5, { type: 'sine', vol: 0.16, slide: -60 }); tone(2210, 0.35, { type: 'sine', vol: 0.08 }); noise(0.04, { vol: 0.4, freq: 3000, q: 3, type: 'bandpass' }); },
 };

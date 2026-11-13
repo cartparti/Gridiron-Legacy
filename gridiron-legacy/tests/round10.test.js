@@ -76,7 +76,7 @@ test('storylines chain into follow-ups', () => {
 test('every position is balanced over full careers (awards and legacy within range of each other)', async () => {
   const { simulateCareer, randomCareerOpts, STRATEGIES } = await import('../src/sim/bot.js');
   const avg = {};
-  for (const pos of ['QB', 'RB', 'WR', 'CB', 'DT']) {
+  for (const pos of ['QB', 'RB', 'WR', 'CB', 'DT', 'K']) {
     let aw = 0, lg = 0;
     for (let i = 0; i < 40; i++) { const st = simulateCareer(randomCareerOpts(5000 + i, pos), STRATEGIES.balanced, 0.6); aw += st.player.awards.length; lg += st.legacy?.score ?? 0; }
     avg[pos] = { aw: aw / 40, lg: lg / 40 };

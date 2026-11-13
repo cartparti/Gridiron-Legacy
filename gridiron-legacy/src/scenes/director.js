@@ -12,6 +12,7 @@ import { surfaceFor } from '../data/surface.js';
 import { goalLine } from './minigames/goalLine.js';
 import { tushPush } from './minigames/tushPush.js';
 import { mascotHype, mascotTshirt, mascotRival, mascotStunt } from './minigames/mascot.js';
+import { kick } from './minigames/kick.js';
 import { freePlay } from './play/engine.js';
 import { fallbackMeter } from './minigames/fallback.js';
 
@@ -355,6 +356,7 @@ const GAMES = {
   qb_throw: freePlay, qb_hailmary: freePlay, qb_scramble: freePlay,
   rb_run: freePlay, rb_screen: freePlay, rb_goalline: goalLine, qb_sneak: tushPush,
   ms_hype: mascotHype, ms_tshirt: mascotTshirt, ms_rival: mascotRival, ms_stunt: mascotStunt,
+  k_fg: kick, k_pat: kick, k_kickoff: kick, k_onside: kick,
   wr_route: freePlay, wr_jumpball: freePlay, wr_toetap: freePlay,
   cb_cover: freePlay, cb_tackle: freePlay, dt_rush: freePlay, dt_run: freePlay,
 };
