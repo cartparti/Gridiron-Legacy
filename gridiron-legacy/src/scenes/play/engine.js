@@ -207,6 +207,10 @@ export function freePlay(ctx) {
     }
     if (mode === 'runD') cbZ.zone = false;
     user = ents.find((e) => e.user);
+    // run defense: the receiver across from you comes to block you (a stalk/crack block) instead of running a route
+    if (mode === 'runD' && user.man && Math.random() < (call === 'risky' ? 0.55 : 0.8)) { user.man.stalk = true; user.man.blockTarget = user; }
+    // ...and the playside guard pulls and leads the sweep, looking for you
+    if (mode === 'runD') { const g = blockers.filter((b) => b.role === 'OL').sort((a, b) => b.start.x - a.start.x)[1]; if (g) g.pullAt = 0.25; }
     if (globalThis.__playDebug) globalThis.__play = { receivers, defenders, time: () => t, phase: () => phase, user, qb: () => qb, carrier: () => carrier,
       flight: () => (flight ? { f: (t - flight.t0) / flight.T, to: flight.to, toUser: flight.target === user } : null) };
     // routes for receivers
@@ -355,6 +359,7 @@ export function freePlay(ctx) {
     else if (user.role === 'QB' && holder === user && !user.runner) mode2 = 'qb';
     else if (user.team === 'off') mode2 = flight && flight.target === user ? 'catch' : 'route';
     else if (user.role === 'DL') mode2 = user.engagedBy ? 'dlBlocked' : 'dlFree';
+    else if (user.engagedBy) mode2 = 'cbBlocked';
     else mode2 = 'def';
     if (mode2 === btnMode) return;
     btnMode = mode2;
@@ -367,9 +372,12 @@ export function freePlay(ctx) {
       catch: [btn.sprint, btn.catch],
       def: [btn.sprint, btn.swat, btn.tackle],
       dlBlocked: [btn.rip, btn.swim, btn.bull],
+      cbBlocked: [btn.tackle],
       dlFree: [btn.sprint, btn.bat, btn.sack],
     };
-    showLev(mode2 === 'dlBlocked');
+    showLev(mode2 === 'dlBlocked' || mode2 === 'cbBlocked');
+    if (mode2 === 'cbBlocked') hud.instr?.('BLOCKED! Push through him, or tap TACKLE to shed');
+    else if (btnMode === 'def' && mode === 'runD') hud.instr?.('');
     controls.setButtons(sets[mode2]);
   };
 
@@ -422,6 +430,17 @@ export function freePlay(ctx) {
         if (user.team === 'off') catchPress = t; else swatPress = t;
         playAction(user.mesh, flight && flight.H > 4 ? 'jump' : 'catch');
         sfx.click();
+      }
+      if (id === 'tackle' && user.team === 'def' && user.engagedBy && user.role === 'CB') {
+        // fighting off a block: a swipe at his hands (stronger corners win it more), then you have to recover
+        if (!(rush.cd > 0)) {
+          rush.cd = 0.6;
+          rush.cd = 0.9;
+          if (Math.random() < 0.18 + (st.strength ?? 60) / 400 + rush.lev * 0.25) rush.lev = 1;
+          else { rush.lev = Math.max(0, rush.lev - 0.25); rush.stun = 0.5; hud.big('STILL BLOCKED', '#fbbf24', 450); }
+          playAction(user.mesh, 'stiff', { dur: 0.3 });
+        }
+        return;
       }
       if (id === 'tackle' && user.team === 'def' && user.lunge <= 0 && user.out <= 0 && !(user.rise > 0)) {
         user.lunge = 0.38; user.lungeDir = carrier ? norm(carrier.pos.x - user.pos.x, carrier.pos.z - user.pos.z) : norm(controls.state.x, controls.state.z || 1);
@@ -577,11 +596,19 @@ export function freePlay(ctx) {
   const aiOffense = (e, dt) => {
     if (stillDown(e, dt)) return;
     if (e.role === 'OL') {
+      if (e.pullAt && t > e.pullAt && !e.engaged && !e.blockTarget) { e.blockTarget = user; e.pulling = true; }
+      if (e.pulling && !e.engaged && e.blockTarget && e.blockTarget.engagedBy && e.blockTarget.engagedBy !== e) {
+        // you're already tied up with the receiver: lead the way just in front of the runner and wait for you
+        const r = carrier ?? rb;
+        moveToward(e, (r.pos.x + user.pos.x) / 2, Math.min(r.pos.z - 1.2, (r.pos.z + user.pos.z) / 2), e.maxSpeed * 0.9, dt);
+        return;
+      }
       if (e.blockTarget && !e.engaged) {
         const d = e.blockTarget;
         moveToward(e, d.pos.x, d.pos.z + 0.7, e.maxSpeed, dt);
         if (dist(e.pos, d.pos) < 1.2 && !d.engagedBy) { e.engaged = d; d.engagedBy = e; d.shed = -0.2; setPose(e.mesh, 'block'); setPose(d.mesh, 'block'); }
-        if (d.engagedBy && d.engagedBy !== e) e.blockTarget = null;
+        if (d.engagedBy && d.engagedBy !== e && !e.pulling) e.blockTarget = null;
+        if (e.pulling && t > 3.2) { e.blockTarget = null; e.pulling = false; e.pullAt = 0; }
         return;
       }
       // Pick the nearest free rusher, step between it and the ball, lock up on contact.
@@ -652,6 +679,7 @@ export function freePlay(ctx) {
       return;
     }
     if (e.route && !(mode === 'run' && e.role !== 'RB')) {
+      if (e.stalk) { e.route = null; return aiOffense(e, dt); } // switched to blocking you
       // Route finished (or the QB is scrambling): stop running to the sideline and work to get open.
       e.routeLen ??= e.route.slice(1).reduce((a, b, i) => a + Math.hypot(b.x - e.route[i].x, b.z - e.route[i].z), 0);
       const scrambling = holder === qb && !flight && t > 1.2 && Math.abs(qb.vel.x) > 3 && Math.abs(qb.pos.x - qb.start.x) > 2.5;
@@ -752,12 +780,14 @@ export function freePlay(ctx) {
     }
     let tx = e.pos.x + ax;
     if (mode === 'runD' && e.role === 'RB' && e.pos.z > -2) tx = 9; // sweep to the edge first
+    // you coming up hard on run defense: he cuts back inside (or bounces outside) away from you
+    if (mode === 'runD' && !e.user && user && !user.engagedBy && user.out <= 0 && dist(user.pos, e.pos) < 4.5 && user.pos.z < e.pos.z + 0.5) tx = e.pos.x - Math.sign(user.pos.x - e.pos.x || 1) * 3.2;
     if (play.hole && e === rb && e.pos.z > -1 && mode === 'run') tx = play.hole[1];
     tx = Math.max(-FIELD_X + 1.5, Math.min(FIELD_X - 1.5, tx));
     moveToward(e, tx, e.pos.z - 6, e.maxSpeed * (moves.slow > 0 && e.user ? 0.55 : !e.user && mode === 'pass' ? 0.88 : 1), dt);
     if (!e.user && e.jukeCd <= 0) {
       const lunger = defenders.find((d) => (d.tell > 0 || d.lunge > 0) && dist(d.pos, e.pos) < 2.6);
-      if (lunger && Math.random() < (mode === 'pass' ? 0.1 : 0.25) * (call === 'risky' ? 1.2 : 1) * (m.defense ? 1 + oppK * 0.3 : 1)) { e.juking = 0.3; e.jukeCd = 1.2; playAction(e.mesh, 'juke', { dir: Math.sign(e.pos.x - lunger.pos.x || 1) }); e.vel.x += Math.sign(e.pos.x - lunger.pos.x || 1) * 5; }
+      if (lunger && Math.random() < (mode === 'pass' ? 0.1 : mode === 'runD' && lunger.user ? 0.45 : 0.25) * (call === 'risky' ? 1.2 : 1) * (m.defense ? 1 + oppK * 0.3 : 1)) { e.juking = 0.3; e.jukeCd = 1.2; playAction(e.mesh, 'juke', { dir: Math.sign(e.pos.x - lunger.pos.x || 1) }); e.vel.x += Math.sign(e.pos.x - lunger.pos.x || 1) * 5; }
     }
   };
 
@@ -1395,7 +1425,7 @@ export function freePlay(ctx) {
       return;
     }
     const str = target.user ? (st.strength ?? 60) : 60;
-    const pBreak = (str / 100) * 0.3 * (target.user ? (0.6 + tol * 0.4) : mode === 'pass' ? 0.35 : 0.6) * Math.pow(0.5, target.broken ?? 0) + (tackler.user ? -0.1 : 0);
+    const pBreak = (str / 100) * 0.3 * (target.user ? (0.6 + tol * 0.4) : mode === 'pass' ? 0.35 : 0.6) * Math.pow(0.5, target.broken ?? 0) + (tackler.user ? (mode === 'runD' ? 0.12 - ((st.strength ?? 60) - 60) / 400 + oppK * 0.04 : -0.1) : 0);
     const traitBreak = target.user ? (has('truck') ? 1.3 : 1) * (has('yac') && mode === 'route' ? 1.4 : 1) : 1;
     if (Math.random() < pBreak * traitBreak * Math.max(0.5, Math.min(1.8, Math.pow(target.mass / tackler.mass, 1.3)))) {
       target.broken = (target.broken ?? 0) + 1;
@@ -1921,12 +1951,16 @@ export function freePlay(ctx) {
         rush.cd = Math.max(0, rush.cd - dt);
         rush.stun = Math.max(0, rush.stun - dt);
         const o = user.engagedBy;
-        const toward = c.active ? Math.max(0, -(c.z) * 0.8 + 0.2) : 0.15;
-        rush.lev = Math.min(1, rush.lev + dt * toward * (0.5 + (st.strength ?? 60) / 200) * (has('motor') ? 1.4 : 1));
+        const toward = user.role === 'CB' ? (c.active ? 0.85 : 0.2) : c.active ? Math.max(0, -(c.z) * 0.8 + 0.2) : 0.15;
+        if (!(user.role === 'CB' && rush.stun > 0)) rush.lev = Math.min(1, rush.lev + dt * toward * (user.role === 'CB' ? 0.32 * Math.max(0.6, Math.min(1.5, (user.mass ?? 190) / (o.mass ?? 200))) : 1) * (0.5 + (st.strength ?? 60) / 200) * (has('motor') ? 1.4 : 1));
         if (levBar) levBar.querySelector('i').style.width = `${rush.lev * 100}%`;
         const push = c.active ? 1.6 : 0.6;
         moveToward(user, o.pos.x + c.x * 1.2, o.pos.z + 0.2, push, dt, 10);
         faceToward(user.mesh, o.pos.x, o.pos.z);
+        if (user.role === 'CB' && rush.lev >= 1) { // shed the receiver's block
+          o.engaged = null; user.engagedBy = null; o.blockTarget = null; o.out = 0.35; setPose(user.mesh, null); setPose(o.mesh, null);
+          rush.lev = 0; hud.big('SHED THE BLOCK!', '#4ade80', 600); sfx.hit?.();
+        }
         if (t > 4.2) { o.engaged = null; user.engagedBy = null; setPose(user.mesh, null); setPose(o.mesh, null); }
       } else if (c.active) {
         if (rush.burst > 0) rush.burst -= dt;
@@ -1957,7 +1991,7 @@ export function freePlay(ctx) {
         else if (user.team === 'def' && carrier) pursue(user, carrier, dt, 0.8);
         else { user.vel.x *= 0.85; user.vel.z *= 0.85; }
       }
-      if (dtMode) setButtonsFor();
+      if (dtMode || mode === 'runD') setButtonsFor();
       // A QB who takes off past the line of scrimmage on a pass play is a runner now: no more passing, and every
       // defender comes after him (before this he was still 'about to throw', so nobody chased and a tackle was a sack).
       if (mode === 'pass' && holder === qb && !carrier && !thrown && !flight && qb.pos.z < -0.4) {
