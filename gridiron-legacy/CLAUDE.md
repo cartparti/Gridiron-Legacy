@@ -651,3 +651,12 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - `src/ui/screens/friends.js`: `friendsPage` (your card + Share via navigator.share / clipboard / code modal, Add a friend,
   leaderboard tabs, `openCard` modal with portrait/costume, stats, awards, house, remove) and `friendsScreen` (title).
   Friends live in `app.settings.friends` (all slots). Hub Career subtab 'friends'; title "Friends" button. Tests: round15.
+
+## v0.53: CB run defense (runD) harder
+- Setup: `user.man` stalk-blocks you 80% (55% on risky/press): `e.stalk` drops its route, `blockTarget = user`. The second-most
+  playside OL gets `pullAt` 0.25: pulls with `blockTarget = user` (`e.pulling`), shadows in front of the runner while you're tied
+  up, gives up at 3.2 s. CB blocked branch: mode2 'cbBlocked' (TACKLE button + LEVERAGE meter + instr); leverage builds at
+  0.32 x mass ratio while pushing; TACKLE = shed try (0.18 + str/400 + lev*0.25, cd 0.9 s, a miss = -0.25 lev and 0.5 s stun);
+  full leverage sheds (blocker out 0.35 s).
+- Carrier: cuts back away from you when you're within 4.5 yd and in front; juke vs your lunge 45%. Your tackles in runD:
+  pBreak + 0.12 - (str-60)/400 + oppK*0.04 (was -0.1). Probe (perfect chase bot, 5 reps): 1 TFL, 3x 1-5 yd, 1 fumble kept.

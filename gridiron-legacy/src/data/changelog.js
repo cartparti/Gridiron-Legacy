@@ -1,5 +1,10 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.53', date: 'Nov 13', title: 'Tougher run defense at corner', items: [
+    'Cornerback run plays are harder. The receiver across from you usually comes to block you instead of running a route, and the playside guard pulls to lead the sweep and looks for you too.',
+    'When you\'re blocked, a LEVERAGE meter shows up: keep pushing to fight through, or tap TACKLE to try to shed him. Mashing doesn\'t work: a missed shed costs you a beat. Stronger corners shed faster, and size matters.',
+    'The ball carrier fights back: he cuts back or bounces outside when you come up hard, jukes your tackle attempts more often, and your tackles can be broken (big backs and good teams break more; Strength helps you hold on).',
+  ] },
   { v: '0.52', date: 'Nov 13', title: 'Friends and leaderboards', items: [
     'New: Friends. Go to Career, then Friends, and tap Share my card to send a friend your link (by text or any app). When they open it, you\'re added to their friends automatically. They can also paste the link into Add a friend.',
     'Your friend card shows your career as it is when you share it: your player (or your mascot costume), team, level, overall, legacy, fame, games and wins, your main stats, every award, your titles and records, your bank balance and your house with every room you\'ve upgraded.',
