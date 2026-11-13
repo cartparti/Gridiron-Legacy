@@ -1,4 +1,5 @@
 // Main career hub: top bar with meters, bottom tabs, and the five tab views.
+import { friendsPage } from './friends.js';
 import { activityFor } from '../../data/activities.js';
 import { costumeSpec, mascotDisplayName } from '../../data/mascots.js';
 import { awardLabel } from '../../sim/awards.js';
@@ -478,7 +479,7 @@ function lifeView(app) {
 
 function careerView(app) {
   const sub = app.ui.careerSub ?? 'profile';
-  const tabs = h('div.subtabs', [['profile', 'Career'], ['traits', 'Traits'], ['awards', 'Trophies'], ['race', 'Award Race'], ['legends', 'Legends'], ['league', 'League Awards']].map(([id, l]) =>
+  const tabs = h('div.subtabs', [['profile', 'Career'], ['friends', 'Friends'], ['traits', 'Traits'], ['awards', 'Trophies'], ['race', 'Award Race'], ['legends', 'Legends'], ['league', 'League Awards']].map(([id, l]) =>
     h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { sfx.click(); app.ui.careerSub = id; app.render(); } }, l)));
   let body;
   if (sub === 'awards') body = awardsView(app);
@@ -486,6 +487,7 @@ function careerView(app) {
   else if (sub === 'legends') body = legendsPage(app);
   else if (sub === 'race') body = racePage(app);
   else if (sub === 'traits') body = traitsPage(app);
+  else if (sub === 'friends') body = friendsPage(app);
   else { body = profileView(app); body.append(...careerStatsSections(app)); }
   return h('div.col', { style: { gap: '14px' } }, tabs, body);
 }

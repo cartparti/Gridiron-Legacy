@@ -1,5 +1,11 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.52', date: 'Nov 13', title: 'Friends and leaderboards', items: [
+    'New: Friends. Go to Career, then Friends, and tap Share my card to send a friend your link (by text or any app). When they open it, you\'re added to their friends automatically. They can also paste the link into Add a friend.',
+    'Your friend card shows your career as it is when you share it: your player (or your mascot costume), team, level, overall, legacy, fame, games and wins, your main stats, every award, your titles and records, your bank balance and your house with every room you\'ve upgraded.',
+    'Leaderboard: you against all your friends by Legacy, Overall, Awards, Titles, Fame or Money. Tap anyone to open their full card.',
+    'Cards are snapshots: share again whenever you want your friends to see your latest progress (a newer card replaces the old one). Friends are kept for all your save slots, and there\'s a Friends button on the title screen too.',
+  ] },
   { v: '0.51', date: 'Nov 12', title: 'Your own mascot costume', items: [
     'Mascots get their own costume editor instead of football gear: pick the animal (or keep your team\'s mascot), the fur colors, a mascot name, the eyes (googly, fierce, sleepy, star-struck, hearts, shades), the mouth (grin, fangs, tongue out, mustache...), a hat (crown, top hat, propeller, viking, chef...), an extra (cape, bow tie, gold chain, foam finger, scarf, tutu) and shoes, clown size included. The jersey, helmet, gear, swag and touchdown celebration tabs are gone for mascots.',
     'The costume you design is the one you wear in every game-day moment, at every team.',

@@ -1,4 +1,5 @@
 // App controller: owns the current game state, routes to screens, autosaves.
+import { friendsScreen, addFriendFrom } from './screens/friends.js';
 import { clear } from './dom.js';
 import { setVoiceEnabled } from '../audio/voice.js';
 import { showWhatsNew } from './whatsnew.js';
@@ -34,6 +35,12 @@ export const app = {
     // what's new: every time the game opens
     setTimeout(() => showWhatsNew(), 350);
     storage.requestPersist();
+    // opened from a friend's link (#friend=CODE): add them, then tidy the address bar
+    if (/#friend=/.test(location.hash)) {
+      const link = location.hash;
+      try { history.replaceState(null, '', location.pathname + location.search); } catch { /* ignore */ }
+      addFriendFrom(this, link).then((r) => { toast(r.msg, 4000); if (r.ok && !this.state) { this.screen = 'friends'; this.render(); } });
+    }
   },
 
   /** Soft menu music on the title and setup screens; quiet inside a career (games bring their own). */
@@ -143,6 +150,7 @@ export const app = {
       if (this.screen === 'slots') view = slotsScreen(this);
       else if (this.screen === 'create') view = createScreen(this);
       else if (this.screen === 'practice') view = practiceScreen(this);
+      else if (this.screen === 'friends') view = friendsScreen(this);
       else view = titleScreen(this);
     } else {
       if (this.screen !== 'settings') stopBackdrop();

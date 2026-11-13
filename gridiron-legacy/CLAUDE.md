@@ -636,3 +636,18 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   camp, aging, create, look editor, effect chips. `activityFor(a, pos)` renames training activities (MASCOT_ACTIVITIES).
 - Traits: MS gets only MS traits (ANY traits hidden): + crowdwhisper (momentum x1.3), fanfav (+0.15 fame per q>0.65 moment),
   tireless (energy drain x0.7), velcro (no head pop, +0.1 quality on flops).
+
+## v0.52: friends + leaderboard (no server)
+- Why no live online board: the artifact `db` only lets the owner (and editors invited by email while there is no public link)
+  write; friends opening the public link can never save, and the GitHub Pages app has no backend. Owner chose friend codes.
+- `src/sim/friends.js` (pure): `friendCard(state)` snapshot (id = `p.uid` via `careerId`, at, names, pos, mascotName, stage,
+  year, team {id,name,city,colors,kind}, ovr, level, fame, money, legacy + tier, awards [[label, n]], ind, titles, records,
+  games, wins, stats (mainStats), seasons, house {name, rooms [[label, level, upgrade name]]}, look). `cleanCard` validates
+  and clamps untrusted cards; `addFriend(list, card, selfId)` -> added/updated/older/self/bad (newest `at` wins, max 60);
+  `BOARDS` + `leaderboard(friends, me, board)`.
+- `src/core/friendcode.js`: `encodeCard` -> "GLF2." gzip base64url (GLF1 plain fallback), `decodeCard` finds a code anywhere in
+  pasted text/links, `shareLink(code)` = Pages URL + `#friend=CODE` (~1.5 KB). app.init reads `#friend=`, adds the friend,
+  toasts, clears the hash (and opens Friends on the title).
+- `src/ui/screens/friends.js`: `friendsPage` (your card + Share via navigator.share / clipboard / code modal, Add a friend,
+  leaderboard tabs, `openCard` modal with portrait/costume, stats, awards, house, remove) and `friendsScreen` (title).
+  Friends live in `app.settings.friends` (all slots). Hub Career subtab 'friends'; title "Friends" button. Tests: round15.
