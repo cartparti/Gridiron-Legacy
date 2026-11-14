@@ -16,6 +16,8 @@ import { crestURL } from '../crest.js';
 import { people } from '../../sim/social.js';
 import { openModal, closeAllModals } from '../components.js';
 import { recruitStars, visitSchool, answerInterview, projection } from '../../sim/career.js';
+import { statLine } from './results.js';
+import { STAGES } from '../../data/config.js';
 
 export function campScreen(app) {
   const st = app.state;
@@ -118,13 +120,50 @@ export function combineScreen(app) {
 export function declareScreen(app) {
   const st = app.state;
   const p = st.player;
+  const pr = st.declareProj ?? flow.projectDraft(st, { early: true });
+  const ds = pr.stock;
+  const seasonsLeft = STAGES.college.seasons - st.career.stageSeason;
+  const pct = (x) => `${Math.round(x * 100)}%`;
+  // what the scouts say, built from last season and the whole résumé
+  const plus = [], minus = [];
+  if (ds.last >= 72) plus.push(`Dominant last season (season rating ${ds.last}).`);
+  else if (ds.last >= 62) plus.push(`Solid last season (season rating ${ds.last}).`);
+  else minus.push(`Quiet last season (season rating ${ds.last}). Another year could help.`);
+  if (ds.lastAwards) plus.push(`${ds.lastAwards} award${ds.lastAwards === 1 ? '' : 's'} last season.`);
+  if (ds.lastChamp) plus.push('Won it all last season.');
+  if (p.ovr >= 76) plus.push(`Pro-ready tools (overall ${Math.round(p.ovr)}).`);
+  else if (p.ovr < 70) minus.push(`Still raw (overall ${Math.round(p.ovr)}).`);
+  if (p.fame >= 60) plus.push('Big name: teams know who you are.');
+  if (ds.seasons < 2) minus.push('Only one season of tape.');
+  if (p.injury) minus.push(`Coming off an injury (${p.injury.label.toLowerCase()}).`);
+  if (p.position === 'K') minus.push('Teams rarely spend high picks on kickers.');
+  const advice = pr.pRound1 >= 0.6 ? 'Your agent: "You\'re a first-rounder. The money is there right now."'
+    : pr.pUndrafted >= 0.35 ? 'Your agent: "Honestly? You could go undrafted. Another year of tape would help."'
+      : pr.round && pr.round <= 3 ? 'Your agent: "Day two pick. Good money, but a big year could push you up."'
+        : 'Your agent: "Late-round range right now. It\'s your call."';
   return h('div.screen',
     h('h1', 'Declare Early?'),
+    h('p.small.muted', `You have ${seasonsLeft} college season${seasonsLeft === 1 ? '' : 's'} left. Leave now and the draft is next.`),
     h('div.card',
-      h('p', `Scouts project you as a ${p.ovr >= 76 ? 'first-round' : p.ovr >= 71 ? 'second or third-round' : 'mid-round'} pick right now (overall ${Math.round(p.ovr)}).`),
-      h('p.small.muted', 'Leaving now starts your pro career and paycheck a year early. Staying gives you one more season to grow and win.')),
+      h('div.card-title', h('h3', `Your ${ds.lastYear ?? ''} season`), ds.lastChamp ? h('span.chip.gold.pix', 'CHAMPIONS') : null),
+      h('div.bigstat',
+        h('div', h('b', ds.lastRecord ?? '-'), h('span', 'Team record')),
+        h('div', h('b', ds.last), h('span', 'Season rating')),
+        h('div', h('b', ds.lastAwards), h('span', 'Awards'))),
+      ds.lastStats ? h('div.bigstat', { style: { marginTop: '8px' } }, statLine(p.position, ds.lastStats).map(([v, l]) => h('div', h('b', v), h('span', l)))) : null),
+    h('div.card.hero',
+      h('div.card-title', h('h3', 'Mock draft'), h('span.chip.pix', pr.label.toUpperCase())),
+      h('div.bigstat',
+        h('div', h('b', pr.round ? `#${pr.lo}-${Math.min(pr.hi, 140)}` : '—'), h('span', 'Likely pick range')),
+        h('div', h('b', pct(pr.pRound1)), h('span', 'Chance of round 1')),
+        h('div', h('b', pct(pr.pUndrafted)), h('span', 'Chance undrafted'))),
+      h('p.small', { style: { marginTop: '8px' } }, `Projected rookie deal: about ${fmtMoney(pr.salary)}/yr.`),
+      plus.length ? h('div', h('div.tiny.pix.good', 'SCOUTS LIKE'), h('ul.small', plus.map((x) => h('li', x)))) : null,
+      minus.length ? h('div', h('div.tiny.pix.bad', 'SCOUTS WORRY'), h('ul.small', minus.map((x) => h('li', x)))) : null,
+      h('p.small', h('i', advice)),
+      h('p.tiny.muted', 'Projections come from last season, your whole college résumé, your overall and fame. The combine can still move you up or down.')),
     h('button.btn.primary.block', { onclick: () => { sfx.select(); flow.declareForDraft(st, true); app.commit(); } }, 'Declare for the Draft'),
-    h('button.btn.block', { onclick: () => { sfx.click(); flow.declareForDraft(st, false); app.commit(); } }, 'Return for Senior Season'));
+    h('button.btn.block', { onclick: () => { sfx.click(); flow.declareForDraft(st, false); app.commit(); } }, seasonsLeft === 1 ? 'Return for Senior Season' : 'Stay in School'));
 }
 
 export function draftScreen(app) {
@@ -153,6 +192,7 @@ export function draftScreen(app) {
       h('p', d.undrafted ? 'Nobody called your name. The phone rings at midnight: a tryout contract.' : `With the ${ordinal(d.pick)} pick, the ${team.name} select ${p.first} ${p.last}!`),
       h('p.small.muted', `Rookie contract: ${fmtMoney(d.salary)}/yr for ${p.contract.years} years`),
       d.reason ? h('p.small', { style: { marginTop: '8px' } }, d.reason) : null,
+      d.proj ? h('p.small', `Mock drafts had you: ${d.proj.label} (around pick ${d.proj.median}). ${d.undrafted ? 'Ouch.' : d.pick + 10 < d.proj.median ? 'You went way higher than expected!' : d.pick > d.proj.median + 15 ? 'You slid on draft night.' : 'Right about where the experts said.'}`) : null,
       d.stock ? h('p.tiny.muted', `Your college résumé: season rating ${d.stock.perf} average, ${d.stock.awards} award${d.stock.awards === 1 ? '' : 's'}.`) : null),
     h('div.card.draft-board', h('h3', 'First Round'), h('div.list', d.board.map((x) => {
       const t = getTeam(st.league, x.team);

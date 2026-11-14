@@ -110,19 +110,44 @@ export function freePlay(ctx) {
   const dtMode = mode === 'rush' || mode === 'runStop';
   let plays = dealPlays(mode, call, m);
   const sit = situationOf(m);
-  if (type === 'qb_hailmary') plays = [{ name: 'Hail Mary', desc: 'Everyone to the end zone. Throw it up!', form: 'shotgun', hail: true, routes: { X: [[0, goalZ - 3]], Z: [[0, goalZ - 3]], S: [[2, goalZ - 4]], TE: [[-2, goalZ - 2]], RB: [[3, -2]] } }];
+  const hm = (name, desc, routes) => ({ name, desc, form: 'shotgun', hail: true, routes });
+  const g = goalZ;
+  if (type === 'qb_hailmary') plays = [
+    hm('Hail Mary', 'Everyone to the end zone. Throw it up!', { X: [[0, g - 3]], Z: [[0, g - 3]], S: [[2, g - 4]], TE: [[-2, g - 2]], RB: [[3, -2]] }),
+    hm('Flood Left', 'Four receivers flood the left corner.', { X: [[0, g - 3]], Z: [[-14, g - 2]], S: [[-6, g - 4]], TE: [[-8, g - 2]], RB: [[3, -2]] }),
+    hm('Flood Right', 'Four receivers flood the right corner.', { X: [[14, g - 2]], Z: [[0, g - 3]], S: [[8, g - 4]], TE: [[6, g - 2]], RB: [[-3, -2]] }),
+    hm('Jump Box', 'Everyone meets in the middle. Tip it to someone.', { X: [[10, g - 2]], Z: [[-10, g - 2]], S: [[3, g - 3]], TE: [[-2, g - 1]], RB: [[0, -3]] }),
+    hm('Deep Crossers', 'Receivers cross in the end zone.', { X: [[0, g + 6], [16, g - 3]], Z: [[0, g + 6], [-16, g - 3]], S: [[2, g - 4]], TE: [[-2, g - 2]], RB: [[3, -2]] }),
+  ];
   if (type === 'rb_screen') plays = [
     { name: 'Screen Left', desc: 'Leak out left, catch it, follow the linemen.', form: 'shotgun', screen: -1 },
     { name: 'Screen Right', desc: 'Same thing to the right side.', form: 'shotgun', screen: 1 },
     { name: 'Middle Screen', desc: 'Sneak behind the rush up the middle.', form: 'shotgun', screen: 0 },
+    { name: 'Slip Screen Left', desc: 'A short slip screen just outside the tackle.', form: 'shotgun', screen: -0.55 },
+    { name: 'Slip Screen Right', desc: 'Slip out to the right behind the guard.', form: 'shotgun', screen: 0.55 },
   ];
   if (type === 'qb_scramble') plays = [
     { name: 'QB Draw', desc: 'Fake the pass, then run it yourself.', form: 'shotgun', hole: [0, 1.6], qbRun: true },
     { name: 'Bootleg', desc: 'Roll out to the edge and take off.', form: 'shotgun', hole: [7, 9], qbRun: true },
     { name: 'Sneak', desc: 'Lower your shoulder behind the center.', form: 'pistol', hole: [0, 0], qbRun: true },
+    { name: 'Read Keep', desc: 'Read the end and keep it inside.', form: 'shotgun', hole: [-3, -1.5], qbRun: true },
+    { name: 'Naked Boot Left', desc: 'Fake right, bootleg all the way left.', form: 'shotgun', hole: [-7, -9], qbRun: true },
   ];
-  if (type === 'wr_jumpball') plays = [{ name: 'Fade', desc: 'Go deep and win the jump ball.', route: [[1.5, -40]], jump: true }];
-  if (type === 'wr_toetap') plays = [{ name: 'Sideline Out', desc: 'Catch it near the sideline and keep your feet in bounds!', route: [[0, -Math.min(10, m.yardLine)], [16, -Math.min(10, m.yardLine)]], toe: true }];
+  if (type === 'wr_jumpball') plays = [
+    { name: 'Fade', desc: 'Go deep and win the jump ball.', route: [[1.5, -40]], jump: true },
+    { name: 'Back-Shoulder Fade', desc: 'Stop at 22 and high-point it on your back shoulder.', route: [[1.5, -24], [2, -22]], sit: true, jump: true },
+    { name: 'Go', desc: 'Straight up the field. Outrun him, then outjump him.', route: [[0, -40]], jump: true },
+    { name: 'Post Jump', desc: 'Break to the post and go up over the safety.', route: [[0, -12], [-7, -34]], jump: true },
+    { name: 'Corner Jump', desc: 'Break to the corner, high-point it near the sideline.', route: [[0, -12], [7, -30]], jump: true },
+  ];
+  const tz = (d) => -Math.min(d, m.yardLine);
+  if (type === 'wr_toetap') plays = [
+    { name: 'Sideline Out', desc: 'Catch it near the sideline and keep your feet in bounds!', route: [[0, tz(10)], [16, tz(10)]], toe: true },
+    { name: 'Speed Out', desc: 'Quick out at 5. Drag your toes.', route: [[0, tz(5)], [16, tz(6)]], toe: true },
+    { name: 'Deep Out', desc: 'Fourteen and out. Tiptoe the sideline.', route: [[0, tz(14)], [16, tz(14)]], toe: true },
+    { name: 'Comeback', desc: 'Push deep, come back to the sideline.', route: [[0, tz(15)], [15, tz(12)]], toe: true },
+    { name: 'Corner', desc: 'Break to the corner, stay in bounds.', route: [[0, tz(8)], [15, tz(18)]], toe: true },
+  ];
 
   let play = null;
   let user = null;
@@ -384,7 +409,7 @@ export function freePlay(ctx) {
   const controls = makeControls(ctx, {
     onPress: (id) => {
       if (qteActive) return;
-      if (phase === 'pick' && /^key[1-3]$/.test(id)) return choose(Number(id.slice(3)) - 1);
+      if (phase === 'pick' && /^key[1-5]$/.test(id)) return choose(Number(id.slice(3)) - 1);
       if (id === 'snap' && phase === 'pre' && !m.defense && t > 0.35) { snapCalled = true; return; }
       if (phase !== 'live') return;
       if (/^key[1-5]$/.test(id) && user.role === 'QB' && holder === user && !user.runner) return throwTo(receivers[Number(id.slice(3)) - 1]);
@@ -404,7 +429,7 @@ export function freePlay(ctx) {
         const stat = id === 'bull' ? (st.strength ?? 60) : id === 'swim' ? (st.skill ?? 60) : ((st.skill ?? 60) + (st.speed ?? 60)) / 2;
         const massK = id === 'bull' ? Math.max(0.7, Math.min(1.4, user.mass / o.mass)) : Math.max(0.8, Math.min(1.25, o.mass / user.mass));
         const traitK = id === 'bull' ? (has('bulldozer') ? 1.2 : 1) : (has('swimclub') ? 1.2 : 1);
-        const pWin = (0.18 + rush.lev * 0.55 + (stat - 50) / 220) * (0.75 + tol * 0.25) * (call === 'risky' ? 0.9 : 1) * massK * traitK * (1 - oppK * 0.1);
+        const pWin = (0.18 + (play.win ?? 0) + rush.lev * 0.55 + (stat - 50) / 220) * (0.75 + tol * 0.25) * (call === 'risky' ? 0.9 : 1) * massK * traitK * (1 - oppK * 0.1);
         rush.cd = 0.7;
         playAction(user.mesh, id === 'bull' ? 'stiff' : id === 'swim' ? 'throw' : 'juke', { dir: Math.random() < 0.5 ? 1 : -1 });
         sfx.hit();
@@ -436,7 +461,7 @@ export function freePlay(ctx) {
         if (!(rush.cd > 0)) {
           rush.cd = 0.6;
           rush.cd = 0.9;
-          if (Math.random() < 0.18 + (st.strength ?? 60) / 400 + rush.lev * 0.25) rush.lev = 1;
+          if (Math.random() < 0.18 + (play.win ?? 0) + (st.strength ?? 60) / 400 + rush.lev * 0.25) rush.lev = 1;
           else { rush.lev = Math.max(0, rush.lev - 0.25); rush.stun = 0.5; hud.big('STILL BLOCKED', '#fbbf24', 450); }
           playAction(user.mesh, 'stiff', { dur: 0.3 });
         }
@@ -1952,7 +1977,7 @@ export function freePlay(ctx) {
         rush.stun = Math.max(0, rush.stun - dt);
         const o = user.engagedBy;
         const toward = user.role === 'CB' ? (c.active ? 0.85 : 0.2) : c.active ? Math.max(0, -(c.z) * 0.8 + 0.2) : 0.15;
-        if (!(user.role === 'CB' && rush.stun > 0)) rush.lev = Math.min(1, rush.lev + dt * toward * (user.role === 'CB' ? 0.32 * Math.max(0.6, Math.min(1.5, (user.mass ?? 190) / (o.mass ?? 200))) : 1) * (0.5 + (st.strength ?? 60) / 200) * (has('motor') ? 1.4 : 1));
+        if (!(user.role === 'CB' && rush.stun > 0)) rush.lev = Math.min(1, rush.lev + dt * toward * (user.role === 'CB' ? 0.32 * Math.max(0.6, Math.min(1.5, (user.mass ?? 190) / (o.mass ?? 200))) : 1) * (0.5 + (st.strength ?? 60) / 200) * (has('motor') ? 1.4 : 1) * (play.lev ?? 1));
         if (levBar) levBar.querySelector('i').style.width = `${rush.lev * 100}%`;
         const push = c.active ? 1.6 : 0.6;
         moveToward(user, o.pos.x + c.x * 1.2, o.pos.z + 0.2, push, dt, 10);

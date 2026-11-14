@@ -7,7 +7,7 @@
 // Traits: bigleg (range), automatic (sweet spot), icewater (no nerves), windreader (shows the drift), hangtime (kickoffs).
 import * as THREE from 'three';
 import { makePlayer, makeBall, animateRun, faceToward, setPose, playAction, celebrate, knockDown, confetti } from '../actors.js';
-import { bindInput, maybeTip, endPlay } from './common.js';
+import { bindInput, maybeTip, endPlay, pickPlay } from './common.js';
 import { sfx } from '../../audio/sfx.js';
 import { react } from '../../audio/stadium.js';
 
@@ -16,6 +16,32 @@ const POST_HALF = 3.08; // half the distance between the uprights (18.5 ft)
 const BAR = 3.33; // crossbar height (10 ft)
 const SIDELINE = 26.6;
 const has = (opts, id) => (opts.traits ?? []).includes(id);
+
+// Five kick calls for every kind of kick. carry/kick: distance x, band: sweet spot x, curve: yd/s2 sideways (+ right),
+// launch: angle, bias: where the aim marker sweeps around, hang: harder to return, rec: onside recovery odds.
+export const KICK_PLAYS = {
+  fg: [
+    { id: 'standard', name: 'Standard', desc: 'Your normal kick. Straight through.' },
+    { id: 'smooth', name: 'Smooth Swing', desc: 'Bigger sweet spot, a little less distance.', carry: 0.94, band: 1.3 },
+    { id: 'power', name: 'Max Leg', desc: 'Extra distance, smaller sweet spot.', carry: 1.08, band: 0.75 },
+    { id: 'draw', name: 'Draw', desc: 'Curls to the right in the air. Fight a wind from the right.', curve: 1.1 },
+    { id: 'fade', name: 'Fade', desc: 'Curls to the left in the air. Fight a wind from the left.', curve: -1.1 },
+  ],
+  kickoff: [
+    { id: 'deep', name: 'Deep Boom', desc: 'As far as you can. Go for the touchback.' },
+    { id: 'sky', name: 'Sky Kick', desc: 'Huge hang time. Shorter, but hard to return.', launch: 1.0, kick: 0.88, hang: 0.3 },
+    { id: 'squib', name: 'Squib', desc: 'Low and bouncing. Short, but no big return.', launch: 0.2, kick: 0.62, squib: true },
+    { id: 'pinL', name: 'Pin Left', desc: 'Aim for the left corner. Careful of the sideline.', bias: -12 },
+    { id: 'pinR', name: 'Pin Right', desc: 'Aim for the right corner. Careful of the sideline.', bias: 12 },
+  ],
+  onside: [
+    { id: 'dribbler', name: 'Dribbler', desc: 'The classic bouncing onside kick.' },
+    { id: 'popup', name: 'Pop-Up', desc: 'Chip it high so your guys can run under it.', launch: 0.8, rec: 0.07, band: 0.8 },
+    { id: 'hopL', name: 'Hop Left', desc: 'Bounce it toward the left sideline.', bias: -8 },
+    { id: 'hopR', name: 'Hop Right', desc: 'Bounce it toward the right sideline.', bias: 8 },
+    { id: 'surprise', name: 'Sneaky', desc: 'Disguise it. Smaller sweet spot, better odds if you nail it.', rec: 0.1, band: 0.7 },
+  ],
+};
 
 export function kick(ctx) {
   const { group, camera, hud, opts, stadium } = ctx;
@@ -98,19 +124,37 @@ export function kick(ctx) {
   // ---- distances, range and the sweet spot
   const postZ = -(m.yardLine + 10);
   const dist = fg ? m.yardLine + 17 : 0;
+  let S = {}; // the kick call you picked
   const range = 40 + (st.strength ?? 60) * 0.22 + ({ hs: -6, college: -2, pro: 0 }[opts.stage] ?? 0) + (has(opts, 'bigleg') ? 5 : 0) + (call === 'risky' ? 3 : call === 'safe' ? -2 : 0);
-  const maxCarry = (range + 9) * 1.14; // landing distance at full power (a 35 degree launch)
-  const maxKickoff = 60 + (st.strength ?? 60) * 0.17 + (has(opts, 'bigleg') ? 5 : 0) + (call === 'risky' ? 3 : call === 'safe' ? -2 : 0);
-  const LAUNCH = fg ? 0.61 : onside ? 0.2 : 0.8; // radians
+  let maxCarry = (range + 9) * 1.14; // landing distance at full power (a 35 degree launch)
+  let maxKickoff = 60 + (st.strength ?? 60) * 0.17 + (has(opts, 'bigleg') ? 5 : 0) + (call === 'risky' ? 3 : call === 'safe' ? -2 : 0);
+  let LAUNCH = fg ? 0.61 : onside ? 0.2 : 0.8; // radians
   // the carry a FG needs to clear the bar at the posts: x tan(a) (1 - x / L) >= bar
-  const needL = fg ? dist / Math.max(0.2, 1 - (BAR + 0.5) / (dist * Math.tan(LAUNCH))) : 0;
+  let needL = fg ? dist / Math.max(0.2, 1 - (BAR + 0.5) / (dist * Math.tan(LAUNCH))) : 0;
   const headwind = wind.z * 0.9; // + = blowing toward the kicker (wind z is toward +z)
-  const need = fg ? Math.min(0.96, (needL + headwind * 1.3) / maxCarry) : kickoff ? 0.78 : 0.2;
+  let need = fg ? Math.min(0.96, (needL + headwind * 1.3) / maxCarry) : kickoff ? 0.78 : 0.2;
   let band = 0.13 * Math.min(1.5, tol) * (has(opts, 'automatic') ? 1.3 : 1) * (call === 'safe' ? 1.2 : call === 'risky' ? 0.8 : 1) * (0.85 + (st.skill ?? 60) / 400);
   if (onside) band *= has(opts, 'hangtime') ? 1.4 : 1;
   if (kickoff && has(opts, 'hangtime')) band *= 1.25;
-  const zoneLo = fg ? need : kickoff ? Math.min(0.86, need) : 0.24;
-  const zoneHi = Math.min(0.985, zoneLo + band);
+  let zoneLo = fg ? need : kickoff ? Math.min(0.86, need) : 0.24;
+  let zoneHi = Math.min(0.985, zoneLo + band);
+  const band0 = band, carry0 = maxCarry, kick0 = maxKickoff, launch0 = LAUNCH;
+  /** Apply a kick call: recompute range, launch and the sweet spot. */
+  const applyStyle = (style) => {
+    S = style ?? {};
+    maxCarry = carry0 * (S.carry ?? 1);
+    maxKickoff = kick0 * (S.kick ?? 1);
+    LAUNCH = S.launch ?? launch0;
+    band = band0 * (S.band ?? 1);
+    needL = fg ? dist / Math.max(0.2, 1 - (BAR + 0.5) / (dist * Math.tan(LAUNCH))) : 0;
+    need = fg ? Math.min(0.96, (needL + headwind * 1.3) / maxCarry) : kickoff ? 0.78 : 0.2;
+    zoneLo = fg ? need : kickoff ? Math.min(0.86, need) : 0.24;
+    zoneHi = Math.min(0.985, zoneLo + band);
+    const z = meter.querySelector('.km-zone'); if (z) { z.style.left = `${zoneLo * 100}%`; z.style.width = `${(zoneHi - zoneLo) * 100}%`; }
+    const nd = meter.querySelector('.km-need'); if (nd) nd.style.left = `${need * 100}%`;
+    const lb = meter.querySelector('.km-call'); if (lb) lb.textContent = style?.name ?? '';
+    if (dbg) { dbg.zoneLo = zoneLo; dbg.zoneHi = zoneHi; dbg.need = need; dbg.style = S.id; }
+  };
 
   // ---- markers
   const AMP = fg ? (pat ? 5 : 6.5) : kickoff ? 22 : 14;
@@ -143,7 +187,7 @@ export function kick(ctx) {
   // ---- HUD: power meter with the sweet spot
   const meter = document.createElement('div');
   meter.className = 'kick-meter';
-  meter.innerHTML = `<div class="km-label">${fg ? (pat ? 'EXTRA POINT' : `${dist} YARDS`) : onside ? 'ONSIDE' : 'KICKOFF'}<span>${wind.mph >= 3 ? `WIND ${wind.mph} MPH` : 'CALM'}</span></div>
+  meter.innerHTML = `<div class="km-label">${fg ? (pat ? 'EXTRA POINT' : `${dist} YARDS`) : onside ? 'ONSIDE' : 'KICKOFF'}<em class="km-call"></em><span>${wind.mph >= 3 ? `WIND ${wind.mph} MPH` : 'CALM'}</span></div>
     <div class="km-bar"><i class="km-zone" style="left:${zoneLo * 100}%;width:${(zoneHi - zoneLo) * 100}%"></i>${fg ? `<i class="km-need" style="left:${need * 100}%"></i>` : ''}<i class="km-cur"></i></div>
     <div class="km-steps"><b class="on">1 AIM</b><b>2 POWER</b></div>`;
   hud.bottom(meter);
@@ -209,9 +253,12 @@ export function kick(ctx) {
       ? ['You need the ball back. Aim the short kick, then tap a soft power in the green.', 'It has to go 10 yards. Your teammates fight for it.']
       : ['1. AIM: pick a landing spot. Corners pin them deep, the sideline is out of bounds.', '2. POWER: tap in the green. Deep into the end zone is a touchback.'];
   maybeTip(ctx, fg ? (pat ? 'Extra Point' : 'Field Goal') : onside ? 'Onside Kick' : 'Kickoff', tips, () => {
-    phase = 'aim'; t = 0;
-    hud.instr(fg ? 'Tap to set your AIM' : 'Tap to pick your spot');
     if (m.gw) hud.say('This one is for the game...');
+    pickPlay(ctx, KICK_PLAYS[fg ? 'fg' : onside ? 'onside' : 'kickoff'], (pl) => {
+      applyStyle(pl);
+      phase = 'aim'; t = 0;
+      hud.instr(fg ? 'Tap to set your AIM' : 'Tap to pick your spot');
+    }, { instr: fg ? 'Pick your kick' : onside ? 'Pick your onside kick' : 'Pick your kickoff' });
   });
 
   // ---- the kick itself
@@ -243,7 +290,7 @@ export function kick(ctx) {
       v.set(Math.sin(dir) * Math.cos(LAUNCH) * sp, Math.sin(LAUNCH) * sp, -Math.cos(dir) * Math.cos(LAUNCH) * sp);
       spin = onside ? -18 : -9;
     }
-    ball.userData.curve = hook * 6; // lateral acceleration from the hook
+    ball.userData.curve = hook * 6 + (S.curve ?? 0); // lateral acceleration from the hook (and a draw / fade)
     ball.userData.zoneMid = zoneMid;
   };
 
@@ -288,7 +335,7 @@ export function kick(ctx) {
     }
     if (phase === 'aim') {
       const s = Math.sin((t / period) * Math.PI * 2);
-      aimX = s * AMP + (nerves ? Math.sin(t * 9.3) * nerves * 0.9 : 0);
+      aimX = (S.bias ?? 0) + s * AMP + (nerves ? Math.sin(t * 9.3) * nerves * 0.9 : 0);
       marker.position.x = aimX;
       ghost.position.x = aimX + driftX;
       cur.style.left = '0%';
@@ -385,7 +432,7 @@ export function kick(ctx) {
           if (bounces >= 3 || Math.abs(v.z) < 1.5) {
             const went = -ball.position.z;
             const inZone = powerLocked >= zoneLo && powerLocked <= zoneHi;
-            let pRec = (inZone ? 0.48 : 0.2) + (has(opts, 'hangtime') ? 0.1 : 0) + (tol - 1) * 0.2 - (opts.oppStrength ?? 0) * 0.05;
+            let pRec = (inZone ? 0.48 : 0.2) + (inZone ? (S.rec ?? 0) : -(S.rec ?? 0) * 0.5) + (has(opts, 'hangtime') ? 0.1 : 0) + (tol - 1) * 0.2 - (opts.oppStrength ?? 0) * 0.05;
             if (went < 10) pRec = 0;
             const rec = Math.random() < Math.max(0, Math.min(0.75, pRec));
             const pile = rec ? mates : opps;
@@ -421,7 +468,7 @@ export function kick(ctx) {
           // caught: the deeper and higher, the less room to return it
           const depth = lz - goal; // yards in front of their goal line (negative = in the end zone)
           const hang = Math.min(1, Math.max(0, 1 - Math.abs(powerLocked - ball.userData.zoneMid) * 4));
-          const ret = Math.max(4, 16 + (opts.oppStrength ?? 0) * 5 - hang * 7 + (Math.random() - 0.4) * 14);
+          const ret = S.squib ? 4 + Math.random() * 7 : Math.max(4, 16 + (opts.oppStrength ?? 0) * 5 - hang * 7 - (S.hang ?? 0) * 20 + (Math.random() - 0.4) * 14);
           start = Math.max(1, Math.round(depth + ret));
           if (start >= 50 && Math.random() < 0.18) { retTD = true; start = 100; }
           q = retTD ? 0.02 : Math.max(0.1, Math.min(0.95, 1 - (start - 14) / 32));

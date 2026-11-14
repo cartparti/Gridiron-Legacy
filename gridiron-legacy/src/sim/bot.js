@@ -88,7 +88,7 @@ export function botStep(state, strat, skill = 0.5) {
       flow.chooseCollege(state, state.offers[0].teamId);
       return true;
     case 'declare':
-      flow.declareForDraft(state, state.player.ovr >= 74);
+      flow.declareForDraft(state, state.career.stageSeason >= 2 && state.player.ovr >= 74);
       return true;
     case 'combine':
       answerInterview(state, 0);

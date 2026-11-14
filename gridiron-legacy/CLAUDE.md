@@ -688,3 +688,22 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Coach's goals: `src/sim/goals.js` `setSeasonGoals` (beginWeek at week 0 of a new year/stage: main stat from PER_GAME x games x ovr
   factor (backup x0.35), second stat or grade goal (backup: win the job), team goal wins/playoffs), `goalProgress`, `resolveGoals`
   (endSeason: XP, coach, fame, pro $40K each; all missed = coach -3). Week tab `goalsCard`, review `goalsReview`. Tests: round16.
+
+## v0.55: five plays per snap, more plays, early draft
+- playbook.js: `EXTRA` pools (pass concepts, runs, routes, coverages, and runD/rush/runStop calls with `lev` (leverage build x)
+  and `win` (+ shed/move odds) that the engine now reads: `play.lev` in the leverage build, `play.win` in pWin and the CB shed).
+  `dealPlays(mode, call, m, n = 5)`: 3 best fits from your call + one wildcard from each other call (fit > -5), recent list 25.
+  Engine special lists have 5 each (Hail Mary `hm()`, screens incl. slip screens ±0.55, scrambles, jump balls, toe-taps `tz()`);
+  keys 1-5 pick. CSS: `.fc-plays` flex-wraps 3 + 2 (one row of 5 at >= 720 px).
+- Non-engine moments: `pickPlay(ctx, plays, onPick)` + `withPlays(build, plays, instr)` (sets `ctx.opts.routine` then builds the
+  minigame) + `routineQ(opts, q)` (qMul/qAdd) in common.js. `MASCOT_PLAYS` (beatK/nAdd/winK, shots/radiusK/vipK/lifeK, lenAdd/timeK,
+  sweetK/airAdd), `SNEAK_PLAYS` (tapK/defK/surgeK/early/durAdd/fumK), `DIVE_PLAYS` (tapK/zoneK/defK/durAdd). kick.js `KICK_PLAYS`
+  fg/kickoff/onside picked after the tip; `applyStyle` recomputes carry/kickoff distance/launch/band/need/zone (carry, kick, launch,
+  band, curve, bias, hang, squib, rec) and updates the meter (`.km-call`).
+- Early draft: nextStageStep offers phase 'declare' after every non-final college season (1 and 2) with `state.declareProj =
+  projectDraft(state, { early: true })`. `draftStock` weights last season (perf x0.3, last-season awards x1.2) and returns last,
+  lastAwards, lastYear, lastRecord, lastStats, lastChamp, seasons. `projectDraft` = 160 mock drafts with a private seeded stream
+  (never the save RNG) mirroring runDraft's scoring -> { median, lo, hi, round, pRound1, pUndrafted, label, salary, stock };
+  matches real picks within a round or so. startCombine stores `state.draftProj`; runDraft copies it to `state.draft.proj`
+  (draft night compares). Declare screen: last season card, mock draft card, scouts like/worry, agent advice. Bot declares only
+  after season 2 at OVR 74+. Kicker draft penalty 8 -> 15. Tests: round17.

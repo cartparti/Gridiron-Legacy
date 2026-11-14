@@ -443,7 +443,8 @@ function nextStageStep(state) {
     return;
   }
   if (c.stage === 'college') {
-    if (c.stageSeason === 2 && p.ovr >= 68) { state.phase = 'declare'; return; }
+    // leave early? offered after every college season but the last (the scouts' report is built from last season)
+    if (c.stageSeason < STAGES.college.seasons) { state.declareProj = projectDraft(state, { early: true }); state.phase = 'declare'; return; }
     if (c.stageSeason < STAGES.college.seasons) {
       c.stageSeason++;
       return startNewSeason(state, { reset: true });
@@ -529,6 +530,8 @@ export function chooseCollege(state, teamId) {
 
 /** The pre-draft combine: testing and an interview, then the draft. */
 function startCombine(state, early) {
+  state.draftProj = state.declareProj ?? projectDraft(state, { early });
+  state.declareProj = null;
   runCombine(state);
   state.combine.early = early;
   state.phase = 'combine';
@@ -539,9 +542,13 @@ export function finishCombine(state) {
 }
 
 export function declareForDraft(state, yes) {
-  if (yes) return startCombine(state, true);
+  if (yes) {
+    addNews(state, 'story', `${state.player.first} ${state.player.last} declares for the pro draft${state.declareProj ? ` (projected: ${state.declareProj.label.toLowerCase()})` : ''}.`);
+    return startCombine(state, true);
+  }
+  state.declareProj = null;
   state.career.stageSeason++;
-  addNews(state, 'story', `${state.player.last} returns for a senior season.`);
+  addNews(state, 'story', `${state.player.last} returns to school for ${state.career.stageSeason === STAGES.college.seasons ? 'a senior season' : 'another season'}.`);
   return startNewSeason(state, { reset: true });
 }
 
@@ -571,7 +578,44 @@ export function draftStock(state) {
   const awards = p.awards.filter((a) => a.stage === 'college');
   const big = awards.filter((a) => /Ironstone|Champion/.test(a.name)).length;
   const wins = col.reduce((a, h) => a + Number(h.record.split('-')[0]), 0) / Math.max(1, col.length);
-  return { value: p.ovr * 0.8 + (perf - 50) * 0.35 + (best - 50) * 0.15 + awards.length * 1.6 + big * 3 + p.fame * 0.08 + wins * 0.3 + 12, perf: Math.round(perf), awards: awards.length };
+  // scouts care most about what you did LAST season
+  const lastH = col[col.length - 1] ?? null;
+  const last = lastH ? lastH.perf ?? 50 : 50;
+  const lastAwards = lastH ? (lastH.awards ?? []).filter((a) => !/Champion$/.test(a)).length : 0;
+  const value = p.ovr * 0.8 + (perf - 50) * 0.25 + (best - 50) * 0.1 + (last - 50) * 0.3 + awards.length * 1.4 + lastAwards * 1.2 + big * 3 + p.fame * 0.08 + wins * 0.3 + 12;
+  return { value, perf: Math.round(perf), awards: awards.length, last: Math.round(last), lastAwards, lastYear: lastH?.year ?? null, lastRecord: lastH?.record ?? null, lastStats: lastH?.seasonStats ?? null, lastChamp: !!lastH?.champion, seasons: col.length };
+}
+
+/**
+ * Mock draft: run the draft many times with a private random stream (doesn't touch the save's RNG) and see where you
+ * land. Returns { median, lo, hi, round, pRound1, pUndrafted, label, stock }.
+ */
+export function projectDraft(state, { early = false, combineBonus = null, runs = 160 } = {}) {
+  const ds = draftStock(state);
+  let seed = ((state.seed ?? 1) ^ (state.career.year * 2654435761)) >>> 0;
+  const rnd = () => { seed = (seed + 0x6D2B79F5) >>> 0; let t = seed; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const gaussR = (mu, sd) => mu + sd * Math.sqrt(-2 * Math.log(rnd() || 1e-9)) * Math.cos(2 * Math.PI * rnd());
+  const isK = state.player.position === 'K';
+  const picks = [];
+  for (let r = 0; r < runs; r++) {
+    const mine = ds.value - (early ? 1 : 0) + (combineBonus ?? gaussR(0, 2.5)) + gaussR(0, 2) + rnd() * 6 - (isK ? 15 : 0);
+    let ahead = 0;
+    for (let i = 0; i < 240; i++) {
+      const pos = rnd() < 1 / 16; // kickers in the prospect pool
+      if (gaussR(62, 9) + rnd() * 6 + gaussR(0, 1.5) - (pos ? 15 : 0) > mine) ahead++;
+    }
+    picks.push(ahead + 1);
+  }
+  picks.sort((a, b) => a - b);
+  const at = (q) => picks[Math.min(picks.length - 1, Math.floor(q * picks.length))];
+  const TEAMS = 20, LAST = TEAMS * 7;
+  const median = at(0.5), lo = at(0.15), hi = at(0.85);
+  const pRound1 = picks.filter((x) => x <= TEAMS).length / runs;
+  const pUndrafted = picks.filter((x) => x > LAST).length / runs;
+  const roundOf = (pk) => (pk > LAST ? 0 : Math.ceil(pk / TEAMS));
+  const r0 = roundOf(median);
+  const label = r0 === 0 ? 'Undrafted free agent' : median <= 10 ? 'Top 10 pick' : r0 === 1 ? 'First round' : `Round ${roundOf(lo) || 7}${roundOf(hi) !== roundOf(lo) ? `-${roundOf(hi) || 'undrafted'}` : ''}`;
+  return { median, lo, hi, round: r0, pRound1, pUndrafted, label, stock: ds, salary: r0 === 0 ? MIN_SALARY : rookieSalary(median) };
 }
 
 export function runDraft(state, early) {
@@ -607,7 +651,7 @@ export function runDraft(state, early) {
       let bestScore = -Infinity;
       for (const pr of available) {
         const nd = need[teamId][pr.pos] ?? (need[teamId][pr.pos] = teamNeed(league, teamId, pr.pos));
-        const score = pr.stock + nd * 0.35 + gauss(state, 0, 1.5) - (pr.pos === 'K' ? 8 : 0);
+        const score = pr.stock + nd * 0.35 + gauss(state, 0, 1.5) - (pr.pos === 'K' ? 15 : 0);
         if (score > bestScore) { bestScore = score; best = pr; }
       }
       available.splice(available.indexOf(best), 1);
@@ -642,7 +686,8 @@ export function runDraft(state, early) {
   // early picks are expected to start; late picks and undrafted guys have to earn it
   initDepth(state, { edge: undrafted ? randInt(state, 5, 9) : userPick.round === 1 ? randInt(state, -3, 1) : userPick.round <= 3 ? randInt(state, 0, 4) : randInt(state, 3, 7) });
   state.combine = null;
-  state.draft = { pick: pickNum, round: undrafted ? 0 : userPick.round, teamId, undrafted, salary, board, early, reason, stock: ds };
+  state.draft = { pick: pickNum, round: undrafted ? 0 : userPick.round, teamId, undrafted, salary, board, early, reason, stock: ds, proj: state.draftProj ? { label: state.draftProj.label, median: state.draftProj.median } : null };
+  state.draftProj = null;
   addNews(state, 'story', undrafted
     ? `${p.first} ${p.last} goes undrafted but signs with ${teamName(state)}.`
     : `With pick #${pickNum}, the ${teamName(state)} select ${p.first} ${p.last}!`);

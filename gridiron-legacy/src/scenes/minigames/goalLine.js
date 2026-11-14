@@ -2,10 +2,10 @@
 // Stats: Strength = push per tap, Skill = leap timing window.
 import * as THREE from 'three';
 import { makePlayer, animateRun, faceToward, knockDown, setPose, setHop, celebrate, confetti } from '../actors.js';
-import { bindInput, maybeTip, rig, endPlay, finalize, hudMeter } from './common.js';
+import { bindInput, maybeTip, rig, endPlay, finalize, hudMeter, withPlays, routineQ } from './common.js';
 import { sfx } from '../../audio/sfx.js';
 
-export function goalLine(ctx) {
+function goalLineGame(ctx) {
   const { group, camera, hud, opts } = ctx;
   const m = opts.moment;
   const st = opts.stats;
@@ -40,9 +40,10 @@ export function goalLine(ctx) {
   box.append(pushM.el, defM.el);
   hud.bottom(box);
 
-  const dur = 2.2;
-  const defRate = { safe: 0.34, balanced: 0.4, risky: 0.46 }[call];
-  const perTap = 0.045 + (st.strength / 100) * 0.04;
+  const R = opts.routine ?? {};
+  const dur = 2.2 + (R.durAdd ?? 0);
+  const defRate = { safe: 0.34, balanced: 0.4, risky: 0.46 }[call] * (R.defK ?? 1);
+  const perTap = (0.045 + (st.strength / 100) * 0.04) * (R.tapK ?? 1);
   let push = 0;
   let defense = 0;
   let phase = 'wait';
@@ -50,7 +51,7 @@ export function goalLine(ctx) {
   let marker = 0;
   let dirM = 1;
   let fx = null;
-  const zone = Math.max(0.08, Math.min(0.32, 0.13 * tol * (0.8 + st.skill / 250)));
+  const zone = Math.max(0.06, Math.min(0.36, 0.13 * (R.zoneK ?? 1) * tol * (0.8 + st.skill / 250)));
   let leap = null;
 
   rig(camera, 0, 0, 0, { zoom: 0.7, ahead: 4, snap: true });
@@ -86,7 +87,7 @@ export function goalLine(ctx) {
     ctx.addCleanup(() => snapBtn?.remove());
   });
 
-  const finish = (r) => { phase = 'over'; endPlay(ctx, finalize(r, m)); };
+  const finish = (r) => { phase = 'over'; endPlay(ctx, finalize({ ...r, quality: routineQ(opts, r.quality) }, m)); };
 
   return (dt) => {
     if (phase === 'presnap') { t += dt; if (t > 15) goPush(); return; }
@@ -150,3 +151,12 @@ export function goalLine(ctx) {
     }
   };
 }
+
+export const DIVE_PLAYS = [
+  { name: 'Dive Over', desc: 'Drive the pile, then leap over the top.' },
+  { name: 'Iso Lead', desc: 'Fullback leads. Easier push, smaller leap window.', tapK: 1.12, zoneK: 0.85 },
+  { name: 'Stretch Leap', desc: 'Bigger leap window, they push back harder.', zoneK: 1.3, defK: 1.12 },
+  { name: 'Quick Hit', desc: 'Snap and go: less time, softer defense.', durAdd: -0.4, defK: 0.85 },
+  { name: 'Power Wedge', desc: 'Everyone behind you. Strong push, longer fight.', tapK: 1.08, durAdd: 0.4, defK: 1.05 },
+];
+export const goalLine = withPlays(goalLineGame, DIVE_PLAYS, 'Pick your goal-line play');

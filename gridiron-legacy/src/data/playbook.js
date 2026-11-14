@@ -381,6 +381,112 @@ for (const [mode, calls] of Object.entries(BIG)) for (const [call, list] of Obje
   for (const pl of list) if (!have.has(pl.name)) PLAYS[mode][call].push(pl);
 }
 
+// ---------------- v0.55: even more plays for every position (each snap now offers five)
+const EXTRA = {
+  pass: {
+    safe: [
+      concept('Quick Game', 'Hitch, slant, flat. Ball out in two seconds.', 'hitch', 'slant', 'flat', 'spot', 'check'),
+      concept('All Hitch', 'Everyone turns around at five.', 'hitch', 'hitch', 'spot', 'hitch', 'flatR'),
+      concept('Slant Flat', 'The oldest combo in football.', 'slant', 'slant', 'flat', 'flat', 'swing'),
+      concept('Ohio', 'Out and up outside, spot inside.', 'out5', 'out5', 'spot', 'drag', 'check'),
+      concept('Pivot Flat', 'Pivot routes with a flat underneath.', 'pivot', 'hitch', 'flat', 'pivot', 'flatL'),
+      concept('Quick Drag', 'Shallow drags rub off each other.', 'drag', 'slant', 'drag', 'spot', 'check'),
+    ],
+    balanced: [
+      concept('Dig Drag', 'A dig over a drag. Read the linebacker.', 'dig', 'drag', 'curl', 'dig', 'flatR'),
+      concept('Sail Flat', 'High-low on the sideline.', 'sail', 'curl', 'flat', 'out10', 'flatL'),
+      concept('Skinny Curl', 'Skinny post with curls under it.', 'skinny', 'curl', 'curl', 'drag', 'check'),
+      concept('Out Seam', 'Ten-yard outs, seam down the middle.', 'out10', 'out10', 'seam', 'curl', 'swing'),
+      concept('Hi-Lo Cross', 'Two crossers at different depths.', 'cross', 'curl', 'drag', 'cross', 'check'),
+      concept('Pivot Dagger', 'Pivot underneath, dig behind it.', 'pivot', 'dig', 'seam', 'pivot', 'flatR'),
+    ],
+    risky: [
+      concept('Bomb Squad', 'Two go routes and a deep over.', 'go', 'go', 'over', 'seam', 'check'),
+      concept('Stick Nod', 'Fake the stick, then go deep.', 'stickNod', 'curl', 'stickNod', 'flat', 'check'),
+      concept('Post Wheel', 'Post inside, the back wheels outside.', 'post', 'dig', 'post', 'curl', 'wheelR'),
+      concept('Corner Post', 'Corner on one side, post on the other.', 'corner', 'post', 'seam', 'drag', 'flatL'),
+      concept('Max Verts', 'Max protection, three deep shots.', 'go', 'fade', 'seam', 'hitch', 'check'),
+      concept('Sluggo Corner', 'Slant-and-go with a corner behind.', 'sluggo', 'corner', 'corner', 'curl', 'swing'),
+    ],
+  },
+  run: {
+    safe: [
+      { name: 'Wedge', desc: 'Everyone blocks inward. Follow the wedge.', form: 'pistol', hole: [0.2, 0.2] },
+      { name: 'Inside Trap', desc: 'Let the tackle in, kick him out.', form: 'pistol', hole: [-1, -1] },
+      { name: 'Hammer', desc: 'Short, quick hit off the guard.', form: 'pistol', hole: [1.2, 0.4] },
+      { name: 'Slam', desc: 'Straight downhill behind the center.', form: 'pistol', hole: [-0.4, 0.4] },
+    ],
+    balanced: [
+      { name: 'Power Read', desc: 'Pull the guard and read the end.', form: 'pistol', hole: [2.8, 3.2] },
+      { name: 'Buck Sweep', desc: 'Both guards pull outside.', form: 'pistol', hole: [4, 5.2] },
+      { name: 'Weak Draw', desc: 'Fake the pass, hit the weak side.', form: 'shotgun', hole: [-1.6, -0.8], draw: true },
+      { name: 'Counter Bash', desc: 'Back goes away from the guard.', form: 'pistol', hole: [-3.2, -2.4] },
+    ],
+    risky: [
+      { name: 'Option Pitch', desc: 'Pitched at the last moment. Turn the corner.', form: 'pistol', hole: [7, 9.5], pitch: true },
+      { name: 'Wide Zone Weak', desc: 'All the way to the weak sideline.', form: 'pistol', hole: [-6, -7.5] },
+      { name: 'Rocket Toss', desc: 'Motion and toss. Pure speed.', form: 'pistol', hole: [9, 11], pitch: true },
+      { name: 'Bootleg Keep', desc: 'Fake it inside, bend it outside.', form: 'pistol', hole: [5.5, 7.5] },
+    ],
+  },
+  route: {
+    safe: [
+      { name: 'Slant & Sit', desc: 'Slant, then settle in the window.', route: [[0, -3], [-4, -6], [-4, -5]], sit: true },
+      { name: 'Bubble', desc: 'Step back and catch it behind the line.', route: [[3, 1], [6, 0.5]] },
+      { name: 'Short Curl', desc: 'Seven yards and come back to the ball.', route: [[0, -8], [-1, -6]], sit: true },
+      { name: 'Hook In', desc: 'Push five, hook inside.', route: [[0, -5], [-3, -5]], sit: true },
+    ],
+    balanced: [
+      { name: 'Deep Dig', desc: 'Twelve yards and flat across.', route: [[0, -12], [-14, -13]] },
+      { name: 'Corner Stop', desc: 'Start the corner, stop and turn.', route: [[0, -10], [4, -14], [4, -13]], sit: true },
+      { name: 'Square Out', desc: 'Nine yards, sharp cut to the sideline.', route: [[0, -9], [7, -9]] },
+      { name: 'Post Curl', desc: 'Lean on the post, then curl back.', route: [[0, -10], [-3, -14], [-3, -12]], sit: true },
+    ],
+    risky: [
+      { name: 'Go Stop Go', desc: 'Stop at 12, then explode deep again.', route: [[0, -12], [0, -11], [0, -38]] },
+      { name: 'Bang 8', desc: 'Skinny post straight up the seam.', route: [[0, -8], [-5, -34]] },
+      { name: 'Wheel Up', desc: 'Out to the flat, turn it up the sideline.', route: [[4, -2], [6, -34]] },
+      { name: 'Deep Comeback', desc: 'Eighteen yards, snap back to the sideline.', route: [[0, -18], [3, -15]], sit: true },
+    ],
+  },
+  cover: {
+    safe: [
+      { name: 'Cover 4 Drop', desc: 'Bail to your quarter. Nothing deep.', coverage: 'zone', user: 'deep' },
+      { name: 'Hard Flat', desc: 'Sit on the flat route and tackle.', coverage: 'zone', user: 'flat' },
+      { name: 'Deep Half', desc: 'You and the safety split the deep half.', coverage: 'zone', user: 'deep' },
+    ],
+    balanced: [
+      { name: 'Man Lock', desc: 'Him and you. Nobody else.', coverage: 'man', user: 'man' },
+      { name: 'Two Man Under', desc: 'Trail him, safety over the top.', coverage: 'man', user: 'man', twoDeep: true },
+      { name: 'Mable', desc: 'Man on your side, zone on the other.', coverage: 'man', user: 'man' },
+    ],
+    risky: [
+      { name: 'Thunder Press', desc: 'Jam hard and stay on his hip.', coverage: 'man', user: 'man', press: true },
+      { name: 'Cover 0 Lock', desc: 'Everybody blitzes. Don\'t get beat.', coverage: 'man', user: 'man', blitz: true, press: true },
+      { name: 'Boundary Blitz', desc: 'Off the short side after the QB!', coverage: 'man', user: 'blitz', blitz: true },
+    ],
+  },
+  runD: {
+    safe: [{ name: 'Fold', desc: 'Stay square, take the safe tackle.', lev: 0.95, win: 0.04 }, { name: 'Shadow', desc: 'Mirror the back from outside.', lev: 1, win: 0.03 }, { name: 'Wall Off', desc: 'Take on the block with your shoulder.', lev: 1.1, win: 0.02 }],
+    balanced: [{ name: 'Slice', desc: 'Cut under the block.', lev: 1.15 }, { name: 'Hard Fill', desc: 'Downhill into the alley.', lev: 1.2, win: -0.01 }, { name: 'Read Step', desc: 'One read step, then attack.', lev: 1.05, win: 0.02 }],
+    risky: [{ name: 'Jet Edge', desc: 'Time the snap and fly off the edge.', lev: 1.35, win: -0.04 }, { name: 'Club & Rip', desc: 'Club the blocker, rip past him.', lev: 1.25, win: 0.03 }, { name: 'Ball Hunt', desc: 'Go straight for the strip.', lev: 1.3, win: -0.02 }],
+  },
+  rush: {
+    safe: [{ name: 'Bull Push', desc: 'Drive him straight back.', lev: 1.05, win: 0.02 }, { name: 'Lane Discipline', desc: 'Stay in your lane, rush under control.', lev: 0.95, win: 0.04 }, { name: 'Hands Up', desc: 'Push, then get your hands up for a bat.', lev: 1, win: 0.02 }],
+    balanced: [{ name: 'Hump', desc: 'Jolt him, then a quick arm-over.', lev: 1.15, win: 0.02 }, { name: 'Ghost', desc: 'Dip the shoulder past his punch.', lev: 1.1, win: 0.04 }, { name: 'Long Arm Rip', desc: 'Long arm, then rip through.', lev: 1.2 }],
+    risky: [{ name: 'Tex Stunt', desc: 'Loop around the end at full speed.', lev: 1.35, win: -0.02, blitz: true }, { name: 'Spin Counter', desc: 'Go wide, spin back inside.', lev: 1.25, win: 0.03 }, { name: 'Zero Blitz', desc: 'Everyone comes. Get home NOW.', lev: 1.4, win: -0.04, blitz: true }],
+  },
+  runStop: {
+    safe: [{ name: 'Square Up', desc: 'Stay square, shed late.', lev: 0.95, win: 0.04 }, { name: 'Shock', desc: 'Strike him and hold your ground.', lev: 1.05, win: 0.02 }, { name: 'Plug', desc: 'Fill your gap and wait.', lev: 1, win: 0.03 }],
+    balanced: [{ name: 'Angle Slant', desc: 'Slant into the next gap.', lev: 1.15 }, { name: 'Wrong Arm', desc: 'Blow up the puller.', lev: 1.2, win: -0.01 }, { name: 'Long Arm Hold', desc: 'Lock out, then throw him aside.', lev: 1.1, win: 0.03 }],
+    risky: [{ name: 'Knife', desc: 'Slice through the gap at the snap.', lev: 1.35, win: -0.03 }, { name: 'Twist Fire', desc: 'Twist with the end, linebackers fill.', lev: 1.3, blitz: true }, { name: 'Backfield Raid', desc: 'Get in the backfield or get pancaked.', lev: 1.4, win: -0.04 }],
+  },
+};
+for (const [mode, calls] of Object.entries(EXTRA)) for (const [call, list] of Object.entries(calls)) {
+  const have = new Set(PLAYS[mode][call].map((x) => x.name));
+  for (const pl of list) if (!have.has(pl.name)) PLAYS[mode][call].push(pl);
+}
+
 // ---------------- situational football: the plays you're offered fit where you are on the field
 // Red-zone / goal-line concepts (red: true) only show up near the end zone; routes are built for ~10-15 yards.
 const RED = {
@@ -462,21 +568,26 @@ export function playFit(mode, pl, s) {
   return f;
 }
 
-// Recently shown plays (per mode) are skipped, so you don't keep seeing the same three.
+// Recently shown plays (per mode) are skipped, so you don't keep seeing the same ones.
 const recent = {};
-/** Three plays for this snap that fit the situation: two from your play call, one wildcard. */
-export function dealPlays(mode, call, m = {}) {
+/** Five plays for this snap that fit the situation: three from your play call and two wildcards from the others. */
+export function dealPlays(mode, call, m = {}, n = 5) {
   const s = situationOf(m);
   const seen = (recent[mode] ??= []);
   const red = (RED[mode] ?? []).slice(...(mode === 'pass' || mode === 'route' || mode === 'run' || mode === 'cover' ? RED_SPLIT[call] : [0, 9]));
   const rank = (list) => list.map((pl) => ({ pl, sc: playFit(mode, pl, s) + Math.random() * 1.2 - (seen.includes(pl.name) ? 1.4 : 0) })).sort((a, b) => b.sc - a.sc);
   const own = rank(PLAYS[mode][call].concat(s.redZone ? red : []));
-  const other = call === 'balanced' ? (Math.random() < 0.5 ? 'safe' : 'risky') : 'balanced';
-  const wild = rank(PLAYS[mode][other].concat(s.redZone ? RED[mode] ?? [] : []).filter((x) => !own.slice(0, 2).some((o) => o.pl.name === x.name)));
-  const third = wild[0] && (!own[2] || wild[0].sc > own[2].sc) ? wild[0] : own[2];
-  const out = [own[0], own[1], third].filter(Boolean).map((x) => x.pl);
+  const others = Object.keys(PLAYS[mode]).filter((c) => c !== call);
+  const out = own.slice(0, Math.max(1, n - others.length)).map((x) => x.pl);
+  const taken = new Set(out.map((x) => x.name));
+  // one wildcard from each of the other calls (if it fits the situation at all)
+  for (const c of others) {
+    const w = rank(PLAYS[mode][c].concat(s.redZone ? RED[mode] ?? [] : [])).find((x) => !taken.has(x.pl.name) && x.sc > -5);
+    if (w && out.length < n) { out.push(w.pl); taken.add(w.pl.name); }
+  }
+  for (const x of own) { if (out.length >= n) break; if (!taken.has(x.pl.name)) { out.push(x.pl); taken.add(x.pl.name); } }
   seen.push(...out.map((x) => x.name));
-  while (seen.length > 12) seen.shift();
+  while (seen.length > 25) seen.shift();
   return out;
 }
 

@@ -5,10 +5,10 @@
 // Stats: Strength = push per tap. Opponent strength and the call set how hard they push back.
 import * as THREE from 'three';
 import { makePlayer, animateRun, faceToward, knockDown, setPose, celebrate, playAction, dustPuff } from '../actors.js';
-import { bindInput, maybeTip, endPlay, finalize, hudMeter } from './common.js';
+import { bindInput, maybeTip, endPlay, finalize, hudMeter, withPlays, routineQ } from './common.js';
 import { sfx } from '../../audio/sfx.js';
 
-export function tushPush(ctx) {
+function tushPushGame(ctx) {
   const { group, camera, hud, opts } = ctx;
   const m = opts.moment;
   const st = opts.stats;
@@ -68,9 +68,10 @@ export function tushPush(ctx) {
   ctx.addCleanup(() => tapsEl.remove());
 
   // Tuning: an average thumb (~7 taps/s) at average strength just about moves the pile a yard in 3 seconds.
-  const dur = 3.0;
-  const perTap = (0.13 + (st.strength / 100) * 0.07) * (call === 'risky' ? 1.12 : call === 'safe' ? 0.94 : 1);
-  const defBase = (call === 'safe' ? 0.66 : call === 'risky' ? 0.86 : 0.76) * (1 + (opts.oppStrength ?? 0) * 0.1) * (opts.hurt ? 1 / opts.hurt : 1);
+  const R = opts.routine ?? {};
+  const dur = 3.0 + (R.durAdd ?? 0);
+  const perTap = (R.tapK ?? 1) * (0.13 + (st.strength / 100) * 0.07) * (call === 'risky' ? 1.12 : call === 'safe' ? 0.94 : 1);
+  const defBase = (R.defK ?? 1) * (call === 'safe' ? 0.66 : call === 'risky' ? 0.86 : 0.76) * (1 + (opts.oppStrength ?? 0) * 0.1) * (opts.hurt ? 1 / opts.hurt : 1);
   let phase = 'wait';
   let t = 0;
   let adv = 0; // yards the ball has gone (+ = forward)
@@ -131,7 +132,7 @@ export function tushPush(ctx) {
     ctx.addCleanup(() => snapBtn?.remove());
   });
 
-  const finish = (r) => { phase = 'over'; endPlay(ctx, finalize(r, m), { delay: 1500 }); };
+  const finish = (r) => { phase = 'over'; endPlay(ctx, finalize({ ...r, quality: routineQ(opts, r.quality) }, m), { delay: 1500 }); };
 
   const lean = (p, z0, k = 1) => { p.position.z = z0 - adv * k; };
 
@@ -145,7 +146,7 @@ export function tushPush(ctx) {
       const rate = taps.length / Math.min(0.6, Math.max(0.15, t));
       if (t > nextSurge) { surge = 0.35; nextSurge = t + 0.8 + Math.random() * 0.7; hud.big('THEY SURGE!', '#f87171', 450); sfx.hit(); }
       if (surge > 0) surge -= dt;
-      const def = defBase * (surge > 0 ? 1.9 : 1) * (t < 0.25 ? 0.4 : 1);
+      const def = defBase * (surge > 0 ? 1.9 * (R.surgeK ?? 1) : 1) * (t < (R.early ?? 0.25) ? 0.4 : 1);
       const v = rate * perTap - def;
       adv = Math.max(-0.8, Math.min(need + 1.6, adv + v * dt * 0.9));
       pushM.set(Math.min(1, rate / 11), rate > 8 ? '#4ade80' : rate > 5 ? '#fbbf24' : '#f87171');
@@ -164,7 +165,7 @@ export function tushPush(ctx) {
         const made = adv >= need;
         // a held-up QB stretches the ball out on the last push (Strength helps)
         const y = Math.max(-1, Math.round(adv + (made ? 0.4 : 0)));
-        const fumbleP = (call === 'risky' ? 0.05 : 0.015) * (made ? 0.3 : 1) * (pusherUser ? 0.5 : 1);
+        const fumbleP = (R.fumK ?? 1) * (call === 'risky' ? 0.05 : 0.015) * (made ? 0.3 : 1) * (pusherUser ? 0.5 : 1);
         if (Math.random() < fumbleP) outcome = { turnover: true, complete: false, yards: 0, quality: 0.05, text: 'FUMBLE in the pile!' };
         else if (made && goal) outcome = { complete: true, yards: m.yardLine, quality: 0.7 + Math.min(0.3, (adv - need) * 0.3), text: pusherUser ? 'You shove him over the goal line! TOUCHDOWN!' : 'Pushed over the top! TOUCHDOWN!' };
         else if (made) outcome = { complete: true, yards: Math.max(y, need), quality: 0.62 + Math.min(0.3, (adv - need) * 0.3), text: pusherUser ? 'You drive him past the sticks. First down!' : 'Tush push. First down!' };
@@ -188,3 +189,12 @@ export function tushPush(ctx) {
     }
   };
 }
+
+export const SNEAK_PLAYS = [
+  { name: 'Tush Push', desc: 'The backs shove from behind. Tap like crazy.' },
+  { name: 'Quick Count', desc: 'Snap it before they set. A head start, a shorter push.', early: 0.65, durAdd: -0.5 },
+  { name: 'Wedge', desc: 'The line blocks inward. Their surges hit softer.', surgeK: 0.7 },
+  { name: 'Power Push', desc: 'Everyone shoves harder. Easier to fumble in the pile.', tapK: 1.12, fumK: 1.8 },
+  { name: 'Long Count', desc: 'More time to push, but they\'re ready for it.', durAdd: 0.6, defK: 1.08 },
+];
+export const tushPush = withPlays(tushPushGame, SNEAK_PLAYS, 'Pick your short-yardage play');

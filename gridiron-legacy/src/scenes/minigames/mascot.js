@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { makeMascot } from '../sideline.js';
 import { confetti } from '../actors.js';
-import { maybeTip, endPlay, finalize, hudMeter } from './common.js';
+import { maybeTip, endPlay, finalize, hudMeter, withPlays, routineQ } from './common.js';
 import { sfx } from '../../audio/sfx.js';
 import { react } from '../../audio/stadium.js';
 
@@ -92,17 +92,18 @@ function headOff(ctx, m) {
     return t < 3;
   };
 }
-const done = (ctx, m, r) => endPlay(ctx, finalize({ complete: false, yards: 0, ...r, quality: Math.max(0, Math.min(1, r.quality + (has(ctx.opts, 'velcro') && r.quality < 0.4 ? 0.1 : 0))) }, m), { delay: 1700 });
+const done = (ctx, m, r) => endPlay(ctx, finalize({ complete: false, yards: 0, ...r, quality: Math.max(0, Math.min(1, routineQ(ctx.opts, r.quality) + (has(ctx.opts, 'velcro') && r.quality < 0.4 ? 0.1 : 0))) }, m), { delay: 1700 });
 
 // ------------------------------------------------------------------ 1. Hype the crowd
-export function mascotHype(ctx) {
+function mascotHypeGame(ctx) {
   const { camera, hud, opts } = ctx;
   const m = opts.moment; const st = opts.stats; const call = opts.call;
   const me = setup(ctx);
   look(camera, [19.5, 3.2, 6.5], [29, 2.6, 0]);
-  const beat = call === 'risky' ? 0.43 : call === 'safe' ? 0.6 : 0.5;
-  const N = call === 'risky' ? 18 : 14;
-  const win = Math.max(0.07, Math.min(0.24, 0.1 * opts.tolerance * (0.85 + st.skill / 300) * (has(opts, 'showman') ? 1.3 : 1))); // a GOOD hit
+  const R = opts.routine ?? {};
+  const beat = (call === 'risky' ? 0.43 : call === 'safe' ? 0.6 : 0.5) * (R.beatK ?? 1);
+  const N = (call === 'risky' ? 18 : 14) + (R.nAdd ?? 0);
+  const win = Math.max(0.07, Math.min(0.24, 0.1 * (R.winK ?? 1) * opts.tolerance * (0.85 + st.skill / 300) * (has(opts, 'showman') ? 1.3 : 1))); // a GOOD hit
   const notes = Array.from({ length: N }, (_, i) => ({ at: 1.6 + i * beat * (i % 4 === 3 ? 1.5 : 1) + (i > 3 ? beat * 0.5 * Math.floor((i - 3) / 4) : 0), hit: null }));
   const meter = hudMeter('Crowd');
   const wrap = document.createElement('div'); wrap.className = 'hud-meters'; wrap.append(meter.el); hud.bottom(wrap);
@@ -152,7 +153,7 @@ export function mascotHype(ctx) {
 }
 
 // ------------------------------------------------------------------ 2. T-shirt cannon
-export function mascotTshirt(ctx) {
+function mascotTshirtGame(ctx) {
   const { camera, hud, opts, group } = ctx;
   const m = opts.moment; const st = opts.stats; const call = opts.call;
   const me = setup(ctx);
@@ -163,21 +164,22 @@ export function mascotTshirt(ctx) {
   cannon.rotation.z = -Math.PI / 2 + 0.5; cannon.position.set(0.3, 1.0, 0.7);
   me.userData.armR.add(cannon);
   look(camera, [X0 - 13, 5.2, 3.2], [X0 + 7, 6.0, -0.5]); // over your shoulder, the stands filling the screen
-  const SHOTS = (call === 'risky' ? 5 : 6) + (has(opts, 'cannonarm') ? 1 : 0);
+  const R = opts.routine ?? {};
+  const SHOTS = (call === 'risky' ? 5 : 6) + (has(opts, 'cannonarm') ? 1 : 0) + (R.shots ?? 0);
   const TIME = 13;
-  const radius = Math.max(36, Math.min(90, 48 * opts.tolerance * (0.8 + st.skill / 250) * (has(opts, 'cannonarm') ? 1.2 : 1))); // screen px
+  const radius = Math.max(30, Math.min(100, 48 * (R.radiusK ?? 1) * opts.tolerance * (0.8 + st.skill / 250) * (has(opts, 'cannonarm') ? 1.2 : 1))); // screen px
   const fans = [];
   const ringTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); g.strokeStyle = '#fff'; g.lineWidth = 7; g.beginPath(); g.arc(32, 32, 26, 0, 7); g.stroke(); g.fillStyle = 'rgba(255,212,59,0.35)'; g.fill(); return new THREE.CanvasTexture(c); })();
   ctx.addCleanup(() => ringTex.dispose());
   const spawn = () => {
-    const vip = Math.random() < (call === 'risky' ? 0.3 : 0.18);
+    const vip = Math.random() < (call === 'risky' ? 0.3 : 0.18) * (R.vipK ?? 1);
     const mat = new THREE.SpriteMaterial({ map: ringTex, color: vip ? '#ffd43b' : '#9be7ff', depthTest: false });
     const sp = new THREE.Sprite(mat); sp.renderOrder = 50;
     const tier = Math.floor(Math.random() * 5);
     sp.position.set(30.65 + 1.4 + tier * 1.25, 2.5 + tier * 1.6, (Math.random() - 0.5) * 16);
     sp.scale.setScalar(vip ? 1.1 : 1.6);
     group.add(sp);
-    fans.push({ sp, t: 0, life: (vip ? 1.3 : 2.4) * (call === 'safe' ? 1.25 : 1), vip });
+    fans.push({ sp, t: 0, life: (vip ? 1.3 : 2.4) * (call === 'safe' ? 1.25 : 1) * (R.lifeK ?? 1), vip });
   };
   const hud2 = document.createElement('div'); hud2.className = 'ms-shots pix'; hud.el.append(hud2); ctx.addCleanup(() => hud2.remove());
   let phase = 'wait', t = 0, left = SHOTS, hits = 0, points = 0, nextSpawn = 0, recoil = 1;
@@ -246,7 +248,7 @@ export function mascotTshirt(ctx) {
 }
 
 // ------------------------------------------------------------------ 3. Mascot showdown
-export function mascotRival(ctx) {
+function mascotRivalGame(ctx) {
   const { camera, hud, opts, group } = ctx;
   const m = opts.moment; const st = opts.stats; const call = opts.call;
   const me = setup(ctx);
@@ -256,8 +258,9 @@ export function mascotRival(ctx) {
   rival.position.set(X0, 0, -2.4); rival.userData.baseYaw = 0;
   look(camera, [X0 - 15, 4.2, 0], [X0 + 1, 2.4, 0]);
   const MOVES = [['dance', '💃', 'DANCE'], ['flex', '💪', 'FLEX'], ['spin', '🌀', 'SPIN'], ['taunt', '👉', 'TAUNT']];
-  const lens = call === 'risky' ? [4, 5, 6] : call === 'safe' ? [3, 3, 4] : [3, 4, 5];
-  const answerT = Math.max(0.9, Math.min(2.8, 1.5 * opts.tolerance * (0.85 + st.speed / 300) * (has(opts, 'smoothmoves') ? 1.35 : 1)));
+  const R = opts.routine ?? {};
+  const lens = (call === 'risky' ? [4, 5, 6] : call === 'safe' ? [3, 3, 4] : [3, 4, 5]).map((n) => Math.max(2, n + (R.lenAdd ?? 0)));
+  const answerT = Math.max(0.8, Math.min(3, 1.5 * (R.timeK ?? 1) * opts.tolerance * (0.85 + st.speed / 300) * (has(opts, 'smoothmoves') ? 1.35 : 1)));
   const pad = document.createElement('div'); pad.className = 'ms-pad';
   const seqEl = document.createElement('div'); seqEl.className = 'ms-seq pix';
   hud.el.append(seqEl, pad); ctx.addCleanup(() => { pad.remove(); seqEl.remove(); });
@@ -329,7 +332,7 @@ export function mascotRival(ctx) {
 }
 
 // ------------------------------------------------------------------ 4. Halftime stunt
-export function mascotStunt(ctx) {
+function mascotStuntGame(ctx) {
   const { camera, hud, opts, group } = ctx;
   const m = opts.moment; const st = opts.stats; const call = opts.call;
   const me = setup(ctx);
@@ -345,7 +348,8 @@ export function mascotStunt(ctx) {
   ctx.addCleanup(() => tramp.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); }));
   me.position.set(TX, 0, 7); me.userData.baseYaw = Math.PI; // runs toward -z... onto the trampoline
   look(camera, [TX - 19, 5.0, 2.5], [TX, 3.6, 1.5]); // wide enough for the whole jump
-  const sweet = Math.max(0.1, Math.min(0.36, 0.16 * opts.tolerance * (0.85 + st.skill / 300) * (has(opts, 'acrobat') ? 1.4 : 1)));
+  const R = opts.routine ?? {};
+  const sweet = Math.max(0.08, Math.min(0.4, 0.16 * (R.sweetK ?? 1) * opts.tolerance * (0.85 + st.skill / 300) * (has(opts, 'acrobat') ? 1.4 : 1)));
   const meter = document.createElement('div'); meter.className = 'hud-timing';
   meter.innerHTML = `<div class="zone" style="left:${(0.85 - sweet) * 100}%;width:${sweet * 100}%"></div><div class="mk"></div>`;
   const mk = meter.querySelector('.mk');
@@ -377,7 +381,7 @@ export function mascotStunt(ctx) {
     if (phase === 'run') {
       me.position.z = Math.max(0, 7 - t * 9);
       poseMascot(me, 'dance', (t * 2) % 1, tt);
-      if (me.position.z <= 0) { phase = 'air'; air = 0.95 + power * 0.85; airT = 0; sfx.bounce?.(0.8); }
+      if (me.position.z <= 0) { phase = 'air'; air = 0.95 + power * 0.85 + (R.airAdd ?? 0); airT = 0; sfx.bounce?.(0.8); }
       return;
     }
     if (phase === 'air') {
@@ -411,3 +415,39 @@ export function mascotStunt(ctx) {
     }
   };
 }
+
+// ------------------------------------------------------------------ five routines for every mascot moment
+export const MASCOT_PLAYS = {
+  ms_hype: [
+    { name: 'Fight Song', desc: 'The school song. Everyone knows the moves.' },
+    { name: 'Slow Jam', desc: 'Easy tempo, fewer beats. A smaller crowd payoff.', beatK: 1.25, nAdd: -2, qMul: 0.9 },
+    { name: 'Drumline Frenzy', desc: 'Fast drums and extra beats. Nail it for a bonus.', beatK: 0.85, nAdd: 4, qAdd: 0.06 },
+    { name: 'Start the Wave', desc: 'Wider beat window, shorter routine.', winK: 1.3, nAdd: -4, qMul: 0.95 },
+    { name: 'Dance-Off Medley', desc: 'Tighter timing, big reward.', winK: 0.82, qAdd: 0.05 },
+  ],
+  ms_tshirt: [
+    { name: 'Standard Cannon', desc: 'The trusty cannon. Six shirts.' },
+    { name: 'Rapid Fire', desc: 'Two extra shirts, smaller targets.', shots: 2, radiusK: 0.85 },
+    { name: 'Big Bazooka', desc: 'Huge targets, one less shirt.', shots: -1, radiusK: 1.25 },
+    { name: 'VIP Hunter', desc: 'Double the gold VIP fans.', vipK: 2 },
+    { name: 'Upper Deck', desc: 'Fans sit down faster. Bonus if you land them.', lifeK: 0.8, qAdd: 0.05 },
+  ],
+  ms_rival: [
+    { name: 'The Robot', desc: 'Your signature. Standard combos.' },
+    { name: 'Breakdance', desc: 'Longer combos, bigger win.', lenAdd: 1, qAdd: 0.06 },
+    { name: 'Moonwalk', desc: 'Smooth and slow: more time to answer.', timeK: 1.25, qMul: 0.94 },
+    { name: 'Taunt Battle', desc: 'Short combos. Safe, but less impressive.', lenAdd: -1, qMul: 0.9 },
+    { name: 'Freestyle', desc: 'Less time to answer, crowd loves it.', timeK: 0.85, qAdd: 0.05 },
+  ],
+  ms_stunt: [
+    { name: 'Classic Backflip', desc: 'The trampoline routine you know.' },
+    { name: 'Double Bounce', desc: 'Bigger power zone.', sweetK: 1.25, qMul: 0.95 },
+    { name: 'Rocket Launch', desc: 'More air for more flips. Smaller power zone.', airAdd: 0.3, sweetK: 0.8 },
+    { name: 'Cannonball', desc: 'Huge splash, easy power zone, less style.', sweetK: 1.4, qMul: 0.85 },
+    { name: 'Fire Flip', desc: 'Tight power zone, huge crowd bonus.', sweetK: 0.82, qAdd: 0.07 },
+  ],
+};
+export const mascotHype = withPlays(mascotHypeGame, MASCOT_PLAYS.ms_hype, 'Pick your routine');
+export const mascotTshirt = withPlays(mascotTshirtGame, MASCOT_PLAYS.ms_tshirt, 'Pick your cannon');
+export const mascotRival = withPlays(mascotRivalGame, MASCOT_PLAYS.ms_rival, 'Pick your dance style');
+export const mascotStunt = withPlays(mascotStuntGame, MASCOT_PLAYS.ms_stunt, 'Pick your stunt');

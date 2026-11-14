@@ -1,5 +1,14 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.55', date: 'Nov 14', title: 'Five plays every snap and the early draft', items: [
+    'Every key moment now gives you five plays to pick from instead of three: three that fit your play call (safe, balanced or risky) and one wildcard from each of the other two. Tap a card or press 1-5.',
+    'Lots of new plays: about 70 pass concepts, 50 runs, 50 routes, 40 coverages and 30-40 calls each for run defense, pass rush and run stopping. New defensive calls really change how fast you build leverage and shed blocks.',
+    'Screens, scrambles, jump balls, sideline toe-taps and Hail Marys all have five versions now (Flood Left, Jump Box, Back-Shoulder Fade, Naked Boot Left...).',
+    'Kickers pick a kick too: Standard, Smooth Swing (bigger sweet spot), Max Leg (more distance), Draw (curls right) or Fade (curls left). Kickoffs: Deep Boom, Sky Kick, Squib, Pin Left, Pin Right. Onside: Dribbler, Pop-Up, Hop Left, Hop Right, Sneaky.',
+    'Mascots pick a routine for every moment (Fight Song, Drumline Frenzy, Rapid Fire cannon, Breakdance, Rocket Launch...), and the tush push and goal-line dive have five plays each (Quick Count, Wedge, Iso Lead, Stretch Leap...).',
+    'Leave college early: after your first or second college season you can declare for the pro draft. The scouting report shows how last season went, a mock draft (likely pick range, chance of going in the first round, chance of going undrafted, projected rookie pay), what scouts like and worry about, and your agent\'s advice. A big last season moves you up; a quiet one drops you. Draft night tells you how you did against the mock drafts.',
+    'Teams are pickier about drafting kickers early.',
+  ] },
   { v: '0.54', date: 'Nov 13', title: 'Kicker, achievements and coach\'s goals', items: [
     'New position: Kicker. Start a career as your school\'s kicker and kick your way to the pros. You come on when your offense scores or stalls in range: field goals, extra points, kickoffs and, when you\'re behind late, onside kicks. Tied or down by 3 at the end? The game is on your foot.',
     'Kicking is two taps: AIM (a pink marker slides across the goalposts; aim into the wind) and POWER (tap in the green sweet spot; too weak falls short, past the green you hook it). The ball really flies: wind drift, hooks, doinks off the uprights and the crossbar, and low kicks get blocked.',

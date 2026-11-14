@@ -12,7 +12,7 @@ export function weatherFx(m) {
 export function bindInput(ctx, handlers) {
   const c = ctx.canvas;
   const hudEl = ctx.hud.el;
-  const pd = (ev) => { if (ev.target.closest?.('.hbtn, .tipbox, .skip')) return; ev.preventDefault(); handlers.down?.(ev, ctx.groundPoint(ev)); };
+  const pd = (ev) => { if (ev.target.closest?.('.hbtn, .tipbox, .skip, .fc-plays')) return; ev.preventDefault(); handlers.down?.(ev, ctx.groundPoint(ev)); };
   const pm = (ev) => { handlers.move?.(ev, ctx.groundPoint(ev)); };
   const pu = (ev) => { handlers.up?.(ev, ctx.groundPoint(ev)); };
   const kd = (ev) => { if (ev.repeat) return; if ([' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(ev.key)) ev.preventDefault(); handlers.key?.(ev, true); };
@@ -145,3 +145,46 @@ export function gaussR() {
   while (u === 0) u = Math.random();
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * Math.random());
 }
+
+/**
+ * Five-card play picker for the moments that don't use the free-play engine (kicks, mascot routines, sneaks,
+ * goal-line dives). plays: [{ name, desc, ... }]. Tap a card or press 1-5. Calls onPick(play, index).
+ */
+export function pickPlay(ctx, plays, onPick, { instr = 'Pick a play' } = {}) {
+  if (!plays?.length) { onPick(null, -1); return; }
+  ctx.hud.instr(instr);
+  const box = document.createElement('div');
+  box.className = 'fc-plays';
+  let done = false;
+  const choose = (i) => {
+    if (done) return;
+    done = true;
+    box.remove();
+    window.removeEventListener('keydown', key);
+    sfx.select();
+    ctx.hud.instr('');
+    onPick(plays[i], i);
+  };
+  const key = (ev) => { if (/^[1-9]$/.test(ev.key) && Number(ev.key) <= plays.length) { ev.preventDefault(); choose(Number(ev.key) - 1); } };
+  plays.forEach((pl, i) => {
+    const b = document.createElement('button');
+    b.className = 'fc-play';
+    b.innerHTML = `<span class="k">${i + 1}</span><b>${pl.name}</b><small>${pl.desc}</small>`;
+    b.addEventListener('pointerdown', (ev) => { ev.preventDefault(); ev.stopPropagation(); choose(i); });
+    box.append(b);
+  });
+  ctx.hud.el.append(box);
+  window.addEventListener('keydown', key);
+  ctx.addCleanup(() => { box.remove(); window.removeEventListener('keydown', key); });
+}
+
+/** Wrap a minigame so you pick one of its five plays first; the pick is passed as ctx.opts.routine. */
+export function withPlays(build, plays, instr) {
+  return (ctx) => {
+    let inner = null;
+    pickPlay(ctx, plays, (pl) => { ctx.opts = { ...ctx.opts, routine: pl ?? {} }; try { inner = build(ctx); } catch (err) { console.error('play build', err); ctx.done({ fallbackQuality: 0.5 }); } }, { instr });
+    return (dt, t) => inner?.(dt, t);
+  };
+}
+/** Apply a routine's quality tweak (qMul, qAdd) to a 0..1 quality. */
+export const routineQ = (opts, q) => Math.max(0, Math.min(1, q * (opts.routine?.qMul ?? 1) + (opts.routine?.qAdd ?? 0)));
