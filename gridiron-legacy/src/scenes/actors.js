@@ -2746,6 +2746,70 @@ export function makeRouteLine(points, color = '#ffffff', opacity = 0.75) {
   return line;
 }
 
+/**
+ * Play-art route on the turf: a flat ribbon (thick enough to read on a phone, unlike 1 px GL lines) with a dark edge,
+ * round joints and an arrowhead (or a T bar for blocks / a dot for a spot). points: [{x, z}]. Returns a Group with
+ * userData.setOpacity(k) (k = 0..1 of the base opacity).
+ */
+export function makeRouteRibbon(points, color = '#ffd43b', { width = 0.34, opacity = 0.9, end = 'arrow', y = 0.07 } = {}) {
+  const g = new THREE.Group();
+  const pts = points.filter((p, i) => i === 0 || Math.hypot(p.x - points[i - 1].x, p.z - points[i - 1].z) > 0.05);
+  if (pts.length < 2) return g;
+  const build = (w, yy) => {
+    const pos = [];
+    const quad = (a, b, c, d) => pos.push(a.x, yy, a.z, b.x, yy, b.z, c.x, yy, c.z, a.x, yy, a.z, c.x, yy, c.z, d.x, yy, d.z);
+    const disc = (p, r, n = 10) => { for (let i = 0; i < n; i++) { const a0 = (i / n) * Math.PI * 2, a1 = ((i + 1) / n) * Math.PI * 2; pos.push(p.x, yy, p.z, p.x + Math.cos(a0) * r, yy, p.z + Math.sin(a0) * r, p.x + Math.cos(a1) * r, yy, p.z + Math.sin(a1) * r); } };
+    const last = pts.length - 1;
+    // stop the ribbon short of the end so the arrowhead tip lands on the last point
+    const tip = pts[last], prev = pts[last - 1];
+    const L = Math.hypot(tip.x - prev.x, tip.z - prev.z) || 1;
+    const ux = (tip.x - prev.x) / L, uz = (tip.z - prev.z) / L;
+    const headL = end === 'arrow' ? Math.min(L * 0.8, w * 3.2) : 0;
+    const P = pts.map((p) => ({ x: p.x, z: p.z }));
+    P[last] = { x: tip.x - ux * headL * 0.85, z: tip.z - uz * headL * 0.85 };
+    for (let i = 0; i < last; i++) {
+      const a = P[i], b = P[i + 1];
+      const l = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+      const nx = (-(b.z - a.z) / l) * w * 0.5, nz = ((b.x - a.x) / l) * w * 0.5;
+      quad({ x: a.x + nx, z: a.z + nz }, { x: b.x + nx, z: b.z + nz }, { x: b.x - nx, z: b.z - nz }, { x: a.x - nx, z: a.z - nz });
+      if (i > 0) disc(a, w * 0.5);
+    }
+    if (end === 'arrow') {
+      const hw = w * 1.45;
+      const base = { x: tip.x - ux * headL, z: tip.z - uz * headL };
+      pos.push(tip.x, yy, tip.z, base.x - uz * hw, yy, base.z + ux * hw, base.x + uz * hw, yy, base.z - ux * hw);
+    } else if (end === 'block') {
+      const hw = w * 2.2, t2 = w * 0.6;
+      const c = P[last];
+      quad({ x: c.x - uz * hw, z: c.z + ux * hw }, { x: c.x - uz * hw + ux * t2, z: c.z + ux * hw + uz * t2 }, { x: c.x + uz * hw + ux * t2, z: c.z - ux * hw + uz * t2 }, { x: c.x + uz * hw, z: c.z - ux * hw });
+    } else if (end === 'dot') disc(P[last], w * 1.4, 14);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    return geo;
+  };
+  const edge = new THREE.Mesh(build(width * 1.7, y - 0.005), new THREE.MeshBasicMaterial({ color: '#0b0f14', transparent: true, opacity: opacity * 0.45, depthWrite: false, side: THREE.DoubleSide }));
+  const core = new THREE.Mesh(build(width, y), new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide }));
+  edge.renderOrder = 3; core.renderOrder = 4;
+  g.add(edge, core);
+  g.userData.setOpacity = (k) => { core.material.opacity = opacity * k; edge.material.opacity = opacity * 0.45 * k; g.visible = k > 0.01; };
+  return g;
+}
+
+/** Translucent zone area on the turf (coverage zones): x0..x1 across, z0..z1 downfield. */
+export function makeZoneArea(x0, x1, z0, z1, color = '#60a5fa', opacity = 0.22) {
+  const g = new THREE.Group();
+  const w = Math.abs(x1 - x0), d = Math.abs(z1 - z0);
+  const fill = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide }));
+  fill.rotation.x = -Math.PI / 2;
+  fill.position.set((x0 + x1) / 2, 0.05, (z0 + z1) / 2);
+  const corners = [{ x: x0, z: z0 }, { x: x1, z: z0 }, { x: x1, z: z1 }, { x: x0, z: z1 }, { x: x0, z: z0 }];
+  const border = makeRouteRibbon(corners, color, { width: 0.18, opacity: Math.min(1, opacity * 3.4), end: 'none', y: 0.06 });
+  fill.renderOrder = 2;
+  g.add(fill, border);
+  g.userData.setOpacity = (k) => { fill.material.opacity = opacity * k; border.userData.setOpacity(k); g.visible = k > 0.01; };
+  return g;
+}
+
 /** Confetti burst. Returns an updater (false when done). */
 export function confetti(scene, origin, colors) {
   const n = 55;

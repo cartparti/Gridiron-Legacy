@@ -1,5 +1,15 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.56', date: 'Nov 15', title: 'Routes you can see, NIL deals and Draft Stock', items: [
+    'See your routes before the snap. Quarterbacks see every receiver\'s route in its own color, matching the number over his head, and your first read is marked (it also shows at the top: "1st read: #3"). The routes stay faint during the play until you throw, so you never forget who is going where.',
+    'Every position gets its own play art: receivers see their route in gold (the rest faint), running backs see the path through the hole and which way the line blocks, cornerbacks see their zone, their man or their blitz path, and defensive tackles see their rush lane or gap. Change it in Settings, Route lines (During play, Before snap, Off).',
+    'The play cards show a little diagram of each play, so you can see the routes while you pick.',
+    'NIL deals in college (endorsements in the pros): brands make you offers every week in Life, NIL. Local businesses, national brands, social campaigns, one-day appearances, performance deals that pay per touchdown (or sack, field goal...), your school\'s booster collective, jersey sales and a video game deal. Accept, decline or ask for more (they might walk away). Hire an agent for more offers and better haggling.',
+    'Your NIL value grows with fame, wins, playing time, a big-name school and your position. Watch out: a suspension can cancel deals, more than 3 deals eats into study time, and a "friend of the program" with a bag of cash is a real risk.',
+    'Staying in school can pay: the booster collective offers you money to come back when you think about declaring early.',
+    'New Career tab: Draft Stock (college). Your projected pick, rank at your position, chance of the first round, rookie pay, a week-by-week trend line, scouting grades, what scouts weigh and how to move up. It updates live as the season goes, and tells you when you can declare. In the pros it becomes My Draft.',
+    'Copy your look: tap Copy look in the look editor, then Paste look when you create your next athlete (or pick a character from another save slot). You can also paste a look code to move a look between devices.',
+  ] },
   { v: '0.55', date: 'Nov 14', title: 'Five plays every snap and the early draft', items: [
     'Every key moment now gives you five plays to pick from instead of three: three that fit your play call (safe, balanced or risky) and one wildcard from each of the other two. Tap a card or press 1-5.',
     'Lots of new plays: about 70 pass concepts, 50 runs, 50 routes, 40 coverages and 30-40 calls each for run defense, pass rush and run stopping. New defensive calls really change how fast you build leverage and shed blocks.',

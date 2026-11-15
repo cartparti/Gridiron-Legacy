@@ -71,6 +71,7 @@ export function postgameScreen(app) {
     g.newTraits?.length || g.levelUps ? h('div.card.unlock-card',
       g.levelUps ? h('div.row', { style: { gap: '8px' } }, h('span.chip.gold.pix', 'LEVEL UP'), h('span.small', `Level ${st.player.level}. You have ${st.player.skillPoints} skill point${st.player.skillPoints === 1 ? '' : 's'} to spend (Career tab).`)) : null,
       (g.newTraits ?? []).map((n) => h('div.row', { style: { gap: '8px', marginTop: '6px' } }, h('span.chip.good.pix', 'NEW TRAIT'), h('b', n), h('span.tiny.muted', 'Equip it in Career → Traits')))) : null,
+    g.nilBonus?.length ? h('div.card', h('h3', 'Deal bonuses'), h('div.list', g.nilBonus.map((b) => h('div.li', h('span.grow', `${b.brand}: ${b.n} ${b.noun}${b.n > 1 ? 's' : ''}`), h('span.good', `+${fmtMoney(b.amount)}`))))) : null,
     g.newAch?.length ? h('div.card.unlock-card', h('h3', 'Achievement unlocked'), h('div.col', { style: { gap: '8px' } }, achUnlockRows(g.newAch))) : null,
     h('button.btn.primary.block', { onclick: () => { sfx.click(); flow.continueAfterGame(st); app.hubTab = 'week'; app.commit(); } }, 'Continue'));
 }

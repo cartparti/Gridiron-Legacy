@@ -7,6 +7,7 @@ import { PARTNER_NAMES, AGENT_NAMES, FIRST_NAMES, LAST_NAMES } from '../data/nam
 import { STAT_LABELS, statLabel } from '../data/positions.js';
 import { applyTraining, refreshOverall } from './player.js';
 import { addNews } from './press.js';
+import { nilValue } from './nil.js';
 
 const REL_LABELS = { coach: 'Coach', teammates: 'Teammates', family: 'Family', partner: 'Partner', agent: 'Agent', rival: 'Rivalry' };
 
@@ -41,11 +42,13 @@ export function createSponsor(state, mult = 1) {
   const p = state.player;
   const s = pick(state, SPONSORS);
   const stageMult = state.career.stage === 'pro' ? 160 : state.career.stage === 'college' ? 3 : 1;
-  const weekly = Math.round((Math.pow(Math.max(5, p.fame), 1.5) * stageMult * mult) / 10) * 10;
-  const deal = { brand: s.brand, product: s.product, weekly, weeks: randInt(state, 14, 42) };
+  const college = state.career.stage === 'college';
+  // college: NIL money scales with what you're worth to brands (the old fame formula paid ~$100 a week)
+  const weekly = college ? Math.max(50, Math.round((nilValue(state) / 15) * 0.08 * mult / 10) * 10) : Math.round((Math.pow(Math.max(5, p.fame), 1.5) * stageMult * mult) / 10) * 10;
+  const deal = { brand: s.brand, product: s.product, weekly, weeks: randInt(state, college ? 8 : 14, college ? 20 : 42), nil: college, total: 0, signedYear: state.career.year };
   p.sponsors.push(deal);
   // You can only carry so many deals: the weakest one is dropped.
-  if (p.sponsors.length > 4) p.sponsors.sort((a, b) => b.weekly - a.weekly).pop();
+  if (p.sponsors.length > 6) p.sponsors.sort((a, b) => b.weekly - a.weekly).pop();
   addNews(state, 'money', `${p.last} signs with ${s.brand} ${s.product}: ${fmt(weekly)}/week.`);
   return deal;
 }

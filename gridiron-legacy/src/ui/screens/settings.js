@@ -18,6 +18,8 @@ export function settingsScreen(app) {
       opt('Sound effects', 'sound', [[true, 'On'], [false, 'Off']]),
       opt('Stadium music', 'music', [[true, 'On'], [false, 'Off']]),
       opt('Game speed (plays)', 'gameSpeed', [[0.72, 'Slow'], [0.85, 'Realistic'], [1, 'Fast']]),
+      h('div.li', h('div.grow', h('span', 'Route lines'), h('div.tiny.muted', 'Your routes and assignments drawn on the field. Before snap = gone at the snap. During play = they stay faint until the throw.')),
+        h('div.row', [['play', 'During play'], ['pre', 'Before snap'], ['off', 'Off']].map(([v, l]) => h(`button.subtab${(s.routeArt ?? 'play') === v ? '.on' : ''}`, { onclick: () => { s.routeArt = v; app.saveSettings(); sfx.click(); app.render(); } }, l)))),
       h('div.li', h('div.grow', h('span', 'Plays per game'), h('div.tiny.muted', 'Key moments = 5-8 big plays. More = 9-12. Every drive = you play every series your unit is on the field.')),
         h('div.row', [['moments', 'Key'], ['more', 'More'], ['every', 'Every']].map(([v, l]) => h(`button.subtab${(s.playStyle ?? 'moments') === v ? '.on' : ''}`, { onclick: () => { s.playStyle = v; if (app.state) { app.state.playStyle = v; app.save(); } app.saveSettings(); sfx.click(); app.render(); } }, l)))),
       opt('Play-by-play voice', 'voice', [[false, 'Off'], [true, 'On']]),

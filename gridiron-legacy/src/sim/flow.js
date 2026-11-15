@@ -35,6 +35,7 @@ import { addXp } from './progress.js';
 import { checkTraitUnlocks } from './traits.js';
 import { checkAchievements } from './achievements.js';
 import { setSeasonGoals, resolveGoals } from './goals.js';
+import { nilWeek, nilAfterGame, nilLeaveCollege, retentionOffer } from './nil.js';
 import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf, recordLeagueAwards } from './awards.js';
 import { computeLegacy } from './legacy.js';
 import { genTeammates } from './social.js';
@@ -127,6 +128,8 @@ export function beginWeek(state) {
     addNews(state, 'story', `${p.first} ${p.last} leaves the ${old} for the ${teamName(state)}.`);
   }
   newWeek(state);
+  state.week.nilNotes = nilWeek(state);
+  trackDraftWatch(state);
   {
     const m = currentMatchup(state);
     state.week.forecast = chooseWeather(state, state.league, !!m?.playoff, m ? m.oppId === c.rivalTeamId : false);
@@ -208,6 +211,7 @@ export function finishGame(state) {
     depthAfterGame(state, g.grade, true);
     addStats(p.seasonStats, g.userStats);
     addStats(p.careerStats, g.userStats);
+    g.nilBonus = nilAfterGame(state, g.userStats);
     if (state.career.stage === 'pro') addStats(p.proCareerStats, g.userStats);
     const sm = STAGE_FAME[state.career.stage];
     let fame = ((g.grade - 55) / 12) * sm + (g.won ? 0.5 : 0) + g.userStats.clutch * 0.8;
@@ -277,6 +281,7 @@ export function finishGame(state) {
     injury: newInj,
     log: g.log,
     weather: g.weather,
+    nilBonus: g.nilBonus ?? [],
   };
   state.lastGame.comeback = !!g.half && (g.half.score[g.userSide === 'home' ? 'away' : 'home'] - g.half.score[g.userSide]) >= 10;
   state.lastGame.newAch = checkAchievements(state, 'game', { g: state.lastGame }).map((a) => a.id);
@@ -530,6 +535,7 @@ export function chooseCollege(state, teamId) {
 
 /** The pre-draft combine: testing and an interview, then the draft. */
 function startCombine(state, early) {
+  nilLeaveCollege(state);
   state.draftProj = state.declareProj ?? projectDraft(state, { early });
   state.declareProj = null;
   runCombine(state);
@@ -545,6 +551,13 @@ export function declareForDraft(state, yes) {
   if (yes) {
     addNews(state, 'story', `${state.player.first} ${state.player.last} declares for the pro draft${state.declareProj ? ` (projected: ${state.declareProj.label.toLowerCase()})` : ''}.`);
     return startCombine(state, true);
+  }
+  // the collective pays you to come back
+  const keep = (state.player.ovr ?? 0) >= 64 ? retentionOffer(state) : 0;
+  if (keep && !state.player.sponsors.some((d) => d.collective)) {
+    const t = getTeam(state.league, state.career.teamId);
+    state.player.sponsors.push({ id: `ret${state.career.year}`, kind: 'collective', brand: `${t?.name ?? 'Booster'} Collective`, product: 'booster collective (stay bonus)', cat: 'collective',
+      weekly: Math.round(keep / 16 / 50) * 50, weeks: 16, morality: true, collective: true, signedYear: state.career.year, total: 0, nil: true });
   }
   state.declareProj = null;
   state.career.stageSeason++;
@@ -570,28 +583,64 @@ export function teamNeed(league, teamId, pos) {
 }
 
 /** Draft stock from your college career: rating, production, awards, fame, team success. */
-export function draftStock(state) {
+export function draftStock(state, { live = false } = {}) {
   const p = state.player;
   const col = p.history.filter((h) => h.stage === 'college');
-  const perf = col.length ? col.reduce((a, h) => a + (h.perf ?? 50), 0) / col.length : 50;
-  const best = col.length ? Math.max(...col.map((h) => h.perf ?? 50)) : 50;
+  // live (Draft Stock tab during a college season): this season's games count, more as the season goes on
+  const cur = live && state.career.stage === 'college' && (p.seasonStats?.games ?? 0) > 0
+    ? { perf: seasonPerf(p.position, p.seasonStats), w: Math.min(1, p.seasonStats.games / 6), stats: p.seasonStats } : null;
+  const perfs = col.map((h) => h.perf ?? 50);
+  // a few games is a small sample: until ~6 games the season counts partly as 'unknown' (50)
+  if (cur) perfs.push(50 * (1 - cur.w) + cur.perf * cur.w);
+  const perf = perfs.length ? perfs.reduce((a, b) => a + b, 0) / perfs.length : 50;
+  const best = perfs.length ? Math.max(...perfs) : 50;
   const awards = p.awards.filter((a) => a.stage === 'college');
   const big = awards.filter((a) => /Ironstone|Champion/.test(a.name)).length;
   const wins = col.reduce((a, h) => a + Number(h.record.split('-')[0]), 0) / Math.max(1, col.length);
   // scouts care most about what you did LAST season
   const lastH = col[col.length - 1] ?? null;
-  const last = lastH ? lastH.perf ?? 50 : 50;
+  const prevLast = lastH ? lastH.perf ?? 50 : 50;
+  const last = cur ? (lastH ? prevLast : 50) * (1 - cur.w) + cur.perf * cur.w : prevLast;
   const lastAwards = lastH ? (lastH.awards ?? []).filter((a) => !/Champion$/.test(a)).length : 0;
+  const parts = {
+    ovr: p.ovr * 0.8 - 48, perf: (perf - 50) * 0.25 + (best - 50) * 0.1, last: (last - 50) * 0.3, awards: awards.length * 1.4 + lastAwards * 1.2 + big * 3,
+    fame: p.fame * 0.08, wins: wins * 0.3,
+  };
   const value = p.ovr * 0.8 + (perf - 50) * 0.25 + (best - 50) * 0.1 + (last - 50) * 0.3 + awards.length * 1.4 + lastAwards * 1.2 + big * 3 + p.fame * 0.08 + wins * 0.3 + 12;
-  return { value, perf: Math.round(perf), awards: awards.length, last: Math.round(last), lastAwards, lastYear: lastH?.year ?? null, lastRecord: lastH?.record ?? null, lastStats: lastH?.seasonStats ?? null, lastChamp: !!lastH?.champion, seasons: col.length };
+  return { value, parts, perf: Math.round(perf), awards: awards.length, last: Math.round(last), live: !!cur, curPerf: cur ? Math.round(cur.perf) : null, lastAwards, lastYear: lastH?.year ?? null, lastRecord: lastH?.record ?? null, lastStats: lastH?.seasonStats ?? null, lastChamp: !!lastH?.champion, seasons: col.length };
+}
+
+const POS_SHARE = { QB: 1 / 16, RB: 1 / 16, WR: 2 / 16, CB: 2 / 16, DT: 2 / 16, K: 1 / 16, MS: 1 / 16 };
+
+/** Draft Stock tab: the live projection (college only), with your rank at your position. */
+export function liveDraftProjection(state) {
+  if (state.career.stage !== 'college') return null;
+  const early = state.career.stageSeason < STAGES.college.seasons;
+  const pr = projectDraft(state, { early, live: true });
+  pr.posRank = Math.max(1, Math.round((pr.median - 1) * (POS_SHARE[state.player.position] ?? 1 / 16)) + 1);
+  pr.early = early;
+  return pr;
+}
+
+/** Weekly snapshot for the Draft Stock trend line (college). */
+function trackDraftWatch(state) {
+  if (state.career.stage !== 'college') return;
+  const wk = state.league?.week ?? 0;
+  state.draftWatch ??= [];
+  const W = state.draftWatch;
+  const key = `${state.career.year}-${state.league?.phase === 'playoffs' ? 'p' : ''}${wk}`;
+  if (W.length && W[W.length - 1].key === key) return;
+  const pr = projectDraft(state, { early: state.career.stageSeason < STAGES.college.seasons, live: true, runs: 100 });
+  W.push({ key, year: state.career.year, week: wk, season: state.career.stageSeason, median: pr.median, round: pr.round, label: pr.label });
+  if (W.length > 60) W.splice(0, W.length - 60);
 }
 
 /**
  * Mock draft: run the draft many times with a private random stream (doesn't touch the save's RNG) and see where you
  * land. Returns { median, lo, hi, round, pRound1, pUndrafted, label, stock }.
  */
-export function projectDraft(state, { early = false, combineBonus = null, runs = 160 } = {}) {
-  const ds = draftStock(state);
+export function projectDraft(state, { early = false, combineBonus = null, runs = 160, live = false } = {}) {
+  const ds = draftStock(state, { live });
   let seed = ((state.seed ?? 1) ^ (state.career.year * 2654435761)) >>> 0;
   const rnd = () => { seed = (seed + 0x6D2B79F5) >>> 0; let t = seed; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   const gaussR = (mu, sd) => mu + sd * Math.sqrt(-2 * Math.log(rnd() || 1e-9)) * Math.cos(2 * Math.PI * rnd());

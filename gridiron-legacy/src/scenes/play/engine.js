@@ -7,7 +7,7 @@
 //
 // Returns the same result objects as the old minigames, so the game simulation is unchanged.
 import * as THREE from 'three';
-import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, confetti, ragdoll, bloodBurst, dustPuff, markTicked, bump, applyWear, addWear, applyInjuryLook, setLookAt, setSurface } from '../actors.js';
+import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, makeRouteRibbon, makeZoneArea, confetti, ragdoll, bloodBurst, dustPuff, markTicked, bump, applyWear, addWear, applyInjuryLook, setLookAt, setSurface } from '../actors.js';
 import { surfaceFor } from '../../data/surface.js';
 import { INJURIES } from '../../data/lifestyle.js';
 import { xrayCard } from './xray.js';
@@ -15,7 +15,8 @@ import { liveXray } from './xraylive.js';
 import { createBallPhysics, orientInFlight } from './ballphys.js';
 import { rig, endPlay, finalize, weatherFx, gaussR } from '../minigames/common.js';
 import { makeControls } from './controls.js';
-import { PLAYS, OFF_FORMATION, OL_X, playMode, dealPlays, situationOf } from '../../data/playbook.js';
+import { PLAYS, OFF_FORMATION, OL_X, playMode, dealPlays, situationOf, rushLane, stopGap } from '../../data/playbook.js';
+import { playArtSVG } from './playart.js';
 import { sfx } from '../../audio/sfx.js';
 import { line } from '../../data/commentary.js';
 import { POS_SIZE } from '../../data/looks.js';
@@ -277,7 +278,8 @@ export function freePlay(ctx) {
     plays.forEach((pl, i) => {
       const b = document.createElement('button');
       b.className = 'fc-play';
-      b.innerHTML = `<span class="k">${i + 1}</span><b>${pl.name}</b><small>${pl.desc}</small>`;
+      const svg = opts.routeArt === 'off' ? '' : playArtSVG(mode, pl, { call, userRole, defense: !!m.defense, type });
+      b.innerHTML = `<span class="k">${i + 1}</span>${svg}<b>${pl.name}</b><small>${pl.desc}</small>`;
       b.addEventListener('pointerdown', (ev) => { ev.preventDefault(); ev.stopPropagation(); choose(i); });
       box.append(b);
     });
@@ -301,7 +303,8 @@ export function freePlay(ctx) {
     // size matchup with the guy across from you
     const foe = dtMode ? nearest(user, blockers) : mode === 'cover' || mode === 'runD' ? user.man : mode === 'route' ? defenders.find((d) => d.man === user) : null;
     const sz = (e) => `${Math.floor(e.hIn / 12)}'${e.hIn % 12}" ${e.wLb}`;
-    hud.instr((foe ? `${play.name} · you ${sz(user)} vs ${sz(foe)} lb` : play.name) + (m.defense ? ' · get set…' : ' · press SNAP when ready'));
+    const readTxt = readIdx >= 0 ? ` · 1st read: #${readIdx + 1}` : '';
+    hud.instr((foe ? `${play.name} · you ${sz(user)} vs ${sz(foe)} lb` : play.name) + readTxt + (m.defense ? ' · get set…' : ' · press SNAP when ready'));
     if (gameSecs !== null) hud.clock?.(clockText());
     snapCalled = false;
     preStart = performance.now();
@@ -314,16 +317,80 @@ export function freePlay(ctx) {
   let gameSecs = clk;
   let clockStopped = false;
   const clockText = () => `Q${m.quarter ?? 1} ${Math.floor(gameSecs / 60)}:${String(Math.max(0, Math.floor(gameSecs % 60))).padStart(2, '0')}`;
-  let routeLine = null;
   let snapCalled = false;
   let preStart = 0;
   let clockShown = -1;
   const PLAY_CLOCK = 20;
-  let assignLine = null;
   let holeArrow = null;
+  // ---------------- play art: what you're supposed to do, drawn on the turf before the snap.
+  // opts.routeArt: 'play' (default: before the snap, then faint during the play) | 'pre' (before the snap only) | 'off'
+  const ART = opts.routeArt ?? 'play';
+  const art = []; // { o, after: opacity factor after the snap (0 = hide), untilThrow }
+  const addArt = (o, after = 0, untilThrow = false) => { group.add(o); art.push({ o, after, untilThrow }); return o; };
+  const ROUTE_COLS = ['#ffd43b', '#60a5fa', '#f472b6', '#4ade80', '#fb923c'];
+  let readIdx = -1;
+  /** QB progression: the first read depends on the call (safe = shortest, risky = deepest, balanced = closest to 10). */
+  const firstRead = () => {
+    const depth = (r) => (r.route ? Math.max(...r.route.map((p) => r.start.z - p.z)) : -99);
+    const cands = receivers.map((r, i) => ({ r, i, d: depth(r) })).filter((c) => c.r.route && c.r !== rb);
+    if (!cands.length) return -1;
+    const score = (c) => (call === 'safe' ? -c.d : call === 'risky' ? c.d : -Math.abs(c.d - 10));
+    return cands.sort((a, b) => score(b) - score(a))[0].i;
+  };
+  const artSide = (x) => Math.sign(x) || 1;
   const preSnapVisuals = () => {
-    if (mode === 'route' && user.route) { routeLine = makeRouteLine(user.route, '#ffd43b', 0.85); group.add(routeLine); }
-    if (mode === 'cover' && user.man && play.user === 'man') { assignLine = makeRouteLine([user.pos, user.man.pos], '#60a5fa', 0.8); group.add(assignLine); }
+    if (ART !== 'off') {
+      const Z = (x, z) => ({ x, z });
+      if (mode === 'pass') {
+        readIdx = play.hail ? -1 : firstRead();
+        receivers.forEach((r, i) => {
+          if (r.route) addArt(makeRouteRibbon(r.route.map((p) => Z(p.x, p.z)), ROUTE_COLS[i], { width: i === readIdx ? 0.5 : 0.34, opacity: 0.92 }), 0.38, true);
+          else if (r === rb && play.screen === undefined) addArt(makeRouteRibbon([Z(rb.pos.x, rb.pos.z), Z(rb.pos.x * 0.4, 2.6)], '#cbd5e1', { width: 0.26, opacity: 0.7, end: 'block' }), 0);
+        });
+        if (play.screen !== undefined) addArt(makeRouteRibbon([Z(rb.pos.x, rb.pos.z), Z(play.screen * 7, 2.2), Z(play.screen * 8.5, -6)], ROUTE_COLS[4], { width: 0.42 }), 0.38, true);
+        for (const o of blockers) addArt(makeRouteRibbon([Z(o.pos.x, o.pos.z + 0.4), Z(o.pos.x, o.pos.z + 1.7)], '#e2e8f0', { width: 0.2, opacity: 0.55, end: 'block' }), 0);
+        if (play.qbRun) addArt(makeRouteRibbon([Z(qb.pos.x, qb.pos.z), Z(play.hole ? play.hole[0] : 2.5, 0), Z(play.hole ? play.hole[1] : 4, -7)], '#ffffff', { width: 0.4 }), 0.3);
+      } else if (mode === 'route') {
+        receivers.forEach((r) => {
+          if (!r.route) return;
+          if (r === user) addArt(makeRouteRibbon(r.route.map((p) => Z(p.x, p.z)), '#ffd43b', { width: 0.5, opacity: 0.95, end: r.sit ? 'dot' : 'arrow' }), 0.35);
+          else addArt(makeRouteRibbon(r.route.map((p) => Z(p.x, p.z)), '#e2e8f0', { width: 0.22, opacity: 0.4 }), 0);
+        });
+      } else if (mode === 'run') {
+        const h0 = play.hole?.[0] ?? 0, h1 = play.hole?.[1] ?? h0;
+        let path;
+        if (user === qb) path = [Z(qb.pos.x, qb.pos.z), Z(h0, 0), Z(h1, -7)];
+        else if (play.screen !== undefined) path = [Z(rb.pos.x, rb.pos.z), Z(play.screen * 7, 2.2), Z(play.screen * 8.5, -6)];
+        else if (play.pitch) path = [Z(rb.pos.x, rb.pos.z), Z(h0 * 0.6, rb.start.z - 0.5), Z(h0, 0.2), Z(h1, -7)];
+        else path = [Z(rb.pos.x, rb.pos.z), Z(qb.pos.x + 0.3 * artSide(h0), qb.pos.z - 0.6), Z(h0, -0.2), Z(h1, -7)];
+        addArt(makeRouteRibbon(path, '#4ade80', { width: 0.5, opacity: 0.95 }), 0.3);
+        if (play.screen === undefined) for (const o of blockers) {
+          const dx = Math.max(-1.1, Math.min(1.1, (h0 - o.pos.x) * 0.35));
+          addArt(makeRouteRibbon([Z(o.pos.x, o.pos.z), Z(o.pos.x + dx, -0.9)], '#e2e8f0', { width: 0.2, opacity: 0.55, end: 'block' }), 0);
+        }
+      } else if (mode === 'cover') {
+        if (play.user === 'blitz') addArt(makeRouteRibbon([Z(user.pos.x, user.pos.z), Z(user.pos.x - 3.5, 0.6), Z(qb.pos.x + 0.6, qb.pos.z - 0.6)], '#f87171', { width: 0.46 }), 0);
+        else if (play.user === 'deep') addArt(makeZoneArea(4.5 * artSide(user.pos.x), (FIELD_X - 0.3) * artSide(user.pos.x), -11, Math.max(-36, goalZ - 6), '#60a5fa', 0.2), 0.45);
+        else if (play.user === 'flat') addArt(makeZoneArea(5.5 * artSide(user.pos.x), (FIELD_X - 0.3) * artSide(user.pos.x), -0.8, Math.max(-9, goalZ - 4), '#38bdf8', 0.24), 0.45);
+        else if (user.man) {
+          const tether = addArt(makeRouteRibbon([Z(user.pos.x, user.pos.z), Z(user.man.pos.x, user.man.pos.z - 0.2)], '#60a5fa', { width: 0.34, end: 'dot' }), 0);
+          tether.userData.tether = true;
+          const ring = makeRing('#60a5fa', 0.62, 0.9, 0.9); user.man.mesh.add(ring); art.push({ o: ring, after: 0, ring: true });
+        }
+      } else if (mode === 'runD') {
+        const blitz = call === 'risky';
+        addArt(makeRouteRibbon(blitz ? [Z(user.pos.x, user.pos.z), Z(user.pos.x - 1, -0.4), Z(7.5, 4)] : [Z(user.pos.x, user.pos.z), Z(user.pos.x + 0.5, -2), Z(10.5, -0.6), Z(8, 1.6)], '#f87171', { width: 0.44 }), 0);
+      } else if (mode === 'rush') {
+        const lane = rushLane(play.name);
+        const via = lane === 'outside' ? Z(user.pos.x + 2.8, 1.6) : lane === 'loop' ? Z(user.pos.x - 2.6, 0.7) : lane === 'move' ? Z(user.pos.x + 0.9, 1.4) : Z(user.pos.x * 0.6, 1.8);
+        addArt(makeRouteRibbon([Z(user.pos.x, user.pos.z), via, Z(qb.pos.x, qb.pos.z - 0.7)], '#f87171', { width: 0.44 }), 0);
+      } else if (mode === 'runStop') {
+        const gap = stopGap(play.name);
+        const x = user.pos.x;
+        const to = gap === 'slant' ? [Z(x + 1.7, 1.3)] : gap === 'pinch' ? [Z(x - 1.2, 1.1)] : gap === 'spill' ? [Z(x + 1.3, 0.9)] : gap === 'shoot' ? [Z(x, 1.2), Z(x + 0.3, 4)] : [Z(x, 0.5)];
+        addArt(makeRouteRibbon([Z(x, user.pos.z), ...to], '#f87171', { width: 0.44, end: gap === 'anchor' ? 'block' : 'arrow' }), 0);
+      }
+    }
     if ((mode === 'run' && play.hole) || mode === 'runD') {
       const hx = mode === 'runD' ? 8 : (play.hole[0] + play.hole[1]) / 2;
       holeArrow = new THREE.Mesh(new THREE.ConeGeometry(0.8, 2, 3), new THREE.MeshBasicMaterial({ color: mode === 'runD' || mode === 'runStop' ? '#f87171' : '#4ade80', transparent: true, opacity: 0.85 }));
@@ -333,16 +400,26 @@ export function freePlay(ctx) {
     }
     if (mode === 'pass') {
       receivers.forEach((r, i) => {
-        const l = makeLabel(String(i + 1), { size: 0.85 });
+        const col = ART !== 'off' ? ROUTE_COLS[i] : '#ffd43b';
+        const l = makeLabel(String(i + 1), { size: i === readIdx ? 1.05 : 0.85, color: col });
         l.position.set(0, 2.8, 0);
         r.mesh.add(l);
         r.label = l;
         labels.push(l);
-        r.ring = makeRing('#4ade80', 0.6, 0.85, 0.9);
+        r.ring = makeRing(i === readIdx ? '#ffffff' : '#4ade80', 0.6, 0.85, 0.9);
         r.mesh.add(r.ring);
       });
     }
   };
+  /** Snap: play art fades to its "during the play" level (or goes away). */
+  const artAtSnap = () => {
+    for (const a of art) {
+      const k = ART === 'play' ? a.after : 0;
+      if (a.ring) { a.o.visible = k > 0; continue; }
+      a.o.userData.setOpacity?.(k);
+    }
+  };
+  const artOnThrow = () => { for (const a of art) if (a.untilThrow) a.o.userData.setOpacity?.(0); };
 
   // ---------------- controls
   const btn = {
@@ -528,6 +605,7 @@ export function freePlay(ctx) {
     sfx.throw();
     labels.forEach((l) => { l.visible = false; });
     receivers.forEach((x) => { if (x.ring) x.ring.visible = false; });
+    artOnThrow();
     hud.instr('');
   };
 
@@ -1881,8 +1959,8 @@ export function freePlay(ctx) {
         if (left !== clockShown) { clockShown = left; hud.playClock?.(Math.max(0, left)); if (left <= 5 && left > 0) sfx.click(); }
       }
       if (!m.defense && !snapCalled && performance.now() - preStart > PLAY_CLOCK * 1000) { hud.playClock?.(null); preSnapFlag(true); return; }
-      if (m.defense) hud.playClock?.(Math.max(1, Math.ceil(7 - t * 4)));
-      if (m.defense ? t > 1.4 : snapCalled) {
+      if (m.defense) hud.playClock?.(Math.max(1, Math.ceil(7 - t * (ART !== 'off' ? 2.6 : 4))));
+      if (m.defense ? t > (ART !== 'off' ? 2.3 : 1.4) : snapCalled) {
         hud.playClock?.(null);
         if (preSnapFlag()) return;
         phase = 'live'; t = 0; snapCalled = false; setButtonsFor();
@@ -1923,8 +2001,7 @@ export function freePlay(ctx) {
             if (d && dist(r.pos, d.pos) < 12 && (r.role === 'TE' || Math.random() < 0.7)) r.blockTarget = d;
           }
         }
-        if (routeLine) routeLine.material.opacity = 0.3;
-        if (assignLine) { group.remove(assignLine); assignLine = null; }
+        artAtSnap();
         setButtonsFor();
       }
       for (const e of ents) animateRun(e.mesh, dt, 0);

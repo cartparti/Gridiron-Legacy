@@ -707,3 +707,26 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   matches real picks within a round or so. startCombine stores `state.draftProj`; runDraft copies it to `state.draft.proj`
   (draft night compares). Declare screen: last season card, mock draft card, scouts like/worry, agent advice. Bot declares only
   after season 2 at OVR 74+. Kicker draft penalty 8 -> 15. Tests: round17.
+
+## v0.56: play art, NIL deals, Draft Stock, copy look
+- Play art (engine.js `preSnapVisuals`): `makeRouteRibbon(points, color, { width, opacity, end: arrow|block|dot|none })` and
+  `makeZoneArea` in actors.js (flat ribbons; 1 px GL lines were invisible on phones). QB: every route in `ROUTE_COLS` (X, S, Z, TE, RB
+  = labels' colors), first read (`firstRead`: safe shortest / risky deepest / balanced ~10 yd) wider + white ring + instr "1st read";
+  OL pass-pro/run-block stubs; WR own route gold + faint others; RB path through the hole; CB zone area / man tether + ring / blitz arrow;
+  runD contain or blitz arrow; DT `rushLane(name)` / `stopGap(name)` (playbook.js). `opts.routeArt` ('play' default: art fades to
+  `after` at the snap and QB routes hide on the throw; 'pre'; 'off') from settings.routeArt. Defense pre-snap 2.3 s when art is on.
+  Card diagrams: `src/scenes/play/playart.js` `playArtSVG(mode, play, { call, userRole })` (string SVG, `.fc-art`).
+- NIL: `src/sim/nil.js`. Deals live in `player.sponsors` (new fields kind/cat/bonus/morality/collective/total/nil); `state.nil`
+  { offers, earned, seq, gameDeal }. `nilValue` (college from marketValue x prestige x POS_NIL x starter x form; pro from fame),
+  `makeOffer(state, kind)` (local/brand/social/appearance/performance/collective/merch/game/shady; no duplicate brands), `nilWeek`
+  (beginWeek: offers expire, new ones, collective at week 0, morality clauses on suspension), `acceptOffer` ({ share } = 20% to the
+  team), `negotiateOffer` (once), `hireNilAgent` (college agents take 5%), `nilAfterGame` (performance bonuses, lastGame.nilBonus),
+  `trackWeeklyPay` + `nilWorkload` (weeklyUpkeep), `nilLeaveCollege` (startCombine), `retentionOffer` (declare screen; staying signs
+  a collective deal). createSponsor in college now pays from nilValue. Max 6 deals. UI `src/ui/screens/deals.js` (Life > NIL/Deals,
+  Week tab `dealsNudge`). Bot never takes deals (balance unchanged).
+- Draft Stock: `draftStock(state, { live })` counts the current season (weight games/6, blended with 50) and returns `parts`;
+  `liveDraftProjection` (+ posRank); `trackDraftWatch` stores weekly snapshots in `state.draftWatch` (beginWeek, college). UI
+  `src/ui/screens/draftStock.js` (Career > Draft Stock in college, My Draft in the pros).
+- Copy look: `src/ui/lookClip.js` (`app.settings.lookClip`, "GLL1." codes, `lookSources` = clipboard + other save slots, `lookFrom`
+  keeps choices, keepSize for another position / in a career). `lookClipBar` in create.js and openLookModal ({ look } reopens with a
+  pasted look). Tests: round18.

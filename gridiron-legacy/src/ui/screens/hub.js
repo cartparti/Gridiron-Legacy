@@ -1,6 +1,9 @@
 // Main career hub: top bar with meters, bottom tabs, and the five tab views.
 import { friendsPage } from './friends.js';
 import { achievementsPage, goalsCard } from './achievements.js';
+import { dealsView, dealsNudge } from './deals.js';
+import { dealsOpen } from '../../sim/nil.js';
+import { draftStockPage, draftTabOpen } from './draftStock.js';
 import { activityFor } from '../../data/activities.js';
 import { costumeSpec, mascotDisplayName } from '../../data/mascots.js';
 import { awardLabel } from '../../sim/awards.js';
@@ -200,6 +203,7 @@ function weekView(app) {
 
   // the coach's goals for this season
   { const gc = goalsCard(app); if (gc) container.append(gc); }
+  { const dn = dealsNudge(app); if (dn) container.append(dn); }
 
   // Season stakes: your role on the depth chart, the playoff race and the award race
   container.append(seasonCard(st));
@@ -424,9 +428,10 @@ function lifeView(app) {
   const p = st.player;
   const sub = app.ui.lifeSub ?? 'social';
   const out = h('div.col', { style: { gap: '14px' } },
-    h('div.subtabs', [['social', 'Social'], ['home', 'Home'], ['people', 'People'], ['store', 'Store'], ['money', 'Money'], ['lifestyle', 'Housing & Cars'], ['invest', 'Invest']].map(([id, l]) =>
+    h('div.subtabs', [['social', 'Social'], ['home', 'Home'], ['people', 'People'], dealsOpen(st) ? ['deals', st.career.stage === 'college' ? `NIL${st.nil?.offers?.length ? ` (${st.nil.offers.length})` : ''}` : `Deals${st.nil?.offers?.length ? ` (${st.nil.offers.length})` : ''}`] : null, ['store', 'Store'], ['money', 'Money'], ['lifestyle', 'Housing & Cars'], ['invest', 'Invest']].filter(Boolean).map(([id, l]) =>
       h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { app.ui.lifeSub = id; app.render(); } }, l))));
-  if (sub === 'social') out.append(socialView(app));
+  if (sub === 'deals' && dealsOpen(st)) out.append(dealsView(app));
+  else if (sub === 'social' || sub === 'deals') out.append(socialView(app));
   else if (sub === 'home') out.append(homeView(app));
   else if (sub === 'people') {
     out.append(peopleView(app));
@@ -445,7 +450,8 @@ function lifeView(app) {
         weeklyPerks ? h('div.li', h('span.grow', 'Staff & perks'), h('span.bad', `−${fmtMoney(weeklyPerks)}/wk`)) : null,
         p.business ? h('div.li', h('span.grow', `Business: ${p.business.name}`), h('span.good', 'passive income')) : null)));
     out.append(h('div.card', h('h3', 'Sponsors'), p.sponsors.length ? h('div.list', p.sponsors.map((s) => h('div.li', h('span.grow', h('b', s.brand), ` · ${s.product}`), h('span.good', `${fmtMoney(s.weekly)}/wk`), h('span.tiny.muted', `${s.weeks} wk`))))
-      : h('p.small.muted', 'No sponsors yet. Fame, an agent and big games bring offers.')));
+      : h('p.small.muted', 'No sponsors yet. Fame, an agent and big games bring offers.'),
+      dealsOpen(st) ? h('button.btn.small', { style: { marginTop: '8px' }, onclick: () => { app.ui.lifeSub = 'deals'; app.render(); } }, st.career.stage === 'college' ? 'Open NIL deals' : 'Open endorsements') : null));
   } else if (sub === 'lifestyle') {
     const stage = st.career.stage;
     out.append(h('div.card', h('h3', 'Housing'), h('p.tiny.muted', 'Rent is weekly. Nicer places lift your mood every week.'), h('div.list', HOUSING.filter((x) => x.stages.includes(stage) || x.id === p.housing).map((x) =>
@@ -482,11 +488,13 @@ function lifeView(app) {
 // ------------------------------------------------------------------ CAREER
 
 function careerView(app) {
+  const st = app.state;
   const sub = app.ui.careerSub ?? 'profile';
-  const tabs = h('div.subtabs', [['profile', 'Career'], ['achievements', 'Achievements'], ['friends', 'Friends'], ['traits', 'Traits'], ['awards', 'Trophies'], ['race', 'Award Race'], ['legends', 'Legends'], ['league', 'League Awards']].map(([id, l]) =>
+  const tabs = h('div.subtabs', [['profile', 'Career'], draftTabOpen(st) ? ['draft', st.career.stage === 'college' ? 'Draft Stock' : 'My Draft'] : null, ['achievements', 'Achievements'], ['friends', 'Friends'], ['traits', 'Traits'], ['awards', 'Trophies'], ['race', 'Award Race'], ['legends', 'Legends'], ['league', 'League Awards']].filter(Boolean).map(([id, l]) =>
     h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { sfx.click(); app.ui.careerSub = id; app.render(); } }, l)));
   let body;
-  if (sub === 'awards') body = awardsView(app);
+  if (sub === 'draft' && draftTabOpen(st)) body = draftStockPage(app);
+  else if (sub === 'awards') body = awardsView(app);
   else if (sub === 'league') body = leagueAwardsView(app);
   else if (sub === 'legends') body = legendsPage(app);
   else if (sub === 'race') body = racePage(app);

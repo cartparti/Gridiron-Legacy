@@ -2,6 +2,7 @@
 import { h } from '../dom.js';
 import { STAT_KEYS, STAT_LABELS, POSITIONS, statLabel } from '../../data/positions.js';
 import { getTeam } from '../../sim/league.js';
+import { retentionOffer } from '../../sim/nil.js';
 import * as flow from '../../sim/flow.js';
 import { fmtMoney, ordinal, signed } from '../../core/util.js';
 import { teamBadge, stars, confirmDialog } from '../components.js';
@@ -162,6 +163,9 @@ export function declareScreen(app) {
       minus.length ? h('div', h('div.tiny.pix.bad', 'SCOUTS WORRY'), h('ul.small', minus.map((x) => h('li', x)))) : null,
       h('p.small', h('i', advice)),
       h('p.tiny.muted', 'Projections come from last season, your whole college résumé, your overall and fame. The combine can still move you up or down.')),
+    (p.ovr ?? 0) >= 64 && retentionOffer(st) ? h('div.card',
+      h('div.card-title', h('h3', 'If you stay'), h('span.chip.gold.pix', 'NIL')),
+      h('p.small', `Your school's booster collective will pay you about ${fmtMoney(retentionOffer(st))} next season to come back. Leaving ends all collective money.`)) : null,
     h('button.btn.primary.block', { onclick: () => { sfx.select(); flow.declareForDraft(st, true); app.commit(); } }, 'Declare for the Draft'),
     h('button.btn.block', { onclick: () => { sfx.click(); flow.declareForDraft(st, false); app.commit(); } }, seasonsLeft === 1 ? 'Return for Senior Season' : 'Stay in School'));
 }

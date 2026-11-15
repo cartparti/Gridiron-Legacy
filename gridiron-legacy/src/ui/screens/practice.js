@@ -101,7 +101,7 @@ export function practiceScreen(app) {
       interlude: Math.random() < 0.3 ? INTERLUDES[Math.floor(Math.random() * INTERLUDES.length)] : null,
       showTips: app.settings.tutorials && !app.settings.seenTips?.[`mg_${type}`],
       markTip: () => { app.settings.seenTips = { ...(app.settings.seenTips ?? {}), [`mg_${type}`]: true }; app.saveSettings(); },
-      reducedMotion: app.settings.reducedMotion, blood: app.settings.blood !== false, gameSpeed: app.settings.gameSpeed ?? 0.85,
+      reducedMotion: app.settings.reducedMotion, blood: app.settings.blood !== false, gameSpeed: app.settings.gameSpeed ?? 0.85, routeArt: app.settings.routeArt ?? 'play',
       oppStrength: oppK, health: 100, traits: [], wear: { key: `practice-${P.weather}`, progress: 0.35 },
     });
     const q = res.fallbackQuality ?? res.quality ?? 0;

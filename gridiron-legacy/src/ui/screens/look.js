@@ -2,6 +2,7 @@
 import { mascotKind } from '../crest.js';
 import { h, clear } from '../dom.js';
 import { openModal, toast } from '../components.js';
+import { lookClipBar, lookFrom } from '../lookClip.js';
 import {
   SKIN_TONES, HAIR_COLORS, EYE_COLORS, GEAR_COLORS, HAIR_STYLES, BROWS, EYES, NOSES, MOUTHS, BEARDS, TATTOOS,
   SIDES, VISORS, CELEBRATIONS, SPATS, TOWELS, CHAINS, normalizeLook,
@@ -220,13 +221,20 @@ const mascotOf = (app) => {
   return t ? { mascotKind: mascotKind(t), teamColors: t.colors } : {};
 };
 /** Modal editor for an existing athlete (body size is locked after creation). */
-export function openLookModal(app, { uniform, onDone } = {}) {
+export function openLookModal(app, { uniform, onDone, look: start } = {}) {
   const p = app.state.player;
-  const look = normalizeLook({ ...p.look }, p.first + p.last);
+  const look = start ?? normalizeLook({ ...p.look }, p.first + p.last);
   const content = h('div');
   const m = openModal(content, { dismissable: true });
   content.append(
     h('div.row.between', h('h2', 'Your Look'), h('span.tiny.muted', 'Free to change')),
+    lookClipBar(app, { look, meta: { name: `${p.first} ${p.last}`, pos: p.position }, exceptSlot: app.slot, onPaste: (src, srcPos, label) => {
+      // in a career your height and weight are locked
+      const next = lookFrom(src, p.look, { keepSize: true, seed: p.first + p.last });
+      m.close();
+      toast(`${label}'s look loaded. Tap Save to keep it.`);
+      openLookModal(app, { uniform, onDone, look: next });
+    } }),
     lookEditor({ look, uniform, number: p.number, position: p.position, lockBody: true, seed: p.first + p.last, ...mascotOf(app) }),
     h('div.row', { style: { marginTop: '12px' } },
       h('button.btn.grow', { onclick: () => m.close() }, 'Cancel'),

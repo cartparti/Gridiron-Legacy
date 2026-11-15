@@ -93,6 +93,22 @@ export const PLAYS = {
   },
 };
 
+/** Pass-rush lane a DT call implies (used by the play art on the field and on the cards). */
+export function rushLane(name = '') {
+  if (/Speed|Edge|Wide|Outside|Dip/i.test(name)) return 'outside';
+  if (/Stunt|Twist|Loop|Game/i.test(name)) return 'loop';
+  if (/Swim|Rip|Spin|Club/i.test(name)) return 'move';
+  return 'power';
+}
+/** Gap a run-stop call implies. */
+export function stopGap(name = '') {
+  if (/Slant|Cross|Exchange|Backdoor/i.test(name)) return 'slant';
+  if (/Pinch|Wall|Plug|Squeeze/i.test(name)) return 'pinch';
+  if (/Spill|Rip/i.test(name)) return 'spill';
+  if (/Penetrate|Shoot|Jet|Sell|Blitz|Knife/i.test(name)) return 'shoot';
+  return 'anchor';
+}
+
 /** Which playbook a moment type uses. */
 export function playMode(type) {
   if (type === 'qb_throw' || type === 'qb_hailmary') return 'pass';

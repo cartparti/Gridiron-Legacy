@@ -436,6 +436,7 @@ export function gamedayScreen(app) {
       reducedMotion: app.settings.reducedMotion,
       blood: app.settings.blood !== false,
       gameSpeed: app.settings.gameSpeed ?? 0.85,
+      routeArt: app.settings.routeArt ?? 'play',
       traits: equippedTraits(st),
       health: st.player.health,
       hurt: g.playingHurt ? (INJURY_STATUS[g.playingHurt]?.speed ?? 1) : 1,

@@ -11,6 +11,8 @@ import { DIFFICULTIES } from '../../data/config.js';
 import { defaultLook, POS_SIZE } from '../../data/looks.js';
 import { teamKits } from '../../data/kits.js';
 import { lookEditor } from './look.js';
+import { lookClipBar, lookFrom } from '../lookClip.js';
+import { toast } from '../components.js';
 import { hometownSchools, cleanTown } from '../../data/hometown.js';
 
 const rnd = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -63,6 +65,13 @@ export function createScreen(app) {
       h('div.card',
         h('h2', 'Look'),
         h('p.small.muted', 'Make them yours: skin, hair, face, tattoos, gear, size and touchdown celebration. You can change everything except height and weight later.'),
+        lookClipBar(app, { look: f.look, meta: { name: `${f.first} ${f.last}`.trim(), pos: f.position }, onPaste: (src, srcPos, label) => {
+          // another position's height and weight don't fit this one: keep the size, take everything else
+          const keepSize = !!srcPos && srcPos !== f.position;
+          f.look = lookFrom(src, f.look, { keepSize, seed: `${f.first}${f.last}` });
+          toast(keepSize ? `Copied ${label}'s look (kept a ${f.position} size).` : `Copied ${label}'s look.`);
+          draw();
+        } }),
         lookEditor({ look: f.look, uniform: teamKits(school).home, number: f.number, position: f.position, mascotKind: mascotKind(school), teamColors: school.colors, seed: `${f.first}${f.last}` })),
       h('div.card',
         h('h2', 'Background'),

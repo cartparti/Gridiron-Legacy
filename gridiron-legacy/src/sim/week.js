@@ -8,6 +8,7 @@ import { homePerks, applyHomeWeekly } from './home.js';
 import { applyEffects } from './effects.js';
 import { addNews } from './press.js';
 import { itemWeekly } from './shop.js';
+import { trackWeeklyPay, nilWorkload } from './nil.js';
 
 export const ACTIVITY_BY_ID = Object.fromEntries(ACTIVITIES.map((a) => [a.id, a]));
 
@@ -106,9 +107,15 @@ export function weeklyUpkeep(state) {
   let expenses = 0;
   if (stage === 'pro' && p.contract) income += Math.round(p.contract.salary / STAGES.pro.games);
   if (stage === 'hs') income += 20; // allowance
+  trackWeeklyPay(state);
   for (const s of p.sponsors) { income += s.weekly; s.weeks--; }
   const expired = p.sponsors.filter((s) => s.weeks <= 0);
-  for (const s of expired) addNews(state, 'money', `${s.brand} sponsorship has ended.`);
+  for (const s of expired) addNews(state, 'money', `${s.brand} ${s.nil ? 'NIL deal' : 'sponsorship'} has ended.`);
+  {
+    const wl = nilWorkload(state);
+    if (wl.academics && typeof p.academics === 'number') p.academics = clamp(p.academics - wl.academics, 0, 100);
+    if (wl.mood) p.mood = clamp(p.mood + wl.mood, 0, 100);
+  }
   p.sponsors = p.sponsors.filter((s) => s.weeks > 0);
   if (p.business) income += Math.round((p.flags.business_big ? 4000 : 1200) * (1 + p.fame / 120));
   if (stage === 'pro' && p.agentName) expenses += Math.round(income * 0.03);
