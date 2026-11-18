@@ -7,7 +7,7 @@
 //
 // Returns the same result objects as the old minigames, so the game simulation is unchanged.
 import * as THREE from 'three';
-import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, makeRouteRibbon, makeZoneArea, confetti, ragdoll, bloodBurst, dustPuff, markTicked, bump, applyWear, addWear, applyInjuryLook, setLookAt, setSurface } from '../actors.js';
+import { makePlayer, animateRun, faceToward, setPose, playAction, celebrate, knockDown, isDown, setHop, makeBall, makeRing, makeLabel, makeRouteLine, makeRouteRibbon, makeZoneArea, confetti, ragdoll, bloodBurst, dustPuff, markTicked, bump, applyWear, addWear, applyInjuryLook, setLookAt, setReach, setSurface } from '../actors.js';
 import { surfaceFor } from '../../data/surface.js';
 import { INJURIES } from '../../data/lifestyle.js';
 import { xrayCard } from './xray.js';
@@ -238,7 +238,8 @@ export function freePlay(ctx) {
     // ...and the playside guard pulls and leads the sweep, looking for you
     if (mode === 'runD') { const g = blockers.filter((b) => b.role === 'OL').sort((a, b) => b.start.x - a.start.x)[1]; if (g) g.pullAt = 0.25; }
     if (globalThis.__playDebug) globalThis.__play = { receivers, defenders, time: () => t, phase: () => phase, user, qb: () => qb, carrier: () => carrier,
-      flight: () => (flight ? { f: (t - flight.t0) / flight.T, to: flight.to, toUser: flight.target === user } : null) };
+      flight: () => (flight ? { f: (t - flight.t0) / flight.T, to: flight.to, toUser: flight.target === user, endY: flight.endY } : null),
+      throwTo: (i) => throwTo(receivers[i]), cine: (fn, s) => ctx.cinematic?.(fn, s), slow: (k) => ctx.setTimeScale?.(k), holder: () => holder };
     // routes for receivers
     const routeFor = (slot) => {
       if (mode === 'route' && slot === 'Z') return play.route;
@@ -530,7 +531,7 @@ export function freePlay(ctx) {
       }
       if ((id === 'catch' || id === 'swat') && flight && catchPress === null && swatPress === null) {
         if (user.team === 'off') catchPress = t; else swatPress = t;
-        playAction(user.mesh, flight && flight.H > 4 ? 'jump' : 'catch');
+        if (flight && !flight.jumped?.has(user)) { flight.jumped?.add(user); playAction(user.mesh, (flight.endY ?? 1.3) >= 1.9 || flight.H > 4 ? 'jump' : 'catch'); }
         sfx.click();
       }
       if (id === 'tackle' && user.team === 'def' && user.engagedBy && user.role === 'CB') {
@@ -599,7 +600,12 @@ export function freePlay(ctx) {
     const to = clampPos({ x: lead.x + gaussR() * sd * 0.7 + wfx.wind.x * T * 0.45, z: lead.z + gaussR() * sd + wfx.wind.z * T * 0.45 });
     if (play.hail) to.z = Math.min(to.z, goalZ - 1);
     const H = Math.max(1.4, dist(qbP, to) * (play.hail ? 0.3 : 0.12));
-    flight = { from: { x: qbP.x + 0.3, z: qbP.z - 0.2 }, to, T: Math.max(0.4, dist(qbP, to) / v), t0: t, H, target: r, wobble: Math.random() < (user === qb ? 0.06 + Math.max(0, 70 - (st.skill ?? 60)) / 200 : 0.08) ? 0.22 : 0.025 };
+    // where the ball arrives: chest high most of the time, up high on jump balls and into tight coverage (go up and
+    // get it), sometimes low (scoop it)
+    const tight = defenders.some((d) => !d.down && d.role !== 'DL' && dist(d.pos, to) < 2);
+    const rh = Math.random();
+    const endY = play.jump || play.hail ? 2.45 + Math.random() * 0.25 : tight && rh < 0.55 ? 2.15 + Math.random() * 0.35 : rh < 0.16 ? 1.95 + Math.random() * 0.3 : rh > 0.9 ? 0.6 + Math.random() * 0.25 : 1.2 + Math.random() * 0.3;
+    flight = { endY: globalThis.__endY ?? endY, jumped: new Set(), from: { x: qbP.x + 0.3, z: qbP.z - 0.2 }, to, T: Math.max(0.4, dist(qbP, to) / v), t0: t, H, target: r, wobble: Math.random() < (user === qb ? 0.06 + Math.max(0, 70 - (st.skill ?? 60)) / 200 : 0.08) ? 0.22 : 0.025 };
     holder = null;
     playAction(qb.mesh, 'throw');
     sfx.throw();
@@ -759,8 +765,9 @@ export function freePlay(ctx) {
     // receivers
     if (flight && flight.target === e) {
       const remain = Math.max(0.05, flight.T - (t - flight.t0));
+      // get under it: arrive a beat early on high balls so there's time to go up
       moveToward(e, flight.to.x, flight.to.z, e.maxSpeed * 1.05, dt, 20);
-      if (remain < 0.3) faceToward(e.mesh, qb.pos.x, qb.pos.z);
+      void remain;
       return;
     }
     if (carrier && carrier !== e && carrier.team === 'off') {
@@ -1589,6 +1596,90 @@ export function freePlay(ctx) {
     else whistle('tackle', tackler);
   };
 
+  // ---------------- ball skills: track it, turn to it, reach for it, go up and get it, then secure it
+  const reachV = new THREE.Vector3();
+  const arriveV = new THREE.Vector3();
+  const reachers = new Map(); // entity -> seconds to keep reaching after the ball arrives (arms stay up on a breakup)
+  const ballWorld = () => ball.getWorldPosition(reachV);
+  const ballSkills = (dt) => {
+    const f = flight;
+    if (!f || f.pitch) return;
+    const remain = f.T - (t - f.t0);
+    const land = f.to;
+    const y1 = f.endY ?? 1.3;
+    const tr = f.target;
+    // the receiver and up to two defenders who can get there
+    const contest = defenders.filter((d) => !d.down && d.out <= 0 && d.role !== 'DL' && !d.engagedBy && dist(d.pos, land) < 2.8)
+      .sort((a, b) => dist(a.pos, land) - dist(b.pos, land)).slice(0, 2);
+    const who = tr && !tr.down ? [tr, ...contest] : contest;
+    const ax = land.x - f.from.x, az = land.z - f.from.z, al = Math.hypot(ax, az) || 1; // the way the ball is travelling
+    // hands go to where the ball will arrive first, then follow it in over the last moment
+    const bw = ballWorld();
+    const kIn = Math.max(0, Math.min(1, 1 - remain / 0.45));
+    arriveV.set(land.x, y1, land.z);
+    group.localToWorld(arriveV);
+    arriveV.lerp(bw, 0.25 + 0.75 * kIn);
+    for (const e of who) {
+      const isTr = e === tr;
+      const startAt = isTr ? (y1 >= 1.85 ? 0.75 : 0.6) : 0.5;
+      if (remain > startAt) continue;
+      const k = Math.min(1, (startAt - remain) / 0.3);
+      setReach(e.mesh, arriveV, (isTr ? 1 : 0.85) * k);
+      reachers.set(e, 0.3);
+      // turn to the ball. Running away from the QB on a deep ball: keep running, catch it over the shoulder.
+      if (!e.user && remain < 0.55 && !e.out) {
+        const sp = Math.hypot(e.vel.x, e.vel.z);
+        const away = sp > 4 && (e.vel.x * ax + e.vel.z * az) / (sp * al) > 0.55;
+        if (!away) faceToward(e.mesh, ball.position.x, ball.position.z);
+      }
+      // go up for it: leave the ground so the top of the jump meets the ball
+      const lead = y1 >= 2.25 ? 0.36 : 0.3;
+      if (y1 >= 1.85 && remain <= lead && remain > 0.05 && !f.jumped.has(e) && (!e.user || catchPress !== null || swatPress !== null || isTr)) {
+        f.jumped.add(e);
+        playAction(e.mesh, 'jump');
+      }
+      // low ball: get down to it
+      if (y1 < 0.95 && isTr && !e.user && remain <= 0.22 && !f.jumped.has(e)) { f.jumped.add(e); playAction(e.mesh, 'catch'); }
+    }
+  };
+  /** Right after a catch: the ball is in both hands (where it was caught), then pulled in and tucked away. */
+  const SECURE_T = 0.42;
+  const tuckV = new THREE.Vector3();
+  const secureBall = (e, dt) => {
+    e.secure -= dt;
+    const rg = e.mesh.userData.rig;
+    const hl = rg?.armL?.hand, hr = rg?.armR?.hand;
+    const k = Math.max(0, Math.min(1, 1 - e.secure / SECURE_T)); // 0 = just caught .. 1 = tucked
+    // hands come from the catch point to the chest
+    const fwd = e.mesh.rotation.y;
+    const sc = rg?.body?.scale?.y ?? 1;
+    const chest = { x: e.pos.x - Math.sin(fwd) * 0.32, y: 1.25 * sc, z: e.pos.z - Math.cos(fwd) * 0.32 };
+    const c0 = e.catchAt ?? chest;
+    const kk = k * k * (3 - 2 * k);
+    tuckV.set(c0.x + (chest.x - c0.x) * kk, c0.y + (chest.y - c0.y) * kk, c0.z + (chest.z - c0.z) * kk);
+    group.localToWorld(tuckV);
+    setReach(e.mesh, tuckV, 1);
+    if (hl && hr) {
+      const a = hl.getWorldPosition(new THREE.Vector3()), b = hr.getWorldPosition(new THREE.Vector3());
+      ball.position.copy(a.add(b).multiplyScalar(0.5));
+      group.worldToLocal(ball.position);
+      ball.quaternion.copy(e.mesh.quaternion);
+      ball.rotateY(Math.PI / 2); // laces up, nose across the hands
+      ball.userData.shadow.position.set(ball.position.x, 0.03, ball.position.z);
+    } else carryBall(e);
+    if (e.secure <= 0) { e.secure = 0; setReach(e.mesh, null); reachers.delete(e); }
+  };
+  /** Let go of the reach a moment after the ball arrives (ballSkills keeps refreshing it while the ball is coming). */
+  const releaseReach = (dt) => {
+    for (const [e, left] of reachers) {
+      if (e.secure > 0) continue;
+      const nl = left - dt;
+      if (nl <= 0) { setReach(e.mesh, null); reachers.delete(e); } else reachers.set(e, nl);
+    }
+  };
+  /** Someone just came down with it (catch or pick): hold it up in both hands, then tuck it. */
+  const secureIt = (e) => { e.catchAt = { x: ball.position.x, y: Math.max(0.5, ball.position.y), z: ball.position.z }; e.secure = SECURE_T; };
+
   // ---------------- catch resolution
   const resolveFlight = () => {
     const f = flight;
@@ -1596,6 +1687,7 @@ export function freePlay(ctx) {
     const r = f.target;
     const land = f.to;
     if (f.pitch) { holder = r; carrier = r; return; }
+    if (globalThis.__forceCatch) { completeCatch(r, land); return; } // test hook
     const dR = dist(r.pos, land);
     const defs = defenders.filter((d) => !d.down && d.out <= 0);
     const dD = Math.min(...defs.map((d) => dist(d.pos, land)));
@@ -1606,7 +1698,7 @@ export function freePlay(ctx) {
       startQte('ring', 'BREAK IT UP!', (ok) => {
         if (phase !== 'live') return;
         if (ok) {
-          if (Math.random() < 0.28 + (st.skill ?? 60) / 600 + (has('ballhawk') ? 0.15 : 0)) { holder = user; carrier = user; user.int = true; snap('Interception!', 100); hud.big('INTERCEPTION!', '#4ade80', 900); ctx.cinematic?.(() => user.pos, 1.3); sfx.catch(); setButtonsFor(); return; }
+          if (Math.random() < 0.28 + (st.skill ?? 60) / 600 + (has('ballhawk') ? 0.15 : 0)) { holder = user; carrier = user; user.int = true; secureIt(user); snap('Interception!', 100); hud.big('INTERCEPTION!', '#4ade80', 900); ctx.cinematic?.(() => user.pos, 1.3); sfx.catch(); setButtonsFor(); return; }
           playAction(user.mesh, 'dive'); hud.big('BROKEN UP!', '#4ade80', 800); ctx.cinematic?.(() => user.pos, 1.1); whistle('pd'); return;
         }
         completeCatch(r, land);
@@ -1617,7 +1709,7 @@ export function freePlay(ctx) {
       const timing = swatPress === null ? 9 : Math.abs(f.t0 + f.T - swatPress - 0.12);
       const win = (0.16 + (st.skill ?? 60) / 100 * 0.12) * tol;
       if (timing <= win && dist(user.pos, land) <= dR + 0.5) {
-        if (Math.random() < 0.3 + (st.skill ?? 60) / 600 + (has('ballhawk') ? 0.15 : 0)) { holder = user; carrier = user; user.int = true; snap('Interception!', 150); hud.big('INTERCEPTION!', '#4ade80', 900); ctx.slowMo(0.5); sfx.catch(); setButtonsFor(); return; }
+        if (Math.random() < 0.3 + (st.skill ?? 60) / 600 + (has('ballhawk') ? 0.15 : 0)) { holder = user; carrier = user; user.int = true; secureIt(user); snap('Interception!', 150); hud.big('INTERCEPTION!', '#4ade80', 900); ctx.slowMo(0.5); sfx.catch(); setButtonsFor(); return; }
         whistle('pd'); return;
       }
       if (timing <= win * 2.2 || dist(user.pos, land) < 0.9) { whistle('pd'); return; }
@@ -1627,11 +1719,11 @@ export function freePlay(ctx) {
       const nearD0 = defs.reduce((a, d) => (dist(d.pos, land) < dist(a.pos, land) ? d : a), defs[0]);
       if (nearD0 && dist(nearD0.pos, land) < 1.7 && dR < 1.9 + (user.hIn - 73) * 0.04) {
         ball.position.set(land.x, 1.7, land.z);
-        playAction(user.mesh, f.H > 3 ? 'jump' : 'catch');
+        if (!f.jumped?.has(user)) playAction(user.mesh, (f.endY ?? 1.3) >= 1.9 || f.H > 3 ? 'jump' : 'catch');
         startQte('ring', 'CONTESTED CATCH!', (ok) => {
           if (phase !== 'live') return;
           if (ok) { hud.big('MOSSED HIM!', '#4ade80', 900); ctx.cinematic?.(() => user.pos, 1.3); snap('Contested catch!', 250); completeCatch(r, land); return; }
-          if (Math.random() < 0.25) { holder = nearD0; carrier = nearD0; whistle('int'); return; }
+          if (Math.random() < 0.25) { holder = nearD0; carrier = nearD0; secureIt(nearD0); whistle('int'); return; }
           whistle('incomplete', null, 'Ripped away at the catch point!');
         });
         return;
@@ -1662,7 +1754,7 @@ export function freePlay(ctx) {
     const intRisk = dD < 0.9 && dD < dR ? 0.45 : dD < 1.3 && !catchOk ? 0.2 : 0;
     if (!catchOk && Math.random() < intRisk * (call === 'risky' ? 1.3 : 1)) {
       const picker = defs.reduce((a, d) => (dist(d.pos, land) < dist(a.pos, land) ? d : a), defs[0]);
-      holder = picker; carrier = picker;
+      holder = picker; carrier = picker; secureIt(picker);
       whistle('int');
       return;
     }
@@ -1676,6 +1768,8 @@ export function freePlay(ctx) {
     holder = r;
     carrier = r;
     sfx.catch();
+    // the ball stays where it was caught, in both hands, for a beat
+    secureIt(r);
     const reach = land ? dist(r.pos, land) : 0;
     const involved = r.user || user === qb;
     if (reach > 0.95 || (involved && Math.random() < 0.12)) {
@@ -1946,7 +2040,7 @@ export function freePlay(ctx) {
     }
     if (phase === 'replay') { runReplay(dt); return; }
     if (bphys.active && !flight && !(holder && phase !== 'live')) bphys.step(dt);
-    if (holder && phase !== 'live') carryBall(holder);
+    if (holder && phase !== 'live') { if (holder.secure > 0) secureBall(holder, dt); else carryBall(holder); }
     if (phase === 'live' || phase === 'dead' || phase === 'celebrate') record(dt);
     if (phase === 'pick' || phase === 'over') return;
     if (phase === 'pre') {
@@ -2210,16 +2304,19 @@ export function freePlay(ctx) {
         const f = Math.min(1, (t - flight.t0) / flight.T);
         const x = flight.from.x + (flight.to.x - flight.from.x) * f;
         const z = flight.from.z + (flight.to.z - flight.from.z) * f;
-        ball.position.set(x, 1.6 + (1.3 - 1.6) * f + 4 * flight.H * f * (1 - f), z);
+        const y1 = flight.endY ?? 1.3;
+        ball.position.set(x, 1.6 + (y1 - 1.6) * f + 4 * flight.H * f * (1 - f), z);
         if (!flight.pitch) { trail ??= makeTrail(group); trail.push(ball.position); }
-        lastVel.set((flight.to.x - flight.from.x) / flight.T, (-0.3 + 4 * flight.H * (1 - 2 * f)) / flight.T, (flight.to.z - flight.from.z) / flight.T);
+        lastVel.set((flight.to.x - flight.from.x) / flight.T, (y1 - 1.6 + 4 * flight.H * (1 - 2 * f)) / flight.T, (flight.to.z - flight.from.z) / flight.T);
+        ballSkills(dt);
         orientInFlight(ball, lastVel, (t - flight.t0) * (flight.pitch ? 9 : 48), flight.pitch ? 0.12 : flight.wobble ?? 0.03, t);
         ball.userData.shadow.position.set(x, 0.03, z);
         if (f >= 1) resolveFlight();
       } else if (holder) {
-        carryBall(holder);
+        if (holder.secure > 0) secureBall(holder, dt); else carryBall(holder);
         trail?.fade();
       } else if (loose) updateLoose(dt);
+      releaseReach(dt);
       // ---- end conditions
       if (play.qbRun && t > 0.35 && !carrier && holder === qb) { carrier = qb; qb.runner = true; }
       if (phase === 'live' && carrier && !carrier.down) {

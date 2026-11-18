@@ -1,5 +1,12 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.57', date: 'Nov 18', title: 'Receivers go get the ball', items: [
+    'Receivers now track the ball in the air: they turn to face it (or catch it over the shoulder when they\'re running deep), their hands go up to meet it and follow it all the way in.',
+    'Passes arrive at different heights. High balls and throws into tight coverage make receivers leap and high-point it; low throws get scooped. Jump balls and Hail Marys always go up top.',
+    'You can see the catch: the ball lands in both hands, held there for a beat, then gets pulled in and tucked away before the run.',
+    'Defenders near the ball turn, reach and jump for it too, so contested catches look like a real fight at the catch point. Interceptions get secured the same way.',
+    'Playing receiver: press CATCH on a high ball and you jump for it.',
+  ] },
   { v: '0.56', date: 'Nov 15', title: 'Routes you can see, NIL deals and Draft Stock', items: [
     'See your routes before the snap. Quarterbacks see every receiver\'s route in its own color, matching the number over his head, and your first read is marked (it also shows at the top: "1st read: #3"). The routes stay faint during the play until you throw, so you never forget who is going where.',
     'Every position gets its own play art: receivers see their route in gold (the rest faint), running backs see the path through the hole and which way the line blocks, cornerbacks see their zone, their man or their blitz path, and defensive tackles see their rush lane or gap. Change it in Settings, Route lines (During play, Before snap, Off).',

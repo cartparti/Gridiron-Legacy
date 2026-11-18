@@ -730,3 +730,16 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - Copy look: `src/ui/lookClip.js` (`app.settings.lookClip`, "GLL1." codes, `lookSources` = clipboard + other save slots, `lookFrom`
   keeps choices, keepSize for another position / in a career). `lookClipBar` in create.js and openLookModal ({ look } reopens with a
   pasted look). Tests: round18.
+
+## v0.57: ball skills (track it, reach, high-point, secure)
+- actors.js `setReach(mesh, worldPoint|null, k)` + `reachTarget` (applyPose, after lookAtTarget): solves both shoulders for the
+  direction to the target in the shoulder's parent space (arm hangs -y; rot x = pitch, z = out; behind-the-head wraps past PI),
+  blends over the animated pose by u.reachW (eases in fast, out slow), elbows bend for close targets, palms open.
+- engine.js: `flight.endY` (arrival height: jump/hail 2.45-2.7, tight coverage 55% 2.15-2.5, 16% high 1.95-2.25, 10% low 0.6-0.85,
+  else 1.2-1.5; `globalThis.__endY` overrides) used by the ball path. `ballSkills(dt)` each flight frame: the target + up to two
+  defenders within 2.8 yd reach (hands go to the arrival point first, then follow the ball in), AI turns to the ball unless running
+  away from the QB (over-the-shoulder), 'jump' action timed 0.3-0.36 s before arrival for balls >= 1.85 (`flight.jumped` set; user
+  receivers auto-jump, user defenders only after pressing). `secureIt(e)` on every catch / pick: `secureBall` holds the ball between
+  both hands for SECURE_T 0.42 s while the reach target slides from the catch point to the chest, then normal `carryBall`.
+  `releaseReach` lets go 0.3 s after the ball arrives. Catch odds unchanged (balance unaffected). Debug: `__play.throwTo(i)`,
+  `cine`, `slow`, `holder`; `globalThis.__forceCatch`. Probe: scratchpad catch.cjs <endY> <tag> <receiver>.

@@ -2240,6 +2240,7 @@ function applyPose(p, P, dt) {
   while (d < -Math.PI) d += Math.PI * 2;
   p.rotation.y += d * (1 - Math.exp(-12 * dt));
   lookAtTarget(p, P, dt);
+  reachTarget(p, dt);
   legIK(p, dt, jv);
   jointLimits(r);
   groundContact(p, dt);
@@ -2415,6 +2416,48 @@ function lookAtTarget(p, P, dt) {
   // the chest turns a little with a big head turn so it doesn't look like the head is screwed on
   u.spineLook = (u.lkY ?? 0) * 0.18 * u.lookW; // applied as an offset on the spine's twist target in applyPose
 }
+/**
+ * Ball skills: both arms aim the hands at a world point (the ball in the air, or where the ball is being tucked).
+ * The shoulder angles are solved for the direction to the target in the shoulder's parent space (arm hangs along -y;
+ * rotation x pitches it forward/up, z swings it out), then blended over the animated pose by u.reachW.
+ */
+const _rv = new THREE.Vector3();
+function reachTarget(p, dt) {
+  const u = p.userData.u;
+  const r = p.userData.rig;
+  const tg = u.reach;
+  const on = !!tg && !u.rag;
+  u.reachW = (u.reachW ?? 0) + (((on ? u.reachK ?? 1 : 0)) - (u.reachW ?? 0)) * Math.min(1, dt * (on ? 14 : 6));
+  if (u.reachW < 0.01) return;
+  if (on) u.reachLast = { x: tg.x, y: tg.y, z: tg.z };
+  const T = u.reachLast;
+  if (!T) return;
+  for (const [arm, side] of [[r.armL, -1], [r.armR, 1]]) {
+    const par = arm.sh.parent;
+    if (!par) continue;
+    _rv.set(T.x, T.y, T.z);
+    par.worldToLocal(_rv);
+    _rv.x -= arm.sh.position.x + side * 0.06; // hands meet a little inside the shoulders
+    _rv.y -= arm.sh.position.y;
+    _rv.z -= arm.sh.position.z;
+    const len = _rv.length() || 1;
+    const dx = _rv.x / len, dy = _rv.y / len, dz = _rv.z / len;
+    const zr = Math.asin(Math.max(-0.95, Math.min(0.95, dx)));
+    let th = Math.atan2(-dz, -dy);
+    if (th < -1.2) th += Math.PI * 2; // up and behind the head: over-the-shoulder catches
+    th = Math.max(-0.4, Math.min(3.5, th));
+    const w = u.reachW;
+    arm.sh.rotation.x += (th - arm.sh.rotation.x) * w;
+    arm.sh.rotation.z += (zr - arm.sh.rotation.z) * w;
+    // close target: bend the elbows (the hands come in to the chest); far: arms nearly straight
+    const bend = Math.max(0.08, Math.min(1.6, (0.62 - len) * 3));
+    arm.el.rotation.x += (bend - arm.el.rotation.x) * w;
+    if (arm.wrist) arm.wrist.rotation.x += (-0.45 - arm.wrist.rotation.x) * w; // palms open to the ball
+  }
+}
+/** Reach for a world point with both hands (null lets go). k = how fully (0..1). */
+export function setReach(p, target, k = 1) { const u = p?.userData?.u; if (!u) return; u.reach = target; u.reachK = k; }
+
 /** Give a character something to watch (a world-space point with x, y, z), or null to look ahead. */
 export function setLookAt(p, target) { if (p?.userData?.u) p.userData.u.lookAt = target; }
 
