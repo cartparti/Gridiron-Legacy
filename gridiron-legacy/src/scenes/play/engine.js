@@ -80,7 +80,7 @@ export function freePlay(ctx) {
     const colors = team === 'off' ? offColors : defColors;
     const mesh = makePlayer(colors, {
       highlight: isUser, number: isUser && opts.number !== undefined ? opts.number : extra.number ?? Math.floor(rnd(n0, n1 + 1)),
-      uniform: team === 'off' ? offUniform : defUniform, look: isUser ? opts.look : undefined, position: role,
+      uniform: (() => { const un = team === 'off' ? offUniform : defUniform; return isUser && opts.captain && un ? { ...un, captain: true } : un; })(), look: isUser ? opts.look : undefined, position: role,
     });
     mesh.position.set(x, 0, z);
     if (opts.wear) applyWear(mesh, wearFor(role));

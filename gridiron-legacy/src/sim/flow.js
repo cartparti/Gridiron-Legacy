@@ -37,6 +37,7 @@ import { checkAchievements } from './achievements.js';
 import { setSeasonGoals, resolveGoals } from './goals.js';
 import { resolveChallenge } from './matchday.js';
 import { makePresser } from './presser.js';
+import { captainVote, captainWeekly } from './captain.js';
 import { statPhrase } from './press.js';
 import { nilWeek, nilAfterGame, nilLeaveCollege, retentionOffer } from './nil.js';
 import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf, recordLeagueAwards } from './awards.js';
@@ -116,6 +117,8 @@ export function beginWeek(state) {
   const c = state.career;
   // a new season: the coach sets your goals before week 1
   if (state.league?.phase === 'regular' && (state.league.week ?? 0) === 0 && (state.goals?.year !== c.year || state.goals?.stage !== c.stage)) setSeasonGoals(state);
+  if (state.league?.phase === 'regular' && (state.league.week ?? 0) === 0) captainVote(state);
+  captainWeekly(state);
   // Trades and transfers only take effect during the regular season, never mid-playoffs.
   if (c.pendingMove && !getTeam(state.league, c.pendingMove)) delete c.pendingMove; // stale (changed leagues)
   if (c.pendingMove && state.league.phase === 'regular') {
@@ -218,7 +221,7 @@ export function finishGame(state) {
     if (state.career.stage === 'pro') addStats(p.proCareerStats, g.userStats);
     const sm = STAGE_FAME[state.career.stage];
     let fame = ((g.grade - 55) / 12) * sm + (g.won ? 0.5 : 0) + g.userStats.clutch * 0.8;
-    if (g.primetime) fame *= fame > 0 ? 1.4 : 1.2; // the whole country was watching
+    if (g.primetime) fame *= fame > 0 ? 1.25 : 1.15; // the whole country was watching
     if (g.playoff) fame += 1;
     if (g.rivalry && g.won) fame += 2;
     if (g.isTitle && g.won) fame += 6;

@@ -814,7 +814,7 @@ const NUM_FONTS = {
 /** Jersey torso texture: the team's pattern, collar, chest logo and numbers in the team's font. */
 function jerseyMat(un, number, side) {
   const st = un.style;
-  const key = `jersey3|${un.jersey}|${un.trim}|${un.numbers}|${number}|${side}|${st ? `${st.pattern}|${st.font}|${st.collar}|${st.chestLogo}|${st.glyph}|${st.logo}` : ''}`;
+  const key = `jersey3|${un.jersey}|${un.trim}|${un.numbers}|${number}|${side}|${un.captain ? 'C|' : ''}${st ? `${st.pattern}|${st.font}|${st.collar}|${st.chestLogo}|${st.glyph}|${st.logo}` : ''}`;
   return pixMat(key, 22, 26, (g) => {
     const J = un.jersey, T = un.trim;
     px(g, 0, 0, J, 22, 26);
@@ -878,6 +878,13 @@ function jerseyMat(un, number, side) {
     g.fillStyle = fold; g.fillRect(0, 0, 22, 26);
     px(g, 0, 24.5, shade(J, -0.15), 22, 1.5);
     if (side === 'front' && st?.chestLogo && number !== undefined) { const [m, h2] = logoColors(J, un); drawLogo(g, st, 18, 4.6, 3.2, m, h2); }
+    // captain's patch: a 'C' on the left chest
+    if (side === 'front' && un.captain && number !== undefined) {
+      const pc = luma(J) > 0.55 ? '#16181c' : '#f4f4f4';
+      g.fillStyle = shade(J, luma(J) > 0.5 ? -0.12 : 0.12); g.beginPath(); g.roundRect?.(2.2, 2.6, 4.2, 4.2, 0.9); g.fill();
+      g.strokeStyle = pc; g.lineWidth = 0.35; g.beginPath(); g.roundRect?.(2.2, 2.6, 4.2, 4.2, 0.9); g.stroke();
+      g.fillStyle = pc; g.font = 'bold 3.6px "Arial Black", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('C', 4.3, 4.85);
+    }
     if (number === undefined || side === 'side') return;
     // numbers in the team's font, with a smooth outline (two outlines for varsity)
     const sNum = String(number); const font = NUM_FONTS[st?.font ?? 'block'] ?? NUM_FONTS.block;

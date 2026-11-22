@@ -59,7 +59,7 @@ test('tags land in Huddle Mentions with varied, answerable replies', async () =>
   // weekly template texts carry pre-picked wordings
   textFrom(st, 'family', 'hi');
   const labels = new Set();
-  for (let i = 0; i < 12; i++) { const s2 = career(); s2.rngState = 1000 + i * 77; const ph = await import('../src/sim/phone.js'); ph.postGameTexts(s2, { grade: 80, won: true }); const o = ph.replyOptions(s2, 'coach'); if (o[0]) labels.add(o[0]); }
+  for (let i = 0; i < 30; i++) { const s2 = career(); s2.rngState = 1000 + i * 77; const ph = await import('../src/sim/phone.js'); ph.postGameTexts(s2, { grade: 80, won: true }); for (const k of Object.keys(s2.phone?.threads ?? {})) { const o = ph.replyOptions(s2, k); if (o[0]) labels.add(o[0]); } }
   assert.ok(labels.size >= 2, 'reply wording varies');
 });
 

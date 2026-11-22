@@ -1225,3 +1225,6 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 .presser .pq-a.humble span:first-child { color: #60a5fa; } .presser .pq-a.confident span:first-child { color: #ffd43b; } .presser .pq-a.fiery span:first-child { color: #f87171; }
 .presser .pq-picked { margin-top: 6px; padding: 6px 10px; border-radius: 10px; background: rgba(255,255,255,0.05); font-style: italic; }
 .presser .pq-picked.fiery { border-left: 3px solid #f87171; } .presser .pq-picked.humble { border-left: 3px solid #60a5fa; } .presser .pq-picked.confident { border-left: 3px solid #ffd43b; }
+.speech-card { margin-top: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(96,165,250,0.08); border: 1px solid rgba(96,165,250,0.4); }
+.captain-card .cap-c { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font: 900 1.4rem "Arial Black", Arial, sans-serif; background: rgba(255,255,255,0.08); border: 2px solid var(--line); }
+.captain-card.won .cap-c { background: #ffd43b; color: #16181c; border-color: #ffd43b; box-shadow: 0 0 14px rgba(255,212,59,0.5); }

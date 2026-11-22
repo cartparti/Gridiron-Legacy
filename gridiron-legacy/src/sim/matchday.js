@@ -63,7 +63,7 @@ export function autoToss(state) {
 // ---------------------------------------------------------------- in the zone
 
 export const ZONE_AT = 3; // great moments in a row to get in the zone
-export const ZONE_TOL = 1.12;
+export const ZONE_TOL = 1.08;
 
 /** After every moment you played: build or break the streak. Returns 'in' | 'out' | null (what changed). */
 export function zoneAfterMoment(state, q) {
@@ -133,7 +133,7 @@ export function pickChallenge(state, g) {
   const c = pick(state, fresh.length ? fresh : weighted);
   state.recentChallenges = [c.id, ...recent].slice(0, 4);
   const stage = state.career.stage;
-  return { id: c.id, label: c.label, reward: { xp: stage === 'pro' ? 60 : 45, fame: stage === 'hs' ? 1 : 2, money: stage === 'pro' ? 25000 : 0 }, done: null };
+  return { id: c.id, label: c.label, reward: { xp: stage === 'pro' ? 40 : 30, fame: 1, money: stage === 'pro' ? 25000 : 0 }, done: null };
 }
 
 /** Postgame: did you do it? Pays out. */

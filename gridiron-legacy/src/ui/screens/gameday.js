@@ -28,7 +28,7 @@ import { teamKits, oppKitFor, kitUniform, KIT_IDS } from '../../data/kits.js';
 import { randomLook, fmtSize } from '../../data/looks.js';
 import { portraitImg } from '../../scenes/portrait.js';
 import { clutchChallenge } from './drills.js';
-import { coinTossCard, challengeChip, primetimeBanner, zoneMeter, zoneFlash } from './pregame.js';
+import { coinTossCard, challengeChip, primetimeBanner, zoneMeter, zoneFlash, speechCard } from './pregame.js';
 import { tunnelCutscene } from '../../scenes/cutscenes.js';
 
 /** Small pixel jersey icon for a kit. */
@@ -414,6 +414,7 @@ export function gamedayScreen(app) {
       call,
       tolerance: tolerance(st, call, m.type),
       zone: !!g.zone,
+      captain: st.player.captain === st.career.year,
       stats: st.player.stats,
       position: st.player.position,
       teamColors: me.colors,
@@ -600,6 +601,7 @@ export function gamedayScreen(app) {
       primetimeBanner(st, g),
       g.sitOut ? null : challengeChip(g.challenge),
       g.sitOut ? null : coinTossCard(app),
+      speechCard(app),
       h('div.venue-card',
         h('div.vc-head', h('b.pix', culture.stadium), h('span.tiny.muted', `"${culture.nickname}" · ${BIOME_INFO[culture.biome].label}`)),
         (() => { const mu = matchup(st); const cls = mu.k > 0.35 ? '.bad' : mu.k < -0.35 ? '.good' : ''; return h('div.row', { style: { gap: '8px', margin: '6px 0' } },

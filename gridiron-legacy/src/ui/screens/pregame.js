@@ -5,6 +5,7 @@ import { sfx } from '../../audio/sfx.js';
 import { fmtMoney } from '../../core/util.js';
 import { tossCoin, tossChoice, ZONE_AT, PRIMETIME_NAME } from '../../sim/matchday.js';
 import { answerPresser } from '../../sim/presser.js';
+import { SPEECHES, speechDue, giveSpeech, isCaptain } from '../../sim/captain.js';
 
 /** Coin toss: call it, watch it spin, then receive or defer if you won. */
 export function coinTossCard(app, onDone) {
@@ -105,4 +106,40 @@ export function pressCard(app) {
   };
   draw();
   return card;
+}
+
+/** Captain's pregame speech before big games. */
+export function speechCard(app) {
+  const st = app.state;
+  const g = st.game;
+  if (!speechDue(st, g) && !g.speech) return null;
+  if (!isCaptain(st)) return null;
+  const box = h('div.speech-card');
+  const draw = () => {
+    clear(box);
+    box.append(h('div.tiny.pix', 'CAPTAIN\'S SPEECH'));
+    if (g.speech) {
+      const s = SPEECHES.find((x) => x.id === g.speech);
+      box.append(h('p.small', `You: "${s.label}." ${s.desc}`));
+      return;
+    }
+    box.append(h('p.small.muted', 'Big game. The locker room is looking at you.'),
+      h('div.col', { style: { gap: '6px', marginTop: '6px' } }, SPEECHES.map((s) => h('button.btn.block', { style: { textAlign: 'left' }, onclick: () => { sfx.select(); giveSpeech(st, s.id); app.save(); draw(); } },
+        h('b', s.label), h('div.tiny.muted', s.desc)))));
+  };
+  draw();
+  return box;
+}
+
+/** Week tab: the result of the captain vote, shown early in the season. */
+export function captainCard(app) {
+  const st = app.state;
+  const v = st.captainVote;
+  if (!v || v.year !== st.career.year || v.stage !== st.career.stage || (st.league?.week ?? 0) > 1) return null;
+  return h(`div.card.captain-card${v.won ? '.won' : ''}`,
+    h('div.row', { style: { gap: '12px', alignItems: 'center' } },
+      h('span.cap-c', 'C'),
+      h('div.grow', h('b', v.won ? 'Voted team captain!' : 'Captain vote'),
+        h('div.tiny.muted', v.won ? 'You wear the C this season: teammates rally around you every week, you play with a little more poise, and you give the speech before big games.'
+          : `Not this year (about ${v.pct}% of the vote). Teammates, your play, years with the team and how you handle the media all count.`))));
 }
