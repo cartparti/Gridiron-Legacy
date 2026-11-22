@@ -3,6 +3,7 @@ import { h } from '../dom.js';
 import { STAT_KEYS, STAT_LABELS, POSITIONS, statLabel } from '../../data/positions.js';
 import { getTeam } from '../../sim/league.js';
 import { retentionOffer } from '../../sim/nil.js';
+import { openCombineTest } from './combineGames.js';
 import * as flow from '../../sim/flow.js';
 import { fmtMoney, ordinal, signed } from '../../core/util.js';
 import { teamBadge, stars, confirmDialog } from '../components.js';
@@ -16,7 +17,7 @@ import { COLLEGE_TEAMS } from '../../data/teams.js';
 import { crestURL } from '../crest.js';
 import { people } from '../../sim/social.js';
 import { openModal, closeAllModals } from '../components.js';
-import { recruitStars, visitSchool, answerInterview, projection } from '../../sim/career.js';
+import { recruitStars, visitSchool, answerInterview, projection, combineTest } from '../../sim/career.js';
 import { statLine } from './results.js';
 import { STAGES } from '../../data/config.js';
 
@@ -103,12 +104,23 @@ export function combineScreen(app) {
   return h('div.screen',
     h('h1', 'The Combine'),
     h('p.muted', 'Every scout in the league is here. Your numbers and your interview move your draft stock.'),
-    h('div.card', h('h3', 'Testing'),
-      h('div.bigstat',
-        h('div', h('b', `${c.forty}s`), h('span', '40-yard dash')),
-        h('div', h('b', c.bench), h('span', 'Bench reps')),
-        h('div', h('b', `${c.vert}"`), h('span', 'Vertical')),
-        h('div', h('b', c.drill), h('span', `${p.position} drills`)))),
+    h('div.card', h('div.card-title', h('h3', 'Testing'), h('span.tiny.muted', c.base ? 'Run each test yourself, or keep the projected number' : '')),
+      c.base ? h('div.cg-tests', [['forty', `${c.forty}s`, '40-yard dash'], ['bench', c.bench, 'Bench reps'], ['vert', `${c.vert}"`, 'Vertical'], ['drill', c.drill, `${POSITIONS[p.position]?.label ?? p.position} drill`]].map(([id, v, l]) => {
+        const played = !!c.played?.[id];
+        const baseV = id === 'forty' ? c.base.forty : c.base[id];
+        const better = id === 'forty' ? Number(c.forty) < baseV - 0.005 : Number(String(v).replace('"', '')) > baseV;
+        const worse = id === 'forty' ? Number(c.forty) > baseV + 0.005 : Number(String(v).replace('"', '')) < baseV;
+        return h(`div.cg-test${played ? '.done' : ''}`,
+          h('b', v), h('span', l),
+          played ? h(`span.tiny${better ? '.good' : worse ? '.bad' : '.muted'}`, better ? '▲ beat projection' : worse ? '▼ under projection' : 'on projection')
+            : h('button.btn.small.primary', { onclick: () => { sfx.click(); openCombineTest(id, { base: baseV, posLabel: POSITIONS[p.position]?.label }, (perf) => { combineTest(st, id, perf); app.save(); app.render(); }); } }, 'Run it'),
+          played ? null : h('span.tiny.muted', 'projected'));
+      }))
+        : h('div.bigstat',
+          h('div', h('b', `${c.forty}s`), h('span', '40-yard dash')),
+          h('div', h('b', c.bench), h('span', 'Bench reps')),
+          h('div', h('b', `${c.vert}"`), h('span', 'Vertical')),
+          h('div', h('b', c.drill), h('span', `${p.position} drills`)))),
     h('div.card', h('h3', 'Team Interview'), h('p', iv.q),
       c.answer === null
         ? h('div.col', { style: { gap: '8px' } }, iv.a.map((a, i) => h('button.btn.block.left', { onclick: () => { sfx.click(); answerInterview(st, i); app.save(); app.render(); } }, a.t)))

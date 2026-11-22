@@ -182,8 +182,28 @@ export function runCombine(state) {
   const vert = Math.round(clamp(26 + (s.speed + s.skill - 100) * 0.12 + gauss(state, 0, 1.5), 22, 44) * 2) / 2;
   const drill = clamp(Math.round(s.skill * 0.7 + s.iq * 0.3 + gauss(state, 0, 4)), 30, 99);
   const bonus = (4.6 - forty) * 4 + (drill - 70) * 0.05;
-  state.combine = { forty: forty.toFixed(2), bench, vert, drill, bonus, interview: INTERVIEW[randInt(state, 0, INTERVIEW.length - 1)], answer: null };
+  state.combine = { forty: forty.toFixed(2), bench, vert, drill, bonus, interview: INTERVIEW[randInt(state, 0, INTERVIEW.length - 1)], answer: null,
+    base: { forty, bench, vert, drill }, played: {} };
   return state.combine;
+}
+
+/**
+ * Playable combine: run a test yourself. perf 0..1 (0.5 = what your ratings say you'd do). Each test can be run once;
+ * the stock bonus moves with how far you beat (or miss) your projected number. Returns the new value.
+ */
+export function combineTest(state, id, perf) {
+  const c = state.combine;
+  if (!c?.base || c.played?.[id]) return null;
+  const b = c.base;
+  const k = clamp(perf, 0, 1) - 0.5;
+  c.played = { ...(c.played ?? {}), [id]: true };
+  if (id === 'forty') c.forty = clamp(b.forty - k * 0.32, 4.18, 5.6).toFixed(2);
+  else if (id === 'bench') c.bench = Math.max(1, Math.round(b.bench * (1 + k * 0.5)));
+  else if (id === 'vert') c.vert = Math.round(clamp(b.vert + k * 9, 18, 46) * 2) / 2;
+  else if (id === 'drill') c.drill = clamp(Math.round(b.drill + k * 22), 20, 99);
+  const answered = c.answer !== null ? c.interview.a[c.answer].d : 0;
+  c.bonus = (4.6 - Number(c.forty)) * 4 + (c.drill - 70) * 0.05 + (c.vert - b.vert) * 0.08 + (c.bench - b.bench) * 0.05 + answered;
+  return c[id];
 }
 
 export function answerInterview(state, i) {
