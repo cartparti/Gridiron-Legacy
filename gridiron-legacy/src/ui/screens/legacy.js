@@ -12,12 +12,16 @@ import { choosePostCareer, newCareer } from '../../sim/flow.js';
 import { hometownSchools } from '../../data/hometown.js';
 import { CITIES } from '../../data/teams.js';
 import { defaultLook } from '../../data/looks.js';
+import { SPEECH_OPENS, SPEECH_CLOSES, speechThanks, giveSpeech } from '../../sim/speech.js';
+import { heirName } from '../../sim/family.js';
+import { clear } from '../dom.js';
 
 const REASONS = {
   age: 'Father Time remains undefeated.',
   decline: 'Your body told you it was time.',
   unsigned: 'The phone stopped ringing.',
   choice: 'You walked away on your own terms.',
+  farewell: 'A farewell tour, a standing ovation in every stadium, and out on your own terms.',
 };
 
 export function legacyScreen(app) {
@@ -44,6 +48,7 @@ export function legacyScreen(app) {
       h('div.display', { style: { fontSize: '1.2rem' } }, `Legacy score ${L.score}`)),
     jersey(p, colors, 170),
     hof ? h('p.center.small', h('b', 'Your number is retired. Your jersey hangs in the rafters forever.')) : null,
+    hof ? speechCard(app) : null,
     h('div.card', h('h3', 'Legacy Breakdown'), h('table.tbl', L.lines.map((l) => h('tr', h('td', l.label), h('td.num', `+${l.pts}`))))),
     h('div.card', h('h3', 'Pro Career'), h('div.bigstat', statLine(p.position, p.proCareerStats).map(([v, l]) => h('div', h('b', v), h('span', l)))),
       h('p.small.muted', { style: { marginTop: '8px' } }, `${p.proCareerStats.games} pro games · ${p.titles.filter((t) => t.stage === 'pro').length} titles · career earnings banked: ${fmtMoney(p.money)}`)),
@@ -65,7 +70,28 @@ export function legacyScreen(app) {
         o.look = { ...defaultLook(o.position), skin: p.look?.skin ?? 2, hairColor: p.look?.hairColor ?? 2, eyeColor: p.look?.eyeColor ?? 0 };
         o.playStyle = app.settings.playStyle ?? 'moments';
         app.startCareer(newCareer(o), app.slot);
-      } }, `Play as ${p.last} Jr.`)),
+      } }, `Play as ${heirName(p) ? `${heirName(p)} ${p.last}` : `${p.last} Jr.`}`)),
     h('button.btn.block', { onclick: () => { app.ui.newCareer = true; app.state = null; app.go('slots'); } }, 'Start a New Career'),
     h('button.btn.block', { onclick: () => app.quitToTitle() }, 'Title Screen'));
+}
+
+/** The Hall of Fame induction speech: open, thank two people, close. */
+function speechCard(app) {
+  const st = app.state;
+  const L = st.legacy;
+  const card = h('div.card.speech-hof');
+  const picks = { open: null, thanks: [], close: null };
+  const draw = () => {
+    clear(card);
+    card.append(h('div.card-title', h('h3', '🎙️ Induction Speech'), h('span.tiny.muted', 'Your moment at the podium')));
+    if (L.speech) { card.append(h('blockquote.hof-quote', L.speech.text)); return; }
+    const step = !picks.open ? 'open' : picks.thanks.length < 2 ? 'thanks' : !picks.close ? 'close' : 'done';
+    const row = (list, onPick, picked = []) => h('div.col', { style: { gap: '6px', marginTop: '6px' } }, list.map((o) => h(`button.btn.block${picked.includes(o.id) ? '.primary' : ''}`, { style: { textAlign: 'left' }, disabled: picked.includes(o.id), onclick: () => { sfx.click(); onPick(o.id); draw(); } }, o.label)));
+    if (step === 'open') card.append(h('p.small.muted', 'The crowd goes quiet. How do you begin?'), row(SPEECH_OPENS, (id) => { picks.open = id; }));
+    else if (step === 'thanks') card.append(h('p.small.muted', `Who do you thank? (${picks.thanks.length + 1} of 2)`), row(speechThanks(st), (id) => { picks.thanks.push(id); }, picks.thanks));
+    else if (step === 'close') card.append(h('p.small.muted', 'How do you end it?'), row(SPEECH_CLOSES, (id) => { picks.close = id; }));
+    else { giveSpeech(st, picks); app.save(); sfx.cheer?.(true); draw(); }
+  };
+  draw();
+  return card;
 }

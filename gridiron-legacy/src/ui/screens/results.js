@@ -73,6 +73,7 @@ export function postgameScreen(app) {
       g.levelUps ? h('div.row', { style: { gap: '8px' } }, h('span.chip.gold.pix', 'LEVEL UP'), h('span.small', `Level ${st.player.level}. You have ${st.player.skillPoints} skill point${st.player.skillPoints === 1 ? '' : 's'} to spend (Career tab).`)) : null,
       (g.newTraits ?? []).map((n) => h('div.row', { style: { gap: '8px', marginTop: '6px' } }, h('span.chip.good.pix', 'NEW TRAIT'), h('b', n), h('span.tiny.muted', 'Equip it in Career → Traits')))) : null,
     rivalryResultCard(g),
+    g.farewellGift ? h('div.card.farewell-card', h('h3', '🎁 A farewell gift'), h('p.small', `Before kickoff the ${g.farewellGift.team} honored you with ${g.farewellGift.gift}. The whole stadium stood and cheered.`)) : null,
     g.challenge ? challengeChip(g.challenge) : null,
     potwCard(app),
     pressCard(app),

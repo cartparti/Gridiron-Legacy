@@ -4,7 +4,7 @@ import { achievementsPage, goalsCard, journalPage } from './achievements.js';
 import { dealsView, dealsNudge } from './deals.js';
 import { dealsOpen } from '../../sim/nil.js';
 import { mediaPersona } from '../../sim/presser.js';
-import { captainCard, tradeCard, scoutCard, previewCard, recordChaseCard, rivalryChip, powerView, extensionCard, mentorCard, familyView, givingView, rehabCard } from './pregame.js';
+import { captainCard, tradeCard, scoutCard, previewCard, recordChaseCard, rivalryChip, powerView, extensionCard, mentorCard, familyView, givingView, rehabCard, farewellCard } from './pregame.js';
 import { draftStockPage, draftTabOpen } from './draftStock.js';
 import { activityFor } from '../../data/activities.js';
 import { costumeSpec, mascotDisplayName } from '../../data/mascots.js';
@@ -513,7 +513,7 @@ function careerView(app) {
   else if (sub === 'friends') body = friendsPage(app);
   else if (sub === 'achievements') body = achievementsPage(app);
   else if (sub === 'journal') body = journalPage(app);
-  else { body = profileView(app); body.append(...careerStatsSections(app)); }
+  else { body = profileView(app); const fw = farewellCard(app); if (fw) body.prepend(fw); body.append(...careerStatsSections(app)); }
   return h('div.col', { style: { gap: '14px' } }, tabs, body);
 }
 

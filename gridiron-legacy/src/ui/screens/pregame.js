@@ -13,6 +13,7 @@ import { canMentor, menteeCandidates, pickMentee, mentorSession, MENTOR_TOPICS }
 import { isMarried, WEDDINGS, planWedding, tryForBaby, kidAge, heirName } from '../../sim/family.js';
 import { CAUSES, LEVELS, PROGRAMS, canFound, startFoundation, donate, hostEvent } from '../../sim/foundation.js';
 import { REHAB_PLANS, canRehab, chooseRehab, eliteCost } from '../../sim/rehab.js';
+import { canAnnounceFarewell, announceFarewell, isFarewellSeason } from '../../sim/farewell.js';
 import { getTeam } from '../../sim/league.js';
 import { portraitImg } from '../../scenes/portrait.js';
 import { teamKits } from '../../data/kits.js';
@@ -461,4 +462,19 @@ export function awardNightCard(app) {
   };
   draw(an.opened ? 'open' : 'wait');
   return card;
+}
+
+/** Career tab (veterans): the farewell tour. */
+export function farewellCard(app) {
+  const st = app.state;
+  if (isFarewellSeason(st)) {
+    const F = st.farewell;
+    return h('div.card.farewell-card', h('div.card-title', h('h3', '👋 Farewell Tour'), h('span.chip.gold.pix', 'FINAL SEASON')),
+      h('p.small.muted', 'Every road stadium is sending you off. When this season ends, you retire.'),
+      F.gifts.length ? h('div.list', F.gifts.map((g) => h('div.li', h('span', '🎁'), h('div.grow', h('b.small', g.gift), h('div.tiny.muted', `from the ${g.team}`))))) : h('p.tiny.muted', 'Your first road game is coming. Bring tissues.'));
+  }
+  if (!canAnnounceFarewell(st)) return null;
+  return h('div.card.farewell-card', h('h3', '👋 Farewell tour'),
+    h('p.small.muted', 'Announce that this season is your last. Every road team will honor you with a gift and an ovation, your teammates will play for you, and you retire at the end of the season on your own terms.'),
+    h('button.btn.small', { onclick: async () => { if (!(await confirmDialog('Make this your final season?', 'You will retire when the season ends. This cannot be undone.', 'Announce it'))) return; sfx.cheer?.(true); announceFarewell(st); app.commit(); } }, 'Announce my final season'));
 }

@@ -450,6 +450,7 @@ export function tolerance(state, call = 'balanced', type = state.game?.pending?.
     t *= 1 + g.momentum * 0.06;
     if (g.zone) t *= ZONE_TOL; // in the zone: everything slows down
     if (state.player.captain === state.career.year) t *= 1.015; // the C on your chest: a little more poise
+    if (state.farewell?.year === state.career.year) t *= 1.02; // the farewell season: playing loose, nothing to lose
     if (g.playingHurt) t *= INJURY_STATUS[g.playingHurt]?.tol ?? 0.75;
     t *= 1 - matchup(state, g).k * 0.09; // good teams make for hard games
   }

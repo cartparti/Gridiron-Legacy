@@ -47,6 +47,8 @@ import { foundationWeekly, humanitarianVote } from './foundation.js';
 import { familyWeekly } from './family.js';
 import { mentorSeasonEnd } from './mentor.js';
 import { rehabHealed, rushedRisk } from './rehab.js';
+import { farewellAfterGame } from './farewell.js';
+import { teamCulture } from '../data/culture.js';
 import { statPhrase } from './press.js';
 import { nilWeek, nilAfterGame, nilLeaveCollege, retentionOffer } from './nil.js';
 import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf, recordLeagueAwards, awardLabel } from './awards.js';
@@ -283,6 +285,7 @@ export function finishGame(state) {
   }
   resolveChallenge(state, g);
   const rivalryResult = settleRivalry(state, g);
+  const farewellGift = farewellAfterGame(state, g, teamCulture(getTeam(league, g.homeId) ?? { id: g.homeId, city: '', name: '' }, state.career.stage));
   const opp = getTeam(league, g.oppId);
   const press = postGamePress(state, g, `${opp.city}`, teamName(state));
   simOtherGames(state, league, sched);
@@ -318,6 +321,7 @@ export function finishGame(state) {
     primetime: !!g.primetime,
     toss: g.toss ?? null,
     zoneCount: g.zoneCount ?? 0,
+    farewellGift,
     rivalryResult: rivalryResult ? { name: rivalryResult.trophy.name, kept: rivalryResult.kept, won: rivalryResult.won, lost: rivalryResult.lost, streak: rivalryResult.trophy.streak } : null,
   };
   state.lastGame.potw = nominatePlay(state, state.lastGame);
@@ -524,6 +528,7 @@ function nextStageStep(state) {
     return startCombine(state, false);
   }
   // Pro
+  if (state.farewell && state.farewell.year === c.year - 1) return retire(state, 'farewell'); // the tour is over
   if (p.age > RETIRE_AGE) return retire(state, 'age');
   const peak = Math.max(...p.history.map((h) => h.ovr));
   if (p.ovr < 60 || (p.age >= 32 && p.ovr < peak - 8)) return retire(state, 'decline');
