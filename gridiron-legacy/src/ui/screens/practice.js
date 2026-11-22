@@ -102,7 +102,7 @@ export function practiceScreen(app) {
       showTips: app.settings.tutorials && !app.settings.seenTips?.[`mg_${type}`],
       markTip: () => { app.settings.seenTips = { ...(app.settings.seenTips ?? {}), [`mg_${type}`]: true }; app.saveSettings(); },
       reducedMotion: app.settings.reducedMotion, blood: app.settings.blood !== false, gameSpeed: app.settings.gameSpeed ?? 0.85, routeArt: app.settings.routeArt ?? 'play',
-      oppStrength: oppK, health: 100, traits: [], wear: { key: `practice-${P.weather}`, progress: 0.35 },
+      oppStrength: oppK, health: 100, traits: [], scout: { blitz: 0.3, man: 0.5, deep: 0.3, revealed: true }, wear: { key: `practice-${P.weather}`, progress: 0.35 },
     });
     const q = res.fallbackQuality ?? res.quality ?? 0;
     P.log.unshift({ type, text: res.text ?? '', q, td: !!(res.td || res.defTD), at: Date.now() });

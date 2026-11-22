@@ -1263,3 +1263,9 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 .allstar-card { border-color: rgba(255,212,59,0.55) !important; background: linear-gradient(135deg, rgba(255,212,59,0.1), rgba(255,255,255,0.02)); }
 .trade-card .swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; margin-right: 8px; }
 .presser .pq-a .small { text-transform: none; font-weight: 600; letter-spacing: 0; }
+/* v0.59 scouting + audibles */
+.scout-card .sc-row { display: grid; grid-template-columns: 96px 1fr 38px; gap: 8px; align-items: center; }
+.scout-card .sc-row .tiny { grid-column: 2 / 4; margin-top: -4px; }
+.scout-card .sc-bar { height: 8px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.scout-card .sc-bar i { display: block; height: 100%; background: linear-gradient(90deg, #60a5fa, #f87171); }
+.audible-box .fc-play.ghost { opacity: 0.8; border-style: dashed; justify-content: center; }

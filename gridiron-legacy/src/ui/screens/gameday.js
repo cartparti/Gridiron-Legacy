@@ -29,7 +29,8 @@ import { randomLook, fmtSize } from '../../data/looks.js';
 import { portraitImg } from '../../scenes/portrait.js';
 import { clutchChallenge } from './drills.js';
 import { bannersFor } from '../../sim/honors.js';
-import { coinTossCard, challengeChip, primetimeBanner, zoneMeter, zoneFlash, speechCard } from './pregame.js';
+import { scoutForPlay } from '../../sim/scouting.js';
+import { coinTossCard, challengeChip, primetimeBanner, zoneMeter, zoneFlash, speechCard, scoutCard } from './pregame.js';
 import { tunnelCutscene } from '../../scenes/cutscenes.js';
 
 /** Small pixel jersey icon for a kit. */
@@ -415,6 +416,7 @@ export function gamedayScreen(app) {
       call,
       tolerance: tolerance(st, call, m.type),
       zone: !!g.zone,
+      scout: scoutForPlay(st, opp),
       captain: st.player.captain === st.career.year,
       stats: st.player.stats,
       position: st.player.position,
@@ -601,6 +603,7 @@ export function gamedayScreen(app) {
       w.desc ? h('p.center.tiny.muted', { style: { marginTop: '8px' } }, w.desc) : null,
       primetimeBanner(st, g),
       g.sitOut ? null : challengeChip(g.challenge),
+      g.sitOut ? null : scoutCard(app, opp, { compact: true }),
       g.sitOut ? null : coinTossCard(app),
       speechCard(app),
       h('div.venue-card',

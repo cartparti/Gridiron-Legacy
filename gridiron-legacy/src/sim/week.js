@@ -64,6 +64,7 @@ export function applyPlan(state, plan) {
     if (act.effects.train) addXp(state, Math.round(12 * (state.week.drills?.[i] !== undefined ? 0.6 + state.week.drills[i] : 1)));
   });
   state.week.plan = plan.slice();
+  if (plan.includes('film')) state.week.scouted = true; // film study reveals the next opponent's tendencies
   state.week.freshness = clamp((max - cost) / max, 0, 1);
   const upkeep = weeklyUpkeep(state);
   return { changes: mergeChanges(all), upkeep, freshness: state.week.freshness };

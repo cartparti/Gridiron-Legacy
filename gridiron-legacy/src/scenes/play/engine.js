@@ -188,6 +188,31 @@ export function freePlay(ctx) {
   const tellRings = new Map();
   let callForBall = false;
 
+  // ---------------- routes (re-run after an audible or a hot route)
+  const assignRoutes = () => {
+    // routes for receivers
+    const routeFor = (slot) => {
+      if (mode === 'route' && slot === 'Z') return play.route;
+      if (play.routes?.[slot]) return play.routes[slot];
+      // run plays / defense: generic concept
+      const oc = opts.scout && m.defense ? (Math.random() < opts.scout.deep ? 'risky' : Math.random() < 0.5 ? 'balanced' : 'safe') : call; // their offense's habits
+      const concept = PLAYS.pass[oc][Math.floor(Math.random() * 3)];
+      return concept.routes[slot];
+    };
+    // near the end zone the routes are fitted to the room you have (break points scale with them), so receivers
+    // finish inside the end zone instead of piling up against the end line
+    const room = m.yardLine + 8.6;
+    for (const r of receivers) {
+      const pts = routeFor(r.slot);
+      if (!pts) continue;
+      const deepest = Math.max(1, ...pts.map(([, z]) => -z));
+      const k = deepest > room && !play.hail ? room / deepest : 1;
+      r.route = [{ x: r.pos.x, z: r.pos.z }, ...pts.map(([dx, dz2]) => clampPos({ x: r.pos.x + dx * (k < 1 ? 0.6 + 0.4 * k : 1), z: dz2 * k }))];
+      r.sit = mode === 'route' && r.slot === 'Z' ? !!play.sit : false;
+    }
+    if (play.screen !== undefined) { rb.route = null; }
+  };
+
   const buildFormation = () => {
     // backed up against your own goal line: no shotgun from inside your own end zone
     const ownGoal = 100 - m.yardLine; // z of your own goal line (behind the line of scrimmage)
@@ -219,7 +244,8 @@ export function freePlay(ctx) {
     defenders = [...dl, ...lbs, cbX, cbZ, nb, ss, fs];
     // assignments
     cbX.man = X; cbZ.man = Z; nb.man = S; lbs[1].man = TE; lbs[0].man = rb; ss.man = null; fs.man = null;
-    const zone = mode === 'cover' ? play.coverage === 'zone' : call === 'safe';
+    const scout = opts.scout ?? null; // the opponent's real tendencies (scouting.js)
+    const zone = mode === 'cover' ? play.coverage === 'zone' : scout && (mode === 'pass' || mode === 'route') ? Math.random() > scout.man : call === 'safe';
     for (const d of defenders) d.zone = zone;
     if (play.blitz) { lbs.forEach((l) => { l.blitz = true; }); if (mode === 'cover' && play.user === 'blitz') cbZ.blitz = true; }
     if (play.twoDeep || zone) { ss.deep = -1; fs.deep = 1; } else { fs.deep = 0; ss.robber = true; }
@@ -227,10 +253,11 @@ export function freePlay(ctx) {
     // linebacker spies you and comes the moment you leave the pocket.
     if (mode === 'pass' && userRole === 'QB' && !m.defense && !play.hail) {
       const r = Math.random();
-      const blitzP = call === 'risky' ? 0.34 : call === 'safe' ? 0.18 : 0.26;
+      const blitzP = scout ? scout.blitz * (call === 'risky' ? 1.25 : call === 'safe' ? 0.8 : 1) : call === 'risky' ? 0.34 : call === 'safe' ? 0.18 : 0.26;
       if (r < blitzP) { lbs[1].blitz = true; lbs[1].man = null; if (Math.random() < 0.35) { nb.blitz = true; nb.man = null; } }
       else if (r < blitzP + 0.42) { lbs[0].spy = true; lbs[0].man = null; }
     }
+    if (mode === 'route' && !m.defense && scout && Math.random() < scout.blitz * 0.8) { lbs[1].blitz = true; lbs[1].man = null; }
     if (mode === 'runD') cbZ.zone = false;
     user = ents.find((e) => e.user);
     // run defense: the receiver across from you comes to block you (a stalk/crack block) instead of running a route
@@ -240,26 +267,7 @@ export function freePlay(ctx) {
     if (globalThis.__playDebug) globalThis.__play = { receivers, defenders, time: () => t, phase: () => phase, user, qb: () => qb, carrier: () => carrier,
       flight: () => (flight ? { f: (t - flight.t0) / flight.T, to: flight.to, toUser: flight.target === user, endY: flight.endY } : null),
       throwTo: (i) => throwTo(receivers[i]), cine: (fn, s) => ctx.cinematic?.(fn, s), slow: (k) => ctx.setTimeScale?.(k), holder: () => holder };
-    // routes for receivers
-    const routeFor = (slot) => {
-      if (mode === 'route' && slot === 'Z') return play.route;
-      if (play.routes?.[slot]) return play.routes[slot];
-      // run plays / defense: generic concept
-      const concept = PLAYS.pass[call][Math.floor(Math.random() * 3)];
-      return concept.routes[slot];
-    };
-    // near the end zone the routes are fitted to the room you have (break points scale with them), so receivers
-    // finish inside the end zone instead of piling up against the end line
-    const room = m.yardLine + 8.6;
-    for (const r of receivers) {
-      const pts = routeFor(r.slot);
-      if (!pts) continue;
-      const deepest = Math.max(1, ...pts.map(([, z]) => -z));
-      const k = deepest > room && !play.hail ? room / deepest : 1;
-      r.route = [{ x: r.pos.x, z: r.pos.z }, ...pts.map(([dx, dz2]) => clampPos({ x: r.pos.x + dx * (k < 1 ? 0.6 + 0.4 * k : 1), z: dz2 * k }))];
-      r.sit = mode === 'route' && r.slot === 'Z' ? !!play.sit : false;
-    }
-    if (play.screen !== undefined) { rb.route = null; }
+    assignRoutes();
     // stances
     for (const e of ents) if (e.role !== 'QB' && e.role !== 'S' && e.role !== 'CB' && e.role !== 'LB') setPose(e.mesh, 'stance');
     holder = qb;
@@ -304,7 +312,8 @@ export function freePlay(ctx) {
     // size matchup with the guy across from you
     const foe = dtMode ? nearest(user, blockers) : mode === 'cover' || mode === 'runD' ? user.man : mode === 'route' ? defenders.find((d) => d.man === user) : null;
     const sz = (e) => `${Math.floor(e.hIn / 12)}'${e.hIn % 12}" ${e.wLb}`;
-    const readTxt = readIdx >= 0 ? ` · 1st read: #${readIdx + 1}` : '';
+    tellTxt = showTells();
+    const readTxt = (readIdx >= 0 ? ` · 1st read: #${readIdx + 1}` : '') + tellTxt;
     hud.instr((foe ? `${play.name} · you ${sz(user)} vs ${sz(foe)} lb` : play.name) + readTxt + (m.defense ? ' · get set…' : ' · press SNAP when ready'));
     if (gameSecs !== null) hud.clock?.(clockText());
     snapCalled = false;
@@ -412,6 +421,77 @@ export function freePlay(ctx) {
       });
     }
   };
+  // ---------------- pre-snap reads: the defense shows its hand (always if you studied film, else your IQ might see it)
+  let audibled = false;
+  let audibleBox = null;
+  const tellLabels = [];
+  const showTells = () => {
+    for (const l of tellLabels) l.parent?.remove(l);
+    tellLabels.length = 0;
+    if (m.defense || !(mode === 'pass' || mode === 'route' || mode === 'run')) return '';
+    const scout = opts.scout;
+    const sees = scout?.revealed || Math.random() < Math.max(0, ((st.iq ?? 60) - 45) / 110);
+    if (!sees) return '';
+    const blitzers = defenders.filter((d) => d.blitz);
+    for (const d of blitzers) { const l = makeLabel('!', { color: '#f87171', size: 0.9 }); l.position.set(0, 2.9, 0); d.mesh.add(l); tellLabels.push(l); }
+    const cov = defenders.find((d) => d.role === 'CB')?.zone ? 'zone' : 'man';
+    return blitzers.length ? ` · BLITZ LOOK (${blitzers.length})${mode === 'pass' ? ': audible?' : ''}` : ` · they show ${cov}`;
+  };
+  let tellTxt = '';
+  /** Change the play at the line. QB: a quick pass or a shot play. RB: flip the run or check to an inside run. WR: hot route. */
+  const showAudible = () => {
+    let opts2 = [];
+    if (mode === 'pass') {
+      const quick = dealPlays('pass', 'safe', m, 5).find((p) => p.name !== play.name);
+      const shot = dealPlays('pass', 'risky', m, 5).find((p) => p.name !== play.name);
+      opts2 = [quick && { label: `Quick: ${quick.name}`, desc: 'Ball out fast. Beats the blitz.', apply: () => quick }, shot && { label: `Shot: ${shot.name}`, desc: 'Take a shot. Best against no blitz.', apply: () => shot }].filter(Boolean);
+    } else if (mode === 'run') {
+      const inside = dealPlays('run', 'safe', m, 5).find((p) => p.name !== play.name && !p.pitch);
+      opts2 = [{ label: 'Flip it', desc: 'Same play to the other side.', apply: () => ({ ...play, name: `${play.name} (flipped)`, hole: play.hole.map((x) => -x) }) },
+        inside && { label: `Check to ${inside.name}`, desc: 'Safer inside run.', apply: () => inside }].filter(Boolean);
+    } else if (mode === 'route') {
+      const HOT = [['Slant', [[0, -3], [-6, -9]]], ['Go', [[0, -40]]], ['Quick Out', [[0, -5], [6, -5]]], ['Curl', [[0, -10], [-1, -8]], true]];
+      opts2 = HOT.map(([n, r, sit]) => ({ label: n, desc: n === 'Go' ? 'Beat press man deep.' : n === 'Slant' ? 'Hot vs the blitz.' : n === 'Curl' ? 'Sit in the zone hole.' : 'Quick to the sideline.', apply: () => ({ ...play, name: n, route: r, sit: !!sit }) }));
+    }
+    const box = document.createElement('div');
+    box.className = 'fc-plays audible-box';
+    const pick = (i) => {
+      const o = opts2[i];
+      if (!o) return;
+      box.remove(); audibleBox = null; audibled = true;
+      const np = o.apply();
+      play = mode === 'run' ? { ...np, form: play.form, pitch: !!np.pitch } : { ...np, form: play.form };
+      assignRoutes();
+      // redraw the play art for the new call
+      for (const a of art) a.o.parent?.remove(a.o);
+      art.length = 0;
+      for (const l of labels) l.parent?.remove(l);
+      labels.length = 0;
+      for (const r of receivers) if (r.ring) { r.ring.parent?.remove(r.ring); r.ring = null; }
+      if (holeArrow) { group.remove(holeArrow); holeArrow = null; }
+      preSnapVisuals();
+      sfx.select();
+      hud.big(mode === 'route' ? 'HOT ROUTE!' : 'AUDIBLE!', '#ffd43b', 700);
+      hud.instr(`${mode === 'route' ? 'Hot route' : 'Audible'}: ${play.name}${tellTxt} · press SNAP`);
+      setButtonsFor();
+    };
+    opts2.forEach((o, i) => {
+      const b = document.createElement('button');
+      b.className = 'fc-play';
+      b.innerHTML = `<span class="k">${i + 1}</span><b>${o.label}</b><small>${o.desc}</small>`;
+      b.addEventListener('pointerdown', (ev) => { ev.preventDefault(); ev.stopPropagation(); pick(i); });
+      box.append(b);
+    });
+    const cancel = document.createElement('button');
+    cancel.className = 'fc-play ghost';
+    cancel.innerHTML = '<b>Keep the call</b>';
+    cancel.addEventListener('pointerdown', (ev) => { ev.preventDefault(); ev.stopPropagation(); box.remove(); audibleBox = null; });
+    box.append(cancel);
+    box.pick = pick;
+    hud.el.append(box);
+    audibleBox = box;
+    sfx.click();
+  };
   /** Snap: play art fades to its "during the play" level (or goes away). */
   const artAtSnap = () => {
     for (const a of art) {
@@ -440,6 +520,8 @@ export function freePlay(ctx) {
     sack: { id: 'tackle', label: 'SACK / TACKLE', key: 'F', big: true, tint: 'red' },
     bat: { id: 'swat', label: 'BAT IT', key: 'Space' },
     snap: { id: 'snap', label: 'SNAP', key: 'Space', big: true, tint: 'gold' },
+    audible: { id: 'audible', label: 'AUDIBLE', key: 'Q' },
+    hot: { id: 'audible', label: 'HOT ROUTE', key: 'Q' },
   };
   // pass-rush battle state: leverage builds while you drive into the blocker
   const rush = { lev: 0, cd: 0, stun: 0, burst: 0 };
@@ -468,7 +550,7 @@ export function freePlay(ctx) {
     btnMode = mode2;
     const sets = {
       none: [],
-      pre: [btn.snap],
+      pre: !audibled && mode === 'pass' && !play.hail ? [btn.audible, btn.snap] : !audibled && mode === 'route' ? [btn.hot, btn.snap] : !audibled && mode === 'run' && play.screen === undefined && !play.qbRun ? [btn.audible, btn.snap] : [btn.snap],
       runner: [btn.sprint, btn.juke, btn.spin, btn.stiff, btn.dive],
       qb: [btn.sprint, btn.pass],
       route: [btn.sprint, btn.call, btn.catch],
@@ -489,6 +571,8 @@ export function freePlay(ctx) {
       if (qteActive) return;
       if (phase === 'pick' && /^key[1-5]$/.test(id)) return choose(Number(id.slice(3)) - 1);
       if (id === 'snap' && phase === 'pre' && !m.defense && t > 0.35) { snapCalled = true; return; }
+      if (id === 'audible' && phase === 'pre' && !m.defense && !audibled && !audibleBox) { showAudible(); return; }
+      if (audibleBox && /^key[1-4]$/.test(id)) { audibleBox.pick?.(Number(id.slice(3)) - 1); return; }
       if (phase !== 'live') return;
       if (/^key[1-5]$/.test(id) && user.role === 'QB' && holder === user && !user.runner) return throwTo(receivers[Number(id.slice(3)) - 1]);
       if (id === 'juke' && user === carrier && moves.jukeCd <= 0) {
@@ -2096,6 +2180,8 @@ export function freePlay(ctx) {
           }
         }
         artAtSnap();
+        for (const l of tellLabels) l.parent?.remove(l);
+        if (audibleBox) { audibleBox.remove(); audibleBox = null; }
         setButtonsFor();
       }
       for (const e of ents) animateRun(e.mesh, dt, 0);

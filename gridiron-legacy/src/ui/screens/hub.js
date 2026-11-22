@@ -4,7 +4,7 @@ import { achievementsPage, goalsCard, journalPage } from './achievements.js';
 import { dealsView, dealsNudge } from './deals.js';
 import { dealsOpen } from '../../sim/nil.js';
 import { mediaPersona } from '../../sim/presser.js';
-import { captainCard, tradeCard } from './pregame.js';
+import { captainCard, tradeCard, scoutCard } from './pregame.js';
 import { draftStockPage, draftTabOpen } from './draftStock.js';
 import { activityFor } from '../../data/activities.js';
 import { costumeSpec, mascotDisplayName } from '../../data/mascots.js';
@@ -207,6 +207,7 @@ function weekView(app) {
   { const gc = goalsCard(app); if (gc) container.append(gc); }
   { const dn = dealsNudge(app); if (dn) container.append(dn); }
   { const cc = captainCard(app); if (cc) container.append(cc); }
+  if (m && opp && st.player.position !== 'MS') { const sc = scoutCard(app, opp); if (sc) container.append(sc); }
 
   // Season stakes: your role on the depth chart, the playoff race and the award race
   container.append(seasonCard(st));

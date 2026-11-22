@@ -5,6 +5,7 @@ import { sfx } from '../../audio/sfx.js';
 import { fmtMoney } from '../../core/util.js';
 import { tossCoin, tossChoice, ZONE_AT, PRIMETIME_NAME } from '../../sim/matchday.js';
 import { answerPresser } from '../../sim/presser.js';
+import { scoutReport } from '../../sim/scouting.js';
 import { SPEECHES, speechDue, giveSpeech, isCaptain } from '../../sim/captain.js';
 import { allStarChallenge } from '../../sim/allstar.js';
 import { openCombineTest } from './combineGames.js';
@@ -188,4 +189,24 @@ export function tradeCard(app) {
   const dest = r.teams.find((t) => t.id === r.to);
   card.append(h(`p.small${r.status === 'accepted' ? '.good' : '.bad'}`, r.status === 'accepted' ? `Traded! You join the ${dest?.city} ${dest?.name} next week.` : 'Request denied. You\'re staying this season.'));
   return card;
+}
+
+/** Scouting report on this week's opponent (full report after Film Study). */
+export function scoutCard(app, opp, { compact = false } = {}) {
+  const st = app.state;
+  if (!opp) return null;
+  const r = scoutReport(st, opp);
+  if (!r) return null;
+  const pct = (x) => `${Math.round(x * 100)}%`;
+  const bar = (label, v, hint) => h('div.sc-row', h('span.small', label), h('div.sc-bar', h('i', { style: { width: pct(v) } })), h('b.small', r.revealed ? pct(v) : '?'), h('span.tiny.muted', r.revealed ? hint : ''));
+  return h('div.card.scout-card',
+    h('div.card-title', h('h3', `🎬 Scouting: ${opp.name}`), h(`span.chip.pix${r.revealed ? '.good' : ''}`, r.revealed ? 'FILM STUDIED' : 'NO FILM')),
+    h('p.small', h('b', r.style), ` · ${r.offense}`),
+    r.revealed ? h('div.col', { style: { gap: '4px', marginTop: '6px' } },
+      bar('Blitz', r.blitz, r.blitz > 0.32 ? 'often' : r.blitz < 0.2 ? 'rarely' : 'sometimes'),
+      bar('Man coverage', r.man, r.man > 0.55 ? 'press man team' : r.man < 0.4 ? 'zone team' : 'mixes it up'),
+      bar('Deep shots', r.deep, r.deep > 0.4 ? 'loves the deep ball' : 'short game'),
+      compact ? null : h('ul.small', { style: { margin: '8px 0 0 16px' } }, r.tips.map((t) => h('li', t))),
+      h('p.tiny.muted', { style: { marginTop: '6px' } }, 'In plays you will see their tells before the snap: a red ! over blitzers. QBs and running backs can AUDIBLE (Q), receivers can call a HOT ROUTE.'))
+      : h('p.tiny.muted', { style: { marginTop: '6px' } }, 'Put Film Study in your week plan to unlock their tendencies, tips for your position and pre-snap tells (a red ! over blitzers) in every play this game. You can still AUDIBLE (Q) at the line either way.'));
 }
