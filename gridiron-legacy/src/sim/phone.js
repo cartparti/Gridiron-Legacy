@@ -119,7 +119,10 @@ function freshLine(state, lines) {
   const ph = phone(state);
   const recent = (ph.recentLines ??= []);
   const fresh = lines.filter((l) => !recent.includes(l));
-  const line = pick(state, fresh.length ? fresh : lines);
+  // when every line was used lately, at least never send the most recent one again
+  const last = [...recent].reverse().find((r) => lines.includes(r));
+  const fallback = lines.filter((l) => l !== last);
+  const line = pick(state, fresh.length ? fresh : fallback.length ? fallback : lines);
   recent.push(line);
   if (recent.length > 40) recent.splice(0, recent.length - 40);
   return line;

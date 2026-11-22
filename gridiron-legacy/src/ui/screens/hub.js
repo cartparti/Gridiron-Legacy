@@ -3,6 +3,7 @@ import { friendsPage } from './friends.js';
 import { achievementsPage, goalsCard } from './achievements.js';
 import { dealsView, dealsNudge } from './deals.js';
 import { dealsOpen } from '../../sim/nil.js';
+import { mediaPersona } from '../../sim/presser.js';
 import { draftStockPage, draftTabOpen } from './draftStock.js';
 import { activityFor } from '../../data/activities.js';
 import { costumeSpec, mascotDisplayName } from '../../data/mascots.js';
@@ -582,7 +583,9 @@ function profileView(app) {
         h('span.small', `${team.city} ${team.name}`),
         p.draft ? h('span.small.muted', p.position === 'MS' ? `Hired as the team mascot (${p.draft.year})` : p.draft.undrafted ? 'Undrafted free agent' : `Drafted ${ordinal(p.draft.pick)} overall (${p.draft.year})`) : null,
         p.injury ? h('span.chip.bad', icon('bandage'), `${p.injury.label} · ${injuryInfo(p.injury, p.position)?.label} · ${p.injury.weeks} wk`) : null,
-        p.suspended ? h('span.chip.bad', `Suspended ${p.suspended}`) : null))),
+        p.suspended ? h('span.chip.bad', `Suspended ${p.suspended}`) : null,
+        (() => { const mp = mediaPersona(st); return mp.id === 'new' ? null : h('span.small', { title: mp.desc }, '🎤 ', h('b', mp.label), h('span.tiny.muted', ` · ${mp.desc}`)); })(),
+        p.captain === st.career.year ? h('span.chip.gold.pix', 'TEAM CAPTAIN') : null))),
     h('div.card', h('div.card-title', h('h3', 'Ratings'), h('span.display', { style: { fontSize: '1.4rem' } }, `${Math.round(p.ovr)} OVR`)), statBars(p.stats, POSITIONS[p.position].statNotes, p.position)),
     h('div.card', h('h3', 'Overall by Season'), ratingChart(p.history, Math.round(p.ovr * 10) / 10)),
     h('div.card', h('h3', `This Season (${s.games} games)`), h('p.small', posLine(s)),

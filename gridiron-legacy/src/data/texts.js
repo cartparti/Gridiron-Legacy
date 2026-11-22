@@ -152,7 +152,7 @@ export const TEXTS = {
     ],
   },
   family_cousin: {
-    who: 'family', text: ['Your little cousin wore your jersey to school today!'],
+    who: 'family', text: ['Your little cousin wore your jersey to school today!', 'Your aunt framed your newspaper clipping 😂', 'The neighbors asked for an autograph. For their dog.', 'Grandma learned what a blitz is. She will not stop talking about it.', 'Your old coach stopped by the house to say hi!'],
     replies: [
       { label: 'Tell them I said what\'s up!', bond: 3, effects: { fame: 0.2 }, back: 'They screamed 😂' },
       { label: 'I\'ll mail them signed gloves', bond: 5, effects: { money: -60, fame: 0.4, mood: 2 }, back: 'You just made their entire year.' },

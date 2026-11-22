@@ -4,6 +4,7 @@ import { icon } from '../icons.js';
 import { sfx } from '../../audio/sfx.js';
 import { fmtMoney } from '../../core/util.js';
 import { tossCoin, tossChoice, ZONE_AT, PRIMETIME_NAME } from '../../sim/matchday.js';
+import { answerPresser } from '../../sim/presser.js';
 
 /** Coin toss: call it, watch it spin, then receive or defer if you won. */
 export function coinTossCard(app, onDone) {
@@ -73,4 +74,35 @@ export function zoneFlash(root) {
   const b = h('div.zone-flash', h('span.pix', 'IN THE ZONE'), h('small', 'Three great plays in a row. Everything slows down.'));
   root.append(b);
   setTimeout(() => b.remove(), 2200);
+}
+
+/** Postgame press conference: one question at a time, three ways to answer. */
+export function pressCard(app) {
+  const st = app.state;
+  const pr = st.lastGame?.presser;
+  if (!pr?.questions?.length) return null;
+  const card = h('div.card.presser');
+  const draw = () => {
+    clear(card);
+    card.append(h('div.card-title', h('h3', '🎤 Press Conference'), h('span.tiny.muted', `${pr.questions.filter((q) => q.picked !== null).length}/${pr.questions.length}`)));
+    pr.questions.forEach((q, qi) => {
+      const prevDone = qi === 0 || pr.questions[qi - 1].picked !== null;
+      if (!prevDone) return;
+      card.append(h('div.pq', h('div.tiny.muted', q.outlet), h('b', `"${q.q}"`)));
+      if (q.picked === null) {
+        card.append(h('div.pq-answers', q.answers.map((a, ai) => h(`button.btn.pq-a.${a.tone}`, { onclick: () => {
+          sfx.click();
+          const ch = answerPresser(st, qi, ai);
+          app.save();
+          q.changes = ch;
+          draw();
+        } }, h('span.tiny.pix', a.label.toUpperCase()), h('span.small', a.quote)))));
+      } else {
+        const a = q.answers[q.picked];
+        card.append(h(`div.pq-picked.${a.tone}`, h('span.small', `You: "${a.quote}"`)), q.changes?.length ? h('div.changes', q.changes.map((c) => h(`span.chip.${c.delta > 0 ? 'good' : 'bad'}`, `${c.label} ${c.text}`))) : null);
+      }
+    });
+  };
+  draw();
+  return card;
 }

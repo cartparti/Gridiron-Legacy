@@ -36,6 +36,8 @@ import { checkTraitUnlocks } from './traits.js';
 import { checkAchievements } from './achievements.js';
 import { setSeasonGoals, resolveGoals } from './goals.js';
 import { resolveChallenge } from './matchday.js';
+import { makePresser } from './presser.js';
+import { statPhrase } from './press.js';
 import { nilWeek, nilAfterGame, nilLeaveCollege, retentionOffer } from './nil.js';
 import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf, recordLeagueAwards } from './awards.js';
 import { computeLegacy } from './legacy.js';
@@ -290,6 +292,7 @@ export function finishGame(state) {
     toss: g.toss ?? null,
     zoneCount: g.zoneCount ?? 0,
   };
+  state.lastGame.presser = makePresser(state, g, { oppName: opp.name, teamName: teamName(state), statText: statPhrase(p.position, g.userStats), hurt: !!newInj });
   state.lastGame.comeback = !!g.half && (g.half.score[g.userSide === 'home' ? 'away' : 'home'] - g.half.score[g.userSide]) >= 10;
   state.lastGame.newAch = checkAchievements(state, 'game', { g: state.lastGame }).map((a) => a.id);
   postGameTexts(state, state.lastGame);
