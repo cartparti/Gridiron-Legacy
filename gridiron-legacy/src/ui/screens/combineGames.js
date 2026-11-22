@@ -12,7 +12,7 @@ export const COMBINE_TESTS = {
 };
 
 /** Open a test. base = your projected value (for the live display); onDone(perf). */
-export function openCombineTest(id, { base, posLabel } = {}, onDone) {
+export function openCombineTest(id, { base, posLabel, title } = {}, onDone) {
   const box = h('div.drill.combine-game');
   const m = openModal(box, { dismissable: false });
   let cleanup = null;
@@ -20,12 +20,12 @@ export function openCombineTest(id, { base, posLabel } = {}, onDone) {
     cleanup?.();
     clear(box);
     if (perf >= 0.6) sfx.cheer?.(true); else sfx.click();
-    box.append(h('div.kicker.pix', COMBINE_TESTS[id].name), h('div.drill-grade.pix', line), h('p.center.small.muted', perf >= 0.62 ? 'Scouts are scribbling. That beat your projection.' : perf <= 0.38 ? 'Under what they expected.' : 'Right about where they had you.'),
+    box.append(h('div.kicker.pix', title ?? COMBINE_TESTS[id].name), h('div.drill-grade.pix', line), h('p.center.small.muted', title ? (perf >= 0.62 ? 'Huge score. The other all-stars are watching.' : perf <= 0.38 ? 'Not your best. The crowd still cheered.' : 'A solid score. Now it comes down to the others.') : perf >= 0.62 ? 'Scouts are scribbling. That beat your projection.' : perf <= 0.38 ? 'Under what they expected.' : 'Right about where they had you.'),
       h('button.btn.primary.block', { onclick: () => { m.close(); onDone(perf); } }, 'Done'));
   };
   const T = COMBINE_TESTS[id];
   clear(box);
-  box.append(h('div.kicker.pix', 'The Combine'), h('h2', id === 'drill' ? `${posLabel ?? ''} ${T.name}`.trim() : T.name), h('p.small.muted', T.how),
+  box.append(h('div.kicker.pix', title ? 'All-Star Skills Challenge' : 'The Combine'), h('h2', title ?? (id === 'drill' ? `${posLabel ?? ''} ${T.name}`.trim() : T.name)), h('p.small.muted', T.how),
     h('button.btn.primary.block', { style: { marginTop: '12px' }, onclick: () => { sfx.whistle(); cleanup = GAMES[id](box, done, base); } }, 'Start'));
   return m;
 }

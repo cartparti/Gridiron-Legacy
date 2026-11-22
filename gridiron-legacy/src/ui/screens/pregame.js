@@ -6,6 +6,8 @@ import { fmtMoney } from '../../core/util.js';
 import { tossCoin, tossChoice, ZONE_AT, PRIMETIME_NAME } from '../../sim/matchday.js';
 import { answerPresser } from '../../sim/presser.js';
 import { SPEECHES, speechDue, giveSpeech, isCaptain } from '../../sim/captain.js';
+import { allStarChallenge } from '../../sim/allstar.js';
+import { openCombineTest } from './combineGames.js';
 
 /** Coin toss: call it, watch it spin, then receive or defer if you won. */
 export function coinTossCard(app, onDone) {
@@ -142,4 +144,21 @@ export function captainCard(app) {
       h('div.grow', h('b', v.won ? 'Voted team captain!' : 'Captain vote'),
         h('div.tiny.muted', v.won ? 'You wear the C this season: teammates rally around you every week, you play with a little more poise, and you give the speech before big games.'
           : `Not this year (about ${v.pct}% of the vote). Teammates, your play, years with the team and how you handle the media all count.`))));
+}
+
+/** Season review: All-Star selection and the skills challenge you play. */
+export function allStarCard(app) {
+  const st = app.state;
+  const as = st.review?.allStar;
+  if (!as?.selected) return null;
+  const base = { forty: 4.6, bench: 22, vert: 34, drill: 75 }[as.test] ?? 70;
+  return h('div.card.allstar-card',
+    h('div.card-title', h('h3', `⭐ ${as.name}`), h('span.chip.gold.pix', 'SELECTED')),
+    h('p.small', 'Your season earned you a spot with the best players in the league.'),
+    as.result
+      ? h(`p.small${as.result.won ? '.good' : ''}`, h('b', as.result.text), ` +${as.result.fame} fame.`)
+      : h('div.row', { style: { gap: '8px', alignItems: 'center', marginTop: '6px' } },
+        h('span.small.grow', `Skills challenge: ${as.title}`),
+        h('button.btn.primary.small', { onclick: () => { sfx.click(); openCombineTest(as.test, { base, title: as.title }, (perf) => { allStarChallenge(st, perf); app.save(); app.render(); }); } }, 'Compete'),
+        h('button.btn.small.ghost', { onclick: () => { sfx.click(); allStarChallenge(st, 0.45 + Math.random() * 0.2); app.save(); app.render(); } }, 'Sim it')));
 }

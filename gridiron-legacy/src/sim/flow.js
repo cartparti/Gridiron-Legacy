@@ -40,6 +40,7 @@ import { makePresser } from './presser.js';
 import { captainVote, captainWeekly } from './captain.js';
 import { logJournal, journalAfterGame, journalSeason } from './journal.js';
 import { honorCheck } from './honors.js';
+import { allStarSelect } from './allstar.js';
 import { statPhrase } from './press.js';
 import { nilWeek, nilAfterGame, nilLeaveCollege, retentionOffer } from './nil.js';
 import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf, recordLeagueAwards, awardLabel } from './awards.js';
@@ -424,6 +425,7 @@ export function endSeason(state) {
     leaders: league.leaders,
     goals,
     newAch,
+    allStar: allStarSelect(state, { perf: aw.perf, awards: aw.awards }),
     standings: standings(league).map((t) => ({ id: t.id, w: t.w, l: t.l })),
   };
   journalSeason(state, state.review, { teamName: `${team.city} ${team.name}`, titleName: STAGES[c.stage].titleName, awardLabel: (n) => awardLabel(n, p.position) });
