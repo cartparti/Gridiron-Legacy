@@ -190,3 +190,21 @@ export function votePlay(state, { boost = false } = {}) {
   if (boost) p.mood = clamp(p.mood - 1, 0, 100); // begging for votes is a little embarrassing
   return pw;
 }
+
+// ---------------------------------------------------------------- player of the week
+const POW_SIDE = { QB: 'Offensive', RB: 'Offensive', WR: 'Offensive', CB: 'Defensive', DT: 'Defensive', K: 'Special Teams', MS: 'Spirit' };
+/** After a game: a monster performance (in a win) earns the league's Player of the Week. */
+export function playerOfWeek(state, g) {
+  if (!g || g.sitOut || g.userOut) return null;
+  const grade = g.grade ?? 0;
+  if (grade < 85 || (!g.won && grade < 93)) return null;
+  if (grade < 91 && rand(state) < 0.4) return null; // someone else had a bigger week
+  const p = state.player;
+  const label = `${POW_SIDE[p.position] ?? 'Offensive'} Player of the Week`;
+  p.playerOfWeek = (p.playerOfWeek ?? 0) + 1;
+  p.fame = clamp((p.fame ?? 0) + 2, 0, 100);
+  addXp(state, 30);
+  addNews(state, 'award', `${p.first} ${p.last} named ${label}.`);
+  if (p.playerOfWeek === 1 || p.playerOfWeek % 5 === 0) logJournal(state, 'award', `${label}${p.playerOfWeek > 1 ? ` (#${p.playerOfWeek})` : ' for the first time'}.`);
+  return { label, count: p.playerOfWeek };
+}

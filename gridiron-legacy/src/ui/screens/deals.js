@@ -3,6 +3,8 @@ import { h } from '../dom.js';
 import { icon } from '../icons.js';
 import { fmtMoney } from '../../core/util.js';
 import { toast, confirmDialog } from '../components.js';
+import { commercialDeals, canShoot, shootCommercial, scriptFor } from '../../sim/commercial.js';
+import { openCommercial } from './combineGames.js';
 import { sfx } from '../../audio/sfx.js';
 import { DEAL_KINDS, MAX_DEALS, nilValue, nilEarnings, offerTotal, offerBlock, acceptOffer, declineOffer, negotiateOffer, hireNilAgent, dealsTitle, nilWorkload } from '../../sim/nil.js';
 
@@ -69,7 +71,8 @@ export function dealsView(app) {
     h('span.deal-ic.sm', icon((DEAL_KINDS[d.kind] ?? DEAL_KINDS.brand).icon)),
     h('div.grow', h('b', d.brand), h('div.tiny.muted', d.product),
       d.bonus ? h('div.tiny', `${fmtMoney(d.bonus.per)} per ${d.bonus.noun} · ${fmtMoney(d.bonus.paid)} of ${fmtMoney(d.bonus.cap)} earned`) : null),
-    h('div', { style: { textAlign: 'right' } }, h('div.good.small', `${fmtMoney(d.weekly)}/wk`), h('div.tiny.muted', `${d.weeks} wk left${d.total ? ` · ${fmtMoney(d.total)} so far` : ''}`)));
+    h('div', { style: { textAlign: 'right' } }, h('div.good.small', `${fmtMoney(d.weekly)}/wk`), h('div.tiny.muted', `${d.weeks} wk left${d.total ? ` · ${fmtMoney(d.total)} so far` : ''}`),
+      commercialDeals(st).includes(d) ? h('button.btn.small', { style: { marginTop: '4px' }, disabled: !canShoot(st), title: canShoot(st) ? '' : 'Needs a free day this week', onclick: () => { sfx.click(); openCommercial(d.brand, scriptFor(d), (perf) => { const r = shootCommercial(st, d.brand, perf); if (r?.text) toast(r.text); if (r?.ok) sfx.cash(); app.commit(); }); } }, '🎬 Shoot ad') : null));
 
   return h('div.col', { style: { gap: '14px' } },
     h('div.card.hero',

@@ -181,3 +181,65 @@ function drill(box, done, base) {
 }
 
 const GAMES = { forty, bench, vert, drill };
+
+// ---------------------------------------------------------------- commercial shoot
+/** Say each line on your mark: tap ACTION (or Space) when the cursor is in the green. onDone(perf 0..1). */
+export function openCommercial(brand, lines, onDone) {
+  const box = h('div.drill.combine-game');
+  const m = openModal(box, { dismissable: false });
+  let raf = 0, idx = 0, score = 0, pos = 0, dir = 1, lastT = 0, zone = null, locked = false;
+  const lineEl = h('div.cm-line');
+  const takeEl = h('b.pix', '');
+  const bar = h('div.cm-bar');
+  const mark = h('div.cm-mark');
+  const cur = h('div.cm-cur');
+  bar.append(mark, cur);
+  const setLine = () => {
+    const w = 20 - idx * 3;
+    zone = { a: 10 + Math.random() * (80 - w), w };
+    mark.style.left = `${zone.a}%`; mark.style.width = `${zone.w}%`;
+    lineEl.textContent = `"${lines[idx]}"`;
+    takeEl.textContent = `LINE ${idx + 1}/${lines.length}`;
+  };
+  const press = () => {
+    if (locked) return;
+    const mid = zone.a + zone.w / 2;
+    const q = Math.max(0, 1 - Math.abs(pos - mid) / (zone.w / 2 + 8));
+    score += q;
+    locked = true;
+    lineEl.classList.add(q > 0.6 ? 'good' : 'bad');
+    sfx[q > 0.6 ? 'catch' : 'click']?.();
+    setTimeout(() => {
+      lineEl.classList.remove('good', 'bad');
+      locked = false;
+      idx++;
+      if (idx >= lines.length) { cleanup(); finish(score / lines.length); } else setLine();
+    }, 650);
+  };
+  const key = (e) => { if (e.code === 'Space') { e.preventDefault(); press(); } };
+  const cleanup = () => { cancelAnimationFrame(raf); window.removeEventListener('keydown', key); };
+  const finish = (perf) => {
+    clear(box);
+    box.append(h('div.kicker.pix', `${brand} commercial`), h('div.drill-grade.pix', perf >= 0.85 ? 'THAT\'S A WRAP!' : perf >= 0.5 ? 'GOOD TAKE' : 'ROUGH DAY'),
+      h('p.center.small.muted', perf >= 0.85 ? 'The director is crying. This one is going viral.' : perf >= 0.5 ? 'Solid. The brand is happy.' : 'It took 40 takes, but they got something usable.'),
+      h('button.btn.primary.block', { onclick: () => { m.close(); onDone(perf); } }, 'Done'));
+  };
+  const start = () => {
+    clear(box);
+    box.append(h('div.row.between', h('span.pix.small', `🎬 ${brand.toUpperCase()}`), takeEl), lineEl, bar,
+      h('div', { style: { marginTop: '12px' } }, h('button.btn.primary.block.drill-pad', { onpointerdown: (e) => { e.preventDefault(); press(); } }, 'ACTION!')));
+    setLine();
+    window.addEventListener('keydown', key);
+    lastT = performance.now();
+    const loop = (now) => {
+      const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+      if (!locked) { pos += dir * dt * (80 + idx * 15); if (pos > 100) { pos = 100; dir = -1; } if (pos < 0) { pos = 0; dir = 1; } }
+      cur.style.left = `${pos}%`;
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+  };
+  box.append(h('div.kicker.pix', 'Commercial shoot'), h('h2', brand), h('p.small.muted', 'Hit your mark on every line: tap ACTION (or Space) when the cursor is in the green. Each line the mark gets smaller.'),
+    h('button.btn.primary.block', { style: { marginTop: '12px' }, onclick: () => { sfx.whistle(); start(); } }, 'Lights, camera...'));
+  return m;
+}

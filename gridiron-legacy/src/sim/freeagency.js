@@ -31,7 +31,7 @@ export function pitchOffer(state, o, team) {
       : p.position === 'CB' ? (t.man > 0.55 ? 'Press-man defense: islands for corners' : 'Zone defense: read and react')
         : p.position === 'DT' ? (t.blitz > 0.3 ? 'Attacking front: get after the QB' : 'Two-gap front: eat blocks, stop the run')
           : 'Big crowds, big moments';
-  o.city = `${BIOME_INFO[cul.biome]?.label ?? 'City'} · ${cul.trait?.label ?? 'home crowd'}`;
+  o.vibe = `${BIOME_INFO[cul.biome]?.label ?? 'City'} · ${cul.trait?.label ?? 'home crowd'}`;
   o.pitch = o.loyal ? 'You built something here. Let\'s finish it together.' : pick(state, PITCHES);
   o.perk = pick(state, PERKS).id;
   o.visited = false;
@@ -47,7 +47,7 @@ export function visitTeam(state, idx) {
   if (!o || o.visited || visitsLeft(state) <= 0) return null;
   o.visited = true;
   const perk = perkInfo(o);
-  return { ok: true, perk, text: `${o.city.split(' · ')[0]} visit: ${perk.text(o)}` };
+  return { ok: true, perk, text: `${o.city} visit: ${perk.text(o)}` };
 }
 
 /** Signing: apply the perk if you visited (called from signContract). */

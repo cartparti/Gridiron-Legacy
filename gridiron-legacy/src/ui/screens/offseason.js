@@ -238,7 +238,7 @@ export function contractScreen(app) {
       o.prove ? h('p.tiny.warn', 'Prove-it deal: the only offer on the table.') : null,
       o.pitch ? h('div.fa-pitch',
         h('p.small', h('i', `"${o.pitch}"`)),
-        h('div.fa-tags', h('span.chip', `Role: ${o.role}`), h('span.chip', o.scheme), h('span.chip', o.city))) : null,
+        h('div.fa-tags', h('span.chip', `Role: ${o.role}`), h('span.chip', o.scheme), h('span.chip', o.vibe))) : null,
       o.perk ? (o.visited
         ? h('div.fa-perk', h('b.small', `✈️ Visit: ${perkInfo(o).label}`), h('div.tiny', perkInfo(o).text(o)), h('div.tiny.good', 'Comes with the deal if you sign here.'))
         : h('button.btn.small', { style: { marginTop: '8px' }, disabled: visitsLeft(st) <= 0, onclick: () => { sfx.click(); const r = visitTeam(st, i); if (r?.text) toast(r.text); app.commit(); } }, visitsLeft(st) > 0 ? `✈️ Visit (${visitsLeft(st)} left)` : 'No visits left')) : null,

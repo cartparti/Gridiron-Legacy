@@ -41,7 +41,7 @@ import { captainVote, captainWeekly } from './captain.js';
 import { logJournal, journalAfterGame, journalSeason } from './journal.js';
 import { honorCheck } from './honors.js';
 import { allStarSelect } from './allstar.js';
-import { settleRivalry, nominatePlay, snapshotPower, makePreview } from './leaguelife.js';
+import { settleRivalry, nominatePlay, snapshotPower, makePreview, playerOfWeek } from './leaguelife.js';
 import { holdoutWeek } from './extension.js';
 import { foundationWeekly, humanitarianVote } from './foundation.js';
 import { familyWeekly } from './family.js';
@@ -323,6 +323,7 @@ export function finishGame(state) {
     toss: g.toss ?? null,
     zoneCount: g.zoneCount ?? 0,
     farewellGift,
+    playerOfWeek: playerOfWeek(state, g),
     rivalryResult: rivalryResult ? { name: rivalryResult.trophy.name, kept: rivalryResult.kept, won: rivalryResult.won, lost: rivalryResult.lost, streak: rivalryResult.trophy.streak } : null,
   };
   state.lastGame.potw = nominatePlay(state, state.lastGame);

@@ -1,5 +1,18 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.60', date: 'Nov 24', title: 'Overtime, two-point tries, farewell tours and award night', items: [
+    'Real overtime: tied games go to sudden-death overtime. First score wins, and you play the big moments yourself.',
+    'Two-point decisions: after a late touchdown you choose to kick or go for two (the card tells you what the chart says). Going for two is a clutch challenge you play.',
+    'Weather can turn at halftime: rain rolls in, the wind picks up, or snow starts falling in cold cities.',
+    'Injury rehab plans: on the Week tab, choose how to recover. Rush back (faster, but you could get hurt again), standard, careful (slower, but you come back healthier and smarter) or an elite specialist (costs money).',
+    'Award night: when you are a finalist for the biggest award (State Player of the Year, the Ironstone Trophy or MVP), see the three finalists and open the envelope yourself.',
+    'Hall of Fame speech: when you get in, write your induction speech. Pick how to open, who to thank and how to close.',
+    'Farewell tour (veteran pros, Career tab): announce your last season early in the year. Road teams give you gifts and standing ovations, and you retire when the season ends.',
+    'Free agency pitches: every offer now shows your role, the team\'s scheme and its vibe. Visit up to two teams to hear the full pitch and unlock a hidden perk.',
+    'Commercial shoots: once a season each brand wants you on camera (Life, then Deals, Shoot ad). Hit your lines for a bonus check, and a perfect take goes viral.',
+    'Player of the Week: monster games earn Offensive, Defensive, Special Teams or Spirit Player of the Week. Your count shows on your profile.',
+    'Fixed: the same text message no longer arrives twice in a row.',
+  ] },
   { v: '0.59', date: 'Nov 23', title: 'Audibles, scouting, rivalries and life after the whistle', items: [
     'Pre-snap reads and audibles: the defense now shows its hand. Blitzers get a red ! over their heads before the snap. Quarterbacks can AUDIBLE (Q) to a quick pass or a shot play, running backs can flip the run or check to an inside run, and receivers can call a HOT ROUTE (slant, go, quick out, curl).',
     'Opponent scouting: every team has real habits (how often they blitz, man or zone, how deep they throw) and the defense really plays that way. Put Film Study in your week to unlock their full report, tips for your position and the pre-snap tells in every play.',

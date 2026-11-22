@@ -804,3 +804,21 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   player.mentees), `mentorLegacy` (legacy line).
 - UI: Team tab lineup shows extensionCard, tradeCard, mentorCard; Life gets Family + Giving subtabs; review shows offFieldReview.
   Tests: round20.
+
+## v0.60: overtime, two-point tries, farewell, award night (10 features)
+- game.js: sudden-death OT (`startOvertime` pushes up to 4 OT drives with `ot: true`; stepGame breaks as soon as the score differs;
+  log q 'OT'), two-point decisions (`maybeTwoPoint` in finishDrive after a user TD in Q4, not K/MS/defense/OT; `TWO_CHART`; with
+  halftimeUI sets `g.pendingTwo` -> stepGame returns { type: 'twoPoint' }, else auto by chart; `twoPointOdds`, `resolveTwoPoint`),
+  `weatherShift` at halftime (16%; g.weatherShift). gameday.js `showTwoPoint` (clutchChallenge timing).
+- `src/sim/rehab.js`: REHAB_PLANS rush/standard/careful/elite, `chooseRehab`, `rehabHealed`, `rushedRisk` (14%/game re-injury while
+  p.rushedBack). Week tab `rehabCard`.
+- flow.js `awardNight` (review.awardNight: 3 finalists via awardRace, only when you won or ranked top 3) -> pregame `awardNightCard`.
+- `src/sim/speech.js`: HOF speech (`speechThanks`, `giveSpeech` -> state.legacy.speech); legacy.js `speechCard`.
+- `src/sim/farewell.js`: `announceFarewell` (pro, week <= 3, age 30+ or 8+ seasons), `farewellAfterGame` (away gifts by biome),
+  nextStageStep retires with reason 'farewell' the season after. Profile `farewellCard`.
+- `src/sim/freeagency.js`: `pitchOffer` (role, scheme, `o.vibe` — not `o.city`, which visits read — pitch, hidden perk), `visitTeam`
+  (2 max), `applyPerk` only when visited (signContract).
+- `src/sim/commercial.js`: `commercialDeals`, `shootCommercial(state, brand, perf)` (uses a free day, once a season per brand, viral at
+  0.85 extends 6 weeks). UI `openCommercial` in combineGames.js, "Shoot ad" in deals.js.
+- leaguelife.js `playerOfWeek` (grade >= 88 win / 94 loss; lastGame.playerOfWeek, p.playerOfWeek). phone.js: never repeat the last
+  identical text in a thread. Tests: round21.
