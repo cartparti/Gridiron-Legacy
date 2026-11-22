@@ -53,6 +53,7 @@ import { teamCulture } from '../data/culture.js';
 import { homecomingCheck, seniorNightCheck, ratingRevealCheck, isHomecomingWeek, isSeniorNight, traditionsAfterGame, ringEarned } from './seasonal.js';
 import { printCard, gameBallsAfterGame } from './collectibles.js';
 import { mailWeek } from './mailbag.js';
+import { fantasyPoints, fantasyRank, trackJerseySales, bucketCheck, birthdayCheck, birthdayAfterGame } from './moments.js';
 import { petWeekly } from './pets.js';
 import { makeIncentive, settleIncentive, coachingCarousel, coachWeekly, assignCoachStyle, ritualAfterGame } from './staff.js';
 import { statPhrase } from './press.js';
@@ -164,6 +165,8 @@ export function beginWeek(state) {
   coachWeekly(state);
   state.week.petNote = petWeekly(state);
   mailWeek(state);
+  trackJerseySales(state);
+  birthdayCheck(state);
   state.week.nilNotes = nilWeek(state);
   trackDraftWatch(state);
   {
@@ -302,6 +305,9 @@ export function finishGame(state) {
   const gameBalls = g.sitOut ? [] : gameBallsAfterGame(state, g, `${getTeam(league, g.oppId)?.city ?? ''} ${getTeam(league, g.oppId)?.name ?? ''}`.trim());
   const traditions = traditionsAfterGame(state, g);
   const ritual = ritualAfterGame(state, g);
+  birthdayAfterGame(state);
+  const fantasy = g.sitOut ? null : { pts: fantasyPoints(p.position, g.userStats) };
+  if (fantasy) fantasy.rank = fantasyRank(p.position, fantasy.pts);
   const rivalryResult = settleRivalry(state, g);
   const farewellGift = farewellAfterGame(state, g, teamCulture(getTeam(league, g.homeId) ?? { id: g.homeId, city: '', name: '' }, state.career.stage));
   const opp = getTeam(league, g.oppId);
@@ -343,6 +349,7 @@ export function finishGame(state) {
     gameBalls,
     traditions,
     ritual,
+    fantasy,
     playerOfWeek: playerOfWeek(state, g),
     rivalryResult: rivalryResult ? { name: rivalryResult.trophy.name, kept: rivalryResult.kept, won: rivalryResult.won, lost: rivalryResult.lost, streak: rivalryResult.trophy.streak } : null,
   };
@@ -356,6 +363,7 @@ export function finishGame(state) {
     const stageTDs = hist.reduce((a, x) => a + tdSum(x.seasonStats), 0) + tdSum(p.seasonStats);
     journalAfterGame(state, state.lastGame, { stageGames, stageTDs, careerTDsBefore, oppName: `${opp.city} ${opp.name}` });
   }
+  state.lastGame.bucket = bucketCheck(state);
   postGameTexts(state, state.lastGame);
   state.game = null;
   state.phase = 'postgame';

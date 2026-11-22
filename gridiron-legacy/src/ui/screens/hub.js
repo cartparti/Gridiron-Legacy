@@ -6,6 +6,7 @@ import { dealsOpen } from '../../sim/nil.js';
 import { mediaPersona } from '../../sim/presser.js';
 import { captainCard, tradeCard, scoutCard, previewCard, recordChaseCard, rivalryChip, powerView, extensionCard, mentorCard, familyView, givingView, rehabCard, farewellCard } from './pregame.js';
 import { draftStockPage, draftTabOpen } from './draftStock.js';
+import { fantasyCard, jerseyCard, bucketCard, birthdayCard } from './traditions.js';
 import { ratingRevealCard, homecomingCard, seniorNightCard, mailCard, ritualCard, ringDesigner, incentiveCard, coachStyleChip, petCard, collectionPage } from './traditions.js';
 import { activityFor } from '../../data/activities.js';
 import { costumeSpec, mascotDisplayName } from '../../data/mascots.js';
@@ -206,7 +207,7 @@ function weekView(app) {
   }
 
   // the coach's goals for this season
-  for (const card of [seniorNightCard(app), homecomingCard(app), ratingRevealCard(app), ringDesigner(app)]) if (card) container.append(card);
+  for (const card of [birthdayCard(app), seniorNightCard(app), homecomingCard(app), ratingRevealCard(app), ringDesigner(app)]) if (card) container.append(card);
   if (st.week?.petNote) container.append(h('div.card.flat', h('p.small', `🐾 ${st.week.petNote}`)));
   { const gc = goalsCard(app); if (gc) container.append(gc); }
   { const dn = dealsNudge(app); if (dn) container.append(dn); }
@@ -352,7 +353,7 @@ function teamView(app) {
     .map(([id, l]) => h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { app.ui.teamSub = id; app.render(); } }, l)));
   const out = h('div.col', { style: { gap: '14px' } }, h('h2', STAGES[league.kind].leagueName), tabs);
   if (sub === 'power') out.append(powerView(app));
-  else if (sub === 'lineup') { out.append(lineupView(app)); { const cs = coachStyleChip(app); if (cs) out.append(h('div.card.flat', cs)); } { const ic = incentiveCard(app); if (ic) out.append(ic); } const ec = extensionCard(app); if (ec) out.append(ec); const tc = tradeCard(app); if (tc) out.append(tc); const mc = mentorCard(app); if (mc) out.append(mc); }
+  else if (sub === 'lineup') { out.append(lineupView(app)); { const cs = coachStyleChip(app); if (cs) out.append(h('div.card.flat', cs)); } { const ic = incentiveCard(app); if (ic) out.append(ic); } { const jc = jerseyCard(app); if (jc) out.append(jc); } const ec = extensionCard(app); if (ec) out.append(ec); const tc = tradeCard(app); if (tc) out.append(tc); const mc = mentorCard(app); if (mc) out.append(mc); }
   else if (sub === 'standings') {
     const divLeague = isDivisionLeague(league);
     const proj = divLeague ? projectedSeeds(league) : null;
@@ -518,7 +519,7 @@ function careerView(app) {
   else if (sub === 'friends') body = friendsPage(app);
   else if (sub === 'achievements') body = achievementsPage(app);
   else if (sub === 'journal') body = journalPage(app);
-  else if (sub === 'collection') body = collectionPage(app);
+  else if (sub === 'collection') { body = collectionPage(app); body.prepend(bucketCard(app)); }
   else { body = profileView(app); const fw = farewellCard(app); if (fw) body.prepend(fw); body.append(...careerStatsSections(app)); }
   return h('div.col', { style: { gap: '14px' } }, tabs, body);
 }

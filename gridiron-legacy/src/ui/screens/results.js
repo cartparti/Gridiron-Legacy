@@ -3,7 +3,7 @@ import { awardLabel } from '../../sim/awards.js';
 import { achUnlockRows, goalsReview } from './achievements.js';
 import { challengeChip, pressCard, allStarCard, rivalryResultCard, potwCard, offFieldReview, awardNightCard } from './pregame.js';
 import { injuryInfo, injuryNote } from '../../sim/injury.js';
-import { postgameExtras, reviewExtras } from './traditions.js';
+import { postgameExtras, reviewExtras, fantasyCard, handshakeCard } from './traditions.js';
 import { h } from '../dom.js';
 import { backupModal } from './slots.js';
 import { STAGES, PLAY_CALLS } from '../../data/config.js';
@@ -73,7 +73,10 @@ export function postgameScreen(app) {
     g.newTraits?.length || g.levelUps ? h('div.card.unlock-card',
       g.levelUps ? h('div.row', { style: { gap: '8px' } }, h('span.chip.gold.pix', 'LEVEL UP'), h('span.small', `Level ${st.player.level}. You have ${st.player.skillPoints} skill point${st.player.skillPoints === 1 ? '' : 's'} to spend (Career tab).`)) : null,
       (g.newTraits ?? []).map((n) => h('div.row', { style: { gap: '8px', marginTop: '6px' } }, h('span.chip.good.pix', 'NEW TRAIT'), h('b', n), h('span.tiny.muted', 'Equip it in Career → Traits')))) : null,
+    handshakeCard(app),
+    fantasyCard(g),
     ...postgameExtras(app),
+    g.bucket?.length ? h('div.card.unlock-card', h('h3', '📝 Bucket list'), g.bucket.map((x) => h('div.small', '✅ ', h('b', x)))) : null,
     rivalryResultCard(g),
     g.playerOfWeek ? h('div.card.unlock-card', h('div.row', { style: { gap: '10px', alignItems: 'center' } }, h('span', { style: { fontSize: '1.8rem' } }, '🏅'), h('div', h('b', g.playerOfWeek.label), h('div.tiny.muted', g.playerOfWeek.count > 1 ? `Number ${g.playerOfWeek.count} of your career. +2 fame.` : 'The first of your career! +2 fame.')))) : null,
     g.farewellGift ? h('div.card.farewell-card', h('h3', '🎁 A farewell gift'), h('p.small', `Before kickoff the ${g.farewellGift.team} honored you with ${g.farewellGift.gift}. The whole stadium stood and cheered.`)) : null,

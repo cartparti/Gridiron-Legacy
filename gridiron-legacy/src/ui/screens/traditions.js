@@ -17,6 +17,7 @@ import {
 import { RARITY, cardValue } from '../../sim/collectibles.js';
 import { answerMail } from '../../sim/mailbag.js';
 import { PET_KINDS, PET_NAMES, adoptPet, playWithPet, canPlayWithPet } from '../../sim/pets.js';
+import { jerseySales, bucketList, HANDSHAKES, handshakeDue, doHandshake, PARTIES, isBirthdayWeek, throwParty } from '../../sim/moments.js';
 import { RITUALS, LUCKY_AT, chooseRitual, isLucky, incentiveProgress, coachStyle } from '../../sim/staff.js';
 
 const STAGE_SHORT = { hs: 'HS', college: 'College', pro: 'Pro' };
@@ -277,4 +278,47 @@ export function reviewExtras(app) {
   if (r.coachChange) out.push(h('div.card', { style: { borderColor: 'var(--warn)' } }, h('h3', '📋 Coaching change'), h('p.small', `Coach ${r.coachChange.old} ${r.coachChange.why}. The new head coach is ${r.coachChange.coach}: ${r.coachChange.style.label}.`), h('p.tiny.muted', `${r.coachChange.style.desc} You start fresh with the new staff.`)));
   if (app.state.pendingRings?.length && r.champion) out.push(ringDesigner(app));
   return out;
+}
+
+// ---------------------------------------------------------------- v0.62: fantasy, jersey sales, bucket list, handshake, birthday
+
+export function fantasyCard(g) {
+  const f = g.fantasy;
+  if (!f) return null;
+  const hot = f.rank <= 5;
+  return h('div.card.flat', h('div.row.between', h('div', h('b', `📊 ${f.pts} fantasy points`), h('div.tiny.muted', hot ? 'Fantasy managers everywhere are thanking you.' : f.rank > 25 ? 'A few fantasy managers are benching you next week.' : 'A solid week for anyone who started you.')),
+    h(`span.chip.pix${hot ? '.good' : ''}`, `#${f.rank} THIS WEEK`)));
+}
+
+export function jerseyCard(app) {
+  const js = jerseySales(app.state);
+  if (!js) return null;
+  return h('div.card', h('div.card-title', h('h3', '👕 Jersey sales'), h(`span.chip.pix${js.rank <= 10 ? '.gold' : ''}`, `#${js.rank} IN THE LEAGUE`)),
+    h('p.small', `About ${js.units.toLocaleString('en-US')} of your jerseys sold this week.${js.moved > 0 ? ` Up ${js.moved} spot${js.moved > 1 ? 's' : ''}.` : js.moved < 0 ? ` Down ${-js.moved}.` : ''}`),
+    h('p.tiny.muted', 'Fame, winning, Player of the Week awards and rings sell jerseys. Number 1 is on your bucket list.'));
+}
+
+export function bucketCard(app) {
+  const b = bucketList(app.state);
+  return h('div.card', h('div.card-title', h('h3', '📝 Bucket list'), h('span.chip.pix', `${b.done}/${b.total}`)),
+    h('div.list', b.list.map((x) => h('div.li', h('span', x.done ? '✅' : '⬜'), h(`span.small${x.done ? '' : '.muted'}`, x.label)))));
+}
+
+export function handshakeCard(app) {
+  const st = app.state;
+  if (!handshakeDue(st)) return null;
+  const rival = st.player.rivalName ?? 'your rival';
+  return h('div.card.hc-card', h('h3', '🤝 Postgame at midfield'),
+    h('p.small', `${rival} is walking over. ${st.lastGame.won ? 'He lost, and he knows it.' : 'He won, and he is smiling.'} What do you do?`),
+    h('div.row', { style: { gap: '6px', flexWrap: 'wrap' } }, HANDSHAKES.map((x) => h('button.btn.small', { onclick: () => { sfx.click(); const r = doHandshake(st, x.id); if (r) toast(r.text); app.commit(); } }, x.label))));
+}
+
+export function birthdayCard(app) {
+  const st = app.state, p = st.player;
+  if (!isBirthdayWeek(st)) return null;
+  const b = st.birthday;
+  return h('div.card.hc-card', h('div.card-title', h('h3', `🎂 Happy birthday!`), h('span.chip.pix', `TURNING ${b.age}`)),
+    b.party ? h('p.small.muted', 'What a day. One more year older, one more year better.')
+      : h('div', h('p.small', 'Your phone has been buzzing since midnight. How do you celebrate?'),
+        h('div.col', { style: { gap: '6px' } }, PARTIES.filter((x) => x.needs !== 'partner' || p.partnerName).map((x) => h('button.btn.block', { onclick: () => { sfx.levelUp?.(); const r = throwParty(st, x.id); if (r) toast(r.text); app.commit(); } }, x.label.replace('{partner}', p.partnerName ?? ''))))));
 }

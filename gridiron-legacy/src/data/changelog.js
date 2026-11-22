@@ -1,5 +1,12 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.62', date: 'Nov 24', title: 'Birthdays, bucket list, fantasy points and more', items: [
+    'Birthday: once a year your birthday falls in the season. Pick how to celebrate: family dinner, a team party, a night with your partner or a live stream with fans.',
+    'Bucket list (Career, then Collection): 15 life goals, from winning a state title and buying Mom a house to the Hall of Fame. Check them off as you go.',
+    'Fantasy points: every game now shows your fantasy score and where it ranked that week.',
+    'Jersey sales (pros, Team tab): see where your jersey ranks in the league each week. Number 1 is on your bucket list.',
+    'Postgame handshake: after rivalry games your rival walks over. Shake hands, hug it out, talk trash or walk away.',
+  ] },
   { v: '0.61', date: 'Nov 24', title: 'Senior Night, Homecoming, trading cards, pets and more', items: [
     'Senior Night: your last home game in high school and college (and the last home game of a pro farewell tour). Pick who walks you out, then watch the walk to midfield between two lines of teammates. You play that game with a little extra.',
     'Homecoming week (high school and college): parade, dance plans and maybe a crown. Win the homecoming game for extra fame.',

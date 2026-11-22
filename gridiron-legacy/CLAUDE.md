@@ -845,3 +845,10 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   ringDesigner/ringSVG, incentiveCard + coachStyleChip (Team > Lineup), petCard (Life > Home), collectionPage (Career > Collection:
   trading cards with a portrait modal, rings, game balls), traditionChips (gameday header), postgameExtras, reviewExtras.
 - Events: `src/data/events/extra.js` (18, incl. arcs walk-on and documentary). Tests: round22 (7 full bot careers poke every feature).
+
+## v0.62 (quick round): `src/sim/moments.js`
+- `fantasyPoints`/`fantasyRank` (lastGame.fantasy), `jerseySales` + `trackJerseySales` (pros, state.jerseyRank; rank 1 -> state.jerseyTop),
+  BUCKET + `bucketList`/`bucketCheck` (finishGame -> lastGame.bucket, state.bucketDone), HANDSHAKES + `doHandshake` (postgame after rivalry
+  games, lastGame.handshake), birthday (`birthdayCheck` beginWeek; birth week hashed from the name, NOT the save RNG — using rand there shifted
+  every career and broke seed-sensitive tests; `throwParty`, `birthdayAfterGame`). UI in traditions.js (fantasyCard, jerseyCard, bucketCard,
+  handshakeCard, birthdayCard). Tests: round23.
