@@ -125,6 +125,7 @@ export function beginWeek(state) {
   // Trades and transfers only take effect during the regular season, never mid-playoffs.
   if (c.pendingMove && !getTeam(state.league, c.pendingMove)) delete c.pendingMove; // stale (changed leagues)
   if (c.pendingMove && state.league.phase === 'regular') {
+    if (c.stage === 'pro') honorCheck(state, getTeam(state.league, c.teamId), 'pro'); // a legend traded away can still get the number retired
     const old = teamName(state);
     c.teamId = c.pendingMove;
     c.teamAbbr = c.teamId;

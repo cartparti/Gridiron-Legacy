@@ -4,7 +4,7 @@ import { achievementsPage, goalsCard, journalPage } from './achievements.js';
 import { dealsView, dealsNudge } from './deals.js';
 import { dealsOpen } from '../../sim/nil.js';
 import { mediaPersona } from '../../sim/presser.js';
-import { captainCard } from './pregame.js';
+import { captainCard, tradeCard } from './pregame.js';
 import { draftStockPage, draftTabOpen } from './draftStock.js';
 import { activityFor } from '../../data/activities.js';
 import { costumeSpec, mascotDisplayName } from '../../data/mascots.js';
@@ -341,7 +341,7 @@ function teamView(app) {
     .filter(([id]) => (id === 'roster' ? league.kind === 'pro' : id === 'history' ? st.proHistory.length || st.records : true))
     .map(([id, l]) => h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { app.ui.teamSub = id; app.render(); } }, l)));
   const out = h('div.col', { style: { gap: '14px' } }, h('h2', STAGES[league.kind].leagueName), tabs);
-  if (sub === 'lineup') out.append(lineupView(app));
+  if (sub === 'lineup') { out.append(lineupView(app)); const tc = tradeCard(app); if (tc) out.append(tc); }
   else if (sub === 'standings') {
     const divLeague = isDivisionLeague(league);
     const proj = divLeague ? projectedSeeds(league) : null;

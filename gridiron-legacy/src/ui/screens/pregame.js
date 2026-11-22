@@ -8,6 +8,8 @@ import { answerPresser } from '../../sim/presser.js';
 import { SPEECHES, speechDue, giveSpeech, isCaptain } from '../../sim/captain.js';
 import { allStarChallenge } from '../../sim/allstar.js';
 import { openCombineTest } from './combineGames.js';
+import { TRADE_DEADLINE, canRequestTrade, requestTrade, chooseTrade, cancelTrade } from '../../sim/trade.js';
+import { toast, confirmDialog } from '../components.js';
 
 /** Coin toss: call it, watch it spin, then receive or defer if you won. */
 export function coinTossCard(app, onDone) {
@@ -161,4 +163,29 @@ export function allStarCard(app) {
         h('span.small.grow', `Skills challenge: ${as.title}`),
         h('button.btn.primary.small', { onclick: () => { sfx.click(); openCombineTest(as.test, { base, title: as.title }, (perf) => { allStarChallenge(st, perf); app.save(); app.render(); }); } }, 'Compete'),
         h('button.btn.small.ghost', { onclick: () => { sfx.click(); allStarChallenge(st, 0.45 + Math.random() * 0.2); app.save(); app.render(); } }, 'Sim it')));
+}
+
+/** Team tab (pros): ask for a trade. */
+export function tradeCard(app) {
+  const st = app.state;
+  if (st.career.stage !== 'pro') return null;
+  const r = st.tradeReq && st.tradeReq.year === st.career.year ? st.tradeReq : null;
+  const card = h('div.card.trade-card', h('div.card-title', h('h3', 'Trade Request'), h('span.tiny.muted', `Deadline: week ${TRADE_DEADLINE}`)));
+  const say = (res) => { if (res?.text) toast(res.text); app.commit(); };
+  if (!r || r.status === 'cancelled') {
+    if (!canRequestTrade(st)) { card.append(h('p.small.muted', st.league.phase !== 'regular' ? 'Trades only happen during the regular season.' : 'The trade deadline has passed.')); return card; }
+    card.append(h('p.small.muted', 'Not happy here? Ask out. Your agent will find teams that want you. The coach and the locker room will not like it.'),
+      h('button.btn.small', { onclick: async () => { if (!(await confirmDialog('Ask for a trade?', 'The coach and teammates will take it badly (coach -12, teammates -6), even if you end up staying.', 'Ask for a trade'))) return; sfx.click(); requestTrade(st); app.commit(); } }, 'Ask for a trade'));
+    return card;
+  }
+  if (r.status === 'open') {
+    card.append(h('p.small', 'Your agent found interest from:'),
+      h('div.list', r.teams.map((t) => h('div.li', h('span.swatch', { style: { background: t.colors[0] } }), h('div.grow', h('b', `${t.city} ${t.name}`), h('div.tiny.muted', `${t.record} · ${t.why}`)),
+        h('button.btn.small.primary', { onclick: () => { sfx.select(); say(chooseTrade(st, t.id)); } }, 'Go here')))),
+      h('button.btn.small.ghost', { style: { marginTop: '8px' }, onclick: () => { sfx.click(); cancelTrade(st); toast('You took it back. Some of the damage heals.'); app.commit(); } }, 'Never mind, I\'ll stay'));
+    return card;
+  }
+  const dest = r.teams.find((t) => t.id === r.to);
+  card.append(h(`p.small${r.status === 'accepted' ? '.good' : '.bad'}`, r.status === 'accepted' ? `Traded! You join the ${dest?.city} ${dest?.name} next week.` : 'Request denied. You\'re staying this season.'));
+  return card;
 }

@@ -44,7 +44,7 @@ export function journalByYear(state) {
   backfillJournal(state);
   const by = new Map();
   for (const e of state.journal ?? []) { if (!by.has(e.year)) by.set(e.year, []); by.get(e.year).push(e); }
-  return [...by.entries()].sort((a, b) => b[0] - a[0]).map(([year, list]) => ({ year, stage: list[0].stage, list: list.slice().reverse() }));
+  return [...by.entries()].sort((a, b) => b[0] - a[0]).map(([year, list]) => ({ year, stage: list[list.length - 1].stage, stages: [...new Set(list.map((e) => e.stage))], list: list.slice().reverse() }));
 }
 
 /** Older saves: rebuild a short journal from the season history (once). */

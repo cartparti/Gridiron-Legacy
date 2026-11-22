@@ -1261,3 +1261,5 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 .ring-item b { font-size: 1.6rem; color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,0.35); }
 .ring-item span { font-size: 0.68rem; font-weight: 800; }
 .allstar-card { border-color: rgba(255,212,59,0.55) !important; background: linear-gradient(135deg, rgba(255,212,59,0.1), rgba(255,255,255,0.02)); }
+.trade-card .swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; margin-right: 8px; }
+.presser .pq-a .small { text-transform: none; font-weight: 600; letter-spacing: 0; }

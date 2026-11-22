@@ -743,3 +743,36 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   both hands for SECURE_T 0.42 s while the reach target slides from the catch point to the chest, then normal `carryBall`.
   `releaseReach` lets go 0.3 s after the ball arrives. Catch odds unchanged (balance unaffected). Debug: `__play.throwTo(i)`,
   `cine`, `slow`, `holder`; `globalThis.__forceCatch`. Probe: scratchpad catch.cjs <endY> <tag> <receiver>.
+
+## v0.58: home field fix + 11 features (written while the owner was away for a week)
+- Home field: gameday passes `culture.home` { name, city, colors, glyph, banners }; `fieldTexture` (stadium.js) paints both end
+  zones in home colors (name / city) and the home glyph (GLYPHS) at midfield whenever style.home is set (title/cutscenes keep the
+  old far/near look). Practice has a home too. Debug: `globalThis.__camOverride` {x,y,z,lx,ly,lz} in director render;
+  `globalThis.__fieldYL` set by setYardLine under __playDebug.
+- `src/sim/matchday.js`: coin toss (`tossCoin`, `tossChoice`, `autoToss` in stepGame, `setPossessionOrder` keeps slot
+  quarters/clocks), In the Zone (`zoneAfterMoment` on every moment record -> rec.zone 'in'|'out', g.zone, tolerance x ZONE_TOL 1.08,
+  opts.zone -> HUD badge), game challenges (`CHALLENGES`, `pickChallenge` in createUserGame, `resolveChallenge` in finishGame; 30/40 XP,
+  +1 fame, pro $25K), primetime (`isPrimetime`: not HS; rivalry 50% / else ~12-23%; playoffs after round 0; clear/wind -> night;
+  fame x1.25). UI `src/ui/screens/pregame.js` (coinTossCard, challengeChip, primetimeBanner, zoneMeter/zoneFlash, pressCard,
+  speechCard, captainCard, allStarCard, tradeCard).
+- `src/sim/presser.js`: `makePresser` (finishGame: big games / notable grades / 45% else; 2 questions from situation pools),
+  `answerPresser` (humble/confident/fiery fx), `mediaPersona` (profile).
+- `src/sim/captain.js`: `captainVote` at week 0 (teammates, ovr, seasons with the team, persona; backups/K/MS/newcomers less likely),
+  `captainWeekly` (chemistry floor 60), tolerance x1.015, `giveSpeech` in big games; jersey C patch via `uniform.captain`
+  (engine sets it for the user when opts.captain). NOTE: rel.teammates feeds team strength (gameRatings chem), so captain boosts
+  must stay small (a +0.8/week version broke the balance test).
+- Combine: `runCombine` stores `base` + `played`; `combineTest(state, id, perf)` (forty/bench/vert/drill) recomputes the bonus from
+  deltas vs base (bots never play: same bonus as before). Mini-games `src/ui/screens/combineGames.js` `openCombineTest(id, {base,
+  title})` (also used by the All-Star skills challenge).
+- `src/sim/journal.js`: `logJournal`, `journalAfterGame` (debut, first TD career/stage, A+ games, titles, long injuries, tier-2+
+  achievements), `journalSeason` (awards, titles, records), plus hooks in flow (commit, declare, draft, contract, trade, retire),
+  captain and honors; `backfillJournal` for old saves. UI Career > Journal (`journalPage` in achievements.js).
+- `src/sim/honors.js`: `honorCheck(state, team, stage)` when leaving HS (chooseCollege), college (startCombine), a pro team (signContract
+  move, trade at beginWeek, retire); score = seasons + awards*1.5 + titles*4 + MVP-level*3 >= hs 5 / college 7 / pro 15.
+  `bannersFor(state, teamId)` -> retired number + title years -> stadium `paintHonors` beside the jumbotron. Trophies page lists them.
+- `src/sim/allstar.js`: `allStarSelect` (endSeason review.allStar: all-team awards / MVP-level / perf >= 72), `allStarChallenge(perf)`
+  vs 7 others; player.allStars.
+- `src/sim/trade.js`: `requestTrade` (pro regular season before week 9; 3 interested teams by need + record), `chooseTrade` (odds by
+  ovr/fame/rookie deal; accepted -> career.pendingMove), `cancelTrade`. Team tab card.
+- Balance after all this (30 careers): QB ~12, RB ~13, WR ~17 (WR was already ~14 before), CB ~14, K ~12 awards; the round10 spread
+  test passes. Tests: round19.

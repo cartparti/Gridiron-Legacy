@@ -73,6 +73,6 @@ export function journalPage(app) {
     h('div.card.hero', h('div.card-title', h('h2', 'Career Journal'), h('span.chip.pix', `${(st.journal ?? []).length} ENTRIES`)),
       h('p.tiny.muted', 'Everything that mattered, written down as it happened.')),
     ...years.map((y) => h('div.card.journal-year',
-      h('div.card-title', h('h3', String(y.year)), h('span.tiny.muted', STAGE_NAME[y.stage] ?? '')),
+      h('div.card-title', h('h3', String(y.year)), h('span.tiny.muted', (y.stages ?? [y.stage]).map((x) => STAGE_NAME[x] ?? x).join(' → '))),
       h('div.journal', y.list.map((e) => h(`div.jr${e.big ? '.big' : ''}`, h('span.jr-ic', icon(e.icon)), h('div.grow', h('span.small', e.text), h('div.tiny.muted', `Week ${e.week}`))))))));
 }

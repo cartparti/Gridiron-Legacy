@@ -1,5 +1,19 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.58', date: 'Nov 22', title: 'Home field, captains, combine and 10 more new things', items: [
+    'Home field fixed: the midfield logo and both end zones now always belong to the home team (team name in one end zone, city in the other), whichever way the play goes. Away games finally look like away games.',
+    'Coin toss before every game: call heads or tails, then receive or defer if you win. It decides who gets the ball first in each half.',
+    'In the Zone: three great plays in a row and you get hot. Timing windows open up, the streak meter lights up and the play screen shows the flame, until a bad play cools you off.',
+    'Game challenges: every game comes with a bonus goal for your position (score a touchdown, 100 yards, no turnovers, make every kick...). Hit it for XP, fame and, in the pros, a bonus check.',
+    'Primetime games: big college and pro games under the lights on national TV. More fame when you show up.',
+    'Press conferences after big games: answer humble, confident or fiery. It moves the coach, your teammates, the rivalry and your fame, and builds your media persona (Locker Room Leader, Swagger, The Villain...).',
+    'Team captains: before each season your teammates vote. Captains wear a C patch on the jersey, play with a little more poise, keep the locker room together and give the pregame speech before big games.',
+    'Playable combine: run the 40-yard dash, the bench press, the vertical jump and your position drill yourself. Beat your projection and your draft stock goes up.',
+    'Career Journal (Career, then Journal): an automatic timeline of your whole career: debuts, first touchdowns, A+ games, awards, titles, records, the draft, trades and retirement.',
+    'Ring of Honor: leave a team as a legend and they retire your number. Retired numbers and the championships you won hang as banners next to the big screen in their stadium.',
+    'All-Star selection: great seasons earn a spot in the All-State Showcase, All-American Bowl or All-Star Classic, with a skills challenge for your position.',
+    'Trade requests (pros): not happy? Ask out on the Team tab. Your agent finds teams that want you, you pick one, and the front office decides before the deadline.',
+  ] },
   { v: '0.57', date: 'Nov 18', title: 'Receivers go get the ball', items: [
     'Receivers now track the ball in the air: they turn to face it (or catch it over the shoulder when they\'re running deep), their hands go up to meet it and follow it all the way in.',
     'Passes arrive at different heights. High balls and throws into tight coverage make receivers leap and high-point it; low throws get scooped. Jump balls and Hail Marys always go up top.',
