@@ -397,3 +397,77 @@ export function playerOfGameCutscene(opts) {
     },
   });
 }
+
+// ------------------------------------------------------------------ senior night
+
+/**
+ * Senior Night / farewell home finale: you walk from the end zone to midfield with the people you picked, between two
+ * lines of teammates, and the coach meets you at the 50. opts: { colors, uniform, look, number, teamName, stage, culture,
+ * escort: 'family'|'partner'|'coach'|'teammates', partnerLook, title, sub }
+ */
+export function seniorNightCutscene(opts) {
+  return runCutscene((ctx) => {
+    const g = ctx.group;
+    const Z0 = 24, Z1 = 1.2;
+    const me = makePlayer(opts.colors, { uniform: opts.uniform, look: opts.look, number: opts.number, helmet: false });
+    me.position.set(0, 0, Z0);
+    g.add(me);
+    // who walks with you
+    const walkers = [];
+    const addWalker = (m, dx) => { m.position.set(dx, 0, Z0 + 0.3); g.add(m); walkers.push({ m, dx }); };
+    if (opts.escort === 'partner') addWalker(makePerson({ ...(opts.partnerLook ?? randomLook('partner', { gender: 'f' })), outfit: 'gala', suit: '#7a1f3a' }), 1.0);
+    else if (opts.escort === 'coach') addWalker(makePerson({ ...randomLook('coach-sn'), shirt: opts.colors[0], pants: '#2a2d34', hairStyle: 'short' }), 1.0);
+    else if (opts.escort === 'teammates') { addWalker(makePlayer(opts.colors, { uniform: opts.uniform, helmet: false }), 1.1); addWalker(makePlayer(opts.colors, { uniform: opts.uniform, helmet: false }), -1.1); }
+    else { addWalker(makePerson({ ...randomLook('mom-sn', { gender: 'f' }), shirt: opts.colors[0] }), 1.0); addWalker(makePerson({ ...randomLook('dad-sn', { gender: 'm' }), shirt: opts.colors[1] ?? '#ffffff' }), -1.0); }
+    // two lines of teammates making a tunnel to midfield
+    const mates = [];
+    for (let i = 0; i < 16; i++) {
+      const side = i % 2 ? 1 : -1;
+      const m = makePlayer(opts.colors, { uniform: opts.uniform, helmet: Math.random() < 0.6 });
+      const z = Z0 - 3 - Math.floor(i / 2) * 2.4;
+      m.position.set(side * 2.05, 0, z);
+      faceToward(m, 0, z);
+      m.rotation.y = m.userData.u.targetYaw;
+      g.add(m);
+      mates.push({ m, z, cheered: false });
+    }
+    // the coach waits at the 50
+    const coach = makePerson({ ...randomLook('hc-sn', { gender: 'm' }), shirt: opts.colors[0], pants: '#2a2d34', hairStyle: 'short' });
+    coach.position.set(0, 0, Z1 - 1.3);
+    faceToward(coach, 0, Z0);
+    coach.rotation.y = coach.userData.u.targetYaw;
+    g.add(coach);
+    ctx.caption(opts.title ?? 'Senior Night', opts.sub ?? '');
+    const bursts = [];
+    let arrived = false;
+    return (dt) => {
+      const T = (ctx._t = (ctx._t ?? 0) + dt);
+      const k = Math.min(1, Math.max(0, (T - 0.4) / 6.2));
+      const z = lerp(Z0, Z1, k);
+      if (k < 1) {
+        me.position.z = z; faceToward(me, 0, z - 2); animateRun(me, dt, 1.25);
+        for (const w of walkers) { w.m.position.set(w.dx, 0, z + 0.3); faceToward(w.m, w.dx, z - 2); animateRun(w.m, dt, 1.25); }
+      } else {
+        animateRun(me, dt, 0);
+        for (const w of walkers) animateRun(w.m, dt, 0);
+        if (!arrived) {
+          arrived = true;
+          faceToward(me, 0, Z1 - 1.3);
+          celebrate(coach, 'pump');
+          setTimeout(() => celebrate(me, 'point'), 500);
+          bursts.push(confetti(ctx.scene, new THREE.Vector3(0, 3.2, Z1), [opts.colors[0], opts.colors[1] ?? '#ffffff', '#ffd43b']));
+        }
+      }
+      for (const mt of mates) {
+        if (!mt.cheered && z < mt.z + 3.5) { mt.cheered = true; celebrate(mt.m, ['pump', 'flex', 'pump', 'dance'][Math.floor(Math.random() * 4)]); }
+        animateRun(mt.m, dt, 0);
+      }
+      animateRun(coach, dt, 0);
+      for (let i = bursts.length - 1; i >= 0; i--) if (!bursts[i](dt)) bursts.splice(i, 1);
+      // camera: in front of you, backing up, then a slow orbit at midfield
+      if (k < 1) { ctx.camera.position.set(Math.sin(T * 0.3) * 1.6, 2.1, z - 6.2); ctx.camera.lookAt(0, 1.45, z); }
+      else { const a = (T - 6.6) * 0.35; ctx.camera.position.set(Math.sin(a) * 6.5, 2.4, Z1 - Math.cos(a) * 6.5); ctx.camera.lookAt(0, 1.5, Z1 - 0.6); }
+      return T < 9.2;
+    };
+  }, { setup: stadiumSetup(opts.colors, opts.teamName, opts.stage, opts.culture) });
+}

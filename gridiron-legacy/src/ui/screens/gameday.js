@@ -30,6 +30,7 @@ import { portraitImg } from '../../scenes/portrait.js';
 import { clutchChallenge } from './drills.js';
 import { bannersFor } from '../../sim/honors.js';
 import { scoutForPlay } from '../../sim/scouting.js';
+import { traditionChips } from './traditions.js';
 import { coinTossCard, challengeChip, primetimeBanner, zoneMeter, zoneFlash, speechCard, scoutCard, rivalryChip } from './pregame.js';
 import { tunnelCutscene } from '../../scenes/cutscenes.js';
 
@@ -627,6 +628,7 @@ export function gamedayScreen(app) {
         g.isTitle ? h('span.chip.gold', icon('trophy'), g.roundName) : g.playoff ? h('span.chip.info', g.roundName) : null),
       w.desc ? h('p.center.tiny.muted', { style: { marginTop: '8px' } }, w.desc) : null,
       primetimeBanner(st, g),
+      traditionChips(st, g),
       rivalryChip(app, opp),
       g.sitOut ? null : challengeChip(g.challenge),
       g.sitOut ? null : scoutCard(app, opp, { compact: true }),

@@ -20,6 +20,8 @@ import { emptyStats } from './player.js';
 import { applyEffects } from './effects.js';
 import { eventTokens } from './events.js';
 import { gearBonus } from './shop.js';
+import { fuelTol } from './seasonal.js';
+import { coachTol, ritualTol } from './staff.js';
 
 // Moment types per position with relative weights.
 const MOMENT_POOL = {
@@ -451,6 +453,8 @@ export function tolerance(state, call = 'balanced', type = state.game?.pending?.
     if (g.zone) t *= ZONE_TOL; // in the zone: everything slows down
     if (state.player.captain === state.career.year) t *= 1.015; // the C on your chest: a little more poise
     if (state.farewell?.year === state.career.year) t *= 1.02; // the farewell season: playing loose, nothing to lose
+    if (g.seniorNight) t *= 1.02; // senior night: the whole town is here for you
+    t *= fuelTol(state) * coachTol(state) * ritualTol(state);
     if (g.playingHurt) t *= INJURY_STATUS[g.playingHurt]?.tol ?? 0.75;
     t *= 1 - matchup(state, g).k * 0.09; // good teams make for hard games
   }

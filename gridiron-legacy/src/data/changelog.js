@@ -1,5 +1,19 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.61', date: 'Nov 24', title: 'Senior Night, Homecoming, trading cards, pets and more', items: [
+    'Senior Night: your last home game in high school and college (and the last home game of a pro farewell tour). Pick who walks you out, then watch the walk to midfield between two lines of teammates. You play that game with a little extra.',
+    'Homecoming week (high school and college): parade, dance plans and maybe a crown. Win the homecoming game for extra fame.',
+    'Ratings reveal: every college and pro season starts with your Blitz Kings video game rating. Tap to flip it, then post it, laugh it off, or call it disrespect and play angry all season.',
+    'Trading cards (Career, then Collection): every season prints a card for you. Great seasons print Silver, Gold or Legendary cards, and old cards gain value as you get famous. Your first pro season is your rookie card.',
+    'Game balls: milestones earn the game ball for your shelf: your first touchdown, big seasons, 100 games, your first pro win, monster playoff nights.',
+    'Championship rings: win a title and design the ring: the stone, the band and the engraving inside.',
+    'Fan mail: letters arrive most weeks. A kid wants a signed photo, a critic says you are not the answer, a kid in the hospital asks if you could visit. How you answer matters.',
+    'Pets (Life, then Home): adopt a dog or a cat and name it. Play with it once a week. It lifts your mood every week and sometimes goes viral.',
+    'Game-day ritual: pick a pregame ritual on the Week tab. Win three in a row with it and you feel lucky (a small edge) until you lose.',
+    'Contract incentives (pros): every deal comes with a bonus for hitting a stat target. Track it on the Team tab.',
+    'Coaching changes: coaches get fired after bad seasons or poached after great ones. Every coach has a style (offensive guru, defensive mastermind, players\' coach...) that changes your season a little.',
+    '18 new events, including two new storylines: the walk-on who asks you for help, and a documentary crew that follows your season.',
+  ] },
   { v: '0.60', date: 'Nov 24', title: 'Overtime, two-point tries, farewell tours and award night', items: [
     'Real overtime: tied games go to sudden-death overtime. First score wins, and you play the big moments yourself.',
     'Two-point decisions: after a late touchdown you choose to kick or go for two (the card tells you what the chart says). Going for two is a clutch challenge you play.',

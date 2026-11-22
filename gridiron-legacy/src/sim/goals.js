@@ -7,7 +7,7 @@ import { getTeam } from './league.js';
 import { addXp } from './progress.js';
 
 // per-game expectations for a solid starter (hs, college, pro), scaled by how good you are
-const PER_GAME = {
+export const PER_GAME = {
   QB: [['passYds', 'passing yards', [150, 205, 235]], ['passTD', 'touchdown passes', [1.3, 1.7, 1.6]]],
   RB: [['rushYds', 'rushing yards', [70, 78, 72]], ['rushTD', 'rushing touchdowns', [0.75, 0.8, 0.65]]],
   WR: [['recYds', 'receiving yards', [55, 64, 66]], ['recTD', 'receiving touchdowns', [0.5, 0.55, 0.5]]],

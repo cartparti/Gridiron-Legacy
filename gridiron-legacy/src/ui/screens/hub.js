@@ -6,6 +6,7 @@ import { dealsOpen } from '../../sim/nil.js';
 import { mediaPersona } from '../../sim/presser.js';
 import { captainCard, tradeCard, scoutCard, previewCard, recordChaseCard, rivalryChip, powerView, extensionCard, mentorCard, familyView, givingView, rehabCard, farewellCard } from './pregame.js';
 import { draftStockPage, draftTabOpen } from './draftStock.js';
+import { ratingRevealCard, homecomingCard, seniorNightCard, mailCard, ritualCard, ringDesigner, incentiveCard, coachStyleChip, petCard, collectionPage } from './traditions.js';
 import { activityFor } from '../../data/activities.js';
 import { costumeSpec, mascotDisplayName } from '../../data/mascots.js';
 import { awardLabel } from '../../sim/awards.js';
@@ -205,6 +206,8 @@ function weekView(app) {
   }
 
   // the coach's goals for this season
+  for (const card of [seniorNightCard(app), homecomingCard(app), ratingRevealCard(app), ringDesigner(app)]) if (card) container.append(card);
+  if (st.week?.petNote) container.append(h('div.card.flat', h('p.small', `🐾 ${st.week.petNote}`)));
   { const gc = goalsCard(app); if (gc) container.append(gc); }
   { const dn = dealsNudge(app); if (dn) container.append(dn); }
   { const rh = rehabCard(app); if (rh) container.append(rh); }
@@ -212,6 +215,8 @@ function weekView(app) {
   { const rc = recordChaseCard(app); if (rc) container.append(rc); }
   { const cc = captainCard(app); if (cc) container.append(cc); }
   if (m && opp && st.player.position !== 'MS') { const sc = scoutCard(app, opp); if (sc) container.append(sc); }
+  { const rc = m && status.canPlay ? ritualCard(app) : null; if (rc) container.append(rc); }
+  { const mc = mailCard(app); if (mc) container.append(mc); }
 
   // Season stakes: your role on the depth chart, the playoff race and the award race
   container.append(seasonCard(st));
@@ -347,7 +352,7 @@ function teamView(app) {
     .map(([id, l]) => h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { app.ui.teamSub = id; app.render(); } }, l)));
   const out = h('div.col', { style: { gap: '14px' } }, h('h2', STAGES[league.kind].leagueName), tabs);
   if (sub === 'power') out.append(powerView(app));
-  else if (sub === 'lineup') { out.append(lineupView(app)); const ec = extensionCard(app); if (ec) out.append(ec); const tc = tradeCard(app); if (tc) out.append(tc); const mc = mentorCard(app); if (mc) out.append(mc); }
+  else if (sub === 'lineup') { out.append(lineupView(app)); { const cs = coachStyleChip(app); if (cs) out.append(h('div.card.flat', cs)); } { const ic = incentiveCard(app); if (ic) out.append(ic); } const ec = extensionCard(app); if (ec) out.append(ec); const tc = tradeCard(app); if (tc) out.append(tc); const mc = mentorCard(app); if (mc) out.append(mc); }
   else if (sub === 'standings') {
     const divLeague = isDivisionLeague(league);
     const proj = divLeague ? projectedSeeds(league) : null;
@@ -443,7 +448,7 @@ function lifeView(app) {
   else if (sub === 'giving') out.append(givingView(app));
   else if (sub === 'deals' && dealsOpen(st)) out.append(dealsView(app));
   else if (sub === 'social' || sub === 'deals') out.append(socialView(app));
-  else if (sub === 'home') out.append(homeView(app));
+  else if (sub === 'home') { out.append(petCard(app)); out.append(homeView(app)); }
   else if (sub === 'people') {
     out.append(peopleView(app));
     if (st.career.stage !== 'pro') out.append(h('div.card', h('h3', 'Grades'), h('div.statbar', h('span', 'Academics'), h('div.track', h('div.fill', { style: { width: `${p.academics}%`, background: p.academics < 40 ? 'var(--bad)' : undefined } })), h('span.val', Math.round(p.academics))), h('p.tiny.muted', 'Drop below 30 and you are ineligible. Study Hall raises it.')));
@@ -501,7 +506,7 @@ function lifeView(app) {
 function careerView(app) {
   const st = app.state;
   const sub = app.ui.careerSub ?? 'profile';
-  const tabs = h('div.subtabs', [['profile', 'Career'], draftTabOpen(st) ? ['draft', st.career.stage === 'college' ? 'Draft Stock' : 'My Draft'] : null, ['journal', 'Journal'], ['achievements', 'Achievements'], ['friends', 'Friends'], ['traits', 'Traits'], ['awards', 'Trophies'], ['race', 'Award Race'], ['legends', 'Legends'], ['league', 'League Awards']].filter(Boolean).map(([id, l]) =>
+  const tabs = h('div.subtabs', [['profile', 'Career'], draftTabOpen(st) ? ['draft', st.career.stage === 'college' ? 'Draft Stock' : 'My Draft'] : null, ['journal', 'Journal'], ['collection', 'Collection'], ['achievements', 'Achievements'], ['friends', 'Friends'], ['traits', 'Traits'], ['awards', 'Trophies'], ['race', 'Award Race'], ['legends', 'Legends'], ['league', 'League Awards']].filter(Boolean).map(([id, l]) =>
     h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { sfx.click(); app.ui.careerSub = id; app.render(); } }, l)));
   let body;
   if (sub === 'draft' && draftTabOpen(st)) body = draftStockPage(app);
@@ -513,6 +518,7 @@ function careerView(app) {
   else if (sub === 'friends') body = friendsPage(app);
   else if (sub === 'achievements') body = achievementsPage(app);
   else if (sub === 'journal') body = journalPage(app);
+  else if (sub === 'collection') body = collectionPage(app);
   else { body = profileView(app); const fw = farewellCard(app); if (fw) body.prepend(fw); body.append(...careerStatsSections(app)); }
   return h('div.col', { style: { gap: '14px' } }, tabs, body);
 }

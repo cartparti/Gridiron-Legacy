@@ -50,6 +50,11 @@ import { rehabHealed, rushedRisk } from './rehab.js';
 import { farewellAfterGame } from './farewell.js';
 import { pitchOffer, applyPerk } from './freeagency.js';
 import { teamCulture } from '../data/culture.js';
+import { homecomingCheck, seniorNightCheck, ratingRevealCheck, isHomecomingWeek, isSeniorNight, traditionsAfterGame, ringEarned } from './seasonal.js';
+import { printCard, gameBallsAfterGame } from './collectibles.js';
+import { mailWeek } from './mailbag.js';
+import { petWeekly } from './pets.js';
+import { makeIncentive, settleIncentive, coachingCarousel, coachWeekly, assignCoachStyle, ritualAfterGame } from './staff.js';
 import { statPhrase } from './press.js';
 import { nilWeek, nilAfterGame, nilLeaveCollege, retentionOffer } from './nil.js';
 import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf, recordLeagueAwards, awardLabel } from './awards.js';
@@ -119,6 +124,7 @@ function newCoach(state) {
   state.player.coachName = genPersonName(state);
   state.player.rel.coach = 50;
   state.player.coachLook = null;
+  assignCoachStyle(state);
   genTeammates(state); // new team, new friends
 }
 
@@ -152,6 +158,12 @@ export function beginWeek(state) {
   }
   newWeek(state);
   { const ho = holdoutWeek(state); if (ho) state.week.notice = ho; }
+  ratingRevealCheck(state);
+  homecomingCheck(state);
+  seniorNightCheck(state);
+  coachWeekly(state);
+  state.week.petNote = petWeekly(state);
+  mailWeek(state);
   state.week.nilNotes = nilWeek(state);
   trackDraftWatch(state);
   {
@@ -213,6 +225,8 @@ export function submitPlan(state, plan, { playHurt = false } = {}) {
   state.game = initWeather(state, createUserGame(state, league, sched, { playoff, round, sitOut, playingHurt: !sitOut && !!state.player.injury ? injuryStatus(state.player.injury, state.player.position) : false }));
   state.game.isTitle = playoff && league.playoffs.rounds[round].length === 1;
   state.game.roundName = playoff ? roundName(league, round) : `Week ${league.week + 1}`;
+  if (!playoff && isHomecomingWeek(state)) state.game.homecoming = true;
+  if (!playoff && isSeniorNight(state)) state.game.seniorNight = state.seniorNight.kind;
   state.week.summary = summary;
   state.phase = 'game';
   return summary;
@@ -285,6 +299,9 @@ export function finishGame(state) {
     }
   }
   resolveChallenge(state, g);
+  const gameBalls = g.sitOut ? [] : gameBallsAfterGame(state, g, `${getTeam(league, g.oppId)?.city ?? ''} ${getTeam(league, g.oppId)?.name ?? ''}`.trim());
+  const traditions = traditionsAfterGame(state, g);
+  const ritual = ritualAfterGame(state, g);
   const rivalryResult = settleRivalry(state, g);
   const farewellGift = farewellAfterGame(state, g, teamCulture(getTeam(league, g.homeId) ?? { id: g.homeId, city: '', name: '' }, state.career.stage));
   const opp = getTeam(league, g.oppId);
@@ -323,6 +340,9 @@ export function finishGame(state) {
     toss: g.toss ?? null,
     zoneCount: g.zoneCount ?? 0,
     farewellGift,
+    gameBalls,
+    traditions,
+    ritual,
     playerOfWeek: playerOfWeek(state, g),
     rivalryResult: rivalryResult ? { name: rivalryResult.trophy.name, kept: rivalryResult.kept, won: rivalryResult.won, lost: rivalryResult.lost, streak: rivalryResult.trophy.streak } : null,
   };
@@ -422,6 +442,10 @@ export function endSeason(state) {
     fame: Math.round(p.fame),
   };
   p.history.push(entry);
+  const card = printCard(state, entry, aw.awards);
+  if (champion) ringEarned(state, team, STAGES[c.stage].titleName);
+  const incentive = c.stage === 'pro' ? settleIncentive(state) : null;
+  const coachChange = coachingCarousel(state, team);
   if (c.stage === 'pro') state.proHistory.push({ year: c.year, champion: league.champion, mvp: aw.awards.includes('Most Valuable Player') ? `${p.first} ${p.last}` : null });
 
   // Money: investments grow or shrink.
@@ -471,6 +495,9 @@ export function endSeason(state) {
     humanitarian: humanitarianVote(state),
     awardNight: awardNight(state, aw),
     mentor: mentorSeasonEnd(state),
+    card,
+    incentive,
+    coachChange,
     standings: standings(league).map((t) => ({ id: t.id, w: t.w, l: t.l })),
   };
   journalSeason(state, state.review, { teamName: `${team.city} ${team.name}`, titleName: STAGES[c.stage].titleName, awardLabel: (n) => awardLabel(n, p.position) });
@@ -805,7 +832,7 @@ export function runDraft(state, early) {
   c.stage = 'pro';
   c.stageSeason = 1;
   c.teamId = teamId;
-  p.contract = { teamId, years: ROOKIE_CONTRACT_YEARS, salary, rookie: true };
+  p.contract = { teamId, years: ROOKIE_CONTRACT_YEARS, salary, rookie: true, incentive: makeIncentive(state, Math.max(salary, 1500000)) };
   newCoach(state);
   p.rel.teammates = 45;
   if (p.housing === 'dorm' || p.housing === 'parents') p.housing = 'offcampus';
@@ -861,6 +888,7 @@ export function contractOffers(state) {
     offers.push({
       teamId: t.id, city: t.city, name: t.name, colors: t.colors, salary, years: randInt(state, Math.max(1, maxYears - 2), maxYears),
       capSpace: space, contender: Math.round((t.off + t.def) / 2), lastRank: ranks.indexOf(t.id) + 1, loyal: t.id === cur,
+      incentive: makeIncentive(state, salary),
     });
   }
   if (!offers.length && p.ovr >= 58) {
@@ -876,7 +904,7 @@ export function signContract(state, idx) {
   const o = state.offers[idx];
   const moved = o.teamId !== state.career.teamId;
   if (moved) honorCheck(state, getTeam(state.league, state.career.teamId), 'pro');
-  p.contract = { teamId: o.teamId, years: o.years, salary: o.salary, rookie: false };
+  p.contract = { teamId: o.teamId, years: o.years, salary: o.salary, rookie: false, incentive: o.incentive ?? null };
   if (moved) {
     state.career.teamId = o.teamId;
     newCoach(state);

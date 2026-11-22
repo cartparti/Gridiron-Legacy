@@ -236,6 +236,7 @@ export function contractScreen(app) {
         h('div', h('b', o.years), h('span', 'Years')),
         h('div', h('b', fmtMoney(o.salary * o.years)), h('span', 'Total'))),
       o.prove ? h('p.tiny.warn', 'Prove-it deal: the only offer on the table.') : null,
+      o.incentive ? h('p.tiny.good', `💰 Incentive: ${o.incentive.target.toLocaleString('en-US')} ${o.incentive.noun} in a season pays ${fmtMoney(o.incentive.bonus)}.`) : null,
       o.pitch ? h('div.fa-pitch',
         h('p.small', h('i', `"${o.pitch}"`)),
         h('div.fa-tags', h('span.chip', `Role: ${o.role}`), h('span.chip', o.scheme), h('span.chip', o.vibe))) : null,

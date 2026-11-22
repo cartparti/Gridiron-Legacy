@@ -822,3 +822,26 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   0.85 extends 6 weeks). UI `openCommercial` in combineGames.js, "Shoot ad" in deals.js.
 - leaguelife.js `playerOfWeek` (grade >= 88 win / 94 loss; lastGame.playerOfWeek, p.playerOfWeek). phone.js: never repeat the last
   identical text in a thread. Tests: round21.
+
+## v0.61: traditions, collectibles, pets, staff (12 features)
+- `src/sim/seasonal.js`: Homecoming (`homecomingCheck` in beginWeek: one home game in weeks 2-5 of hs/college seasons; king odds from
+  fame + teammates; `chooseHomecoming` HOMECOMING_PLANS; state.homecoming), Senior Night (`seniorNightKind`: last regular-season home game
+  of the final hs/college season, or the farewell season in the pros; state.seniorNight; `chooseEscort` ESCORTS; g.seniorNight -> tol
+  x1.02), ratings reveal (`ratingRevealCheck` week 0 college/pro, player.gameRatings, `reactToRating` post/fuel/laugh; fuel = p.fuel ->
+  `fuelTol` x1.01), rings (`ringEarned` in endSeason on a title -> state.pendingRings; `designRing` -> player.rings; `ringColors`),
+  `traditionsAfterGame` (lastGame.traditions). submitPlan sets g.homecoming / g.seniorNight.
+- `src/sim/collectibles.js`: `printCard` (endSeason -> player.cards, review.card; rarity base/silver/gold/legendary), `cardValue`,
+  `gameBallsAfterGame` (finishGame; milestone ids; first run on an old save backfills silently) -> player.gameBalls, lastGame.gameBalls.
+- `src/sim/mailbag.js`: LETTERS with replies (fx, optional chance/fail, day = uses a day slot); `mailWeek` (beginWeek, 40% when fame >= 4)
+  -> state.week.mail; `answerMail`.
+- `src/sim/pets.js`: PET_KINDS, `adoptPet` (fee, cleaned name), `playWithPet` (once a week, tricks), `petWeekly` (beginWeek: upkeep,
+  mood, viral/chewed notes -> state.week.petNote).
+- `src/sim/staff.js`: `makeIncentive` (contract offers, rookie deal; uses goals.js PER_GAME, now exported), `incentiveProgress`,
+  `settleIncentive` (endSeason -> review.incentive); coaching carousel (`coachingCarousel` endSeason -> review.coachChange; COACH_STYLES,
+  `assignCoachStyle` also in newCoach; `coachTol`, `coachWeekly`); rituals (RITUALS, `chooseRitual`, `ritualAfterGame` -> state.ritual
+  streak; LUCKY_AT 3 -> `ritualTol` x1.02). All new tolerance multipliers are tiny on purpose (balance test still passes).
+- Scene: `seniorNightCutscene` in cutscenes.js (stadium; you + escort walk from the end zone to midfield between teammates, coach waits).
+- UI `src/ui/screens/traditions.js`: ratingRevealCard, homecomingCard, seniorNightCard (plays the cutscene), mailCard, ritualCard,
+  ringDesigner/ringSVG, incentiveCard + coachStyleChip (Team > Lineup), petCard (Life > Home), collectionPage (Career > Collection:
+  trading cards with a portrait modal, rings, game balls), traditionChips (gameday header), postgameExtras, reviewExtras.
+- Events: `src/data/events/extra.js` (18, incl. arcs walk-on and documentary). Tests: round22 (7 full bot careers poke every feature).
