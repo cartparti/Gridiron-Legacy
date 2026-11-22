@@ -5,7 +5,7 @@ import { INJURY_STATUS } from '../../sim/injury.js';
 import { h, clear } from '../dom.js';
 import { PLAY_CALLS, WEATHER } from '../../data/config.js';
 import { getTeam } from '../../sim/league.js';
-import {
+import { resolveTwoPoint, twoPointOdds,
   stepGame, resolveMoment, autoMoment, tolerance, outcomeFromQuality, resolveDecision, autoDecision,
   resolveGameEvent, autoGameEvent, MOMENT_NAMES, setGamePlan, matchup, HALFTIME_CHOICES, halftimeChoice,
 } from '../../sim/game.js';
@@ -310,6 +310,7 @@ export function gamedayScreen(app) {
     reveal(() => {
       if (r.type === 'moment') showMoment(r.moment);
       else if (r.type === 'decision') showDecision(r.decision);
+      else if (r.type === 'twoPoint') showTwoPoint(r.two);
       else if (r.type === 'gameEvent') showGameEvent(r.event);
       else if (r.type === 'halftime') showHalftime();
       else showEnd();
@@ -367,6 +368,29 @@ export function gamedayScreen(app) {
       h('div.row', { style: { marginTop: '8px' } },
         h('button.btn.primary.grow', { onclick: () => { sfx.whistle(); resolveDecision(st, true); app.save(); clear(momentSlot); advance(); } }, 'Go for it'),
         h('button.btn.grow', { onclick: () => { sfx.click(); resolveDecision(st, false); app.save(); clear(momentSlot); advance(); } }, d.fgRange ? 'Kick FG' : 'Punt'))));
+  };
+
+  /** Touchdown late in a close game: kick it, or go for two (a clutch timing challenge)? */
+  const showTwoPoint = (two) => {
+    clear(momentSlot);
+    clear(controls);
+    sfx.select();
+    const odds = twoPointOdds(st);
+    const after = (m) => (m === 0 ? 'tie it' : m > 0 ? `lead by ${m}` : `trail by ${-m}`);
+    const card = h('div.card.decision',
+      h('div.row', { style: { gap: '6px' } }, h('span.chip.gold.pix', 'TOUCHDOWN'), h('span.chip.info.pix', 'DECISION')),
+      h('h2', { style: { marginTop: '10px' } }, 'Kick or go for two?'),
+      h('p.small.muted', `Kick and you ${after(two.m6 + 1)}. Make a two-point try and you ${after(two.m6 + 2)}, miss it and you ${after(two.m6)}.${two.chart ? ' The chart says go for it.' : ''}`),
+      h('div.row', { style: { marginTop: '8px' } },
+        h('button.btn.grow', { onclick: () => { sfx.click(); resolveTwoPoint(st, false); app.save(); clear(momentSlot); setScore(); advance(); } }, 'Kick the extra point'),
+        h('button.btn.primary.grow', { onclick: () => {
+          if (card.dataset.busy) return;
+          card.dataset.busy = '1';
+          sfx.whistle();
+          const done = (ok) => { const r = resolveTwoPoint(st, true, ok); app.save(); clear(momentSlot); momentSlot.append(h('div.card', h('h3', r.success ? 'Two-point conversion is good!' : 'The two-point try fails.'))); if (r.success) sfx.cheer?.(true); setScore(); setTimeout(advance, 900); };
+          if (app.ui.game?.skipAnim) done(Math.random() < odds); else clutchChallenge({ title: 'Two-point try!', kind: 'timing', p: odds }, done);
+        } }, `Go for two (${Math.round(odds * 100)}%)`)));
+    momentSlot.append(card);
   };
 
   const showGameEvent = (ev) => {
@@ -477,6 +501,7 @@ export function gamedayScreen(app) {
       for (let guard = 0; guard < 300; guard++) {
         if (g.pendingEvent) { resolveGameEvent(st, autoGameEvent(st)); continue; }
         if (g.pendingDecision) { resolveDecision(st, autoDecision(st)); continue; }
+        if (g.pendingTwo) { const go = g.pendingTwo.chart; resolveTwoPoint(st, go, go && Math.random() < twoPointOdds(st)); continue; }
         if (g.pending) { resolveMoment(st, autoMoment(st, 'balanced')); continue; }
         const r = stepGame(st);
         if (r.type === 'end') break;
@@ -639,6 +664,7 @@ export function gamedayScreen(app) {
   } else if (g.finished) showEnd();
   else if (g.pendingEvent) showGameEvent(g.pendingEvent);
   else if (g.pendingDecision) showDecision(g.pendingDecision);
+  else if (g.pendingTwo) showTwoPoint(g.pendingTwo);
   else if (g.pending) showMoment(g.pending);
   else setTimeout(advance, 50);
   return root;

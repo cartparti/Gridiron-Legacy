@@ -169,14 +169,17 @@ export function stepGame(state) {
   if (g.pendingEvent) return { type: 'gameEvent', event: g.pendingEvent };
   if (g.pendingDecision) return { type: 'decision', decision: g.pendingDecision };
   if (g.pending) return { type: 'moment', moment: g.pending };
+  if (g.pendingTwo) return { type: 'twoPoint', two: g.pendingTwo };
   if (!g.toss?.choice) autoToss(state); // nobody called the coin toss: flip it for them
   if (!g.pregameDone) {
     g.pregameDone = true;
     if (!g.sitOut && maybeEvent(state, 'pregame', 0.55)) return { type: 'gameEvent', event: g.pendingEvent };
   }
   while (g.cursor < g.drives.length) {
+    if (g.ot && g.score.home !== g.score.away) break; // sudden death: first score wins
     const d = g.drives[g.cursor];
     if (!g.halfDone && d.quarter >= 3) {
+      weatherShift(state, g);
       g.halfDone = true;
       g.log.push({ q: 2, clock: '0:00', team: '', user: false, out: 'HALF', text: 'Halftime', score: `${g.score.away}-${g.score.home}`, key: false });
       g.energy = Math.min(100, (g.energy ?? 80) + 10); // catch your breath
@@ -233,8 +236,63 @@ export function stepGame(state) {
     g.cursor++;
     if (active && maybeEvent(state, 'random', 0.06)) return { type: 'gameEvent', event: g.pendingEvent };
   }
+  if (startOvertime(state, g)) return stepGame(state);
   endGame(state, g);
   return { type: 'end' };
+}
+
+// ---------------- overtime, two-point tries, weather that turns
+const OT_CLOCKS = ['10:00', '7:41', '5:12', '2:38'];
+/** Tied at the end with you on the field: sudden-death overtime you play (up to four possessions). */
+function startOvertime(state, g) {
+  if (g.ot || g.finished || g.score.home !== g.score.away || g.sitOut || g.userOut) return false;
+  g.ot = true;
+  const first = rand(state) < 0.5 ? 'home' : 'away';
+  for (let i = 0; i < 4; i++) {
+    const side = i % 2 === 0 ? first : otherSide(first);
+    g.drives.push({ side, i: 100 + i, quarter: 4, clock: OT_CLOCKS[i], ot: true, moment: side === g.momentSide && !isKicker(state), result: null });
+  }
+  g.log.push({ q: 'OT', clock: '10:00', team: '', user: true, out: 'INFO', text: `Overtime! Sudden death. ${first === g.userSide ? 'Your team gets' : 'They get'} the ball first.`, score: `${g.score.away}-${g.score.home}`, key: true });
+  return true;
+}
+
+// go for two when the 6-point margin says so (down 2, 5 or 10, or up 1)
+const TWO_CHART = new Set([-2, -5, -10, 1]);
+/** After your team's touchdown late in a close game: kick or go for two? Called from finishDrive. */
+function maybeTwoPoint(state, g, d) {
+  if (isDefense(state) || isKicker(state) || state.player.position === 'MS' || g.sitOut || g.userOut || d.quarter < 4 || d.ot) return;
+  const m6 = userScore(g) - 1 - oppScore(g); // 7 already counted
+  if (Math.abs(m6) > 12) return;
+  if (g.halftimeUI) { g.pendingTwo = { m6, chart: TWO_CHART.has(m6) }; return; } // the match screen asks you
+  if (TWO_CHART.has(m6)) resolveTwoPoint(state, true, rand(state) < twoPointOdds(state));
+}
+export const twoPointOdds = (state) => clamp(0.44 + ((state.player.ovr ?? 65) - 65) / 200, 0.35, 0.6);
+/** Kick (go = false) or go for two; success decides the extra point. */
+export function resolveTwoPoint(state, go, success = false) {
+  const g = state.game;
+  g.pendingTwo = null;
+  if (!go) return { go: false };
+  const side = g.userSide;
+  g.score[side] += success ? 1 : -1;
+  if (success) momentumShift(g, 0.08);
+  g.log.push({ q: 4, clock: '', team: side === 'home' ? g.homeId : g.awayId, user: true, out: 'INFO', text: success ? 'Two-point conversion is GOOD!' : 'Two-point try fails.', score: `${g.score.away}-${g.score.home}`, key: true });
+  return { go: true, success };
+}
+
+const SHIFTS = { clear: [['rain', 0.5], ['wind', 0.5]], wind: [['rain', 1]], rain: [['storm', 0.7], ['clear', 0.3]], night: [['rain', 1]], fog: [['clear', 1]], snow: [['snow', 1]] };
+/** At halftime the weather can turn (or clear up). */
+function weatherShift(state, g) {
+  const from = g.weather ?? 'clear';
+  if (rand(state) > 0.16 || !SHIFTS[from]) return;
+  let r = rand(state);
+  let to = SHIFTS[from].find(([, w]) => (r -= w) < 0)?.[0] ?? from;
+  if (from === 'clear' && g.homeTrait === 'cold' && rand(state) < 0.6) to = 'snow';
+  if (to === from) return;
+  g.weather = to;
+  g.wind = makeWind(state, to);
+  g.weatherShift = { from, to };
+  const text = { rain: 'The skies open up: rain for the second half.', storm: 'The rain turns into a storm. Hold on to the ball.', wind: 'The wind picks up at halftime.', clear: 'The clouds break. Clear skies for the second half.', snow: 'Snow starts falling at halftime!' }[to] ?? `Weather change: ${to}.`;
+  g.log.push({ q: 2, clock: '0:00', team: '', user: false, out: 'INFO', text, score: `${g.score.away}-${g.score.home}`, key: true });
 }
 
 // ---------------- game plan (approach + intensity)
@@ -346,7 +404,8 @@ function buildMoment(state, g, d, over = {}) {
     wind: g.wind,
     label: KICK_TYPES.has(type) ? kickLabel(state, type, yardLine, d.quarter) : MASCOT_TYPES.has(type) ? `Q${d.quarter} · ${{ ms_hype: 'TV timeout: get them loud', ms_tshirt: 'Break in play: T-shirt time', ms_rival: 'Their mascot is coming over...', ms_stunt: 'Halftime show' }[type]}` : `${label}${ords[down]} and ${yardLine <= distance ? 'Goal' : distance} at ${yardText(yardLine)}`,
     trailing: userScore(g) < oppScore(g),
-    situation: over.gw ? 'For the win!' : d.twoMin ? (isDefense(state) ? 'Final stand' : 'Two-minute drill') : clutch ? 'Clutch' : type === 'qb_sneak' ? 'Short yardage' : null,
+    ot: !!d.ot,
+    situation: d.ot ? (isDefense(state) ? 'Overtime: stop them!' : 'Overtime: score to win!') : over.gw ? 'For the win!' : d.twoMin ? (isDefense(state) ? 'Final stand' : 'Two-minute drill') : clutch ? 'Clutch' : type === 'qb_sneak' ? 'Short yardage' : null,
     gw: !!over.gw,
     pusher: type === 'qb_sneak' && state.player.position === 'RB',
   };
@@ -869,6 +928,7 @@ function momentumShift(g, v) {
 function finishDrive(state, g, d, out, momentInfo) {
   const pts = (out === 'DOWNS' || out === 'MISS' ? 0 : POINTS[out]) + (momentInfo?.ptsAdj ?? 0);
   g.score[d.side] += pts;
+  if (out === 'TD' && d.side === g.userSide && !(momentInfo?.ptsAdj)) maybeTwoPoint(state, g, d);
   if (out === 'MISS') g.toBonus[otherSide(d.side)] = 0.04; // they take over at the spot
   if (out === 'TO' || out === 'DOWNS') g.toBonus[otherSide(d.side)] = 0.07;
   const team = d.side === 'home' ? g.homeId : g.awayId;
@@ -900,7 +960,7 @@ function finishDrive(state, g, d, out, momentInfo) {
     if (notes.length) flagNote = notes[Math.floor(rand(state) * notes.length)];
   }
   g.log.push({
-    q: d.quarter, clock: d.clock, team: team, user: isUserTeam, out,
+    q: d.ot ? 'OT' : d.quarter, clock: d.clock, team: team, user: isUserTeam, out,
     text: `${who}${verb}${flagNote}${momentInfo?.result.defTD ? ' (then pick six!)' : ''}`, score: `${g.score.away}-${g.score.home}`, key: !!momentInfo,
   });
 }
