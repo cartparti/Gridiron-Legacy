@@ -6,6 +6,7 @@ import { buildEnvironment } from './environment.js';
 import { buildGrounds } from './grounds.js';
 import { buildSideline } from './sideline.js';
 import { buildFieldWear } from './fieldwear.js';
+import { GLYPHS } from '../data/mascots.js';
 
 const FIELD_W = 53.3;
 const FIELD_L = 120;
@@ -57,8 +58,11 @@ function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWA
     g.fillText(txt.toUpperCase(), 0, 0);
     g.restore();
   };
-  ez(0, homeColors, homeName);
-  ez(110, awayColors, awayName);
+  // The home team owns the field: both end zones in home colors (team name in one, city in the other) and the home
+  // logo at midfield, whichever way the play is going. Without a home team (title screen, cutscenes) the old look.
+  const H = style?.home;
+  if (H) { ez(0, H.colors, H.name); ez(110, H.colors, H.city || H.name); }
+  else { ez(0, homeColors, homeName); ez(110, awayColors, awayName); }
   // end zone pattern: each home team paints theirs differently
   const pat = style?.pattern ?? 'diagonal';
   g.save();
@@ -104,7 +108,38 @@ function fieldTexture(homeColors, awayColors, homeName = 'HOME', awayName = 'AWA
       g.restore();
     }
   }
-  // Midfield logo.
+  // Midfield logo: the home team's mascot glyph on a disc in their colors.
+  if (H) {
+    const glyph = GLYPHS[H.glyph] ?? GLYPHS.shield;
+    const [p0, p1] = H.colors;
+    g.beginPath(); g.arc(cw / 2, 60 * ppy, 6 * ppy, 0, Math.PI * 2);
+    g.fillStyle = p0; g.globalAlpha = 0.9; g.fill(); g.globalAlpha = 1;
+    g.lineWidth = 0.45 * ppy; g.strokeStyle = p1; g.stroke();
+    g.lineWidth = 0.15 * ppy; g.strokeStyle = '#ffffff'; g.beginPath(); g.arc(cw / 2, 60 * ppy, 6.6 * ppy, 0, Math.PI * 2); g.stroke();
+    const cell = 0.56 * ppy;
+    const ox = cw / 2 - 8 * cell, oy = 60 * ppy - 8.6 * cell;
+    const at = (x, y) => glyph?.[y]?.[x] ?? '.';
+    // dark outline, then the glyph
+    g.fillStyle = 'rgba(10,12,16,0.9)';
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (at(x, y) === '.' && [at(x - 1, y), at(x + 1, y), at(x, y - 1), at(x, y + 1)].some((ch) => ch === '#' || ch === '+')) g.fillRect(ox + x * cell, oy + y * cell, cell + 0.5, cell + 0.5);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const ch = at(x, y);
+      if (ch === '.') continue;
+      g.fillStyle = ch === '#' ? p1 : ch === '+' ? '#ffffff' : '#0b0d10';
+      g.fillRect(ox + x * cell, oy + y * cell, cell + 0.5, cell + 0.5);
+    }
+    // the team name arched under the logo
+    g.save();
+    g.fillStyle = '#ffffff';
+    g.font = `900 ${Math.round(1.25 * ppy)}px "Arial Black", Impact, "Inter", sans-serif`;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(String(H.name).toUpperCase(), cw / 2, 60 * ppy + 4.6 * ppy);
+    g.restore();
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    return tex;
+  }
   g.beginPath();
   g.arc(cw / 2, 60 * ppy, 5 * ppy, 0, Math.PI * 2);
   g.fillStyle = homeColors[0];
@@ -604,12 +639,13 @@ export function buildStadium(scene) {
       const col = flagGeo.attributes.color;
       for (let i = 0; i < col.count; i += 3) { const c = bc[(i / 3) % 3]; for (let k = 0; k < 3; k++) col.setXYZ(i + k, c.r, c.g, c.b); }
       col.needsUpdate = true;
-      paintTifo(crowdColors, crowdColors === nearColors ? nearName : farName);
+      paintTifo(crowdColors, style?.home?.name ?? (crowdColors === nearColors ? nearName : farName));
       sidePaint = [crowdColors, crowdColors === nearColors ? farColors : nearColors, nearColors, farColors, style?.mascot ?? 'shield'];
       sideline.paint(...sidePaint, this.level ?? 'pro');
     },
     /** Place the world so the opponent goal line is `yardLine` yards ahead of z = 0. */
     setYardLine(yardLine, distance) {
+      if (globalThis.__playDebug) globalThis.__fieldYL = yardLine;
       world.position.z = -yardLine + 50;
       los.position.z = 0;
       fd.position.z = -Math.min(distance, yardLine);

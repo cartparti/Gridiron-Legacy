@@ -125,6 +125,7 @@ function frame(now) {
     R.camera.position.x += (Math.random() - 0.5) * shake * 1.5;
     R.camera.position.y += (Math.random() - 0.5) * shake * 1.5;
   }
+  if (globalThis.__camOverride) { const o = globalThis.__camOverride; R.camera.position.set(o.x, o.y, o.z); R.camera.lookAt(o.lx ?? 0, o.ly ?? 0, o.lz ?? 0); } // test hook
   R.renderer.render(R.active ?? R.scene, R.camera);
   // highlight snapshot: copy the frame we just drew into a small JPEG
   if (R.snapReq) {

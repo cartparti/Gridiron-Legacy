@@ -421,7 +421,7 @@ export function gamedayScreen(app) {
       lastName: st.player.last,
       userHome: g.userSide === 'home',
       stage: st.career.stage,
-      culture: { ...culture, mascot: mascotKind(home) },
+      culture: { ...culture, mascot: mascotKind(home), home: { name: home.name, city: home.city, colors: home.colors, glyph: mascotKind(home) } },
       homeName: home.name,
       // a broadcast shot between plays about half the time (mascot, cheer squad, coach, crowd, huddle, bench)
       interlude: !m.type.startsWith('ms_') && Math.random() < 0.55 ? INTERLUDES[Math.floor(Math.random() * INTERLUDES.length)] : null,
