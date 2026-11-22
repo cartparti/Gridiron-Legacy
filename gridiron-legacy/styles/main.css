@@ -1289,3 +1289,16 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 .ext-offer { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.35); display: flex; flex-direction: column; gap: 2px; }
 .li.locked { opacity: 0.55; }
 .wedding-card { border-color: rgba(244,114,182,0.5) !important; }
+/* v0.60 award night */
+.award-night { text-align: center; background: radial-gradient(circle at 50% 0%, rgba(255,212,59,0.18), transparent 70%), var(--card, #161b22) !important; border-color: rgba(255,212,59,0.55) !important; }
+.award-night .an-kicker { color: #ffd43b; letter-spacing: 0.2em; font-size: 0.7rem; }
+.award-night .an-title { margin: 4px 0; }
+.an-finalists { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+.an-f { display: flex; flex-direction: column; gap: 2px; padding: 10px 6px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--line); transition: all 0.4s; }
+.an-f.you { border-color: rgba(96,165,250,0.6); }
+.an-f.win { background: linear-gradient(160deg, #ffd43b, #b8860b); color: #1a1200; transform: scale(1.06); box-shadow: 0 0 22px rgba(255,212,59,0.6); }
+.an-f.win .muted { color: #3a2a00; opacity: 0.9; }
+.an-f.lose { opacity: 0.45; }
+.an-envelope { font-size: 2.6rem; margin-top: 10px; animation: anShake 0.4s ease-in-out infinite alternate; }
+@keyframes anShake { from { transform: rotate(-6deg) scale(1); } to { transform: rotate(6deg) scale(1.1); } }
+.an-result { margin-top: 12px; font: 900 1.05rem var(--pixel); }

@@ -4,7 +4,7 @@ import { achievementsPage, goalsCard, journalPage } from './achievements.js';
 import { dealsView, dealsNudge } from './deals.js';
 import { dealsOpen } from '../../sim/nil.js';
 import { mediaPersona } from '../../sim/presser.js';
-import { captainCard, tradeCard, scoutCard, previewCard, recordChaseCard, rivalryChip, powerView, extensionCard, mentorCard, familyView, givingView } from './pregame.js';
+import { captainCard, tradeCard, scoutCard, previewCard, recordChaseCard, rivalryChip, powerView, extensionCard, mentorCard, familyView, givingView, rehabCard } from './pregame.js';
 import { draftStockPage, draftTabOpen } from './draftStock.js';
 import { activityFor } from '../../data/activities.js';
 import { costumeSpec, mascotDisplayName } from '../../data/mascots.js';
@@ -207,6 +207,7 @@ function weekView(app) {
   // the coach's goals for this season
   { const gc = goalsCard(app); if (gc) container.append(gc); }
   { const dn = dealsNudge(app); if (dn) container.append(dn); }
+  { const rh = rehabCard(app); if (rh) container.append(rh); }
   { const pv = previewCard(app); if (pv) container.append(pv); }
   { const rc = recordChaseCard(app); if (rc) container.append(rc); }
   { const cc = captainCard(app); if (cc) container.append(cc); }

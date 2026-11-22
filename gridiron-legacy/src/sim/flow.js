@@ -46,6 +46,7 @@ import { holdoutWeek } from './extension.js';
 import { foundationWeekly, humanitarianVote } from './foundation.js';
 import { familyWeekly } from './family.js';
 import { mentorSeasonEnd } from './mentor.js';
+import { rehabHealed, rushedRisk } from './rehab.js';
 import { statPhrase } from './press.js';
 import { nilWeek, nilAfterGame, nilLeaveCollege, retentionOffer } from './nil.js';
 import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf, recordLeagueAwards, awardLabel } from './awards.js';
@@ -257,6 +258,10 @@ export function finishGame(state) {
     if (chance(state, Math.max(0.005, pInj))) {
       newInj = newInjury(state, { allowMajor: true });
       applyInjury(state, newInj);
+    } else if (!p.injury) {
+      // rushed back from an injury? the first games back are risky
+      const re = rushedRisk(state, () => newInjury(state, { allowMajor: false }));
+      if (re) { newInj = re; applyInjury(state, re); }
     }
   } else {
     p.mood = clamp(p.mood + (g.won ? 1 : -2), 0, 100);
@@ -272,6 +277,7 @@ export function finishGame(state) {
     } else p.injury.weeks--;
     if (p.injury.weeks <= 0) {
       addNews(state, 'injury', `${p.last} is fully healed from the ${p.injury.label.toLowerCase()}.`);
+      rehabHealed(state, p.injury);
       p.injury = null;
     }
   }
@@ -354,6 +360,22 @@ function playoffStep(state) {
 }
 
 // ---------------------------------------------------------------- season end
+
+// The big award of each level: if you're one of the finalists, there's a ceremony with an envelope.
+const TOP_AWARD = { hs: 'State Player of the Year', college: 'Ironstone Trophy', pro: 'Most Valuable Player' };
+function awardNight(state, aw) {
+  const c = state.career, p = state.player;
+  const award = TOP_AWARD[c.stage];
+  if (!award || (p.seasonStats?.games ?? 0) < 4) return null;
+  const race = awardRace(state);
+  const youWon = aw.awards.includes(award);
+  const myRank = race.findIndex((r) => r.you) + 1;
+  if (!youWon && myRank > 3) return null;
+  const others = race.filter((r) => !r.you).slice(0, youWon ? 2 : 3);
+  const finalists = [...others.slice(0, youWon ? 2 : 2), race.find((r) => r.you)].map((r) => ({ name: r.name, team: r.team, perf: Math.round(r.perf), you: !!r.you }));
+  const winner = youWon ? finalists.find((f) => f.you).name : others[0]?.name;
+  return { award: awardLabel(award, p.position), finalists: shuffle(state, finalists), winner, youWon, opened: false };
+}
 
 export function endSeason(state) {
   const p = state.player;
@@ -441,6 +463,7 @@ export function endSeason(state) {
     newAch,
     allStar: allStarSelect(state, { perf: aw.perf, awards: aw.awards }),
     humanitarian: humanitarianVote(state),
+    awardNight: awardNight(state, aw),
     mentor: mentorSeasonEnd(state),
     standings: standings(league).map((t) => ({ id: t.id, w: t.w, l: t.l })),
   };

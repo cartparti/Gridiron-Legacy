@@ -31,6 +31,8 @@ export function fmtCount(n) {
 export function textFrom(state, key, text, tid = null, opts = null) {
   const ph = phone(state);
   const t = (ph.threads[key] = ph.threads[key] ?? []);
+  const prevThem = t.filter((m) => m.from === 'them').pop();
+  if (prevThem && prevThem.text === text) return; // never the same text twice in a row
   t.push({ from: 'them', text, tid, opts, year: state.career.year, week: (state.league?.week ?? 0) + 1, read: false });
   if (t.length > MAX_MSGS) t.shift();
   ph.unread = Object.values(ph.threads).reduce((a, th) => a + th.filter((m) => !m.read && m.from === 'them').length, 0);
@@ -144,8 +146,12 @@ function sendTemplate(state, tid, { cool = 4, force = false } = {}) {
   if (!force && last !== undefined && now - last < cool && now >= last) return false;
   const key = tpl.who === 'mate' ? (p.teammates?.length ? pick(state, p.teammates).id : null) : tpl.who;
   if (!key) return false;
+  const line = freshLine(state, tpl.text);
+  // never the exact same text twice in a row from the same person
+  const prev = (ph.threads?.[key] ?? []).filter((m) => m.from === 'them').pop();
+  if (prev && prev.text === line) return false;
   ph.sentAt[tid] = now;
-  textFrom(state, key, freshLine(state, tpl.text), tid, resolveOptions(state, tid, tpl.replies));
+  textFrom(state, key, line, tid, resolveOptions(state, tid, tpl.replies));
   return true;
 }
 

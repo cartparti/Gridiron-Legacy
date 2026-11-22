@@ -1,7 +1,7 @@
 // Postgame report and end-of-season review.
 import { awardLabel } from '../../sim/awards.js';
 import { achUnlockRows, goalsReview } from './achievements.js';
-import { challengeChip, pressCard, allStarCard, rivalryResultCard, potwCard, offFieldReview } from './pregame.js';
+import { challengeChip, pressCard, allStarCard, rivalryResultCard, potwCard, offFieldReview, awardNightCard } from './pregame.js';
 import { injuryInfo, injuryNote } from '../../sim/injury.js';
 import { h } from '../dom.js';
 import { backupModal } from './slots.js';
@@ -114,6 +114,7 @@ export function reviewScreen(app) {
     h('div.card', h('h3', 'Season Stats'), h('div.bigstat', statLine(p.position, r.seasonStats).map(([v, l]) => h('div', h('b', v), h('span', l)))),
       h('p.tiny.muted', { style: { marginTop: '6px' } }, `${r.seasonStats.games} games played`)),
     goalsReview(r.goals),
+    awardNightCard(app),
     allStarCard(app),
     ...offFieldReview(r),
     r.newAch?.length ? h('div.card.unlock-card', h('h3', 'Achievements unlocked'), h('div.col', { style: { gap: '8px' } }, achUnlockRows(r.newAch))) : null,

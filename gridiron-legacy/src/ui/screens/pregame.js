@@ -12,6 +12,7 @@ import { marketValue } from '../../sim/flow.js';
 import { canMentor, menteeCandidates, pickMentee, mentorSession, MENTOR_TOPICS } from '../../sim/mentor.js';
 import { isMarried, WEDDINGS, planWedding, tryForBaby, kidAge, heirName } from '../../sim/family.js';
 import { CAUSES, LEVELS, PROGRAMS, canFound, startFoundation, donate, hostEvent } from '../../sim/foundation.js';
+import { REHAB_PLANS, canRehab, chooseRehab, eliteCost } from '../../sim/rehab.js';
 import { getTeam } from '../../sim/league.js';
 import { portraitImg } from '../../scenes/portrait.js';
 import { teamKits } from '../../data/kits.js';
@@ -421,4 +422,43 @@ export function offFieldReview(r) {
   if (r?.humanitarian) out.push(h('div.card.unlock-card', h('h3', '🏅 Humanitarian of the Year'), h('p.small', 'For everything your foundation did for the community this season.')));
   if (r?.mentor) out.push(h('div.card', h('h3', `🧑‍🏫 ${r.mentor.name}'s season`), h('p.small', `${r.mentor.from} → ${r.mentor.to} overall (${r.mentor.grew >= 0 ? '+' : ''}${r.mentor.grew}). ${r.mentor.line}`), r.mentor.done ? h('p.tiny.good', r.mentor.made ? 'He made it. He joins your coaching tree.' : 'He graduates from your mentorship.') : null));
   return out;
+}
+
+/** Week tab: hurt for 2+ weeks? Pick a rehab plan. */
+export function rehabCard(app) {
+  const st = app.state;
+  const p = st.player;
+  if (!p.injury) return null;
+  if (!canRehab(st)) {
+    if (!p.injury.plan) return null;
+    const plan = REHAB_PLANS.find((x) => x.id === p.injury.plan);
+    return h('div.card.rehab-card', h('div.card-title', h('h3', '🩹 Rehab'), h('span.chip.pix', plan.label.toUpperCase())), h('p.small.muted', `${p.injury.weeks} week${p.injury.weeks === 1 ? '' : 's'} to go. ${plan.desc}`));
+  }
+  return h('div.card.rehab-card',
+    h('div.card-title', h('h3', '🩹 Rehab plan'), h('span.tiny.muted', `${p.injury.label} · ${p.injury.weeks} weeks`)),
+    h('p.small.muted', 'How do you want to come back?'),
+    h('div.col', { style: { gap: '8px', marginTop: '6px' } }, REHAB_PLANS.filter((r) => r.id !== 'elite' || st.career.stage !== 'hs').map((r) => h('button.btn.block', {
+      style: { textAlign: 'left' }, disabled: r.id === 'elite' && p.money < eliteCost(st),
+      onclick: () => { sfx.click(); const res = chooseRehab(st, r.id); if (res?.text) toast(res.text); app.commit(); },
+    }, h('div.row.between', h('b', r.label), r.id === 'elite' ? h('span.small', fmtMoney(eliteCost(st))) : null), h('div.tiny.muted', r.desc)))));
+}
+
+/** Season review: award night. Finalists, then open the envelope. */
+export function awardNightCard(app) {
+  const st = app.state;
+  const an = st.review?.awardNight;
+  if (!an) return null;
+  const card = h('div.card.award-night');
+  const draw = (phase) => {
+    clear(card);
+    card.append(h('div.an-kicker.pix', 'AWARD NIGHT'), h('h2.an-title', an.award), h('p.tiny.muted', 'And the finalists are...'),
+      h('div.an-finalists', an.finalists.map((f) => h(`div.an-f${phase === 'open' && f.name === an.winner ? '.win' : phase === 'open' ? '.lose' : ''}${f.you ? '.you' : ''}`,
+        h('b', f.you ? 'You' : f.name), h('span.tiny.muted', f.team), h('span.tiny', `season rating ${f.perf}`)))));
+    if (phase === 'wait') card.append(h('button.btn.primary.block', { style: { marginTop: '10px' }, onclick: () => { sfx.click(); draw('drum'); setTimeout(() => { an.opened = true; app.save(); draw('open'); if (an.youWon) sfx.cheer?.(true); else sfx.click(); }, app.settings.reducedMotion ? 50 : 1600); } }, '✉️ Open the envelope'));
+    else if (phase === 'drum') card.append(h('div.an-envelope', '✉️'), h('p.center.small.muted', 'The envelope, please...'));
+    else card.append(h(`p.an-result${an.youWon ? '.good' : ''}`, an.youWon ? `🏆 The ${an.award} goes to... YOU!` : `The ${an.award} goes to ${an.winner}.`),
+      an.youWon ? null : h('p.tiny.muted', 'Being a finalist is an honor. Next year.'));
+  };
+  draw(an.opened ? 'open' : 'wait');
+  return card;
 }
