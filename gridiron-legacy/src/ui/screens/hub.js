@@ -4,7 +4,7 @@ import { achievementsPage, goalsCard, journalPage } from './achievements.js';
 import { dealsView, dealsNudge } from './deals.js';
 import { dealsOpen } from '../../sim/nil.js';
 import { mediaPersona } from '../../sim/presser.js';
-import { captainCard, tradeCard, scoutCard } from './pregame.js';
+import { captainCard, tradeCard, scoutCard, previewCard, recordChaseCard, rivalryChip, powerView } from './pregame.js';
 import { draftStockPage, draftTabOpen } from './draftStock.js';
 import { activityFor } from '../../data/activities.js';
 import { costumeSpec, mascotDisplayName } from '../../data/mascots.js';
@@ -196,6 +196,7 @@ function weekView(app) {
         h('div.team-badge', teamBadge(me, 56), h('span.nm', me.name), h('span.rec', `${me.w}-${me.l}`), formChips(st, me.id)),
         h('span.vs.pix', home ? 'VS' : 'AT'),
         h('div.team-badge', teamBadge(opp, 56), h('span.nm', opp.name), h('span.rec', `${opp.w}-${opp.l}`), formChips(st, opp.id))),
+      rivalryChip(app, opp),
       standsTicker(st),
       h('div.row.between.small.muted', { style: { marginTop: '8px' } },
         h('span', `Your OFF ${Math.round(me.off)} · DEF ${Math.round(me.def)}`),
@@ -206,6 +207,8 @@ function weekView(app) {
   // the coach's goals for this season
   { const gc = goalsCard(app); if (gc) container.append(gc); }
   { const dn = dealsNudge(app); if (dn) container.append(dn); }
+  { const pv = previewCard(app); if (pv) container.append(pv); }
+  { const rc = recordChaseCard(app); if (rc) container.append(rc); }
   { const cc = captainCard(app); if (cc) container.append(cc); }
   if (m && opp && st.player.position !== 'MS') { const sc = scoutCard(app, opp); if (sc) container.append(sc); }
 
@@ -338,11 +341,12 @@ function teamView(app) {
   const st = app.state;
   const league = st.league;
   const sub = app.ui.teamSub ?? 'lineup';
-  const tabs = h('div.subtabs', [['lineup', 'Lineup'], ['standings', 'Standings'], ['schedule', 'Schedule'], ['playoffs', 'Playoffs'], ['roster', 'Roster'], ['history', 'History']]
+  const tabs = h('div.subtabs', [['lineup', 'Lineup'], ['power', 'Power'], ['standings', 'Standings'], ['schedule', 'Schedule'], ['playoffs', 'Playoffs'], ['roster', 'Roster'], ['history', 'History']]
     .filter(([id]) => (id === 'roster' ? league.kind === 'pro' : id === 'history' ? st.proHistory.length || st.records : true))
     .map(([id, l]) => h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { app.ui.teamSub = id; app.render(); } }, l)));
   const out = h('div.col', { style: { gap: '14px' } }, h('h2', STAGES[league.kind].leagueName), tabs);
-  if (sub === 'lineup') { out.append(lineupView(app)); const tc = tradeCard(app); if (tc) out.append(tc); }
+  if (sub === 'power') out.append(powerView(app));
+  else if (sub === 'lineup') { out.append(lineupView(app)); const tc = tradeCard(app); if (tc) out.append(tc); }
   else if (sub === 'standings') {
     const divLeague = isDivisionLeague(league);
     const proj = divLeague ? projectedSeeds(league) : null;
@@ -528,6 +532,8 @@ function awardsView(app) {
   const titles = p.history.filter((x) => x.champion);
   const best = p.history.slice().sort((a, b) => parseInt(b.record, 10) - parseInt(a.record, 10))[0];
   return h('div.col', { style: { gap: '14px' } },
+    Object.keys(st.trophyCase ?? {}).length ? h('div.card', h('div.card-title', h('h3', 'Rivalry Trophies'), h('span.tiny.muted', `${st.player.rivalWins ?? 0} rivalry wins`)),
+      h('div.row.wrap', { style: { gap: '8px' } }, Object.values(st.trophyCase).map((t) => h('span.chip.gold', icon('trophy'), `${t.count > 1 ? `${t.count}× ` : ''}${t.name}`)))) : null,
     (st.ringOfHonor ?? []).length ? h('div.card.ring-card', h('div.card-title', h('h3', 'Ring of Honor'), h('span.tiny.muted', 'Numbers retired for you')),
       h('div.ring-list', st.ringOfHonor.map((r) => h('div.ring-item', { style: { background: r.colors[0], color: r.colors[1] } },
         h('b.pix', `#${r.number}`), h('span', `${r.city} ${r.name}`), h('span.tiny', `${r.year} · ${r.line}`))))) : null,

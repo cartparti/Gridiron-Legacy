@@ -30,7 +30,7 @@ export function seasonPerf(pos, s) {
   return clamp(prod * 0.5 + grade * 0.5, 0, 100);
 }
 
-const STAT_CATS = {
+export const STAT_CATS = {
   QB: [['passYds', 'Passing Yards'], ['passTD', 'Passing TDs']],
   RB: [['rushYds', 'Rushing Yards'], ['rushTD', 'Rushing TDs']],
   WR: [['recYds', 'Receiving Yards'], ['recTD', 'Receiving TDs']],

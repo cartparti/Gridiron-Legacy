@@ -41,6 +41,7 @@ import { captainVote, captainWeekly } from './captain.js';
 import { logJournal, journalAfterGame, journalSeason } from './journal.js';
 import { honorCheck } from './honors.js';
 import { allStarSelect } from './allstar.js';
+import { settleRivalry, nominatePlay, snapshotPower, makePreview } from './leaguelife.js';
 import { statPhrase } from './press.js';
 import { nilWeek, nilAfterGame, nilLeaveCollege, retentionOffer } from './nil.js';
 import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf, recordLeagueAwards, awardLabel } from './awards.js';
@@ -120,7 +121,8 @@ export function beginWeek(state) {
   const c = state.career;
   // a new season: the coach sets your goals before week 1
   if (state.league?.phase === 'regular' && (state.league.week ?? 0) === 0 && (state.goals?.year !== c.year || state.goals?.stage !== c.stage)) setSeasonGoals(state);
-  if (state.league?.phase === 'regular' && (state.league.week ?? 0) === 0) captainVote(state);
+  if (state.league?.phase === 'regular' && (state.league.week ?? 0) === 0) { captainVote(state); makePreview(state); }
+  snapshotPower(state);
   captainWeekly(state);
   // Trades and transfers only take effect during the regular season, never mid-playoffs.
   if (c.pendingMove && !getTeam(state.league, c.pendingMove)) delete c.pendingMove; // stale (changed leagues)
@@ -266,6 +268,7 @@ export function finishGame(state) {
     }
   }
   resolveChallenge(state, g);
+  const rivalryResult = settleRivalry(state, g);
   const opp = getTeam(league, g.oppId);
   const press = postGamePress(state, g, `${opp.city}`, teamName(state));
   simOtherGames(state, league, sched);
@@ -301,7 +304,9 @@ export function finishGame(state) {
     primetime: !!g.primetime,
     toss: g.toss ?? null,
     zoneCount: g.zoneCount ?? 0,
+    rivalryResult: rivalryResult ? { name: rivalryResult.trophy.name, kept: rivalryResult.kept, won: rivalryResult.won, lost: rivalryResult.lost, streak: rivalryResult.trophy.streak } : null,
   };
+  state.lastGame.potw = nominatePlay(state, state.lastGame);
   state.lastGame.presser = makePresser(state, g, { oppName: opp.name, teamName: teamName(state), statText: statPhrase(p.position, g.userStats), hurt: !!newInj });
   state.lastGame.comeback = !!g.half && (g.half.score[g.userSide === 'home' ? 'away' : 'home'] - g.half.score[g.userSide]) >= 10;
   state.lastGame.newAch = checkAchievements(state, 'game', { g: state.lastGame }).map((a) => a.id);

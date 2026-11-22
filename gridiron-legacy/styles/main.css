@@ -1269,3 +1269,19 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 .scout-card .sc-bar { height: 8px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; }
 .scout-card .sc-bar i { display: block; height: 100%; background: linear-gradient(90deg, #60a5fa, #f87171); }
 .audible-box .fc-play.ghost { opacity: 0.8; border-style: dashed; justify-content: center; }
+/* v0.59 league life */
+.mag-card { padding: 0 !important; overflow: hidden; }
+.mag-cover { position: relative; padding: 14px 14px 12px; color: #fff; background: linear-gradient(160deg, var(--c1, #1d3557), #0b0f14 85%); min-height: 150px; }
+.mag-title { font-size: 1.05rem; letter-spacing: 0.06em; color: var(--c2, #ffd43b); text-shadow: 0 2px 0 rgba(0,0,0,0.4); }
+.mag-issue { opacity: 0.8; letter-spacing: 0.12em; }
+.mag-photo { position: absolute; right: 8px; bottom: 0; }
+.mag-photo.team { bottom: 14px; right: 14px; }
+.mag-head { position: relative; margin-top: 40px; max-width: 60%; font: 900 1.2rem/1.15 var(--pixel); text-transform: uppercase; text-shadow: 0 2px 6px rgba(0,0,0,0.6); }
+.mag-body { padding: 12px 14px; }
+.rival-trophy { display: flex; align-items: center; gap: 10px; margin: 8px 0; padding: 8px 10px; border-radius: 12px; background: rgba(255,212,59,0.08); border: 1px solid rgba(255,212,59,0.35); }
+.rival-trophy .rt-ic { font-size: 1.4rem; }
+.rival-result { border-color: rgba(255,212,59,0.55) !important; } .rival-result.lost { border-color: rgba(248,113,113,0.5) !important; }
+.potw-card { border-color: rgba(96,165,250,0.5) !important; }
+.pr-row .pr-rank { width: 26px; text-align: center; font-size: 1rem; }
+.pr-row .pr-move { width: 32px; font-size: 0.7rem; font-weight: 800; }
+.pr-row.you { background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 10px; }

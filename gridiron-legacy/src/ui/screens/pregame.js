@@ -6,6 +6,12 @@ import { fmtMoney } from '../../core/util.js';
 import { tossCoin, tossChoice, ZONE_AT, PRIMETIME_NAME } from '../../sim/matchday.js';
 import { answerPresser } from '../../sim/presser.js';
 import { scoutReport } from '../../sim/scouting.js';
+import { recordChase, rivalryTrophy, votePlay, powerRankings } from '../../sim/leaguelife.js';
+import { getTeam } from '../../sim/league.js';
+import { portraitImg } from '../../scenes/portrait.js';
+import { teamKits } from '../../data/kits.js';
+import { crest } from '../crest.js';
+import { teamBadge } from '../components.js';
 import { SPEECHES, speechDue, giveSpeech, isCaptain } from '../../sim/captain.js';
 import { allStarChallenge } from '../../sim/allstar.js';
 import { openCombineTest } from './combineGames.js';
@@ -209,4 +215,88 @@ export function scoutCard(app, opp, { compact = false } = {}) {
       compact ? null : h('ul.small', { style: { margin: '8px 0 0 16px' } }, r.tips.map((t) => h('li', t))),
       h('p.tiny.muted', { style: { marginTop: '6px' } }, 'In plays you will see their tells before the snap: a red ! over blitzers. QBs and running backs can AUDIBLE (Q), receivers can call a HOT ROUTE.'))
       : h('p.tiny.muted', { style: { marginTop: '6px' } }, 'Put Film Study in your week plan to unlock their tendencies, tips for your position and pre-snap tells (a red ! over blitzers) in every play this game. You can still AUDIBLE (Q) at the line either way.'));
+}
+
+// ---------------------------------------------------------------- league life
+/** Week tab, start of the season: the preseason magazine. */
+export function previewCard(app) {
+  const st = app.state;
+  const pv = st.preview;
+  if (!pv || pv.year !== st.career.year || pv.stage !== st.career.stage || (st.league?.week ?? 0) > 1) return null;
+  const p = st.player;
+  const team = getTeam(st.league, st.career.teamId);
+  return h('div.card.mag-card', { style: { '--c1': team.colors[0], '--c2': team.colors[1] } },
+    h('div.mag-cover',
+      h('div.mag-title.pix', pv.mag.toUpperCase()),
+      h('div.mag-issue.tiny', `${pv.year} SEASON PREVIEW`),
+      pv.cover ? h('div.mag-photo', portraitImg({ uniform: teamKits(team).home, look: p.look, number: p.number, helmet: false }, 110, { full: true })) : h('div.mag-photo.team', crest(team, 80)),
+      h('div.mag-head', pv.headline)),
+    h('div.mag-body',
+      h('div.bigstat',
+        h('div', h('b', `#${pv.preRank}`), h('span', `Preseason rank (of ${pv.teams})`)),
+        h('div', h('b', pv.projected), h('span', 'Projected record')),
+        h('div', h('b', `${pv.odds}%`), h('span', 'Your top-award odds'))),
+      h('p.small', { style: { marginTop: '8px' } }, h('b', 'Bold prediction: '), pv.bold),
+      pv.toWatch?.length ? h('p.tiny.muted', `Teams to watch: ${pv.toWatch.join(', ')}`) : null));
+}
+
+/** Week tab (pros): records you're chasing. */
+export function recordChaseCard(app) {
+  const list = recordChase(app.state);
+  if (!list.length) return null;
+  return h('div.card.chase-card',
+    h('div.card-title', h('h3', '📜 Record Chase'), h('span.tiny.muted', 'History is within reach')),
+    h('div.col', { style: { gap: '10px' } }, list.slice(0, 3).map((r) => h('div',
+      h('div.row.between', h('b.small', `${r.kind === 'season' ? 'Single-season' : 'Career'} ${r.label}`), h('span.tiny.muted', `${r.holder} (${r.year}): ${r.record.toLocaleString('en-US')}`)),
+      h('div.goal-bar', h('i', { style: { width: `${Math.round(r.pct * 100)}%` } })),
+      h('div.tiny', `${r.cur.toLocaleString('en-US')} so far · need ${r.need.toLocaleString('en-US')} more${r.perGame ? ` (about ${r.perGame.toLocaleString('en-US')} a game)` : ''}${r.pace ? ` · on pace for ${r.pace.toLocaleString('en-US')}` : ''}`)))));
+}
+
+/** The rivalry trophy at stake (Week tab matchup / pregame). */
+export function rivalryChip(app, opp) {
+  const st = app.state;
+  if (!opp || opp.id !== st.career.rivalTeamId) return null;
+  const me = getTeam(st.league, st.career.teamId);
+  const tr = rivalryTrophy(st, me, opp);
+  const holder = tr.holder === me.id ? 'You hold it' : tr.holder === opp.id ? `${opp.name} hold it` : 'Up for grabs';
+  return h('div.rival-trophy', h('span.rt-ic', '🏆'), h('div.grow', h('div.tiny.pix', 'RIVALRY TROPHY'), h('b.small', tr.name)), h('span.tiny.muted', `${holder}${tr.streak > 1 && tr.holder ? ` · ${tr.streak} straight` : ''}`));
+}
+
+/** Postgame: rivalry result + Play of the Week vote. */
+export function rivalryResultCard(lg) {
+  const r = lg?.rivalryResult;
+  if (!r) return null;
+  return h(`div.card.rival-result${r.lost ? '.lost' : ''}`, h('div.row', { style: { gap: '10px', alignItems: 'center' } }, h('span', { style: { fontSize: '2rem' } }, r.lost ? '😤' : '🏆'),
+    h('div', h('b', r.lost ? `They took ${r.name}` : r.kept ? `You kept ${r.name}!` : `You won ${r.name}!`), h('div.tiny.muted', r.lost ? 'It sits in their trophy case for a year.' : r.streak > 1 ? `${r.streak} straight. It stays in your building.` : 'It comes home with you.'))));
+}
+export function potwCard(app) {
+  const st = app.state;
+  const pw = st.lastGame?.potw;
+  if (!pw) return null;
+  const card = h('div.card.potw-card');
+  const draw = () => {
+    clear(card);
+    card.append(h('div.card-title', h('h3', '⭐ Play of the Week nominee'), pw.voted ? h(`span.chip.pix${pw.won ? '.gold' : ''}`, pw.won ? 'WINNER' : 'RUNNER-UP') : null),
+      h('p.small', h('b', pw.label), ` · ${pw.text ?? ''}`),
+      h('p.tiny.muted', `Up against: ${pw.rivals.join(' · ')}`));
+    if (!pw.voted) card.append(h('div.row', { style: { gap: '8px', marginTop: '6px' } },
+      h('button.btn.small.primary', { onclick: () => { sfx.click(); votePlay(st); app.save(); draw(); } }, 'Let the fans decide'),
+      h('button.btn.small', { onclick: () => { sfx.click(); votePlay(st, { boost: true }); app.save(); draw(); } }, 'Campaign on Huddle')));
+    else card.append(h(`p.small${pw.won ? '.good' : ''}`, pw.won ? `You won with ${pw.share}% of the vote! +3 fame.` : `So close: ${pw.share}% of the vote.`));
+  };
+  draw();
+  return card;
+}
+
+/** Team tab: power rankings. */
+export function powerView(app) {
+  const st = app.state;
+  const list = powerRankings(st);
+  return h('div.card', h('div.card-title', h('h3', 'Power Rankings'), h('span.tiny.muted', `Week ${(st.league?.week ?? 0) + 1}`)),
+    h('div.list', list.map((r) => h(`div.li.pr-row${r.you ? '.you' : ''}`,
+      h('b.pr-rank.pix', r.rank),
+      h('span.pr-move', { class: r.move > 0 ? 'good' : r.move < 0 ? 'bad' : 'muted' }, r.move > 0 ? `▲${r.move}` : r.move < 0 ? `▼${-r.move}` : '–'),
+      teamBadge(r.team, 28),
+      h('div.grow', h('b.small', `${r.team.city} ${r.team.name}`), h('div.tiny.muted', r.take)),
+      h('span.small', r.record)))));
 }
