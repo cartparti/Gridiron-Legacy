@@ -1285,3 +1285,7 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 .pr-row .pr-rank { width: 26px; text-align: center; font-size: 1rem; }
 .pr-row .pr-move { width: 32px; font-size: 0.7rem; font-weight: 800; }
 .pr-row.you { background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 10px; }
+/* v0.59 off the field */
+.ext-offer { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.35); display: flex; flex-direction: column; gap: 2px; }
+.li.locked { opacity: 0.55; }
+.wedding-card { border-color: rgba(244,114,182,0.5) !important; }

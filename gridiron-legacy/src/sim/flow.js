@@ -42,6 +42,10 @@ import { logJournal, journalAfterGame, journalSeason } from './journal.js';
 import { honorCheck } from './honors.js';
 import { allStarSelect } from './allstar.js';
 import { settleRivalry, nominatePlay, snapshotPower, makePreview } from './leaguelife.js';
+import { holdoutWeek } from './extension.js';
+import { foundationWeekly, humanitarianVote } from './foundation.js';
+import { familyWeekly } from './family.js';
+import { mentorSeasonEnd } from './mentor.js';
 import { statPhrase } from './press.js';
 import { nilWeek, nilAfterGame, nilLeaveCollege, retentionOffer } from './nil.js';
 import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf, recordLeagueAwards, awardLabel } from './awards.js';
@@ -123,6 +127,8 @@ export function beginWeek(state) {
   if (state.league?.phase === 'regular' && (state.league.week ?? 0) === 0 && (state.goals?.year !== c.year || state.goals?.stage !== c.stage)) setSeasonGoals(state);
   if (state.league?.phase === 'regular' && (state.league.week ?? 0) === 0) { captainVote(state); makePreview(state); }
   snapshotPower(state);
+  foundationWeekly(state);
+  { const fam = familyWeekly(state); if (fam) textFrom(state, 'family', fam); }
   captainWeekly(state);
   // Trades and transfers only take effect during the regular season, never mid-playoffs.
   if (c.pendingMove && !getTeam(state.league, c.pendingMove)) delete c.pendingMove; // stale (changed leagues)
@@ -141,6 +147,7 @@ export function beginWeek(state) {
     logJournal(state, 'move', `Traded from the ${old} to the ${teamName(state)}.`, { big: true });
   }
   newWeek(state);
+  { const ho = holdoutWeek(state); if (ho) state.week.notice = ho; }
   state.week.nilNotes = nilWeek(state);
   trackDraftWatch(state);
   {
@@ -175,6 +182,7 @@ export function resolveEvent(state, choiceIdx) {
 /** What the player must or may do about game day this week. */
 export function gameDayStatus(state) {
   const p = state.player;
+  if (p.holdout) return { canPlay: false, reason: 'Holding out for a new contract' };
   if (p.suspended > 0) return { canPlay: false, reason: `Suspended (${p.suspended} game${p.suspended > 1 ? 's' : ''})` };
   const info = injuryInfo(p.injury, p.position);
   if (info && !info.play) return { canPlay: false, injury: info.status, reason: `${p.injury.label} (${info.label}): ${p.injury.weeks} wk` };
@@ -432,6 +440,8 @@ export function endSeason(state) {
     goals,
     newAch,
     allStar: allStarSelect(state, { perf: aw.perf, awards: aw.awards }),
+    humanitarian: humanitarianVote(state),
+    mentor: mentorSeasonEnd(state),
     standings: standings(league).map((t) => ({ id: t.id, w: t.w, l: t.l })),
   };
   journalSeason(state, state.review, { teamName: `${team.city} ${team.name}`, titleName: STAGES[c.stage].titleName, awardLabel: (n) => awardLabel(n, p.position) });

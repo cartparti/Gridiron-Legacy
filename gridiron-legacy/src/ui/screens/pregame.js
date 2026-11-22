@@ -7,6 +7,11 @@ import { tossCoin, tossChoice, ZONE_AT, PRIMETIME_NAME } from '../../sim/matchda
 import { answerPresser } from '../../sim/presser.js';
 import { scoutReport } from '../../sim/scouting.js';
 import { recordChase, rivalryTrophy, votePlay, powerRankings } from '../../sim/leaguelife.js';
+import { leverage, canAskExtension, askExtension, acceptExtension, pushExtension, startHoldout, endHoldout } from '../../sim/extension.js';
+import { marketValue } from '../../sim/flow.js';
+import { canMentor, menteeCandidates, pickMentee, mentorSession, MENTOR_TOPICS } from '../../sim/mentor.js';
+import { isMarried, WEDDINGS, planWedding, tryForBaby, kidAge, heirName } from '../../sim/family.js';
+import { CAUSES, LEVELS, PROGRAMS, canFound, startFoundation, donate, hostEvent } from '../../sim/foundation.js';
 import { getTeam } from '../../sim/league.js';
 import { portraitImg } from '../../scenes/portrait.js';
 import { teamKits } from '../../data/kits.js';
@@ -299,4 +304,121 @@ export function powerView(app) {
       teamBadge(r.team, 28),
       h('div.grow', h('b.small', `${r.team.city} ${r.team.name}`), h('div.tiny.muted', r.take)),
       h('span.small', r.record)))));
+}
+
+// ---------------------------------------------------------------- off the field
+const M$ = (n) => fmtMoney(n);
+
+/** Team tab (pros): contract extension / holdout. */
+export function extensionCard(app) {
+  const st = app.state;
+  const p = st.player;
+  if (st.career.stage !== 'pro' || !p.contract) return null;
+  const e = st.extension && st.extension.year === st.career.year ? st.extension : null;
+  const say = (res) => { if (res?.text) toast(res.text); app.commit(); };
+  const card = h('div.card.ext-card', h('div.card-title', h('h3', 'Contract'), h('span.tiny.muted', `${M$(p.contract.salary)}/yr · ${p.contract.years} yr left`)));
+  const lev = leverage(st);
+  card.append(h('p.small', lev >= 1.15 ? `You're outplaying this deal: your market value is about ${M$(marketValue(st))} a year.` : lev >= 1.05 ? 'You\'re a little underpaid. You could ask for an extension.' : 'Your deal is about right for how you\'re playing.'));
+  if (p.holdout) {
+    card.append(h('p.small.bad', `Holding out for ${M$(e?.ask ?? p.holdout.ask)} a year. You sit every game and get fined every week until they pay or you report back.`),
+      h('button.btn.small', { onclick: () => { sfx.click(); say(endHoldout(st)); } }, 'Report back'));
+    return card;
+  }
+  if (!e && canAskExtension(st)) { card.append(h('button.btn.small', { onclick: () => { sfx.click(); askExtension(st); app.commit(); } }, 'Ask for an extension')); return card; }
+  if (e?.status === 'offer') {
+    card.append(h('div.ext-offer', h('div.tiny.pix.muted', 'THEIR OFFER'), h('b', `${e.offer.years} more years · ${M$(e.offer.salary)}/yr`), h('div.tiny.muted', `Total about ${M$(e.offer.salary * e.offer.years)}`)),
+      h('div.row.wrap', { style: { gap: '6px', marginTop: '8px' } },
+        h('button.btn.small.primary', { onclick: () => { sfx.cash(); say(acceptExtension(st)); } }, 'Sign it'),
+        e.pushes < 2 ? h('button.btn.small', { onclick: () => { sfx.click(); say(pushExtension(st)); } }, 'Push for more') : null,
+        h('button.btn.small.ghost', { onclick: async () => { if (!(await confirmDialog('Hold out?', 'You will sit out games and be fined every week until they pay 15% more, or you give in. Coach and teammates will be upset.', 'Hold out'))) return; sfx.click(); say(startHoldout(st)); } }, 'Hold out')));
+    return card;
+  }
+  if (e) card.append(h('p.small.muted', e.status === 'signed' ? 'Extension signed this season.' : e.text ?? 'No more talks this season.'));
+  return card;
+}
+
+/** Team tab (veterans): mentor a young teammate. */
+export function mentorCard(app) {
+  const st = app.state;
+  const p = st.player;
+  if (!canMentor(st) && !p.mentee) return null;
+  const card = h('div.card.mentor-card', h('div.card-title', h('h3', '🧑‍🏫 Mentorship'), h('span.tiny.muted', `${(p.mentees ?? []).length} in your coaching tree`)));
+  const m = p.mentee;
+  if (!m) {
+    card.append(h('p.small.muted', 'You have been around. Take a young teammate under your wing: weekly sessions grow his game, and every mentee who makes it counts toward your legacy.'),
+      h('div.list', menteeCandidates(st).map((c) => h('div.li', h('div.grow', h('b.small', c.name), h('div.tiny.muted', `${c.pos} · ${c.age ?? 22} yrs · ${c.ovr} OVR`)), h('button.btn.small', { onclick: () => { sfx.select(); pickMentee(st, c); app.commit(); } }, 'Mentor him')))));
+    return card;
+  }
+  const wk = `${st.career.year}-${st.league?.week}`;
+  card.append(h('div.row.between', h('b', m.name), h('span.small', `${m.pos} · ${Math.round(m.ovr)} OVR (${m.ovr - m.ovr0 >= 0 ? '+' : ''}${(m.ovr - m.ovr0).toFixed(1)})`)),
+    h('div.tiny.muted', 'Bond'), h('div.goal-bar', h('i', { style: { width: `${m.bond}%` } })),
+    m.lastWeek === wk ? h('p.tiny.muted', { style: { marginTop: '6px' } }, 'You already met this week.')
+      : h('div.col', { style: { gap: '6px', marginTop: '8px' } }, MENTOR_TOPICS.map((t) => h('button.btn.block.small', { style: { textAlign: 'left' }, onclick: () => { sfx.click(); const r = mentorSession(st, t.id); if (r?.text) toast(r.text); app.commit(); } }, h('b', t.label), h('span.tiny.muted', ` · ${t.desc}`)))));
+  return card;
+}
+
+/** Life > Family. */
+export function familyView(app) {
+  const st = app.state;
+  const p = st.player;
+  const F = p.family ?? { kids: [] };
+  if (!isMarried(p)) {
+    return h('div.card', h('h3', 'Family'),
+      h('p.small.muted', p.partnerName ? `You're with ${p.partnerName}. When the time is right, propose (People tab, once you live together) or wait for the moment in a story event. After that you can plan the wedding and start a family here.`
+        : 'Meet someone first (Social tab). Fall in love, move in together, propose, and you can plan a wedding and start a family here.'),
+      F.kids?.length ? kidsList(st, F) : null);
+  }
+  const out = h('div.col', { style: { gap: '14px' } });
+  if (!F.wedding) {
+    out.append(h('div.card.wedding-card', h('h3', `💍 Plan your wedding with ${p.partnerName}`),
+      h('div.col', { style: { gap: '8px', marginTop: '8px' } }, WEDDINGS.filter((w) => w.id !== 'gala' || st.career.stage === 'pro').map((w) => h('button.btn.block', { style: { textAlign: 'left' }, disabled: p.money < w.cost, onclick: () => { sfx.cash(); const r = planWedding(st, w.id); if (r?.text) toast(r.text); app.commit(); } },
+        h('div.row.between', h('b', w.label), h('span.small', M$(w.cost))), h('div.tiny.muted', w.desc))))));
+  } else {
+    out.append(h('div.card', h('div.card-title', h('h3', `Married to ${p.partnerName}`), h('span.tiny.muted', `since ${F.wedding.year}`)),
+      h('p.small.muted', `${WEDDINGS.find((w) => w.id === F.wedding.kind)?.label ?? 'Wedding'} in ${F.wedding.year}.`)));
+  }
+  const ff = p.family ?? F;
+  out.append(h('div.card', h('div.card-title', h('h3', 'Kids'), h('span.tiny.muted', ff.expecting ? `Baby due in ${ff.expecting.weeks} weeks` : `${ff.kids?.length ?? 0} kid${(ff.kids?.length ?? 0) === 1 ? '' : 's'}`)),
+    ff.kids?.length ? kidsList(st, ff) : h('p.small.muted', 'No kids yet.'),
+    !ff.expecting && (ff.kids?.length ?? 0) < 4 && ff.tried !== st.career.year && F.wedding
+      ? h('button.btn.small', { style: { marginTop: '8px' }, onclick: () => { sfx.click(); const r = tryForBaby(st); if (r?.text) toast(r.text); app.commit(); } }, 'Talk about starting a family') : null,
+    heirName(p) ? h('p.tiny.muted', { style: { marginTop: '8px' } }, `When you retire, ${heirName(p)} can carry on the ${p.last} name in a new career.`) : null));
+  return out;
+}
+function kidsList(st, F) {
+  return h('div.list', F.kids.map((k) => h('div.li', h('span', { style: { fontSize: '1.3rem' } }, kidAge(st, k) < 3 ? '👶' : k.sex === 'm' ? '👦' : '👧'), h('div.grow', h('b.small', k.name), h('div.tiny.muted', `${k.sex === 'm' ? 'Son' : 'Daughter'} · ${kidAge(st, k) === 0 ? 'newborn' : `${kidAge(st, k)} years old`}`)))));
+}
+
+/** Life > Giving: your foundation. */
+export function givingView(app) {
+  const st = app.state;
+  const p = st.player;
+  const F = st.foundation;
+  if (!F) {
+    if (!canFound(st)) return h('div.card', h('h3', 'Charity foundation'), h('p.small.muted', 'In college and the pros you can start your own foundation and give back to your hometown.'));
+    return h('div.card', h('h3', 'Start a foundation'), h('p.small.muted', 'Pick the cause closest to your heart. Donations unlock programs and community events that build fame, mood and your legacy.'),
+      h('div.col', { style: { gap: '8px', marginTop: '8px' } }, CAUSES.map((c) => h('button.btn.block', { style: { textAlign: 'left' }, onclick: () => { sfx.select(); startFoundation(st, c.id); app.commit(); } }, h('b', c.label), h('div.tiny.muted', c.desc)))));
+  }
+  const next = LEVELS[F.level + 1];
+  const amounts = st.career.stage === 'pro' ? [10000, 100000, 1000000] : [1000, 5000, 25000];
+  const cause = CAUSES.find((c) => c.id === F.cause);
+  return h('div.col', { style: { gap: '14px' } },
+    h('div.card.hero', h('div.card-title', h('h2', F.name), h('span.chip.pix.gold', `LEVEL ${F.level}`)),
+      h('p.small.muted', cause?.desc),
+      h('div.bigstat', h('div', h('b', M$(F.donated)), h('span', 'Donated')), h('div', h('b', F.kids.toLocaleString('en-US')), h('span', 'Kids helped')), h('div', h('b', F.events), h('span', 'Events'))),
+      next ? h('div', { style: { marginTop: '8px' } }, h('div.tiny.muted', `Next level at ${M$(next)}`), h('div.goal-bar', h('i', { style: { width: `${Math.min(100, (F.donated / next) * 100)}%` } }))) : h('p.small.good', 'Max level: a national foundation.'),
+      F.humanitarian.length ? h('p.small', `🏅 Humanitarian of the Year: ${F.humanitarian.join(', ')}`) : null),
+    h('div.card', h('h3', 'Donate'), h('div.row.wrap', { style: { gap: '8px' } }, amounts.map((a) => h('button.btn.small', { disabled: p.money < a, onclick: () => { sfx.cash(); const r = donate(st, a); if (r?.text) toast(r.text); app.commit(); } }, M$(a))))),
+    h('div.card', h('h3', 'Community event'), h('p.small.muted', 'Spend a free day this week with the kids your foundation helps. Big fame and mood boost.'),
+      h('button.btn.small.primary', { onclick: () => { sfx.select(); const r = hostEvent(st); if (r?.text) toast(r.text); app.commit(); } }, 'Host an event (uses a day)')),
+    h('div.card', h('h3', 'Programs'), h('div.list', PROGRAMS.map((pr) => h(`div.li${F.level >= pr.level ? '' : '.locked'}`, h('span', F.level >= pr.level ? '✅' : '🔒'), h('div.grow', h('b.small', pr.label), h('div.tiny.muted', `Level ${pr.level} · ${pr.desc}`)))))),
+    h('p.tiny.muted', 'In the pros, a strong foundation and community work can win Humanitarian of the Year, and it all counts toward your legacy.'));
+}
+
+/** Season review: Humanitarian award and the mentee's report. */
+export function offFieldReview(r) {
+  const out = [];
+  if (r?.humanitarian) out.push(h('div.card.unlock-card', h('h3', '🏅 Humanitarian of the Year'), h('p.small', 'For everything your foundation did for the community this season.')));
+  if (r?.mentor) out.push(h('div.card', h('h3', `🧑‍🏫 ${r.mentor.name}'s season`), h('p.small', `${r.mentor.from} → ${r.mentor.to} overall (${r.mentor.grew >= 0 ? '+' : ''}${r.mentor.grew}). ${r.mentor.line}`), r.mentor.done ? h('p.tiny.good', r.mentor.made ? 'He made it. He joins your coaching tree.' : 'He graduates from your mentorship.') : null));
+  return out;
 }

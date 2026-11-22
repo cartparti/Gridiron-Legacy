@@ -1,5 +1,7 @@
 // Legacy score: turns a career into Journeyman / Solid Starter / Star / Hall of Fame.
 import { LEGACY_TIERS, DIFFICULTIES } from '../data/config.js';
+import { foundationLegacy } from './foundation.js';
+import { mentorLegacy } from './mentor.js';
 
 const AWARD_POINTS = {
   'Most Valuable Player': 32,
@@ -37,6 +39,8 @@ export function computeLegacy(state) {
   const POS_PEAK = { QB: 77.5, RB: 70, WR: 75, CB: 75, DT: 75, MS: 75, K: 75 };
   add(`Peak overall ${Math.round(peak)}`, Math.max(0, peak - (POS_PEAK[p.position] ?? 75)) * 2);
   add('Fame', p.fame / 4);
+  add('Charity foundation', foundationLegacy(state));
+  add('Coaching tree (mentees)', mentorLegacy(p));
   let score = lines.reduce((a, l) => a + l.pts, 0);
   const diff = DIFFICULTIES[state.difficulty ?? 'normal'];
   if (diff.legacy !== 1) {

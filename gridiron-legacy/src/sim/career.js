@@ -1,6 +1,7 @@
 // Career depth: earning your spot (depth chart), the season award race, recruiting stars + campus visits,
 // the pre-draft combine, season stakes for the hub, life after football and the next generation.
 import { clamp } from '../core/util.js';
+import { heirName } from './family.js';
 import { gauss, chance, pick, randInt, rand } from '../core/rng.js';
 import { getTeam, standings, genName, isDivisionLeague, projectedSeeds } from './league.js';
 import { seasonPerf } from './awards.js';
@@ -240,7 +241,8 @@ export function nextGenerationOpts(state) {
   const tier = state.legacy?.score ?? 50;
   const boy = genName(state);
   return {
-    first: boy.first, last: p.last, position: p.position, background: 'natural', number: p.number,
+    // your oldest son carries on the name
+    first: heirName(p) ?? boy.first, last: p.last, position: p.position, background: 'natural', number: p.number,
     hometown: p.hometown, customTown: state.career.customTown ?? null, hsTeamId: null,
     difficulty: state.difficulty ?? 'normal', legacyBonus: clamp(Math.round(tier / 25), 1, 4), parentName: `${p.first} ${p.last}`,
   };

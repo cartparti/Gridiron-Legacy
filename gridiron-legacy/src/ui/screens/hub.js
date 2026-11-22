@@ -4,7 +4,7 @@ import { achievementsPage, goalsCard, journalPage } from './achievements.js';
 import { dealsView, dealsNudge } from './deals.js';
 import { dealsOpen } from '../../sim/nil.js';
 import { mediaPersona } from '../../sim/presser.js';
-import { captainCard, tradeCard, scoutCard, previewCard, recordChaseCard, rivalryChip, powerView } from './pregame.js';
+import { captainCard, tradeCard, scoutCard, previewCard, recordChaseCard, rivalryChip, powerView, extensionCard, mentorCard, familyView, givingView } from './pregame.js';
 import { draftStockPage, draftTabOpen } from './draftStock.js';
 import { activityFor } from '../../data/activities.js';
 import { costumeSpec, mascotDisplayName } from '../../data/mascots.js';
@@ -346,7 +346,7 @@ function teamView(app) {
     .map(([id, l]) => h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { app.ui.teamSub = id; app.render(); } }, l)));
   const out = h('div.col', { style: { gap: '14px' } }, h('h2', STAGES[league.kind].leagueName), tabs);
   if (sub === 'power') out.append(powerView(app));
-  else if (sub === 'lineup') { out.append(lineupView(app)); const tc = tradeCard(app); if (tc) out.append(tc); }
+  else if (sub === 'lineup') { out.append(lineupView(app)); const ec = extensionCard(app); if (ec) out.append(ec); const tc = tradeCard(app); if (tc) out.append(tc); const mc = mentorCard(app); if (mc) out.append(mc); }
   else if (sub === 'standings') {
     const divLeague = isDivisionLeague(league);
     const proj = divLeague ? projectedSeeds(league) : null;
@@ -436,9 +436,11 @@ function lifeView(app) {
   const p = st.player;
   const sub = app.ui.lifeSub ?? 'social';
   const out = h('div.col', { style: { gap: '14px' } },
-    h('div.subtabs', [['social', 'Social'], ['home', 'Home'], ['people', 'People'], dealsOpen(st) ? ['deals', st.career.stage === 'college' ? `NIL${st.nil?.offers?.length ? ` (${st.nil.offers.length})` : ''}` : `Deals${st.nil?.offers?.length ? ` (${st.nil.offers.length})` : ''}`] : null, ['store', 'Store'], ['money', 'Money'], ['lifestyle', 'Housing & Cars'], ['invest', 'Invest']].filter(Boolean).map(([id, l]) =>
+    h('div.subtabs', [['social', 'Social'], ['home', 'Home'], ['people', 'People'], dealsOpen(st) ? ['deals', st.career.stage === 'college' ? `NIL${st.nil?.offers?.length ? ` (${st.nil.offers.length})` : ''}` : `Deals${st.nil?.offers?.length ? ` (${st.nil.offers.length})` : ''}`] : null, ['family', 'Family'], ['giving', 'Giving'], ['store', 'Store'], ['money', 'Money'], ['lifestyle', 'Housing & Cars'], ['invest', 'Invest']].filter(Boolean).map(([id, l]) =>
       h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { app.ui.lifeSub = id; app.render(); } }, l))));
-  if (sub === 'deals' && dealsOpen(st)) out.append(dealsView(app));
+  if (sub === 'family') out.append(familyView(app));
+  else if (sub === 'giving') out.append(givingView(app));
+  else if (sub === 'deals' && dealsOpen(st)) out.append(dealsView(app));
   else if (sub === 'social' || sub === 'deals') out.append(socialView(app));
   else if (sub === 'home') out.append(homeView(app));
   else if (sub === 'people') {
