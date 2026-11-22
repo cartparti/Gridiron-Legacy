@@ -39,6 +39,7 @@ import { resolveChallenge } from './matchday.js';
 import { makePresser } from './presser.js';
 import { captainVote, captainWeekly } from './captain.js';
 import { logJournal, journalAfterGame, journalSeason } from './journal.js';
+import { honorCheck } from './honors.js';
 import { statPhrase } from './press.js';
 import { nilWeek, nilAfterGame, nilLeaveCollege, retentionOffer } from './nil.js';
 import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf, recordLeagueAwards, awardLabel } from './awards.js';
@@ -542,6 +543,7 @@ export function chooseCollege(state, teamId) {
   const p = state.player;
   const c = state.career;
   const offer = state.offers.find((o) => o.teamId === teamId) ?? state.offers[0];
+  honorCheck(state, getTeam(state.league, c.teamId), 'hs'); // your high school may retire your number
   c.stage = 'college';
   c.stageSeason = 1;
   state.league = createLeague(state, 'college');
@@ -561,6 +563,7 @@ export function chooseCollege(state, teamId) {
 
 /** The pre-draft combine: testing and an interview, then the draft. */
 function startCombine(state, early) {
+  honorCheck(state, getTeam(state.league, state.career.teamId), 'college');
   nilLeaveCollege(state);
   state.draftProj = state.declareProj ?? projectDraft(state, { early });
   state.declareProj = null;
@@ -823,6 +826,7 @@ export function signContract(state, idx) {
   const p = state.player;
   const o = state.offers[idx];
   const moved = o.teamId !== state.career.teamId;
+  if (moved) honorCheck(state, getTeam(state.league, state.career.teamId), 'pro');
   p.contract = { teamId: o.teamId, years: o.years, salary: o.salary, rookie: false };
   if (moved) {
     state.career.teamId = o.teamId;
@@ -847,6 +851,7 @@ export function choosePostCareer(state, id) {
 
 export function retire(state, reason) {
   const p = state.player;
+  if (state.career.stage !== 'retired' && state.league) honorCheck(state, getTeam(state.league, state.career.teamId), state.career.stage);
   state.career.stage = 'retired';
   state.legacy = computeLegacy(state);
   state.legacy.reason = reason;

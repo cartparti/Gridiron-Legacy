@@ -97,7 +97,7 @@ export function practiceScreen(app) {
       teamColors: COLORS[0], oppColors: COLORS[1], homeColors: COLORS[0], userHome: true,
       look: defaultLook(P.pos), number: P.number, lastName: 'You', teamName: 'Practice', oppName: 'Scout Team', homeName: 'Practice',
       stage: P.level === 'rookie' ? 'hs' : P.level === 'starter' ? 'college' : 'pro',
-      culture: { biome: 'plains', seed: 7, mascot: 'cat', nickname: 'Practice Field', crowd: 'normal', song: 'groove', surface: P.surface ?? 'grass', home: { name: 'Practice', city: 'Gridiron', colors: COLORS[0], glyph: 'cat' } },
+      culture: { biome: 'plains', seed: 7, mascot: 'cat', nickname: 'Practice Field', crowd: 'normal', song: 'groove', surface: P.surface ?? 'grass', home: { name: 'Practice', city: 'Gridiron', colors: COLORS[0], glyph: 'cat', banners: globalThis.__testBanners ?? [] } },
       interlude: Math.random() < 0.3 ? INTERLUDES[Math.floor(Math.random() * INTERLUDES.length)] : null,
       showTips: app.settings.tutorials && !app.settings.seenTips?.[`mg_${type}`],
       markTip: () => { app.settings.seenTips = { ...(app.settings.seenTips ?? {}), [`mg_${type}`]: true }; app.saveSettings(); },

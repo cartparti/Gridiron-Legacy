@@ -28,6 +28,7 @@ import { teamKits, oppKitFor, kitUniform, KIT_IDS } from '../../data/kits.js';
 import { randomLook, fmtSize } from '../../data/looks.js';
 import { portraitImg } from '../../scenes/portrait.js';
 import { clutchChallenge } from './drills.js';
+import { bannersFor } from '../../sim/honors.js';
 import { coinTossCard, challengeChip, primetimeBanner, zoneMeter, zoneFlash, speechCard } from './pregame.js';
 import { tunnelCutscene } from '../../scenes/cutscenes.js';
 
@@ -428,7 +429,7 @@ export function gamedayScreen(app) {
       lastName: st.player.last,
       userHome: g.userSide === 'home',
       stage: st.career.stage,
-      culture: { ...culture, mascot: mascotKind(home), home: { name: home.name, city: home.city, colors: home.colors, glyph: mascotKind(home) } },
+      culture: { ...culture, mascot: mascotKind(home), home: { name: home.name, city: home.city, colors: home.colors, glyph: mascotKind(home), banners: bannersFor(st, home.id) } },
       homeName: home.name,
       // a broadcast shot between plays about half the time (mascot, cheer squad, coach, crowd, huddle, bench)
       interlude: !m.type.startsWith('ms_') && Math.random() < 0.55 ? INTERLUDES[Math.floor(Math.random() * INTERLUDES.length)] : null,

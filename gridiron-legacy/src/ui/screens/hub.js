@@ -527,6 +527,9 @@ function awardsView(app) {
   const titles = p.history.filter((x) => x.champion);
   const best = p.history.slice().sort((a, b) => parseInt(b.record, 10) - parseInt(a.record, 10))[0];
   return h('div.col', { style: { gap: '14px' } },
+    (st.ringOfHonor ?? []).length ? h('div.card.ring-card', h('div.card-title', h('h3', 'Ring of Honor'), h('span.tiny.muted', 'Numbers retired for you')),
+      h('div.ring-list', st.ringOfHonor.map((r) => h('div.ring-item', { style: { background: r.colors[0], color: r.colors[1] } },
+        h('b.pix', `#${r.number}`), h('span', `${r.city} ${r.name}`), h('span.tiny', `${r.year} · ${r.line}`))))) : null,
     h('div.card.hero', h('div.card-title', h('h2', 'Award Watch'), h('span.chip.pix', `${STAGE_LABEL[st.career.stage] ?? ''} · ${st.career.year}`)),
       w.games ? [h('p.small.muted', `Season rating ${w.perf} after ${w.games} games · team ${Math.round(w.winPct * 100)}% wins`),
         ...w.rows.map((r) => h('div.watch-row', h('div.row.between', h('b.small', r.name), h(`span.tiny.${r.pct >= 1 ? 'good' : 'muted'}`, r.pct >= 1 ? 'ON PACE' : `${Math.round(r.pct * 100)}%`)),

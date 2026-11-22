@@ -1256,3 +1256,7 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 .jr .jr-ic svg { width: 14px; height: 14px; }
 .jr.big .jr-ic { background: #ffd43b; color: #16181c; border-color: #ffd43b; }
 .jr.big .small { font-weight: 800; }
+.ring-list { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.ring-item { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 12px 14px; min-width: 96px; border-radius: 6px 6px 0 0; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 88%, 0 100%); text-align: center; }
+.ring-item b { font-size: 1.6rem; color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,0.35); }
+.ring-item span { font-size: 0.68rem; font-weight: 800; }

@@ -518,6 +518,35 @@ export function buildStadium(scene) {
   tifo.position.set(0, 9.5, -FIELD_L / 2 - 14);
   tifo.rotation.x = -0.62;
   world.add(tifo);
+  // Ring of Honor: retired numbers and championship banners hang beside the big screen (home team only)
+  const honorGroup = new THREE.Group();
+  world.add(honorGroup);
+  const paintHonors = (list, colors) => {
+    for (const ch of honorGroup.children.slice()) { ch.material.map?.dispose(); ch.material.dispose(); ch.geometry.dispose(); honorGroup.remove(ch); }
+    if (!list?.length) return;
+    list.forEach((b, i) => {
+      const c = document.createElement('canvas'); c.width = 64; c.height = 112;
+      const g = c.getContext('2d');
+      g.fillStyle = colors[0]; g.fillRect(0, 0, 64, 112);
+      g.fillStyle = colors[1]; g.fillRect(0, 0, 64, 6); g.fillRect(0, 100, 64, 12);
+      g.beginPath(); g.moveTo(0, 112); g.lineTo(32, 98); g.lineTo(64, 112); g.fillStyle = 'rgba(0,0,0,0)'; g.globalCompositeOperation = 'destination-out'; g.fill(); g.globalCompositeOperation = 'source-over';
+      g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      if (b.kind === 'number') {
+        g.font = '900 40px "Arial Black", Impact, sans-serif'; g.fillText(String(b.number), 32, 46);
+        g.font = 'bold 11px Arial, sans-serif'; g.fillText(String(b.name ?? '').toUpperCase().slice(0, 10), 32, 76);
+        g.font = 'bold 8px Arial, sans-serif'; g.fillText('RETIRED', 32, 16);
+      } else {
+        g.font = 'bold 9px Arial, sans-serif'; g.fillText('CHAMPIONS', 32, 22);
+        g.font = '900 20px "Arial Black", Impact, sans-serif'; g.fillText(String(b.year), 32, 52);
+        g.font = '20px serif'; g.fillText('★', 32, 80);
+      }
+      const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 7.4), new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide }));
+      const side = i % 2 ? 1 : -1, k = Math.floor(i / 2);
+      m.position.set(side * (20 + k * 5), jumbo.position.y - 2, jumbo.position.z + 2);
+      honorGroup.add(m);
+    });
+  };
   const paintTifo = (cols, text) => {
     const g = tifoCanvas.getContext('2d');
     g.fillStyle = cols[0]; g.fillRect(0, 0, 128, 40);
@@ -640,6 +669,7 @@ export function buildStadium(scene) {
       for (let i = 0; i < col.count; i += 3) { const c = bc[(i / 3) % 3]; for (let k = 0; k < 3; k++) col.setXYZ(i + k, c.r, c.g, c.b); }
       col.needsUpdate = true;
       paintTifo(crowdColors, style?.home?.name ?? (crowdColors === nearColors ? nearName : farName));
+      paintHonors(style?.home?.banners, style?.home?.colors ?? crowdColors);
       sidePaint = [crowdColors, crowdColors === nearColors ? farColors : nearColors, nearColors, farColors, style?.mascot ?? 'shield'];
       sideline.paint(...sidePaint, this.level ?? 'pro');
     },
@@ -687,6 +717,7 @@ export function buildStadium(scene) {
       tifo.position.y = level === 'pro' ? 13 : 9.5;
       jumbo.scale.setScalar(level === 'hs' ? 0.42 : level === 'college' ? 0.72 : 1);
       jumbo.position.y = level === 'hs' ? 9 : level === 'college' ? 22 : 33;
+      for (const ch of honorGroup.children) ch.position.y = jumbo.position.y - 2;
       const metal = level === 'hs';
       standMat.color.set(metal ? '#c8d0d8' : '#ffffff');
       standMat2.color.set(metal ? '#aeb6bf' : '#ffffff');
