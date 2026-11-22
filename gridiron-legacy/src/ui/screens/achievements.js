@@ -4,6 +4,7 @@ import { h } from '../dom.js';
 import { icon } from '../icons.js';
 import { ACH_BY_ID, TIER_NAME, TIER_XP, achievementsFor, achievementSummary } from '../../sim/achievements.js';
 import { goalProgress } from '../../sim/goals.js';
+import { journalByYear } from '../../sim/journal.js';
 import { fmtMoney } from '../../core/util.js';
 
 const STAGE = { hs: 'High school', college: 'College', pro: 'Pro' };
@@ -60,4 +61,18 @@ export function goalsReview(goals) {
     h('div.list', goals.results.map((r) => h('div.li', h('span', r.done ? '✅' : '❌'), h('div.grow', h('b.small', r.label), h('div.tiny.muted', r.text)),
       r.done ? h('span.chip.good.pix', `+${r.reward.xp} XP${r.reward.money ? ` · ${fmtMoney(r.reward.money)}` : ''}`) : null))),
     goals.hit === 0 ? h('p.tiny.bad', 'The coach noticed. Trust took a small hit.') : null);
+}
+
+/** Career > Journal: the story of your career, newest year first. */
+export function journalPage(app) {
+  const st = app.state;
+  const years = journalByYear(st);
+  const STAGE_NAME = { hs: 'High school', college: 'College', pro: 'Pro' };
+  if (!years.length) return h('div.card', h('h3', 'Career Journal'), h('p.small.muted', 'Your story starts with your first game. Debuts, first touchdowns, big games, awards, titles, the draft and more get written down here automatically.'));
+  return h('div.col', { style: { gap: '14px' } },
+    h('div.card.hero', h('div.card-title', h('h2', 'Career Journal'), h('span.chip.pix', `${(st.journal ?? []).length} ENTRIES`)),
+      h('p.tiny.muted', 'Everything that mattered, written down as it happened.')),
+    ...years.map((y) => h('div.card.journal-year',
+      h('div.card-title', h('h3', String(y.year)), h('span.tiny.muted', STAGE_NAME[y.stage] ?? '')),
+      h('div.journal', y.list.map((e) => h(`div.jr${e.big ? '.big' : ''}`, h('span.jr-ic', icon(e.icon)), h('div.grow', h('span.small', e.text), h('div.tiny.muted', `Week ${e.week}`))))))));
 }

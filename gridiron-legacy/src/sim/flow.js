@@ -38,9 +38,10 @@ import { setSeasonGoals, resolveGoals } from './goals.js';
 import { resolveChallenge } from './matchday.js';
 import { makePresser } from './presser.js';
 import { captainVote, captainWeekly } from './captain.js';
+import { logJournal, journalAfterGame, journalSeason } from './journal.js';
 import { statPhrase } from './press.js';
 import { nilWeek, nilAfterGame, nilLeaveCollege, retentionOffer } from './nil.js';
-import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf, recordLeagueAwards } from './awards.js';
+import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf, recordLeagueAwards, awardLabel } from './awards.js';
 import { computeLegacy } from './legacy.js';
 import { genTeammates } from './social.js';
 import { postGameTexts, weeklyTexts, textFrom } from './phone.js';
@@ -132,6 +133,7 @@ export function beginWeek(state) {
     if (c.rivalTeamId === c.teamId) pickRivalTeam(state);
     initDepth(state, { edge: randInt(state, -2, 3) });
     addNews(state, 'story', `${p.first} ${p.last} leaves the ${old} for the ${teamName(state)}.`);
+    logJournal(state, 'move', `Traded from the ${old} to the ${teamName(state)}.`, { big: true });
   }
   newWeek(state);
   state.week.nilNotes = nilWeek(state);
@@ -208,6 +210,8 @@ export function finishGame(state) {
   const sched = findGame(league, state.career.teamId);
   recordResult(league, sched, g.score.home, g.score.away, league.phase === 'regular');
   const before = { fame: p.fame, coach: p.rel.coach, mood: p.mood };
+  const tdSum = (x) => (x?.passTD ?? 0) + (x?.rushTD ?? 0) + (x?.recTD ?? 0) + (x?.defTD ?? 0);
+  const careerTDsBefore = tdSum(p.careerStats);
   let newInj = null;
   const hadInjury = !!p.injury;
   if (!g.sitOut) {
@@ -298,6 +302,12 @@ export function finishGame(state) {
   state.lastGame.presser = makePresser(state, g, { oppName: opp.name, teamName: teamName(state), statText: statPhrase(p.position, g.userStats), hurt: !!newInj });
   state.lastGame.comeback = !!g.half && (g.half.score[g.userSide === 'home' ? 'away' : 'home'] - g.half.score[g.userSide]) >= 10;
   state.lastGame.newAch = checkAchievements(state, 'game', { g: state.lastGame }).map((a) => a.id);
+  {
+    const hist = p.history.filter((x) => x.stage === state.career.stage);
+    const stageGames = hist.reduce((a, x) => a + (x.seasonStats?.games ?? 0), 0) + (p.seasonStats?.games ?? 0);
+    const stageTDs = hist.reduce((a, x) => a + tdSum(x.seasonStats), 0) + tdSum(p.seasonStats);
+    journalAfterGame(state, state.lastGame, { stageGames, stageTDs, careerTDsBefore, oppName: `${opp.city} ${opp.name}` });
+  }
   postGameTexts(state, state.lastGame);
   state.game = null;
   state.phase = 'postgame';
@@ -415,6 +425,8 @@ export function endSeason(state) {
     newAch,
     standings: standings(league).map((t) => ({ id: t.id, w: t.w, l: t.l })),
   };
+  journalSeason(state, state.review, { teamName: `${team.city} ${team.name}`, titleName: STAGES[c.stage].titleName, awardLabel: (n) => awardLabel(n, p.position) });
+
   state.phase = 'review';
 }
 
@@ -543,6 +555,7 @@ export function chooseCollege(state, teamId) {
   initDepth(state, { edge: offer.visit?.edge ?? Math.round((offer.prestige - 2.5) * 2.4 + gauss(state, 0, 2.5)) });
   state.visits = 0;
   textFrom(state, 'family', `${offer.city}!!! We are so proud of you. Your mom already ordered the sweatshirt.`);
+  logJournal(state, 'commit', `Signed with ${offer.city} ${offer.name}${offer.prestige >= 4 ? ', a powerhouse program' : ''}.`, { big: true });
   startNewSeason(state, { reset: false });
 }
 
@@ -563,6 +576,7 @@ export function finishCombine(state) {
 export function declareForDraft(state, yes) {
   if (yes) {
     addNews(state, 'story', `${state.player.first} ${state.player.last} declares for the pro draft${state.declareProj ? ` (projected: ${state.declareProj.label.toLowerCase()})` : ''}.`);
+    logJournal(state, 'declare', `Left college early to enter the draft${state.declareProj ? ` (mock drafts: ${state.declareProj.label.toLowerCase()})` : ''}.`, { big: true });
     return startCombine(state, true);
   }
   // the collective pays you to come back
@@ -749,6 +763,7 @@ export function runDraft(state, early) {
   initDepth(state, { edge: undrafted ? randInt(state, 5, 9) : userPick.round === 1 ? randInt(state, -3, 1) : userPick.round <= 3 ? randInt(state, 0, 4) : randInt(state, 3, 7) });
   state.combine = null;
   state.draft = { pick: pickNum, round: undrafted ? 0 : userPick.round, teamId, undrafted, salary, board, early, reason, stock: ds, proj: state.draftProj ? { label: state.draftProj.label, median: state.draftProj.median } : null };
+  { const dt = getTeam(league, teamId); logJournal(state, 'draft', undrafted ? 'Went undrafted. Signed as a free agent.' : `Drafted in round ${userPick.round}, pick ${pickNum}, by the ${dt?.city ?? ''} ${dt?.name ?? ''}.`, { big: true }); }
   state.draftProj = null;
   addNews(state, 'story', undrafted
     ? `${p.first} ${p.last} goes undrafted but signs with ${teamName(state)}.`
@@ -815,6 +830,7 @@ export function signContract(state, idx) {
     p.rel.teammates = 45;
     initDepth(state, { edge: randInt(state, -3, 3) });
     addNews(state, 'story', `${p.first} ${p.last} signs a ${o.years}-year deal with the ${o.city} ${o.name}.`);
+    logJournal(state, 'contract', `Signed a ${o.years}-year deal worth ${(o.salary / 1e6).toFixed(1)}M a year with the ${o.city} ${o.name}.`, { big: true });
   } else addNews(state, 'story', `${p.first} ${p.last} re-signs with the ${o.city} ${o.name}: ${o.years} years.`);
   if (p.agentName) p.rel.agent = clamp(p.rel.agent + 5, 0, 100);
   state.offers = null;
@@ -837,4 +853,5 @@ export function retire(state, reason) {
   state.legacy.newAch = checkAchievements(state, 'retire').map((a) => a.id);
   state.phase = 'retired';
   addNews(state, 'story', `${p.first} ${p.last} retires. Legacy: ${state.legacy.tier.label}.`);
+  logJournal(state, 'retire', `Retired at ${p.age}. Legacy: ${state.legacy.tier.label}.`, { big: true });
 }

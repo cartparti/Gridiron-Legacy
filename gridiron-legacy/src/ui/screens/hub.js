@@ -1,6 +1,6 @@
 // Main career hub: top bar with meters, bottom tabs, and the five tab views.
 import { friendsPage } from './friends.js';
-import { achievementsPage, goalsCard } from './achievements.js';
+import { achievementsPage, goalsCard, journalPage } from './achievements.js';
 import { dealsView, dealsNudge } from './deals.js';
 import { dealsOpen } from '../../sim/nil.js';
 import { mediaPersona } from '../../sim/presser.js';
@@ -493,7 +493,7 @@ function lifeView(app) {
 function careerView(app) {
   const st = app.state;
   const sub = app.ui.careerSub ?? 'profile';
-  const tabs = h('div.subtabs', [['profile', 'Career'], draftTabOpen(st) ? ['draft', st.career.stage === 'college' ? 'Draft Stock' : 'My Draft'] : null, ['achievements', 'Achievements'], ['friends', 'Friends'], ['traits', 'Traits'], ['awards', 'Trophies'], ['race', 'Award Race'], ['legends', 'Legends'], ['league', 'League Awards']].filter(Boolean).map(([id, l]) =>
+  const tabs = h('div.subtabs', [['profile', 'Career'], draftTabOpen(st) ? ['draft', st.career.stage === 'college' ? 'Draft Stock' : 'My Draft'] : null, ['journal', 'Journal'], ['achievements', 'Achievements'], ['friends', 'Friends'], ['traits', 'Traits'], ['awards', 'Trophies'], ['race', 'Award Race'], ['legends', 'Legends'], ['league', 'League Awards']].filter(Boolean).map(([id, l]) =>
     h(`button.subtab${sub === id ? '.on' : ''}`, { onclick: () => { sfx.click(); app.ui.careerSub = id; app.render(); } }, l)));
   let body;
   if (sub === 'draft' && draftTabOpen(st)) body = draftStockPage(app);
@@ -504,6 +504,7 @@ function careerView(app) {
   else if (sub === 'traits') body = traitsPage(app);
   else if (sub === 'friends') body = friendsPage(app);
   else if (sub === 'achievements') body = achievementsPage(app);
+  else if (sub === 'journal') body = journalPage(app);
   else { body = profileView(app); body.append(...careerStatsSections(app)); }
   return h('div.col', { style: { gap: '14px' } }, tabs, body);
 }

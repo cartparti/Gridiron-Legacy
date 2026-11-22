@@ -1248,3 +1248,11 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 .cg-jumper { width: 34px; height: 70px; border-radius: 17px 17px 8px 8px; background: linear-gradient(#ffd43b, #b45309); transform-origin: bottom center; transition: transform 0.08s; }
 .cg-jumper.jump { animation: cgJump 0.6s ease-out; }
 @keyframes cgJump { 0% { transform: translateY(0); } 40% { transform: translateY(-70px); } 100% { transform: translateY(0); } }
+/* v0.58 career journal */
+.journal { position: relative; display: flex; flex-direction: column; gap: 8px; margin-top: 6px; padding-left: 4px; }
+.journal::before { content: ''; position: absolute; left: 17px; top: 6px; bottom: 6px; width: 2px; background: var(--line); }
+.jr { position: relative; display: flex; gap: 10px; align-items: flex-start; }
+.jr .jr-ic { position: relative; z-index: 1; width: 28px; height: 28px; flex: 0 0 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--card, #1b2028); border: 2px solid var(--line); }
+.jr .jr-ic svg { width: 14px; height: 14px; }
+.jr.big .jr-ic { background: #ffd43b; color: #16181c; border-color: #ffd43b; }
+.jr.big .small { font-weight: 800; }

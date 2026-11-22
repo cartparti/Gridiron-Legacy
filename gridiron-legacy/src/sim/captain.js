@@ -4,6 +4,7 @@
 import { clamp } from '../core/util.js';
 import { rand } from '../core/rng.js';
 import { addNews } from './press.js';
+import { logJournal } from './journal.js';
 
 export const isCaptain = (state) => !!state.player && state.player.captain === state.career?.year;
 
@@ -19,6 +20,7 @@ export function captainVote(state) {
   const leader = n >= 3 ? ((persona.humble ?? 0) - (persona.fiery ?? 0) * 0.5) / n : 0;
   let pct = 0.08 + ((p.rel.teammates ?? 50) - 50) / 90 + ((p.ovr ?? 60) - 66) / 55 + seasonsHere * 0.13 + (c.stageSeason - 1) * 0.06 + leader * 0.25 + ((p.fame ?? 0) - 30) / 300;
   if (p.depth?.role === 'backup') pct -= 0.35;
+  if (c.stageSeason === 1) pct -= 0.08; // newcomers rarely get the C
   if (p.position === 'MS' || p.position === 'K') pct -= 0.12;
   pct = clamp(pct, 0.02, 0.95);
   const won = rand(state) < pct;
@@ -26,6 +28,7 @@ export function captainVote(state) {
     p.captain = c.year;
     p.captainYears = (p.captainYears ?? 0) + 1;
     addNews(state, 'story', `${p.first} ${p.last} voted a team captain by teammates.`);
+    logJournal(state, 'captain', `Voted team captain (${p.captainYears === 1 ? 'first time' : `${p.captainYears} seasons`}).`, { big: p.captainYears === 1 });
   }
   state.captainVote = { year: c.year, stage: c.stage, won, pct: Math.round(pct * 100) };
   return state.captainVote;
