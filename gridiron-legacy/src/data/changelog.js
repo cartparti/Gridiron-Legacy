@@ -1,5 +1,18 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.59', date: 'Nov 23', title: 'Audibles, scouting, rivalries and life after the whistle', items: [
+    'Pre-snap reads and audibles: the defense now shows its hand. Blitzers get a red ! over their heads before the snap. Quarterbacks can AUDIBLE (Q) to a quick pass or a shot play, running backs can flip the run or check to an inside run, and receivers can call a HOT ROUTE (slant, go, quick out, curl).',
+    'Opponent scouting: every team has real habits (how often they blitz, man or zone, how deep they throw) and the defense really plays that way. Put Film Study in your week to unlock their full report, tips for your position and the pre-snap tells in every play.',
+    'Rivalry trophies: every rivalry game is played for a named trophy. Win it, keep it, build a streak, and see your collection in Career, then Trophies.',
+    'Power rankings (Team, then Power): every team ranked each week with movement arrows and a one-line take.',
+    'Preseason magazine: each season opens with a preview: your preseason rank, projected record, your award odds, a bold prediction, and maybe you on the cover.',
+    'Record chase (pros): when you are on pace to break a record, the Week tab shows how close you are and what you need each game.',
+    'Play of the Week: your best plays get nominated. Let the fans decide, or campaign on Huddle for votes.',
+    'Contract extensions (pros, Team tab): outplaying your deal? Ask for an extension, push for more, or hold out (you sit and get fined until they pay or you give in).',
+    'Charity foundation (Life, then Giving): pick a cause, donate to unlock programs, host community events, and maybe win Humanitarian of the Year. It counts toward your legacy.',
+    'Family (Life, then Family): after you propose, plan the wedding (courthouse to grand gala), start a family and watch your kids grow up. When you retire, your son can carry on the name.',
+    'Mentorship (veterans, Team tab): take a young teammate under your wing. Weekly film sessions, extra reps and life talks grow his game. Every mentee who makes it joins your coaching tree and adds to your legacy.',
+  ] },
   { v: '0.58', date: 'Nov 22', title: 'Home field, captains, combine and 10 more new things', items: [
     'Home field fixed: the midfield logo and both end zones now always belong to the home team (team name in one end zone, city in the other), whichever way the play goes. Away games finally look like away games.',
     'Coin toss before every game: call heads or tails, then receive or defer if you win. It decides who gets the ball first in each half.',

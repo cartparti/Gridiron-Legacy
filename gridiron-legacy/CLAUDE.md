@@ -776,3 +776,31 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   ovr/fame/rookie deal; accepted -> career.pendingMove), `cancelTrade`. Team tab card.
 - Balance after all this (30 careers): QB ~12, RB ~13, WR ~17 (WR was already ~14 before), CB ~14, K ~12 awards; the round10 spread
   test passes. Tests: round19.
+
+## v0.59: audibles, scouting, league life, life after the whistle (10 features)
+- `src/sim/scouting.js`: `teamTendencies(team, year)` (stable hash: blitz 0.1-0.46, man 0.25-0.8, deep, runHeavy, style labels),
+  `scoutReport` (revealed = state.week.scouted, set by applyPlan when the plan has 'film'), `scoutForPlay` -> opts.scout. Engine:
+  pass/route coverage zone = rand > scout.man, QB blitz rate from scout.blitz (x call), WR mode LB blitz from scout, opponent concepts
+  (when you're on defense) by scout.deep. UI `scoutCard` (Week tab + compact on the pregame card).
+- Engine pre-snap (engine.js): `assignRoutes()` (pulled out of buildFormation so it can re-run), `showTells()` (red ! labels over
+  blitzers + "BLITZ LOOK"/"they show man|zone" in the instruction when scouted or an IQ roll), `showAudible()` (QB: quick vs shot from
+  dealPlays safe/risky; RB: flip the hole or check to an inside run; WR: hot routes Slant/Go/Quick Out/Curl) -> rebuilds routes and
+  play art; buttons AUDIBLE / HOT ROUTE (key Q, keys 1-4 in the box), one per play, cleared at the snap.
+- `src/sim/leaguelife.js`: rivalry trophies (`rivalryTrophy` stable names, `settleRivalry` in finishGame -> holder/streak/history,
+  state.trophyCase, player.rivalWins), `powerRankings` + `snapshotPower` (beginWeek; prev/now ranks, reset at 0-0), `makePreview`
+  (week 0; state.preview), `recordChase` (pro; STAT_CATS now exported from awards.js), `nominatePlay` (lastGame.potw, score >= 1.03)
+  + `votePlay` ({ boost }). UI in pregame.js: previewCard, recordChaseCard, rivalryChip, rivalryResultCard, potwCard, powerView
+  (Team > Power).
+- `src/sim/extension.js`: `askExtension` (needs leverage = marketValue / salary >= 1.05), `pushExtension` (x2), `acceptExtension`,
+  `startHoldout` (player.holdout -> gameDayStatus canPlay false), `holdoutWeek` (beginWeek: fines, fame, cave odds), `endHoldout`.
+- `src/sim/foundation.js`: state.foundation (cause, donated, level via LEVELS 25K/100K/500K/2M/8M, events, kids, humanitarian),
+  `donate`, `hostEvent` (uses a free day), `foundationWeekly`, `humanitarianVote` (endSeason review.humanitarian),
+  `foundationLegacy` (legacy line).
+- `src/sim/family.js`: player.family { wedding, kids [{name, sex, born}], expecting, tried }; `planWedding` (WEDDINGS), `tryForBaby`
+  (once a season), `familyWeekly` (births, family moments as family texts, mood; old has_kid flag creates the kid), `heirName` (oldest
+  son -> nextGenerationOpts first name; players are always boys).
+- `src/sim/mentor.js`: `canMentor` (pro, age 28+ or 4+ pro seasons), `menteeCandidates` (young teammates from league.players),
+  `pickMentee`, `mentorSession` (film/reps/life, once a week), `mentorSeasonEnd` (endSeason review.mentor; graduates into
+  player.mentees), `mentorLegacy` (legacy line).
+- UI: Team tab lineup shows extensionCard, tradeCard, mentorCard; Life gets Family + Giving subtabs; review shows offFieldReview.
+  Tests: round20.
