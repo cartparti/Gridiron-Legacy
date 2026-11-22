@@ -409,6 +409,7 @@ export function runMinigame(type, opts) {
       else r.stadium.setTeams(opts.oppColors, opts.teamColors, oppName, myName, opts.homeColors, opts.culture);
     });
     safe(() => { if (opts.scoreInfo) { r.stadium.setScoreboard(opts.scoreInfo); hud.score(opts.scoreInfo); } });
+    safe(() => { if (opts.zone) { const z = document.createElement('div'); z.className = 'hud-zone'; z.textContent = '🔥 IN THE ZONE'; hud.el.append(z); } });
     safe(() => { if (opts.lastName) hud.tag(opts.number ?? '', opts.lastName, opts.look?.heightIn ? `${Math.floor(opts.look.heightIn / 12)}'${opts.look.heightIn % 12}" · ${opts.look.weightLb} lb` : ''); });
     safe(() => { r.stadium.setBigGame?.(opts.bigGame); });
     safe(() => { r.stadium.setLevel?.(opts.stage ?? 'pro'); });

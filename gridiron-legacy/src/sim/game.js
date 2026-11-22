@@ -9,6 +9,7 @@
 // Game situations: weather, momentum, two-minute drills (offense) / goal-line stands (defense),
 // 4th-down decisions, penalties, extra moments earned through mid-game events.
 import { INJURY_STATUS, inGameOutcome } from './injury.js';
+import { pickChallenge, isPrimetime, autoToss, zoneAfterMoment, ZONE_TOL } from './matchday.js';
 import { PLAY_CALLS, DIFFICULTIES, WEATHER } from '../data/config.js';
 import { GAME_EVENTS } from '../data/gameEvents.js';
 import { teamCulture, TRAITS } from '../data/culture.js';
@@ -128,7 +129,7 @@ export function createUserGame(state, league, sched, { playoff = false, round = 
   if (state.player.position === 'K') chosen.clear(); // the kicker comes on when a drive scores (kickerDrive)
   for (const idx of chosen) candidates[idx].moment = true;
 
-  return {
+  const g = {
     homeId: sched.home, awayId: sched.away, userSide, momentSide, oppId, playoff, round, rivalry, sitOut, playingHurt,
     weather: state.week?.forecast ?? chooseWeather(state, league, playoff, rivalry),
     ratings: { home: hr, away: ar },
@@ -143,6 +144,11 @@ export function createUserGame(state, league, sched, { playoff = false, round = 
     homeTrait: teamCulture(getTeam(league, sched.home) ?? { id: sched.home, city: '', name: '' }, state.career.stage).traitId,
     energy: Math.round(70 + (state.week?.freshness ?? 0) * 30), rating: 6.0, ratingHist: [6.0], lastDelta: 0, chart: [],
   };
+  // game-day extras: one bonus challenge, and some big games are primetime (under the lights)
+  g.challenge = pickChallenge(state, g);
+  g.primetime = isPrimetime(state, g, { rivalry, playoff });
+  if (g.primetime && ['clear', 'wind'].includes(g.weather)) g.weather = 'night';
+  return g;
 }
 
 /** Called after createUserGame: wind for this game. */
@@ -163,6 +169,7 @@ export function stepGame(state) {
   if (g.pendingEvent) return { type: 'gameEvent', event: g.pendingEvent };
   if (g.pendingDecision) return { type: 'decision', decision: g.pendingDecision };
   if (g.pending) return { type: 'moment', moment: g.pending };
+  if (!g.toss?.choice) autoToss(state); // nobody called the coin toss: flip it for them
   if (!g.pregameDone) {
     g.pregameDone = true;
     if (!g.sitOut && maybeEvent(state, 'pregame', 0.55)) return { type: 'gameEvent', event: g.pendingEvent };
@@ -382,6 +389,7 @@ export function tolerance(state, call = 'balanced', type = state.game?.pending?.
     else if (g.homeTrait) t *= 1.02;
     if ((g.energy ?? 100) < 50) t *= 0.8 + (g.energy ?? 100) / 250;
     t *= 1 + g.momentum * 0.06;
+    if (g.zone) t *= ZONE_TOL; // in the zone: everything slows down
     if (g.playingHurt) t *= INJURY_STATUS[g.playingHurt]?.tol ?? 0.75;
     t *= 1 - matchup(state, g).k * 0.09; // good teams make for hard games
   }
@@ -583,6 +591,8 @@ export function resolveMoment(state, result) {
   }
   g.moments.push({ ...m, call: result.call, quality: result.quality, yards: m.defense ? -(result.yardsAllowed ?? 0) : result.yards, td: m.defense ? !!result.defTD : result.td, turnover: result.turnover, text: result.text, outcome: null, played: !!result.played });
   const rec = g.moments[g.moments.length - 1];
+  rec.zone = zoneAfterMoment(state, rec.quality ?? 0); // 'in' / 'out' / null
+  rec.inZone = !!g.zone;
 
   if (out === null) {
     // Drive continues: two-minute chain, 4th-down decision, or simulate the rest.
@@ -662,6 +672,8 @@ function resolveMascotMoment(state, g, d, m, result) {
   if (m.type === 'ms_rival' && result.danceWin) state.player.fame = clamp(state.player.fame + 0.3, 0, 100);
   g.moments.push({ ...m, call: result.call, quality: q, yards: 0, td: false, turnover: false, text: result.text, outcome: null, played: !!result.played });
   const rec = g.moments[g.moments.length - 1];
+  rec.zone = zoneAfterMoment(state, rec.quality ?? 0); // 'in' / 'out' / null
+  rec.inZone = !!g.zone;
   let out = driveOutcome(state, g.ratings[d.side].off, g.ratings[otherSide(d.side)].def, g.toBonus[d.side] + momentumBonus(g, d.side) + planBonus(state, g, d.side) + (q - 0.5) * 0.08);
   g.toBonus[d.side] = 0;
   rec.outcome = out;
@@ -744,6 +756,8 @@ function resolveKickerMoment(state, g, d, m, result) {
   const kickoff = m.type === 'k_kickoff' || m.type === 'k_onside';
   g.moments.push({ ...m, call: result.call, quality: q, yards: 0, td: false, turnover: false, text: result.text, outcome: null, played: !!result.played });
   const rec = g.moments[g.moments.length - 1];
+  rec.zone = zoneAfterMoment(state, rec.quality ?? 0); // 'in' / 'out' / null
+  rec.inZone = !!g.zone;
   const opp = otherSide(g.userSide);
   if (kickoff) {
     s.kickoffs = (s.kickoffs ?? 0) + 1;

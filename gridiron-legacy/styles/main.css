@@ -1189,3 +1189,33 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 .look-clip .btn { flex: 1 1 auto; }
 .look-src { width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); color: inherit; cursor: pointer; min-height: 52px; font: inherit; }
 .look-code { width: 100%; box-sizing: border-box; font-family: monospace; font-size: 0.75rem; border-radius: 10px; padding: 8px; background: rgba(0,0,0,0.25); color: inherit; border: 1px solid var(--line); }
+/* v0.58 game-day extras */
+.toss-card { margin-top: 12px; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,0.05); border: 1px solid var(--line); }
+.toss-card .btn { flex-direction: column; display: flex; align-items: center; }
+.toss-coin { width: 52px; height: 52px; flex: 0 0 52px; position: relative; transform-style: preserve-3d; perspective: 400px; }
+.toss-coin .tc-face { position: absolute; inset: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font: 900 1.3rem var(--pixel); color: #5b4300; background: radial-gradient(circle at 35% 30%, #fff3b0, #f5c518 55%, #b8860b); border: 3px solid #a87a08; backface-visibility: hidden; }
+.toss-coin .tc-t { transform: rotateY(180deg); }
+.toss-coin.show-heads { transform: rotateY(0deg); } .toss-coin.show-tails { transform: rotateY(180deg); }
+.toss-coin.spin-heads { animation: coinH 1.3s cubic-bezier(.2,.7,.3,1) forwards; } .toss-coin.spin-tails { animation: coinT 1.3s cubic-bezier(.2,.7,.3,1) forwards; }
+@keyframes coinH { 0% { transform: translateY(0) rotateY(0); } 45% { transform: translateY(-38px) rotateY(1440deg); } 100% { transform: translateY(0) rotateY(2160deg); } }
+@keyframes coinT { 0% { transform: translateY(0) rotateY(0); } 45% { transform: translateY(-38px) rotateY(1440deg); } 100% { transform: translateY(0) rotateY(2340deg); } }
+.challenge { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(255, 212, 59, 0.08); border: 1px solid rgba(255, 212, 59, 0.35); }
+.challenge.done { background: rgba(74, 222, 128, 0.1); border-color: rgba(74, 222, 128, 0.5); }
+.challenge.miss { background: rgba(248, 113, 113, 0.07); border-color: rgba(248, 113, 113, 0.35); }
+.challenge .ch-ic { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9px; background: #ffd43b; color: #111; flex: 0 0 auto; }
+.challenge.done .ch-ic { background: #4ade80; } .challenge.miss .ch-ic { background: #f87171; }
+.challenge .ch-ic svg { width: 60%; height: 60%; }
+.primetime { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; border-radius: 14px; color: #fff; background: linear-gradient(120deg, #0b1d3a, #3b0d5c 60%, #7a1f5c); box-shadow: 0 0 22px rgba(122, 31, 92, 0.45); }
+.primetime .pt-star { font-size: 1.6rem; color: #ffd43b; text-shadow: 0 0 12px #ffd43b; }
+.mb-zwrap { display: flex; }
+.mb-zone { display: flex; align-items: center; }
+.mb-zone small { font-size: 0.5rem; opacity: 0.7; letter-spacing: 0.08em; }
+.mb-zone .zdots { display: flex; gap: 3px; } .mb-zone .zdots i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,0.18); }
+.mb-zone .zdots i.on { background: #ff8c1a; box-shadow: 0 0 6px #ff8c1a; }
+.mb-zone.on b { color: #ffb02e; text-shadow: 0 0 8px #ff6a00; font-size: 0.62rem; animation: zonePulse 1s ease-in-out infinite alternate; }
+@keyframes zonePulse { from { opacity: 0.75; } to { opacity: 1; } }
+.zone-chip { background: linear-gradient(90deg, #ff6a00, #ffb02e); color: #1a0d00; }
+.zone-flash { position: fixed; left: 50%; top: 38%; transform: translate(-50%, -50%); z-index: 40; pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 16px 26px; border-radius: 18px; background: radial-gradient(circle, rgba(255,140,26,0.95), rgba(160,40,0,0.92)); color: #fff; box-shadow: 0 0 50px rgba(255,120,0,0.7); animation: zoneIn 2.2s ease forwards; text-align: center; }
+.zone-flash span { font-size: 1.6rem; letter-spacing: 0.06em; } .zone-flash small { font-size: 0.72rem; opacity: 0.9; }
+@keyframes zoneIn { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } 20% { transform: translate(-50%, -50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
+.hud-zone { position: absolute; top: calc(var(--safe-top, 0px) + 58px); right: 12px; padding: 5px 10px; border-radius: 999px; font: 800 0.66rem var(--pixel); letter-spacing: 0.06em; color: #1a0d00; background: linear-gradient(90deg, #ff6a00, #ffb02e); box-shadow: 0 0 14px rgba(255,120,0,0.7); pointer-events: none; z-index: 5; }

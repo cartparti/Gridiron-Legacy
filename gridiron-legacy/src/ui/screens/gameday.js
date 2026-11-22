@@ -28,6 +28,7 @@ import { teamKits, oppKitFor, kitUniform, KIT_IDS } from '../../data/kits.js';
 import { randomLook, fmtSize } from '../../data/looks.js';
 import { portraitImg } from '../../scenes/portrait.js';
 import { clutchChallenge } from './drills.js';
+import { coinTossCard, challengeChip, primetimeBanner, zoneMeter, zoneFlash } from './pregame.js';
 import { tunnelCutscene } from '../../scenes/cutscenes.js';
 
 /** Small pixel jersey icon for a kit. */
@@ -220,7 +221,9 @@ export function gamedayScreen(app) {
   const intensBtn = h('button.mb-btn.mb-int');
   const pauseBtn = h('button.mb-btn.mb-sq', 'II');
   const speedBtn = h('button.mb-btn.mb-sq');
+  const zoneSlot = h('div.mb-zwrap');
   const drawBar = () => {
+    clear(zoneSlot); zoneSlot.append(zoneMeter(g));
     g.plan ??= { approach: 'balanced', intensity: 'mid' };
     ratingVal.textContent = (g.rating ?? 6).toFixed(1);
     const dl = g.lastDelta ?? 0;
@@ -247,7 +250,7 @@ export function gamedayScreen(app) {
   if (!g.sitOut) {
     root.append(h('div.match-bar',
       h('div.mb-rating', h('small', 'RATING'), h('div.row', { style: { gap: '6px', alignItems: 'baseline' } }, ratingVal, ratingDelta), spark),
-      h('div.mb-energy', h('small', 'ENERGY'), h('div.eb-track', energyFill), energyVal),
+      h('div.mb-energy', h('small', 'ENERGY'), h('div.eb-track', energyFill), h('div.row', { style: { gap: '6px', alignItems: 'center' } }, energyVal, zoneSlot)),
       approachBtn, intensBtn, pauseBtn, speedBtn));
     drawBar();
   }
@@ -322,6 +325,8 @@ export function gamedayScreen(app) {
     const m = g.pending;
     resolveMoment(st, result);
     app.save();
+    if (g.moments[g.moments.length - 1]?.zone === 'in') { zoneFlash(root); sfx.cheer?.(true); }
+    drawBar?.();
     if (result.td || result.int || result.defTD) sfx.touchdown();
     else if ((result.turnover && !m.defense) || result.tdAllowed) sfx.groan();
     clear(momentSlot);
@@ -336,7 +341,7 @@ export function gamedayScreen(app) {
     const w = WEATHER[g.weather];
     const card = h('div.card.moment-card',
       h('div.row.between',
-        h('div.row', { style: { gap: '6px' } }, h('span.chip.gold.pix', icon('bolt'), defense ? 'DEFENSE' : 'KEY MOMENT'), m.situation ? h('span.chip.bad.pix', m.situation.toUpperCase()) : null, m.fourth ? h('span.chip.info.pix', '4TH DOWN') : null),
+        h('div.row', { style: { gap: '6px' } }, h('span.chip.gold.pix', icon('bolt'), defense ? 'DEFENSE' : 'KEY MOMENT'), g.zone ? h('span.chip.pix.zone-chip', '🔥 IN THE ZONE') : null, m.situation ? h('span.chip.bad.pix', m.situation.toUpperCase()) : null, m.fourth ? h('span.chip.info.pix', '4TH DOWN') : null),
         h('span.small.muted', `Q${m.quarter} ${m.clock}`)),
       h('h2', { style: { marginTop: '10px' } }, m.label),
       h('p.small.muted', `${MOMENT_NAMES[m.type] ?? 'Key moment'}${m.trailing ? ' · you are trailing' : ''}${g.weather !== 'clear' && g.weather !== 'night' ? ` · ${w.label.toLowerCase()}` : ''}. Pick a play call:`),
@@ -408,6 +413,7 @@ export function gamedayScreen(app) {
       moment: m,
       call,
       tolerance: tolerance(st, call, m.type),
+      zone: !!g.zone,
       stats: st.player.stats,
       position: st.player.position,
       teamColors: me.colors,
@@ -591,6 +597,9 @@ export function gamedayScreen(app) {
         g.rivalry ? h('span.chip.bad', icon('flame'), `Rivalry vs ${opp.name}`) : null,
         g.isTitle ? h('span.chip.gold', icon('trophy'), g.roundName) : g.playoff ? h('span.chip.info', g.roundName) : null),
       w.desc ? h('p.center.tiny.muted', { style: { marginTop: '8px' } }, w.desc) : null,
+      primetimeBanner(st, g),
+      g.sitOut ? null : challengeChip(g.challenge),
+      g.sitOut ? null : coinTossCard(app),
       h('div.venue-card',
         h('div.vc-head', h('b.pix', culture.stadium), h('span.tiny.muted', `"${culture.nickname}" · ${BIOME_INFO[culture.biome].label}`)),
         (() => { const mu = matchup(st); const cls = mu.k > 0.35 ? '.bad' : mu.k < -0.35 ? '.good' : ''; return h('div.row', { style: { gap: '8px', margin: '6px 0' } },

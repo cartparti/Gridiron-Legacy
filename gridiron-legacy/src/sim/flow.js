@@ -35,6 +35,7 @@ import { addXp } from './progress.js';
 import { checkTraitUnlocks } from './traits.js';
 import { checkAchievements } from './achievements.js';
 import { setSeasonGoals, resolveGoals } from './goals.js';
+import { resolveChallenge } from './matchday.js';
 import { nilWeek, nilAfterGame, nilLeaveCollege, retentionOffer } from './nil.js';
 import { seasonAwards, checkRecords, genLeaders, seedRecords, seedHistory, seasonPerf, recordLeagueAwards } from './awards.js';
 import { computeLegacy } from './legacy.js';
@@ -215,6 +216,7 @@ export function finishGame(state) {
     if (state.career.stage === 'pro') addStats(p.proCareerStats, g.userStats);
     const sm = STAGE_FAME[state.career.stage];
     let fame = ((g.grade - 55) / 12) * sm + (g.won ? 0.5 : 0) + g.userStats.clutch * 0.8;
+    if (g.primetime) fame *= fame > 0 ? 1.4 : 1.2; // the whole country was watching
     if (g.playoff) fame += 1;
     if (g.rivalry && g.won) fame += 2;
     if (g.isTitle && g.won) fame += 6;
@@ -251,6 +253,7 @@ export function finishGame(state) {
       p.injury = null;
     }
   }
+  resolveChallenge(state, g);
   const opp = getTeam(league, g.oppId);
   const press = postGamePress(state, g, `${opp.city}`, teamName(state));
   simOtherGames(state, league, sched);
@@ -282,6 +285,10 @@ export function finishGame(state) {
     log: g.log,
     weather: g.weather,
     nilBonus: g.nilBonus ?? [],
+    challenge: g.challenge ?? null,
+    primetime: !!g.primetime,
+    toss: g.toss ?? null,
+    zoneCount: g.zoneCount ?? 0,
   };
   state.lastGame.comeback = !!g.half && (g.half.score[g.userSide === 'home' ? 'away' : 'home'] - g.half.score[g.userSide]) >= 10;
   state.lastGame.newAch = checkAchievements(state, 'game', { g: state.lastGame }).map((a) => a.id);
