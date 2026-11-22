@@ -48,6 +48,7 @@ import { familyWeekly } from './family.js';
 import { mentorSeasonEnd } from './mentor.js';
 import { rehabHealed, rushedRisk } from './rehab.js';
 import { farewellAfterGame } from './farewell.js';
+import { pitchOffer, applyPerk } from './freeagency.js';
 import { teamCulture } from '../data/culture.js';
 import { statPhrase } from './press.js';
 import { nilWeek, nilAfterGame, nilLeaveCollege, retentionOffer } from './nil.js';
@@ -865,6 +866,7 @@ export function contractOffers(state) {
     const worst = standings(league).slice(-1)[0];
     offers.push({ teamId: worst.id, city: worst.city, name: worst.name, colors: worst.colors, salary: MIN_SALARY, years: 1, capSpace: capSpace(league, worst.id), contender: Math.round((worst.off + worst.def) / 2), lastRank: 30, loyal: false, prove: true });
   }
+  for (const o of offers) pitchOffer(state, o, getTeam(league, o.teamId) ?? { id: o.teamId, city: o.city, name: o.name });
   return offers.sort((a, b) => b.salary - a.salary);
 }
 
@@ -882,6 +884,7 @@ export function signContract(state, idx) {
     addNews(state, 'story', `${p.first} ${p.last} signs a ${o.years}-year deal with the ${o.city} ${o.name}.`);
     logJournal(state, 'contract', `Signed a ${o.years}-year deal worth ${(o.salary / 1e6).toFixed(1)}M a year with the ${o.city} ${o.name}.`, { big: true });
   } else addNews(state, 'story', `${p.first} ${p.last} re-signs with the ${o.city} ${o.name}: ${o.years} years.`);
+  applyPerk(state, o); // what you got out of your visit
   if (p.agentName) p.rel.agent = clamp(p.rel.agent + 5, 0, 100);
   state.offers = null;
   startNewSeason(state, { reset: false });

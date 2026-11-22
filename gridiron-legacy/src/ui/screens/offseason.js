@@ -4,9 +4,10 @@ import { STAT_KEYS, STAT_LABELS, POSITIONS, statLabel } from '../../data/positio
 import { getTeam } from '../../sim/league.js';
 import { retentionOffer } from '../../sim/nil.js';
 import { openCombineTest } from './combineGames.js';
+import { perkInfo, visitsLeft, visitTeam } from '../../sim/freeagency.js';
 import * as flow from '../../sim/flow.js';
 import { fmtMoney, ordinal, signed } from '../../core/util.js';
-import { teamBadge, stars, confirmDialog } from '../components.js';
+import { teamBadge, stars, confirmDialog, toast } from '../components.js';
 import { sfx } from '../../audio/sfx.js';
 import { eventModal } from './event.js';
 import { topBar } from './hub.js';
@@ -235,6 +236,12 @@ export function contractScreen(app) {
         h('div', h('b', o.years), h('span', 'Years')),
         h('div', h('b', fmtMoney(o.salary * o.years)), h('span', 'Total'))),
       o.prove ? h('p.tiny.warn', 'Prove-it deal: the only offer on the table.') : null,
+      o.pitch ? h('div.fa-pitch',
+        h('p.small', h('i', `"${o.pitch}"`)),
+        h('div.fa-tags', h('span.chip', `Role: ${o.role}`), h('span.chip', o.scheme), h('span.chip', o.city))) : null,
+      o.perk ? (o.visited
+        ? h('div.fa-perk', h('b.small', `✈️ Visit: ${perkInfo(o).label}`), h('div.tiny', perkInfo(o).text(o)), h('div.tiny.good', 'Comes with the deal if you sign here.'))
+        : h('button.btn.small', { style: { marginTop: '8px' }, disabled: visitsLeft(st) <= 0, onclick: () => { sfx.click(); const r = visitTeam(st, i); if (r?.text) toast(r.text); app.commit(); } }, visitsLeft(st) > 0 ? `✈️ Visit (${visitsLeft(st)} left)` : 'No visits left')) : null,
       h('button.btn.primary.block', { style: { marginTop: '8px' }, onclick: () => { sfx.cash(); flow.signContract(st, i); app.commit(); } }, 'Sign'))),
     flow.canRetire(st) ? h('button.btn.danger.block', { onclick: async () => { if (await confirmDialog('Retire?', 'Walk away and see your legacy.', 'Retire')) { flow.retire(st, 'choice'); app.commit(); } } }, 'Retire instead') : null);
 }
