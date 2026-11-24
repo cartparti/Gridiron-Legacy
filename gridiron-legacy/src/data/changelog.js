@@ -1,5 +1,12 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.64', date: 'Nov 24', title: 'Fairer grades: you only get blamed for what you did', items: [
+    'Receivers: a bad throw, a sack, an interception on a ball thrown to someone else, or a pass to a teammate no longer hurts your grade or your stats. Being open when the ball goes elsewhere is credited. Only real drops count as drops, and catches by teammates no longer show up as yours.',
+    'Quarterbacks: a perfect pass your receiver drops is graded as a good throw. A sack in the first two seconds is on the line, not you. Tight coverage breaking up a pass is graded fairly.',
+    'Running backs: getting hit in the backfield before you can even cut is put on the blocking, not you.',
+    'Cornerbacks: a catch made on the other side of the field by a man you were not covering no longer counts against you.',
+    'Every play now says why: after the snap and in the game report you see the reason (for example "Bad throw. Nothing you could do." or "A catchable ball. You dropped it."), with a ✓ when it was not your fault.',
+  ] },
   { v: '0.63', date: 'Nov 24', title: 'Tunnel fits, bold predictions, card shows and streaks', items: [
     'Tunnel fits (Week tab): pick your pregame outfit every week, from a sharp suit to a designer fit. The best looks get named best dressed of the week. Wear the same thing twice and fewer cameras care.',
     'Bold prediction: at the start of each season you can guarantee something (playoffs, beating your rival, a career year, two losses or fewer, the title). Back it up for fame and XP, or hear about it all offseason.',

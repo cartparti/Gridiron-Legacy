@@ -859,3 +859,14 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   season, uses a day; pay from cardValue + fame), `dishCheck` (beginWeek, fame >= 60, once per team -> player.dishes), streaks
   (`streaksAfterGame` -> player.streaks {cur, best}, lastGame.streak on a new best; `streakRows`). Nothing uses the save RNG.
   Tests: round24.
+
+## v0.64: fair grades by role (engine `gradeByRole`)
+- engine.js: `pass` per play (target, sepUser = nearest coverage defender at the throw, cause 'off'|'drop'|'contest'|'oob'|'hail',
+  caughtBy). resolveFlight sets the cause (off = landing beyond the catch radius). `gradeByRole(why)` runs after the result is built (also
+  on TDs) and adjusts quality + sets result.blame ('you'|'qb'|'receiver'|'line'|'defense'|'none') and result.why (plain reason):
+  QB: drop 0.5, contested 0.32, sack < 2.3 s = line 0.2; skill player on a pass: sack 0.42 notTargeted, caught by a teammate = toOther
+  (>= 0.45), not targeted incomplete 0.36-0.58 by separation, INT elsewhere 0.38, bad throw at you 0.45, contested 0.32, oob 0.24, real drop
+  0.12 + drop flag; RB stuffed in the backfield < 1.15 s = line 0.3; CB catch on another man > 6 yd away = notMine (>= 0.5).
+- game.js resolveMoment: notTargeted/toOther skip targets/catches; drops only when result.drop (bot results without blame keep the old rule,
+  so balance is unchanged); notMine skips ydsAllowed/recAllowed/tdAllowed. Moments store why + blame; gameday result card and the postgame
+  Key Moments show the reason (green ✓ when it wasn't you). Debug: globalThis.__lastResult under __playDebug. Tests: round25.
