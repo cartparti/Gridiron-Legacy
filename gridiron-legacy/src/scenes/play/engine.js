@@ -1981,6 +1981,7 @@ export function freePlay(ctx) {
       result = def ? (carrier.team === 'def' ? (user.scoop ? { defense: true, forcedFumble: lastFumble?.by === user, fumbleRec: true, turnover: true, defTD: true, quality: 0.99, text: 'SCOOP AND SCORE!' } : { defense: true, int: true, turnover: true, defTD: true, quality: 0.98, text: 'PICK SIX!' }) : { defense: true, caught: true, yardsAllowed: m.yardLine, tdAllowed: true, quality: 0.05, text: 'They score.' })
         : (carrier === qb && qb.scramble ? { scramble: true, complete: false, yards: m.yardLine, td: true, quality: 0.95, text: 'TOUCHDOWN! You took it in yourself!' } : { complete: true, yards: m.yardLine, td: true, quality: 0.95, text: 'TOUCHDOWN!' });
       gradeByRole('td');
+      if (globalThis.__playDebug) globalThis.__lastResult = { ...result, why2: 'td' };
       if ((def && carrier.team === 'def') || (!def && carrier.team === 'off')) startCelebration();
       return;
     }
