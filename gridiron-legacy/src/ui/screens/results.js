@@ -64,7 +64,7 @@ export function postgameScreen(app) {
         h('div.grow', h('b', 'Your game'), h('div.small.muted', `Grade ${g.grade}/100`)), g.potg ? h('span.chip.gold.pix', 'PLAYER OF THE GAME') : null),
       h('div.bigstat', { style: { marginTop: '10px' } }, statLine(p.position, g.userStats).map(([v, l]) => h('div', h('b', v), h('span', l))))),
     g.moments.length ? h('div.card', h('h3', 'Key Moments'), h('div.list', g.moments.map((m) =>
-      h('div.li', h('span.chip', PLAY_CALLS[m.call]?.label ?? m.call), h('div.grow', h('div.small', m.label), h('div.tiny.muted', `${m.text} → ${m.outcome === 'TD' ? 'Touchdown' : m.outcome === 'FG' ? 'Field goal' : m.outcome === 'MISS' ? 'No good' : m.outcome === 'KICK' ? 'Kickoff' : m.outcome === 'TO' ? 'Turnover' : m.outcome === 'DOWNS' ? 'Turnover on downs' : 'Punt'}`)),
+      h('div.li', h('span.chip', PLAY_CALLS[m.call]?.label ?? m.call), h('div.grow', h('div.small', m.label), m.why ? h(`div.tiny.${m.blame === 'you' ? 'bad' : m.blame && m.blame !== 'none' ? 'good' : 'muted'}`, m.blame && m.blame !== 'you' && m.blame !== 'none' ? `✓ ${m.why}` : m.why) : null, h('div.tiny.muted', `${m.text ?? ''} → ${m.outcome === 'TD' ? 'Touchdown' : m.outcome === 'FG' ? 'Field goal' : m.outcome === 'MISS' ? 'No good' : m.outcome === 'KICK' ? 'Kickoff' : m.outcome === 'TO' ? 'Turnover' : m.outcome === 'DOWNS' ? 'Turnover on downs' : 'Punt'}`)),
         h('b', { style: { color: m.quality > 0.7 ? 'var(--good)' : m.quality < 0.35 ? 'var(--bad)' : 'inherit' } }, `${Math.round(m.quality * 100)}%`))))) : null,
     h('div.card', h('h3', 'Fallout'), h('div.changes',
       h(`span.chip.${d.fame >= 0 ? 'good' : 'bad'}`, `Fame ${signed(d.fame, 1)}`),

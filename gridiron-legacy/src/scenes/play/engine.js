@@ -174,6 +174,8 @@ export function freePlay(ctx) {
   };
   let holder = null; // entity holding the ball
   let flight = null; // { from, to, T, t0, H, target, reason }
+  // who the ball went to and why it fell incomplete, so every role is graded on its own job
+  let pass = null; // { target, sepUser, cause: 'off'|'drop'|'contest'|'oob'|'hail', caughtBy }
   let carrier = null; // ball carrier once the ball is past the QB stage
   let thrown = false;
   let catchPress = null;
@@ -690,6 +692,7 @@ export function freePlay(ctx) {
     const rh = Math.random();
     const endY = play.jump || play.hail ? 2.45 + Math.random() * 0.25 : tight && rh < 0.55 ? 2.15 + Math.random() * 0.35 : rh < 0.16 ? 1.95 + Math.random() * 0.3 : rh > 0.9 ? 0.6 + Math.random() * 0.25 : 1.2 + Math.random() * 0.3;
     flight = { endY: globalThis.__endY ?? endY, jumped: new Set(), from: { x: qbP.x + 0.3, z: qbP.z - 0.2 }, to, T: Math.max(0.4, dist(qbP, to) / v), t0: t, H, target: r, wobble: Math.random() < (user === qb ? 0.06 + Math.max(0, 70 - (st.skill ?? 60)) / 200 : 0.08) ? 0.22 : 0.025 };
+    { const ds = defenders.filter((d) => !d.down && d.role !== 'DL'); const sepOf = (e) => (ds.length ? Math.min(...ds.map((d) => dist(d.pos, e.pos))) : 9); pass = { target: r, sepUser: user === qb ? null : sepOf(user), cause: null, caughtBy: null }; }
     holder = null;
     playAction(qb.mesh, 'throw');
     sfx.throw();
@@ -1808,7 +1811,7 @@ export function freePlay(ctx) {
           if (phase !== 'live') return;
           if (ok) { hud.big('MOSSED HIM!', '#4ade80', 900); ctx.cinematic?.(() => user.pos, 1.3); snap('Contested catch!', 250); completeCatch(r, land); return; }
           if (Math.random() < 0.25) { holder = nearD0; carrier = nearD0; secureIt(nearD0); whistle('int'); return; }
-          whistle('incomplete', null, 'Ripped away at the catch point!');
+          if (pass) pass.cause = 'contest'; whistle('incomplete', null, 'Ripped away at the catch point!');
         });
         return;
       }
@@ -1832,8 +1835,12 @@ export function freePlay(ctx) {
       const lock = has('lockdown') && user.team === 'def' && dist(user.pos, land) < 3 ? 0.15 : 0;
       catchOk = dR <= catchR && Math.random() < (crowd ? 0.42 + hEdge : dD < 1.6 ? 0.72 + hEdge : 0.9) - wfx.slip - lock;
       // tight coverage: the defender gets a hand in
-      if (catchOk && dD < 1.25 && Math.random() < 0.3 / tol) { whistle('incomplete', null, 'Broken up at the catch point!'); return; }
+      if (catchOk && dD < 1.25 && Math.random() < 0.3 / tol) { if (pass) pass.cause = 'contest'; whistle('incomplete', null, 'Broken up at the catch point!'); return; }
       if (play.hail) catchOk = dR < 2.4 && Math.random() < 0.35 - crowd * 0.05;
+    }
+    if (!catchOk && pass) {
+      const reachR = r === user ? 1.4 + tol * 0.3 + (user.hIn - 73) * 0.04 : (f.H > 4 ? 1.7 : 1.15) + 0.2 * tol + (r.hIn - 73) * 0.04;
+      pass.cause = play.hail ? 'hail' : dR > reachR ? 'off' : crowd || dD < 1.3 ? 'contest' : 'drop';
     }
     const intRisk = dD < 0.9 && dD < dR ? 0.45 : dD < 1.3 && !catchOk ? 0.2 : 0;
     if (!catchOk && Math.random() < intRisk * (call === 'risky' ? 1.3 : 1)) {
@@ -1844,11 +1851,12 @@ export function freePlay(ctx) {
     }
     if (!catchOk) { whistle('incomplete'); return; }
     // Toe-tap: you must be in bounds.
-    if (Math.abs(r.pos.x) > FIELD_X) { whistle('incomplete', null, 'Out of bounds. No catch.'); return; }
+    if (Math.abs(r.pos.x) > FIELD_X) { if (pass) pass.cause = 'oob'; whistle('incomplete', null, 'Out of bounds. No catch.'); return; }
     completeCatch(r, land);
   };
   /** Ball secured. Long reaches become diving catches with a slow-mo moment. */
   const completeCatch = (r, land) => {
+    if (pass) pass.caughtBy = r;
     holder = r;
     carrier = r;
     sfx.catch();
@@ -1890,7 +1898,59 @@ export function freePlay(ctx) {
     } else if (r.turnover) say('turnover'); else if (r.sack) say('sack'); else if (r.complete === false) say('incomplete');
     else say(r.yards >= 15 ? 'big' : r.yards >= 5 ? 'gain' : 'short');
   };
-  const whistle = (why, by = null, text = null) => {
+  /**
+   * Fair grades: a receiver isn't blamed for a bad throw, a sack or a ball thrown to someone else; a QB isn't blamed
+   * for a drop on a perfect pass; a corner isn't blamed for a catch made on another man far away. Sets result.blame
+   * ('you' | 'qb' | 'receiver' | 'line' | 'defense' | 'none') and result.why (a plain-language reason).
+   */
+  const gradeByRole = (why) => {
+    if (!result) return;
+    const passPlay = !!pass;
+    const meQB = user === qb;
+    if (!m.defense) {
+      if (meQB) {
+        if (why === 'incomplete' && pass?.cause === 'drop') Object.assign(result, { quality: 0.5, blame: 'receiver', why: 'Right on the money. He dropped it.' });
+        else if (why === 'incomplete' && pass?.cause === 'contest') Object.assign(result, { quality: 0.32, blame: 'defense', why: 'Good coverage got a hand on it.' });
+        else if (why === 'incomplete' && pass?.cause === 'off') Object.assign(result, { blame: 'you', why: 'Off target.' });
+        else if (why === 'incomplete' && pass?.cause === 'hail') Object.assign(result, { quality: 0.3, blame: 'none', why: 'A prayer that did not get answered.' });
+        else if (why === 'sack' && t < 2.3) Object.assign(result, { quality: 0.2, blame: 'line', why: 'The line collapsed right away. No time.' });
+        else if (why === 'sack') Object.assign(result, { blame: 'you', why: 'Held it too long.' });
+        return;
+      }
+      if (!passPlay) {
+        // a run: the yards tell the story, unless you were hit in the backfield before you could do anything
+        if (carrier === user && why === 'tackle' && (result.yards ?? 0) <= 0 && t < 1.15) Object.assign(result, { quality: Math.max(result.quality, 0.3), blame: 'line', why: 'Hit in the backfield before you could cut. The line got beat.' });
+        return;
+      }
+      const toMe = pass.target === user;
+      const caughtByOther = pass.caughtBy && pass.caughtBy !== user;
+      const openK = Math.max(0, Math.min(1, ((pass.sepUser ?? 2) - 0.8) / 3.2)); // how open you were when the ball came out
+      if (why === 'sack') return void Object.assign(result, { quality: 0.42, blame: 'line', notTargeted: true, why: 'Sacked before the ball came out. Not on you.' });
+      if (caughtByOther) return void Object.assign(result, { quality: Math.min(result.quality, Math.max(0.45, 0.4 + openK * 0.2 + (result.yards ?? 0) / 60)), toOther: true, notTargeted: true, blame: 'none', why: `Thrown to a teammate${result.td ? ' for the score' : ''}. You did your job on the route.` });
+      if (!toMe) {
+        if (why === 'int') return void Object.assign(result, { quality: 0.38, notTargeted: true, blame: 'qb', why: 'The QB forced it to someone else. Not on you.' });
+        if (why === 'incomplete') return void Object.assign(result, { quality: 0.36 + openK * 0.22, notTargeted: true, blame: 'none', why: openK > 0.5 ? 'You were open, but the ball went elsewhere.' : 'Ball went elsewhere. You were covered.' });
+        return;
+      }
+      if (why === 'int') return void Object.assign(result, pass.cause === 'off' ? { quality: 0.32, blame: 'qb', why: 'Bad throw, picked off. Not on you.' } : { quality: 0.18, blame: 'you', why: 'Lost the fight for the ball.' });
+      if (why === 'incomplete') {
+        const c = pass.cause;
+        if (c === 'off') Object.assign(result, { quality: 0.45, blame: 'qb', why: 'Bad throw. Nothing you could do.' });
+        else if (c === 'hail') Object.assign(result, { quality: 0.4, blame: 'none', why: 'Jump ball. Nobody came down with it.' });
+        else if (c === 'contest') Object.assign(result, { quality: 0.32, blame: 'defense', why: 'The defender got a hand in. Tough break.' });
+        else if (c === 'oob') Object.assign(result, { quality: 0.24, blame: 'you', why: 'Could not get a foot down in bounds.' });
+        else Object.assign(result, { quality: 0.12, blame: 'you', why: 'A catchable ball. You dropped it.', drop: true });
+      }
+      return;
+    }
+    // defense: a corner in coverage is not graded on a catch made far from him on a man he wasn't covering
+    if (mode === 'cover' && result.caught && pass?.caughtBy && pass.caughtBy !== user.man && dist(user.pos, pass.caughtBy.pos) > 6 && by !== user) {
+      Object.assign(result, { quality: Math.max(result.quality, 0.5), notMine: true, blame: 'none', why: 'Caught on the other side of the field, not your man.' });
+    }
+  };
+  let by = null;
+  const whistle = (why, by_ = null, text = null) => { by = by_; return whistleInner(why, by_, text); };
+  const whistleInner = (why, by = null, text = null) => {
     if (phase !== 'live') return;
     setTimeout(() => commentate(why), 0);
     if (globalThis.__playDebug) console.log('whistle', why, 'by', by?.role, by?.slot, by?.engagedBy ? 'blocked' : '', carrier?.role, carrier?.slot, carrier?.pos.z?.toFixed(1), 'holder', holder?.role, 'thrown', thrown, 't', t.toFixed(2));
@@ -1920,6 +1980,7 @@ export function freePlay(ctx) {
       if (chaser && dist(chaser.pos, carrier.pos) < 2.6 && !opts.reducedMotion) { playAction(carrier.mesh, 'dive', { dur: 0.5 }); ctx.cinematic?.(() => carrier.pos, 1.2); snap('Dives in!', 200); }
       result = def ? (carrier.team === 'def' ? (user.scoop ? { defense: true, forcedFumble: lastFumble?.by === user, fumbleRec: true, turnover: true, defTD: true, quality: 0.99, text: 'SCOOP AND SCORE!' } : { defense: true, int: true, turnover: true, defTD: true, quality: 0.98, text: 'PICK SIX!' }) : { defense: true, caught: true, yardsAllowed: m.yardLine, tdAllowed: true, quality: 0.05, text: 'They score.' })
         : (carrier === qb && qb.scramble ? { scramble: true, complete: false, yards: m.yardLine, td: true, quality: 0.95, text: 'TOUCHDOWN! You took it in yourself!' } : { complete: true, yards: m.yardLine, td: true, quality: 0.95, text: 'TOUCHDOWN!' });
+      gradeByRole('td');
       if ((def && carrier.team === 'def') || (!def && carrier.team === 'off')) startCelebration();
       return;
     }
@@ -1945,7 +2006,9 @@ export function freePlay(ctx) {
         else result = { complete: true, yards: y, quality: Math.max(0.05, 0.3 + y / 22 + (carrier?.broken ?? 0) * 0.05), text: why === 'oob' ? `Out of bounds after ${y}.` : null };
       }
     }
+    gradeByRole(why);
     maybeFlag();
+    if (globalThis.__playDebug) globalThis.__lastResult = { ...result, why2: why };
     if (user.injured && result) { result.injured = true; result.injuryId = user.injury?.id ?? null; }
     if (!def && result.complete && result.yards >= 20) snap(`${result.yards}-yard gain`, 100);
   };

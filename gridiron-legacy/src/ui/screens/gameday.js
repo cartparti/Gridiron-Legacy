@@ -322,7 +322,8 @@ export function gamedayScreen(app) {
     const good = result.kick ? result.made || result.recovered || result.touchback : m.defense ? result.int || result.pd || result.forcedFumble || (result.tackle && (result.yardsAllowed ?? 99) < m.distance) : result.td || (result.complete && result.yards >= m.distance);
     const bad = result.kick ? result.made === false || result.recovered === false || result.returnTD : m.defense ? result.tdAllowed || (result.yardsAllowed ?? 0) >= 15 : result.turnover || result.sack;
     return h('div.card.flat', { style: { boxShadow: `inset 4px 0 0 ${good ? 'var(--good)' : bad ? 'var(--bad)' : 'var(--line2)'}` } },
-      h('b', result.text ?? ''), result.played ? h('span.small.muted', ` · execution ${Math.round(result.quality * 100)}%`) : null);
+      h('b', result.text ?? ''), result.played ? h('span.small.muted', ` · execution ${Math.round(result.quality * 100)}%`) : null,
+      result.why ? h(`div.small.${result.blame === 'you' ? 'bad' : result.blame && result.blame !== 'none' ? 'good' : 'muted'}`, { style: { marginTop: '4px' } }, result.blame && result.blame !== 'you' && result.blame !== 'none' ? `✓ ${result.why}` : result.why) : null);
   };
 
   const finishMoment = (result) => {

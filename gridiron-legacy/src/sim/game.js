@@ -603,11 +603,11 @@ export function resolveMoment(state, result) {
     if (result.sack && result.tackle) s.defSacks = (s.defSacks ?? 0) + 1;
     if (result.tfl && result.tackle) s.tfl = (s.tfl ?? 0) + 1;
     if (result.forcedFumble) s.tackles++;
-    if (result.caught || m.type === 'cb_tackle') {
+    if ((result.caught || m.type === 'cb_tackle') && !result.notMine) { // a catch on another man far away isn't yours
       if (result.caught) s.recAllowed++;
       s.ydsAllowed += result.yardsAllowed ?? 0;
     }
-    if (result.tdAllowed) s.tdAllowed++;
+    if (result.tdAllowed && !result.notMine) s.tdAllowed++;
     if (m.clutch && (result.int || result.pd || result.sack || (result.tackle && (result.yardsAllowed ?? 0) < m.distance))) s.clutch++;
     if (result.turnover) out = 'TO';
     else if (result.tdAllowed) out = 'TD';
@@ -639,10 +639,10 @@ export function resolveMoment(state, result) {
       s.rushYds += result.yards;
       if (result.td) s.rushTD++;
       if (result.turnover) s.fumbles++;
-    } else {
+    } else if (!result.notTargeted && !result.toOther) { // sacks and throws to teammates aren't your targets
       s.targets++;
       if (result.complete) { s.rec++; s.recYds += result.yards; if (result.td) s.recTD++; }
-      else if (!result.turnover && result.quality > 0.15 && m.type !== 'rb_screen') s.drops++;
+      else if (result.blame !== undefined ? result.drop : !result.turnover && result.quality > 0.15 && m.type !== 'rb_screen') s.drops++; // only real drops count
     }
     if (m.clutch && (result.td || (result.complete && result.yards >= m.distance))) s.clutch++;
     if (result.td) out = 'TD';
@@ -654,7 +654,7 @@ export function resolveMoment(state, result) {
     }
     momentumShift(g, (result.quality - 0.5) * 0.35 + (result.td ? 0.2 : 0) - (result.turnover ? 0.3 : 0));
   }
-  g.moments.push({ ...m, call: result.call, quality: result.quality, yards: m.defense ? -(result.yardsAllowed ?? 0) : result.yards, td: m.defense ? !!result.defTD : result.td, turnover: result.turnover, text: result.text, outcome: null, played: !!result.played });
+  g.moments.push({ ...m, call: result.call, quality: result.quality, yards: m.defense ? -(result.yardsAllowed ?? 0) : result.yards, td: m.defense ? !!result.defTD : result.td, turnover: result.turnover, text: result.text, why: result.why ?? null, blame: result.blame ?? null, outcome: null, played: !!result.played });
   const rec = g.moments[g.moments.length - 1];
   rec.zone = zoneAfterMoment(state, rec.quality ?? 0); // 'in' / 'out' / null
   rec.inZone = !!g.zone;
