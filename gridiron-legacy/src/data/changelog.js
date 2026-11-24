@@ -1,5 +1,12 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.63', date: 'Nov 24', title: 'Tunnel fits, bold predictions, card shows and streaks', items: [
+    'Tunnel fits (Week tab): pick your pregame outfit every week, from a sharp suit to a designer fit. The best looks get named best dressed of the week. Wear the same thing twice and fewer cameras care.',
+    'Bold prediction: at the start of each season you can guarantee something (playoffs, beating your rival, a career year, two losses or fewer, the title). Back it up for fame and XP, or hear about it all offseason.',
+    'Card show (Career, then Collection): once a season, sign your trading cards for collectors. Rarer cards and more fame mean a bigger check.',
+    'Your own menu item: become a big enough star and your home stadium names food after you. It shows on your Career profile.',
+    'Streaks (Career profile): games in a row with a touchdown, wins in a row, good games in a row and more, with your personal bests. New bests show after the game.',
+  ] },
   { v: '0.62', date: 'Nov 24', title: 'Birthdays, bucket list, fantasy points and more', items: [
     'Birthday: once a year your birthday falls in the season. Pick how to celebrate: family dinner, a team party, a night with your partner or a live stream with fans.',
     'Bucket list (Career, then Collection): 15 life goals, from winning a state title and buying Mom a house to the Hall of Fame. Check them off as you go.',

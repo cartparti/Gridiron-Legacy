@@ -53,6 +53,7 @@ import { teamCulture } from '../data/culture.js';
 import { homecomingCheck, seniorNightCheck, ratingRevealCheck, isHomecomingWeek, isSeniorNight, traditionsAfterGame, ringEarned } from './seasonal.js';
 import { printCard, gameBallsAfterGame } from './collectibles.js';
 import { mailWeek } from './mailbag.js';
+import { predictionAfterGame, settlePrediction, dishCheck, streaksAfterGame } from './flair.js';
 import { fantasyPoints, fantasyRank, trackJerseySales, bucketCheck, birthdayCheck, birthdayAfterGame } from './moments.js';
 import { petWeekly } from './pets.js';
 import { makeIncentive, settleIncentive, coachingCarousel, coachWeekly, assignCoachStyle, ritualAfterGame } from './staff.js';
@@ -167,6 +168,7 @@ export function beginWeek(state) {
   mailWeek(state);
   trackJerseySales(state);
   birthdayCheck(state);
+  dishCheck(state);
   state.week.nilNotes = nilWeek(state);
   trackDraftWatch(state);
   {
@@ -306,6 +308,8 @@ export function finishGame(state) {
   const traditions = traditionsAfterGame(state, g);
   const ritual = ritualAfterGame(state, g);
   birthdayAfterGame(state);
+  predictionAfterGame(state, g);
+  const streak = streaksAfterGame(state, g);
   const fantasy = g.sitOut ? null : { pts: fantasyPoints(p.position, g.userStats) };
   if (fantasy) fantasy.rank = fantasyRank(p.position, fantasy.pts);
   const rivalryResult = settleRivalry(state, g);
@@ -350,6 +354,7 @@ export function finishGame(state) {
     traditions,
     ritual,
     fantasy,
+    streak,
     playerOfWeek: playerOfWeek(state, g),
     rivalryResult: rivalryResult ? { name: rivalryResult.trophy.name, kept: rivalryResult.kept, won: rivalryResult.won, lost: rivalryResult.lost, streak: rivalryResult.trophy.streak } : null,
   };
@@ -454,6 +459,7 @@ export function endSeason(state) {
   if (champion) ringEarned(state, team, STAGES[c.stage].titleName);
   const incentive = c.stage === 'pro' ? settleIncentive(state) : null;
   const coachChange = coachingCarousel(state, team);
+  const prediction = settlePrediction(state, { champion, team });
   if (c.stage === 'pro') state.proHistory.push({ year: c.year, champion: league.champion, mvp: aw.awards.includes('Most Valuable Player') ? `${p.first} ${p.last}` : null });
 
   // Money: investments grow or shrink.
@@ -506,6 +512,7 @@ export function endSeason(state) {
     card,
     incentive,
     coachChange,
+    prediction,
     standings: standings(league).map((t) => ({ id: t.id, w: t.w, l: t.l })),
   };
   journalSeason(state, state.review, { teamName: `${team.city} ${team.name}`, titleName: STAGES[c.stage].titleName, awardLabel: (n) => awardLabel(n, p.position) });

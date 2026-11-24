@@ -6,6 +6,7 @@ import { dealsOpen } from '../../sim/nil.js';
 import { mediaPersona } from '../../sim/presser.js';
 import { captainCard, tradeCard, scoutCard, previewCard, recordChaseCard, rivalryChip, powerView, extensionCard, mentorCard, familyView, givingView, rehabCard, farewellCard } from './pregame.js';
 import { draftStockPage, draftTabOpen } from './draftStock.js';
+import { fitCard, predictionCard, cardShowCard, dishCard, streaksCard } from './flair.js';
 import { fantasyCard, jerseyCard, bucketCard, birthdayCard } from './traditions.js';
 import { ratingRevealCard, homecomingCard, seniorNightCard, mailCard, ritualCard, ringDesigner, incentiveCard, coachStyleChip, petCard, collectionPage } from './traditions.js';
 import { activityFor } from '../../data/activities.js';
@@ -207,7 +208,7 @@ function weekView(app) {
   }
 
   // the coach's goals for this season
-  for (const card of [birthdayCard(app), seniorNightCard(app), homecomingCard(app), ratingRevealCard(app), ringDesigner(app)]) if (card) container.append(card);
+  for (const card of [birthdayCard(app), predictionCard(app), seniorNightCard(app), homecomingCard(app), ratingRevealCard(app), ringDesigner(app)]) if (card) container.append(card);
   if (st.week?.petNote) container.append(h('div.card.flat', h('p.small', `🐾 ${st.week.petNote}`)));
   { const gc = goalsCard(app); if (gc) container.append(gc); }
   { const dn = dealsNudge(app); if (dn) container.append(dn); }
@@ -218,6 +219,7 @@ function weekView(app) {
   if (m && opp && st.player.position !== 'MS') { const sc = scoutCard(app, opp); if (sc) container.append(sc); }
   { const rc = m && status.canPlay ? ritualCard(app) : null; if (rc) container.append(rc); }
   { const mc = mailCard(app); if (mc) container.append(mc); }
+  { const fc = m && status.canPlay ? fitCard(app) : null; if (fc) container.append(fc); }
 
   // Season stakes: your role on the depth chart, the playoff race and the award race
   container.append(seasonCard(st));
@@ -519,8 +521,8 @@ function careerView(app) {
   else if (sub === 'friends') body = friendsPage(app);
   else if (sub === 'achievements') body = achievementsPage(app);
   else if (sub === 'journal') body = journalPage(app);
-  else if (sub === 'collection') { body = collectionPage(app); body.prepend(bucketCard(app)); }
-  else { body = profileView(app); const fw = farewellCard(app); if (fw) body.prepend(fw); body.append(...careerStatsSections(app)); }
+  else if (sub === 'collection') { body = collectionPage(app); body.prepend(bucketCard(app)); const cs = cardShowCard(app); if (cs) body.prepend(cs); }
+  else { body = profileView(app); const fw = farewellCard(app); if (fw) body.prepend(fw); for (const c of [dishCard(app), streaksCard(app)]) if (c) body.append(c); body.append(...careerStatsSections(app)); }
   return h('div.col', { style: { gap: '14px' } }, tabs, body);
 }
 

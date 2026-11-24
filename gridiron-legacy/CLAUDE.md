@@ -852,3 +852,10 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   games, lastGame.handshake), birthday (`birthdayCheck` beginWeek; birth week hashed from the name, NOT the save RNG — using rand there shifted
   every career and broke seed-sensitive tests; `throwParty`, `birthdayAfterGame`). UI in traditions.js (fantasyCard, jerseyCard, bucketCard,
   handshakeCard, birthdayCard). Tests: round23.
+
+## v0.63 (quick round): `src/sim/flair.js` + `src/ui/screens/flair.js`
+- FITS + `pickFit` (state.fit per week key; repeat = 0.4 fame; "best dressed" by hash, never rand), PREDICTIONS + `makePrediction`
+  (weeks 0-1) / `predictionAfterGame` (rival win) / `settlePrediction` (endSeason -> review.prediction), `cardShow` (college/pro, once a
+  season, uses a day; pay from cardValue + fame), `dishCheck` (beginWeek, fame >= 60, once per team -> player.dishes), streaks
+  (`streaksAfterGame` -> player.streaks {cur, best}, lastGame.streak on a new best; `streakRows`). Nothing uses the save RNG.
+  Tests: round24.

@@ -3,6 +3,7 @@ import { awardLabel } from '../../sim/awards.js';
 import { achUnlockRows, goalsReview } from './achievements.js';
 import { challengeChip, pressCard, allStarCard, rivalryResultCard, potwCard, offFieldReview, awardNightCard } from './pregame.js';
 import { injuryInfo, injuryNote } from '../../sim/injury.js';
+import { streakNote, predictionReview } from './flair.js';
 import { postgameExtras, reviewExtras, fantasyCard, handshakeCard } from './traditions.js';
 import { h } from '../dom.js';
 import { backupModal } from './slots.js';
@@ -75,6 +76,7 @@ export function postgameScreen(app) {
       (g.newTraits ?? []).map((n) => h('div.row', { style: { gap: '8px', marginTop: '6px' } }, h('span.chip.good.pix', 'NEW TRAIT'), h('b', n), h('span.tiny.muted', 'Equip it in Career → Traits')))) : null,
     handshakeCard(app),
     fantasyCard(g),
+    streakNote(g),
     ...postgameExtras(app),
     g.bucket?.length ? h('div.card.unlock-card', h('h3', '📝 Bucket list'), g.bucket.map((x) => h('div.small', '✅ ', h('b', x)))) : null,
     rivalryResultCard(g),
@@ -121,6 +123,7 @@ export function reviewScreen(app) {
     h('div.card', h('h3', 'Season Stats'), h('div.bigstat', statLine(p.position, r.seasonStats).map(([v, l]) => h('div', h('b', v), h('span', l)))),
       h('p.tiny.muted', { style: { marginTop: '6px' } }, `${r.seasonStats.games} games played`)),
     goalsReview(r.goals),
+    predictionReview(r),
     ...reviewExtras(app),
     awardNightCard(app),
     allStarCard(app),
