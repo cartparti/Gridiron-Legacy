@@ -870,3 +870,16 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - game.js resolveMoment: notTargeted/toOther skip targets/catches; drops only when result.drop (bot results without blame keep the old rule,
   so balance is unchanged); notMine skips ydsAllowed/recAllowed/tdAllowed. Moments store why + blame; gameday result card and the postgame
   Key Moments show the reason (green ✓ when it wasn't you). Debug: globalThis.__lastResult under __playDebug. Tests: round25.
+
+## v0.65: run defense, college crests, camera
+- engine.js `interceptPoint(e, target, speed)` (true intercept, capped 2.5 s) + `pursue`: for ball carriers (or a QB holder > 5 yd from
+  his start) chase the intercept point and keep leverage (aim z <= carrier.z - 0.8 when downfield of him); full speed (>= 0.99) when the
+  carrier is behind the line (z > 0.6) or retreating (vel.z > 1.5). Blocks shed 3x faster once the carrier is 1.5+ yd behind the line.
+  User sprint fades: user.sprintT (+dt held, -0.6 dt released), sprint mult 1.15 -> 0.98 between 2 and 3.6 s. Probe (RB: retreat 1.3 s,
+  sideline 1.6 s, then upfield, all sprinting): run down for -12 both reps (was a TD). gradeByRole: line blame only for -4..0 yd hits
+  < 1.15 s; losses of 6+ are on you.
+- mascots.js KEYWORDS: sea (sea lion/otter/swell/mariner/anchor) before cat, gator, snake (rattler...), axe (lumberjack/miner), gear
+  (engineer), star (colonial/rocket), more birds/cats/bison. Colleges now use 15 glyphs (was 20/32 plain shields). crest.js: non-pro teams
+  get a hashed badge shape (shield/round/octagon/pennant/arch) and pattern (stripe/chevron/split/band/quarter); pro crests unchanged.
+- Camera (engine live phase): focus blends 30% toward you when the action is elsewhere (zoom out with distance, max 1.25), no z cap at 4
+  (follows retreats to 22), full x tracking, k 5, look-ahead 2.5 when the mover runs backwards.

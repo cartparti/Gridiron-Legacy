@@ -1,5 +1,11 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.65', date: 'Nov 25', title: 'A real run defense, college logos, a smarter camera', items: [
+    'Running is no longer a free touchdown: defenders take real pursuit angles and stay between you and the end zone. Drop back behind the line or loop around the outside and the whole defense chases you down at full speed (and blocks fall apart). Quarterbacks who wander far from the pocket get the same treatment.',
+    'Sprint has limits now: hold it for about two seconds and your legs start to fade. Let go for a moment to get it back.',
+    'College teams finally look different: every school gets its own badge shape (shield, round, pennant, arch, octagon), pattern and mascot, including owls, gears, axes, gators, snakes and stars.',
+    'Better camera: it follows the ball carrier wherever he goes (even way behind the line), stays centered near the sideline, reacts faster, and keeps you in the shot when the play is happening somewhere else.',
+  ] },
   { v: '0.64', date: 'Nov 24', title: 'Fairer grades: you only get blamed for what you did', items: [
     'Receivers: a bad throw, a sack, an interception on a ball thrown to someone else, or a pass to a teammate no longer hurts your grade or your stats. Being open when the ball goes elsewhere is credited. Only real drops count as drops, and catches by teammates no longer show up as yours.',
     'Quarterbacks: a perfect pass your receiver drops is graded as a good throw. A sack in the first two seconds is on the line, not you. Tight coverage breaking up a pass is graded fairly.',

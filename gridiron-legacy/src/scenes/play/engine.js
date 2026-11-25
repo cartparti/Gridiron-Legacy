@@ -1939,7 +1939,9 @@ export function freePlay(ctx) {
       }
       if (!passPlay) {
         // a run: the yards tell the story, unless you were hit in the backfield before you could do anything
-        if (carrier === user && why === 'tackle' && (result.yards ?? 0) <= 0 && t < 1.15) Object.assign(result, { quality: Math.max(result.quality, 0.3), blame: 'line', why: 'Hit in the backfield before you could cut. The line got beat.' });
+        const yds = result.yards ?? 0;
+        if (carrier === user && why === 'tackle' && yds <= 0 && yds >= -4 && t < 1.15) Object.assign(result, { quality: Math.max(result.quality, 0.3), blame: 'line', why: 'Hit in the backfield before you could cut. The line got beat.' });
+        else if (carrier === user && why === 'tackle' && yds <= -6) Object.assign(result, { blame: 'you', why: 'You gave up ground and got run down. Going backwards almost never works.' });
         return;
       }
       const toMe = pass.target === user;
