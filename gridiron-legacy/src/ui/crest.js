@@ -2,6 +2,7 @@
 // Glyphs are 16x16 masks: '#' = mascot color, 'o' = dark detail, '+' = highlight, '.' = empty.
 
 import { GLYPHS as G, mascotKind } from '../data/mascots.js';
+import { proTeamDef } from '../data/teams.js';
 export { mascotKind };
 
 
@@ -20,16 +21,36 @@ export function crestURL(team) {
   const [p, s] = team.colors;
   const px = (x, y, col) => { g.fillStyle = col; g.fillRect(x, y, 1, 1); };
   // shield outline: rows narrow toward the bottom point
+  // Schools get their own badge shape and pattern (stable per team); the built-in pro clubs keep the classic shield.
+  let hsh = 7; for (const ch of `${team.id}|${team.name}`) hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0;
+  const pro = !!proTeamDef(team.id);
+  const shape = pro ? 'shield' : ['shield', 'round', 'octagon', 'pennant', 'arch', 'shield'][hsh % 6];
+  const pattern = pro ? 'plain' : ['plain', 'stripe', 'chevron', 'split', 'band', 'plain', 'quarter'][(hsh >> 4) % 7];
   const inShield = (x, y) => {
+    const dx = Math.abs(x - 16.5), dy = y - 20;
+    if (shape === 'round') return dx * dx + dy * dy <= 16.4 * 16.4 * (y > 20 ? 1.18 : 1) && y >= 1 && y <= 38;
+    if (shape === 'octagon') return y >= 1 && y <= 38 && dx <= 16 && dx + Math.abs(dy) <= 25;
+    if (shape === 'pennant') return y >= 1 && y <= 38 && dx <= 15.5 && (y < 30 || y - 30 < dx * 0.85);
+    if (shape === 'arch') return y <= 38 && dx <= 15.5 && (y >= 14 || (x - 16.5) ** 2 + (y - 14) ** 2 <= 15.5 * 15.5);
     if (y < 1 || y > 38) return false;
     const half = y < 24 ? 16 : 16 - (y - 24) * 1.15;
-    return Math.abs(x - 16.5) <= half;
+    return dx <= half;
+  };
+  const shade = (hex, k) => { const v = parseInt(hex.slice(1), 16); const f = (c) => Math.max(0, Math.min(255, Math.round(c * k))); return `rgb(${f((v >> 16) & 255)},${f((v >> 8) & 255)},${f(v & 255)})`; };
+  const fill = (x, y) => {
+    const dx = x - 16.5;
+    if (pattern === 'stripe' && Math.abs(dx) < 3) return s;
+    if (pattern === 'chevron' && y > 26 && Math.abs(y - 26 - Math.abs(dx) * 0.55) < 2.2) return s;
+    if (pattern === 'split' && dx < 0) return shade(p, 0.78);
+    if (pattern === 'band' && y >= 29 && y <= 32) return s;
+    if (pattern === 'quarter' && ((dx < 0) !== (y < 20))) return shade(p, 0.8);
+    return y < 4 ? s : p;
   };
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (!inShield(x, y)) continue;
     const edge = !inShield(x - 1, y) || !inShield(x + 1, y) || !inShield(x, y - 1) || !inShield(x, y + 1);
     const edge2 = !inShield(x - 2, y) || !inShield(x + 2, y) || !inShield(x, y - 2) || !inShield(x, y + 2);
-    px(x, y, edge ? '#0b0d10' : edge2 ? s : y < 4 ? s : p);
+    px(x, y, edge ? '#0b0d10' : edge2 ? s : fill(x, y));
   }
   // diagonal shine
   g.globalAlpha = 0.12;

@@ -783,7 +783,27 @@ export function freePlay(ctx) {
 
   // ---------------- AI
   const nearest = (from, list) => { let best = null; let bd = Infinity; for (const e of list) { if (e.down || e.out > 0) continue; const d = dist(from.pos, e.pos); if (d < bd) { bd = d; best = e; } } return best; };
+  /** Where a chaser running at `speed` meets the target (true intercept, capped at 2.5 s ahead). */
+  const interceptPoint = (e, target, speed) => {
+    const px = target.pos.x - e.pos.x, pz = target.pos.z - e.pos.z, vx = target.vel.x, vz = target.vel.z;
+    const a = vx * vx + vz * vz - speed * speed, b = 2 * (px * vx + pz * vz), c = px * px + pz * pz;
+    let T = null;
+    if (Math.abs(a) < 1e-4) T = b < 0 ? -c / b : null;
+    else { const disc = b * b - 4 * a * c; if (disc >= 0) { const r1 = (-b - Math.sqrt(disc)) / (2 * a), r2 = (-b + Math.sqrt(disc)) / (2 * a); T = [r1, r2].filter((x) => x > 0).sort((x, y) => x - y)[0] ?? null; } }
+    if (T === null || T > 2.5) T = Math.min(2.5, Math.sqrt(c) / Math.max(1, speed));
+    return { x: target.pos.x + vx * T, z: target.pos.z + vz * T };
+  };
   const pursue = (e, target, dt, factor = 1) => {
+    // Ball carrier (or a QB who has wandered far from his spot): take a real pursuit angle and keep leverage. A runner
+    // who retreats behind the line or loops around gets chased at full speed: there's no free yardage going backwards.
+    if (target.team === 'off' && !flight && (target === carrier || (target === holder && target.start && dist(target.pos, target.start) > 5))) {
+      const retreating = target === carrier ? target.pos.z > 0.6 || target.vel.z > 1.5 : true;
+      const sp = e.maxSpeed * (retreating ? Math.max(factor, 0.99) : factor);
+      const aim = interceptPoint(e, target, sp);
+      if (e.pos.z < target.pos.z - 0.5) aim.z = Math.min(aim.z, target.pos.z - 0.8); // stay between him and the end zone
+      moveToward(e, aim.x, aim.z, sp, dt);
+      return;
+    }
     const d = dist(e.pos, target.pos);
     const lead = Math.min(0.7, d / Math.max(1, e.maxSpeed));
     moveToward(e, target.pos.x + target.vel.x * lead, target.pos.z + target.vel.z * lead, e.maxSpeed * factor, dt);
@@ -1016,7 +1036,7 @@ export function freePlay(ctx) {
     if (stillDown(e, dt)) return;
     if (e.engagedBy) {
       // Blocked: try to shed the block over time.
-      e.shed += dt * ((mode === 'run' ? 0.2 : mode === 'pass' || mode === 'route' ? 0.2 : 0.32) + (mode === 'pass' && user === qb ? 0.1 : 0) + (call === 'risky' ? 0.1 : 0) + (m.defense ? -0.05 : 0.03 + oppK * 0.04) + (e.blitz ? 0.1 : 0));
+      e.shed += dt * (carrier && carrier.team === 'off' && carrier.pos.z > 1.5 && t > 0.8 ? 3 : 1) * ((mode === 'run' ? 0.2 : mode === 'pass' || mode === 'route' ? 0.2 : 0.32) + (mode === 'pass' && user === qb ? 0.1 : 0) + (call === 'risky' ? 0.1 : 0) + (m.defense ? -0.05 : 0.03 + oppK * 0.04) + (e.blitz ? 0.1 : 0));
       if (Math.random() < e.shed * dt * 1.6 || t > 4.5) { const b = e.engagedBy; b.engaged = null; e.engagedBy = null; setPose(b.mesh, null); setPose(e.mesh, null); e.out = 0.25; }
       return;
     }
@@ -2268,7 +2288,8 @@ export function freePlay(ctx) {
       const [uh0, uw0] = POS_SIZE[opts.position] ?? POS_SIZE[user.role] ?? [73, 210];
       const userSize = Math.max(0.9, Math.min(1.06, 1 - ((user.wLb - uw0) / uw0) * 0.3 + (user.hIn - uh0) * 0.003));
       const traitSpeed = (has('gear2') && c.sprint ? 1.08 : 1) * (has('escape') && user === qb && carrier === qb ? 1.08 : 1) * (has('deep') && mode === 'route' && user.pos.z < -10 ? 1.07 : 1) * (has('closing') && flight && user.team === 'def' ? 1.1 : 1);
-      const userSpeed = traitSpeed * BASE_SPEED[user.role] * userSize * (0.86 + (st.speed ?? 60) / 100 * 0.28) * wfx.speed * (1 - surf.sink) * (c.sprint ? 1.15 : 0.95) * (moves.slow > 0 ? 0.55 : 1) * (moves.spin > 0 ? 0.8 : 1) * (opts.hurt ?? 1);
+      const userSpeed = traitSpeed * BASE_SPEED[user.role] * userSize * (0.86 + (st.speed ?? 60) / 100 * 0.28) * wfx.speed * (1 - surf.sink) * (c.sprint ? 0.98 + 0.17 * Math.max(0, Math.min(1, (3.6 - (user.sprintT ?? 0)) / 1.6)) : 0.95) * (moves.slow > 0 ? 0.55 : 1) * (moves.spin > 0 ? 0.8 : 1) * (opts.hurt ?? 1);
+      user.sprintT = Math.max(0, (user.sprintT ?? 0) + (c.sprint ? dt : -dt * 0.6)); // sprint fades after ~2 s held
       if (user.out > 0 || user.rise > 0) { stillDown(user, dt); user.vel.x *= 0.8; user.vel.z *= 0.8; }
       else if (moves.dive) {
         moves.dive += dt;
@@ -2486,8 +2507,18 @@ export function freePlay(ctx) {
       setButtonsFor();
       // ---- camera
       const focus = loose ? { x: ball.position.x, z: ball.position.z } : carrier ? carrier.pos : flight ? { x: ball.position.x, z: ball.position.z } : user.pos;
-      const zoom = mode === 'pass' && !thrown && !carrier ? 1.05 : carrier ? 0.72 : 0.9;
-      rig(camera, focus.x * 0.85, Math.min(4, focus.z), dt, { zoom, k: 3.5, ahead: carrier?.team === 'def' ? -6 : 8 });
+      let zoom = mode === 'pass' && !thrown && !carrier ? 1.05 : carrier ? (carrier === user ? 0.66 : 0.74) : 0.9;
+      // keep YOU in the shot too when the action is somewhere else (a defender chasing, a receiver waiting on the ball)
+      let fx = focus.x, fz = focus.z;
+      if (focus !== user.pos && !user.down) {
+        const d = Math.hypot(user.pos.x - focus.x, user.pos.z - focus.z);
+        if (d < 26) { fx = focus.x * 0.7 + user.pos.x * 0.3; fz = focus.z * 0.7 + user.pos.z * 0.3; zoom = Math.max(zoom, 0.62 + d / 38); }
+      }
+      zoom = Math.min(1.25, zoom);
+      // lead the runner the way he is going: less look-ahead when he is retreating or the defense has the ball
+      const mover = carrier ?? user;
+      const ahead = carrier?.team === 'def' ? -6 : mover.vel.z > 1 ? 2.5 : 7;
+      rig(camera, fx, Math.min(22, fz), dt, { zoom, k: 5, ahead });
       return;
     }
 

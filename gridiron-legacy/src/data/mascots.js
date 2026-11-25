@@ -81,12 +81,18 @@ export const GLYPHS = {
 };
 
 export const KEYWORDS = [
-  ['horse', /stallion|mustang|bronco|colt/i], // before cat: "Stallions" contains "lion"
-  ['cat', /wildcat|lion|panther|bobcat|tiger|cougar/i],
+  ['sea', /sea lion|otter|swell|mariner|anchor|navigator|sailor/i], // before cat: "Sea Lions" contains "lion"
+  ['horse', /stallion|mustang|bronco|colt|charger/i], // before cat: "Stallions" contains "lion"
+  ['gator', /gator|alligator|croc/i],
+  ['snake', /rattler|viper|cobra|python|serpent|snake/i],
+  ['axe', /lumberjack|miner|logger|pioneer|axe/i],
+  ['gear', /engineer|mechanic|robot|machinist|gear/i],
+  ['star', /colonial|rocket|patriot|star|comet|astro/i],
+  ['cat', /wildcat|lion|panther|bobcat|tiger|cougar|puma|jaguar|lynx/i],
   ['wolf', /wol|jackal|coyote|fox|dog/i],
-  ['bird', /talon|heron|firebird|condor|eagle|pelican|hawk|falcon|raven/i],
+  ['bird', /talon|heron|firebird|condor|eagle|pelican|hawk|falcon|raven|owl|cardinal|gull|roadrunner|osprey/i],
   ['bear', /grizzl|bear/i],
-  ['bison', /bison|ram|bull/i],
+  ['bison', /bison|ram|bull|bighorn|stampede|buffalo/i],
   ['sea', /kraken|shark|croc|rapid|breaker|marlin|wave/i],
   ['scorpion', /scorpion|hornet|bee/i],
   ['storm', /squall|cyclone|hurricane|voltage|frost|thunder|bolt|storm/i],
