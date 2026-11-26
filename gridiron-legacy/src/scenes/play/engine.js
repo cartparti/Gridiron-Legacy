@@ -1996,6 +1996,10 @@ export function freePlay(ctx) {
         if (pass.cause === 'drop' && pass.catchDelta !== null) tip = pass.catchDelta < -0.08 ? `You pressed CATCH ${f1(-pass.catchDelta)}s early. Wait until the ball is almost at your hands.` : pass.catchDelta > 0.08 ? `You pressed CATCH ${f1(pass.catchDelta)}s late. Press just as the ball arrives.` : 'Close. Press CATCH right as the ball arrives.';
         else if (pass.cause === 'drop') tip = 'You never pressed CATCH. Tap it just as the ball reaches you.';
         else if (result.complete && yds >= 15) tip = 'Big catch. Separation at the break made that.';
+        else if (pass.cause === 'off') tip = 'Bad throw, nothing to fix. Keep breaking hard at the top of the route so the QB has an easy window.';
+        else if (pass.cause === 'contest') tip = (pass.sepUser ?? 9) < 1.2 ? `The defender was right on you (${f1(pass.sepUser ?? 0)} yd). Sell the route before the break to create more space.` : 'Fight for it at the catch point: press CATCH right as the ball arrives.';
+        else if (pass.cause === 'oob') tip = 'Drift back toward the numbers before the ball arrives so you can get a foot down.';
+        else if (pass.cause === 'hail') tip = 'Jump balls are coin flips. Time your jump and press CATCH at the highest point.';
       } else if (result.notTargeted && (pass.sepUser ?? 9) < 1.5) tip = `You had only ${f1(pass.sepUser ?? 0)} yards of separation when the ball came out. Sell the route harder, or tap CALL FOR IT when you are open.`;
       else if (result.notTargeted && (pass.sepUser ?? 0) > 3) tip = `You were open by ${f1(pass.sepUser)} yards. Tap CALL FOR IT so the QB looks your way.`;
     } else if (m.defense && mode === 'cover') {
