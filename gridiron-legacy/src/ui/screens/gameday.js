@@ -3,7 +3,7 @@
 import { costumeSpec, mascotDisplayName } from '../../data/mascots.js';
 import { INJURY_STATUS } from '../../sim/injury.js';
 import { h, clear } from '../dom.js';
-import { PLAY_CALLS, WEATHER } from '../../data/config.js';
+import { PLAY_CALLS, WEATHER, SLIDER_OPP } from '../../data/config.js';
 import { getTeam } from '../../sim/league.js';
 import { resolveTwoPoint, twoPointOdds,
   stepGame, resolveMoment, autoMoment, tolerance, outcomeFromQuality, resolveDecision, autoDecision,
@@ -323,7 +323,8 @@ export function gamedayScreen(app) {
     const bad = result.kick ? result.made === false || result.recovered === false || result.returnTD : m.defense ? result.tdAllowed || (result.yardsAllowed ?? 0) >= 15 : result.turnover || result.sack;
     return h('div.card.flat', { style: { boxShadow: `inset 4px 0 0 ${good ? 'var(--good)' : bad ? 'var(--bad)' : 'var(--line2)'}` } },
       h('b', result.text ?? ''), result.played ? h('span.small.muted', ` · execution ${Math.round(result.quality * 100)}%`) : null,
-      result.why ? h(`div.small.${result.blame === 'you' ? 'bad' : result.blame && result.blame !== 'none' ? 'good' : 'muted'}`, { style: { marginTop: '4px' } }, result.blame && result.blame !== 'you' && result.blame !== 'none' ? `✓ ${result.why}` : result.why) : null);
+      result.why ? h(`div.small.${result.blame === 'you' ? 'bad' : result.blame && result.blame !== 'none' ? 'good' : 'muted'}`, { style: { marginTop: '4px' } }, result.blame && result.blame !== 'you' && result.blame !== 'none' ? `✓ ${result.why}` : result.why) : null,
+      result.tip ? h('div.small.coach-tip', `📋 Coach: ${result.tip}`) : null);
   };
 
   const finishMoment = (result) => {
@@ -476,7 +477,7 @@ export function gamedayScreen(app) {
       traits: equippedTraits(st),
       health: st.player.health,
       hurt: g.playingHurt ? (INJURY_STATUS[g.playingHurt]?.speed ?? 1) : 1,
-      oppStrength: matchup(st).k,
+      oppStrength: matchup(st).k + (SLIDER_OPP[st.sliders?.opp ?? 'normal']?.k ?? 0),
       // uniforms + field get dirtier as the game goes on
       wear: { key: `${gid}-${st.career.year}`, progress: Math.min(1, (g.cursor + 1) / Math.max(1, g.drives.length)) },
     }).catch((err) => { // never leave the match stuck if a play fails to load: sim it

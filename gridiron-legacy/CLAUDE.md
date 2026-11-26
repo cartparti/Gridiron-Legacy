@@ -883,3 +883,16 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
   get a hashed badge shape (shield/round/octagon/pennant/arch) and pattern (stripe/chevron/split/band/quarter); pro crests unchanged.
 - Camera (engine live phase): focus blends 30% toward you when the action is elsewhere (zoom out with distance, max 1.25), no z cap at 4
   (follows retreats to 22), full x tracking, k 5, look-ahead 2.5 when the mover runs backwards.
+
+## v0.66: coach's notes, automatic backups, gameplay sliders
+- engine.js `coachTip(why)` after gradeByRole (also TDs) -> result.tip; `pass` now also records throwT, sepTarget, others [{slot, sep,
+  depth}], cbGap (CB to his man at the throw), catchDelta (signed catch press vs arrival, < 0 = early). Tips per role (QB sack/INT/
+  off-target/held, RB retreat/stuffed/big run, WR drop timing/not open/open-call-for-it, CB gap/SWAT, DT stuck on block/pursuit).
+  Moments store `tip`; gameday result card + postgame Key Moments show it (`.coach-tip`). Only names real buttons (CALL FOR IT, SWAT / PICK,
+  JUKE, STIFF ARM, RIP, SWIM, CATCH).
+- storage.js: `squeeze` (gzip code), `autoBackup(slot, state, label)` -> `slot{n}:bk` (last 3, drops oldest on quota, memory fallback),
+  `listBackups`, `restoreBackup` (via importCode). app.save makes one at each review and at week 0/4/8/... of a phase (key in
+  app.ui.lastBackupKey). Backups survive deleteSave. UI `backupsModal(app, slot)` in slots.js (Load Career card button + Settings).
+- config.js SLIDER_OPP (relaxed -0.8 / smart +0.6 / ruthless +1.2 added to matchup k -> engine oppStrength, engine clamp now +-2) and
+  SLIDER_TIMING (wide 1.15 / tight 0.88 / pinpoint 0.76 in game.js tolerance). state.sliders per career; Settings card. Bots never set
+  them (balance unchanged). Tests: round26.

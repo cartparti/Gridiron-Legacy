@@ -1357,3 +1357,5 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 .tcard.big .tc-name { font-size: 1.1rem; } .tcard.big .tc-pic { display: flex; justify-content: center; }
 .chip.r-gold { background: #ffd43b; color: #1a1300; } .chip.r-legendary { background: linear-gradient(90deg, #ff6b6b, #c77dff); color: #fff; } .chip.r-silver { background: #c9d1dc; color: #111; }
 .inc-card .statbar span:first-child { min-width: 52px; }
+
+.coach-tip { margin-top: 4px; padding: 6px 8px; border-radius: 8px; background: rgba(96, 165, 250, 0.1); border-left: 3px solid #60a5fa; text-transform: none; letter-spacing: 0; }

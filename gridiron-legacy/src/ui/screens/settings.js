@@ -3,7 +3,8 @@ import { CHANGELOG } from '../../data/changelog.js';
 import { backupModal } from './slots.js';
 import { sfx } from '../../audio/sfx.js';
 import { confirmDialog } from '../components.js';
-import { DIFFICULTIES } from '../../data/config.js';
+import { DIFFICULTIES, SLIDER_OPP, SLIDER_TIMING } from '../../data/config.js';
+import { backupsModal } from './slots.js';
 
 export function settingsScreen(app) {
   const s = app.settings;
@@ -37,6 +38,13 @@ export function settingsScreen(app) {
         } }, h('b', d.label));
       })),
       h('p.tiny.muted', { style: { marginTop: '8px' } }, 'Harder settings shrink timing windows and boost your final legacy score.')),
+    app.state ? h('div.card',
+      h('h3', 'Gameplay sliders'),
+      h('p.tiny.muted', 'Fine-tune the challenge for this career. These do not change your legacy multiplier.'),
+      h('div.li', h('div.grow', h('span', 'Opponent smarts'), h('div.tiny.muted', 'How fast and sharp the other team is: pursuit, coverage, pass rush, blocking, ball carriers.')),
+        h('div.row', { style: { flexWrap: 'wrap', gap: '4px' } }, Object.entries(SLIDER_OPP).map(([id, o]) => h(`button.subtab${(app.state.sliders?.opp ?? 'normal') === id ? '.on' : ''}`, { onclick: () => { app.state.sliders = { ...(app.state.sliders ?? {}), opp: id }; app.save(); sfx.click(); app.render(); } }, o.label)))),
+      h('div.li', h('div.grow', h('span', 'Timing windows'), h('div.tiny.muted', 'How forgiving throws, catches, kicks, cuts and tackles are.')),
+        h('div.row', { style: { flexWrap: 'wrap', gap: '4px' } }, Object.entries(SLIDER_TIMING).map(([id, o]) => h(`button.subtab${(app.state.sliders?.timing ?? 'normal') === id ? '.on' : ''}`, { onclick: () => { app.state.sliders = { ...(app.state.sliders ?? {}), timing: id }; app.save(); sfx.click(); app.render(); } }, o.label))))) : null,
     h('div.card',
       h('h3', 'Controls'),
       h('p.small', 'Touch: tap and drag on the field. Mouse works the same way.'),
@@ -46,6 +54,7 @@ export function settingsScreen(app) {
       h('div.col',
         h('button.btn.block', { onclick: () => { s.seenTips = {}; if (app.state?.tutorial) app.state.tutorial.done = {}; app.saveSettings(); app.save(); sfx.click(); } }, 'Replay tutorial tips'),
         h('button.btn.block', { onclick: () => { app.save(); backupModal(app.slot, `${app.state.player.first} ${app.state.player.last}`); } }, 'Back up this career'),
+        h('button.btn.block', { onclick: () => backupsModal(app, app.slot) }, 'Automatic backups'),
         h('button.btn.danger.block', { onclick: async () => { if (await confirmDialog('Quit to title?', 'Your career is saved automatically.', 'Quit')) app.quitToTitle(); } }, 'Save and quit'))) : null,
     h('p.tiny.muted.center', `Gridiron Legacy · v${CHANGELOG[0].v} · all names fictional`));
 }

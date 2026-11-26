@@ -53,7 +53,7 @@ export function freePlay(ctx) {
   const clampPos = (p) => { p.x = Math.max(-FIELD_X - 1, Math.min(FIELD_X + 1, p.x)); p.z = Math.max(backLine, Math.min(25, p.z)); return p; };
   // Defenders get faster on harder settings / risky calls (tolerance is lower).
   // Opponent quality (-1.5 weak .. +1.5 elite): good teams are faster, read quicker and win more battles.
-  const oppK = Math.max(-1.5, Math.min(1.5, opts.oppStrength ?? 0));
+  const oppK = Math.max(-2, Math.min(2, opts.oppStrength ?? 0)); // matchup + your Opponent smarts slider
   const defBoost = (1.08 - (tol - 1) * 0.12) * wfx.speed * (m.defense ? 1 : 1 + oppK * 0.035);
 
   // ---------------- game wear: uniforms get dirtier as the game goes on (wet in rain, snowy in snow)
@@ -692,7 +692,7 @@ export function freePlay(ctx) {
     const rh = Math.random();
     const endY = play.jump || play.hail ? 2.45 + Math.random() * 0.25 : tight && rh < 0.55 ? 2.15 + Math.random() * 0.35 : rh < 0.16 ? 1.95 + Math.random() * 0.3 : rh > 0.9 ? 0.6 + Math.random() * 0.25 : 1.2 + Math.random() * 0.3;
     flight = { endY: globalThis.__endY ?? endY, jumped: new Set(), from: { x: qbP.x + 0.3, z: qbP.z - 0.2 }, to, T: Math.max(0.4, dist(qbP, to) / v), t0: t, H, target: r, wobble: Math.random() < (user === qb ? 0.06 + Math.max(0, 70 - (st.skill ?? 60)) / 200 : 0.08) ? 0.22 : 0.025 };
-    { const ds = defenders.filter((d) => !d.down && d.role !== 'DL'); const sepOf = (e) => (ds.length ? Math.min(...ds.map((d) => dist(d.pos, e.pos))) : 9); pass = { target: r, sepUser: user === qb ? null : sepOf(user), cause: null, caughtBy: null }; }
+    { const ds = defenders.filter((d) => !d.down && d.role !== 'DL'); const sepOf = (e) => (ds.length ? Math.min(...ds.map((d) => dist(d.pos, e.pos))) : 9); pass = { target: r, sepUser: user === qb ? null : sepOf(user), cause: null, caughtBy: null, throwT: t, sepTarget: sepOf(r), others: receivers.filter((o) => o !== r && o.route && !o.down).map((o) => ({ slot: o.slot, sep: sepOf(o), depth: -o.pos.z })), cbGap: user.team === 'def' && user.man ? dist(user.pos, user.man.pos) : null, catchDelta: null }; }
     holder = null;
     playAction(qb.mesh, 'throw');
     sfx.throw();
@@ -1839,6 +1839,7 @@ export function freePlay(ctx) {
     let catchOk;
     if (r === user) {
       const timing = catchPress === null ? 9 : Math.abs(f.t0 + f.T - catchPress - 0.1);
+      if (pass) pass.catchDelta = catchPress === null ? null : catchPress - (f.t0 + f.T - 0.1); // < 0 = pressed early
       const win = 0.13 * tol * (0.85 + (st.skill ?? 60) / 400) * (play.jump ? 1.3 : 1) * (has('velcro') ? 1.3 : 1);
       const tallK = (user.hIn - 73) * 0.04;
       const nearD = defs.reduce((a, d) => (dist(d.pos, land) < dist(a.pos, land) ? d : a), defs[0]);
@@ -1970,6 +1971,44 @@ export function freePlay(ctx) {
       Object.assign(result, { quality: Math.max(result.quality, 0.5), notMine: true, blame: 'none', why: 'Caught on the other side of the field, not your man.' });
     }
   };
+  /** Coach's note: one specific, honest tip from what actually happened on the snap. Sets result.tip. */
+  const SLOT_NAME = { X: 'X receiver', Z: 'Z receiver', S: 'slot receiver', TE: 'tight end', RB: 'running back' };
+  const coachTip = (why) => {
+    if (!result) return;
+    const yds = result.yards ?? 0;
+    const f1 = (n) => (Math.round(n * 10) / 10).toFixed(1);
+    let tip = null;
+    if (!m.defense && user === qb) {
+      const best = pass?.others?.length ? pass.others.slice().sort((a, b) => b.sep - a.sep)[0] : null;
+      if (why === 'sack') tip = t > 2.8 ? `Sacked at ${f1(t)}s. Get it out by about 2.5s: hit your first read or throw it away.` : 'The protection broke down fast. Against a blitz look, audible to a quick throw before the snap.';
+      else if (why === 'int' || pass?.cause === 'contest') tip = best && best.sep > (pass.sepTarget ?? 0) + 1.5 ? `You threw into ${f1(pass.sepTarget ?? 0)} yards of space. The ${SLOT_NAME[best.slot] ?? 'other receiver'} was open by ${f1(best.sep)}. Look there next time.` : 'Tight window. Lead your receiver away from the defender, or take the checkdown.';
+      else if (why === 'incomplete' && pass?.cause === 'off') tip = pass.throwT > 3 ? `You held it ${f1(pass.throwT)}s and the throw sailed. Set your feet and throw earlier.` : 'Off target. Throw from a set base: moving to your left or right makes the ball wild.';
+      else if (pass && result.complete && pass.throwT > 3.2) tip = `Completed, but you held it ${f1(pass.throwT)}s. Against a better rush that is a sack.`;
+      else if (result.td) tip = 'Touchdown. Great read.';
+      else if (carrier === qb && qb.scramble) tip = yds >= 8 ? 'Good escape. When the pocket collapses, running is better than forcing a throw.' : 'Slide or get out of bounds before you take the big hit.';
+    } else if (!m.defense && !pass && carrier === user) {
+      if (yds <= -6) tip = 'You gave up ground. Hit the hole the play is designed for and take what is there: going backwards gives the defense free angles.';
+      else if (yds <= 1) tip = result.blame === 'line' ? 'The line lost right away. On the next run, try the other side or check to an inside run.' : 'Follow your blockers and pick a lane early. Cutting late into traffic loses yards.';
+      else if (yds >= 15) tip = 'Great vision. That is how you hit a hole.';
+      else if (yds >= 5) tip = 'Solid run. Use JUKE or STIFF ARM when a single defender is in front of you.';
+    } else if (!m.defense && pass) {
+      if (pass.target === user) {
+        if (pass.cause === 'drop' && pass.catchDelta !== null) tip = pass.catchDelta < -0.08 ? `You pressed CATCH ${f1(-pass.catchDelta)}s early. Wait until the ball is almost at your hands.` : pass.catchDelta > 0.08 ? `You pressed CATCH ${f1(pass.catchDelta)}s late. Press just as the ball arrives.` : 'Close. Press CATCH right as the ball arrives.';
+        else if (pass.cause === 'drop') tip = 'You never pressed CATCH. Tap it just as the ball reaches you.';
+        else if (result.complete && yds >= 15) tip = 'Big catch. Separation at the break made that.';
+      } else if (result.notTargeted && (pass.sepUser ?? 9) < 1.5) tip = `You had only ${f1(pass.sepUser ?? 0)} yards of separation when the ball came out. Sell the route harder, or tap CALL FOR IT when you are open.`;
+      else if (result.notTargeted && (pass.sepUser ?? 0) > 3) tip = `You were open by ${f1(pass.sepUser)} yards. Tap CALL FOR IT so the QB looks your way.`;
+    } else if (m.defense && mode === 'cover') {
+      if (result.int || result.pd) tip = 'Great break on the ball.';
+      else if (result.caught && !result.notMine) tip = pass?.cbGap != null && pass.cbGap > 2.5 ? `Your man was ${f1(pass.cbGap)} yards away when the ball came out. Stay tighter, and press SWAT as the ball arrives.` : 'You were close. Time SWAT for the moment the ball reaches him.';
+      else if (result.tackle && (result.yardsAllowed ?? 99) < 4) tip = 'Good tackle. Wrapping up early keeps a short catch short.';
+    } else if (m.defense && (mode === 'rush' || mode === 'runStop' || mode === 'runD')) {
+      if (result.sack || result.tfl) tip = 'Won your block and finished. That is the job.';
+      else if (user.engagedBy || user.engaged) tip = 'You never got off the block. Build leverage by driving into him, then use RIP or SWIM.';
+      else if ((result.yardsAllowed ?? 0) >= 8) tip = 'The runner got past you. Take a pursuit angle toward the sideline instead of chasing his back.';
+    }
+    if (tip) result.tip = tip;
+  };
   let by = null;
   const whistle = (why, by_ = null, text = null) => { by = by_; return whistleInner(why, by_, text); };
   const whistleInner = (why, by = null, text = null) => {
@@ -2003,6 +2042,7 @@ export function freePlay(ctx) {
       result = def ? (carrier.team === 'def' ? (user.scoop ? { defense: true, forcedFumble: lastFumble?.by === user, fumbleRec: true, turnover: true, defTD: true, quality: 0.99, text: 'SCOOP AND SCORE!' } : { defense: true, int: true, turnover: true, defTD: true, quality: 0.98, text: 'PICK SIX!' }) : { defense: true, caught: true, yardsAllowed: m.yardLine, tdAllowed: true, quality: 0.05, text: 'They score.' })
         : (carrier === qb && qb.scramble ? { scramble: true, complete: false, yards: m.yardLine, td: true, quality: 0.95, text: 'TOUCHDOWN! You took it in yourself!' } : { complete: true, yards: m.yardLine, td: true, quality: 0.95, text: 'TOUCHDOWN!' });
       gradeByRole('td');
+      coachTip('td');
       if (globalThis.__playDebug) globalThis.__lastResult = { ...result, why2: 'td' };
       if ((def && carrier.team === 'def') || (!def && carrier.team === 'off')) startCelebration();
       return;
@@ -2030,6 +2070,7 @@ export function freePlay(ctx) {
       }
     }
     gradeByRole(why);
+    coachTip(why);
     maybeFlag();
     if (globalThis.__playDebug) globalThis.__lastResult = { ...result, why2: why };
     if (user.injured && result) { result.injured = true; result.injuryId = user.injury?.id ?? null; }

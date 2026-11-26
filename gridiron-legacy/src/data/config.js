@@ -48,6 +48,10 @@ export const PLAY_CALLS = {
 };
 
 /** Difficulty: scales minigame timing windows. Harder settings also earn more legacy. */
+/** Gameplay sliders (per career; they don't change the legacy multiplier). */
+export const SLIDER_OPP = { relaxed: { label: 'Relaxed', k: -0.8 }, normal: { label: 'Normal', k: 0 }, smart: { label: 'Smart', k: 0.6 }, ruthless: { label: 'Ruthless', k: 1.2 } };
+export const SLIDER_TIMING = { wide: { label: 'Wide', tol: 1.15 }, normal: { label: 'Normal', tol: 1 }, tight: { label: 'Tight', tol: 0.88 }, pinpoint: { label: 'Pinpoint', tol: 0.76 } };
+
 export const DIFFICULTIES = {
   easy: { label: 'Easy', tol: 1.25, legacy: 0.9, desc: 'Generous timing. Learn the ropes.' },
   normal: { label: 'Normal', tol: 1.0, legacy: 1.0, desc: 'A real challenge.' },

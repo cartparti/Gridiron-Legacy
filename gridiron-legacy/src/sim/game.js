@@ -10,7 +10,7 @@
 // 4th-down decisions, penalties, extra moments earned through mid-game events.
 import { INJURY_STATUS, inGameOutcome } from './injury.js';
 import { pickChallenge, isPrimetime, autoToss, zoneAfterMoment, ZONE_TOL } from './matchday.js';
-import { PLAY_CALLS, DIFFICULTIES, WEATHER } from '../data/config.js';
+import { PLAY_CALLS, DIFFICULTIES, WEATHER, SLIDER_TIMING } from '../data/config.js';
 import { GAME_EVENTS } from '../data/gameEvents.js';
 import { teamCulture, TRAITS } from '../data/culture.js';
 import { clamp, fillTokens } from '../core/util.js';
@@ -439,6 +439,7 @@ export function tolerance(state, call = 'balanced', type = state.game?.pending?.
   t *= 1 + (state.week?.freshness ?? 0) * 0.15;
   if (state.week?.studied) t *= 1.04;
   t *= DIFFICULTIES[state.difficulty ?? 'normal'].tol;
+  t *= SLIDER_TIMING[state.sliders?.timing ?? 'normal']?.tol ?? 1; // your timing-window slider
   t *= 1 + gearBonus(p, type);
   if (g) {
     const w = WEATHER[g.weather] ?? WEATHER.clear;
@@ -654,7 +655,7 @@ export function resolveMoment(state, result) {
     }
     momentumShift(g, (result.quality - 0.5) * 0.35 + (result.td ? 0.2 : 0) - (result.turnover ? 0.3 : 0));
   }
-  g.moments.push({ ...m, call: result.call, quality: result.quality, yards: m.defense ? -(result.yardsAllowed ?? 0) : result.yards, td: m.defense ? !!result.defTD : result.td, turnover: result.turnover, text: result.text, why: result.why ?? null, blame: result.blame ?? null, outcome: null, played: !!result.played });
+  g.moments.push({ ...m, call: result.call, quality: result.quality, yards: m.defense ? -(result.yardsAllowed ?? 0) : result.yards, td: m.defense ? !!result.defTD : result.td, turnover: result.turnover, text: result.text, why: result.why ?? null, blame: result.blame ?? null, tip: result.tip ?? null, outcome: null, played: !!result.played });
   const rec = g.moments[g.moments.length - 1];
   rec.zone = zoneAfterMoment(state, rec.quality ?? 0); // 'in' / 'out' / null
   rec.inZone = !!g.zone;

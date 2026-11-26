@@ -73,6 +73,14 @@ export const app = {
   save() {
     if (!this.state || this.slot === null) return;
     const ok = storage.saveGame(this.slot, this.state);
+    // automatic restore points: every season review and every 4th week of the season
+    const st = this.state, c = st.career ?? {};
+    const key = st.phase === 'review' ? `${c.year}-review` : st.phase === 'plan' && (st.league?.week ?? 0) % 4 === 0 ? `${c.year}-${c.stage}-${st.league?.phase}-w${st.league?.week}` : null;
+    if (key && key !== this.ui.lastBackupKey) {
+      this.ui.lastBackupKey = key;
+      const label = st.phase === 'review' ? `${c.year} season review` : `${c.year} · week ${(st.league?.week ?? 0) + 1}${st.league?.phase === 'playoffs' ? ' (playoffs)' : ''}`;
+      storage.autoBackup(this.slot, st, label);
+    }
     if (!ok && !this.ui.warnedStorage) {
       this.ui.warnedStorage = true;
       toast('Saving is not available in this browser. Progress lasts until you close the tab.');

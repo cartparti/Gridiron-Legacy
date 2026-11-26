@@ -107,10 +107,8 @@ export function exportSave(slot) {
 // ---- backup codes: the save squeezed (gzip when the browser can) into one copy-paste line
 const b64 = (bytes) => { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); };
 const unb64 = (str) => { const s = atob(str); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; };
-/** A backup code for a slot ("GL2." = gzip, "GL1." = plain). */
-export async function exportCode(slot) {
-  const text = storageGet(`slot${slot}`);
-  if (!text) return null;
+/** Squeeze save text into a backup code ("GL2." = gzip, "GL1." = plain). */
+async function squeeze(text) {
   const raw = new TextEncoder().encode(text);
   if (typeof CompressionStream === 'function') {
     try {
@@ -119,6 +117,45 @@ export async function exportCode(slot) {
     } catch { /* fall through */ }
   }
   return `GL1.${b64(raw)}`;
+}
+
+// ---- automatic backups: the last few save points of each slot, kept even if the slot is deleted or overwritten
+const BACKUPS_KEPT = 3;
+export function listBackups(slot) {
+  try { const list = JSON.parse(storageGet(`slot${slot}:bk`) ?? '[]'); return Array.isArray(list) ? list : []; } catch { return []; }
+}
+/** Keep a compressed copy of this career as a restore point (label e.g. "2031 season review"). */
+export async function autoBackup(slot, state, label) {
+  try {
+    const code = await squeeze(JSON.stringify({ version: SAVE_VERSION, state }));
+    const list = listBackups(slot).filter((b) => b.label !== label || b.meta?.name !== `${state.player.first} ${state.player.last}`);
+    list.unshift({ at: Date.now(), label, meta: metaFor(state), code });
+    while (list.length > BACKUPS_KEPT) list.pop();
+    const key = `slot${slot}:bk`;
+    while (list.length) { // if the phone is short on space, keep fewer
+      const json = JSON.stringify(list);
+      memory.set(key, json);
+      let ls = null;
+      try { ls = globalThis.localStorage; } catch { ls = null; }
+      if (!ls) break; // no browser storage (private mode, tests): the memory copy is all we have
+      try { ls.setItem(PREFIX + key, json); break; } catch { list.pop(); }
+    }
+    return list.length > 0;
+  } catch {
+    return false;
+  }
+}
+/** Put a backup back into its slot (the current save there is replaced). */
+export async function restoreBackup(slot, i) {
+  const b = listBackups(slot)[i];
+  return b ? importCode(slot, b.code) : false;
+}
+
+/** A backup code for a slot ("GL2." = gzip, "GL1." = plain). */
+export async function exportCode(slot) {
+  const text = storageGet(`slot${slot}`);
+  if (!text) return null;
+  return squeeze(text);
 }
 /** Restore a backup code (or raw save JSON) into a slot. */
 export async function importCode(slot, code) {

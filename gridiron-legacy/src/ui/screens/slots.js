@@ -1,5 +1,5 @@
 import { h } from '../dom.js';
-import { listSlots, deleteSave, exportSave, importSave, exportCode, importCode } from '../../core/storage.js';
+import { listSlots, deleteSave, exportSave, importSave, exportCode, importCode, listBackups, restoreBackup } from '../../core/storage.js';
 import { confirmDialog, toast, openModal } from '../components.js';
 import { STAGES } from '../../data/config.js';
 import { sfx } from '../../audio/sfx.js';
@@ -28,6 +28,7 @@ export function slotsScreen(app) {
           } }, s.empty ? 'New' : 'Overwrite')
           : (s.empty ? null : h('button.btn.small.primary', { onclick: () => { sfx.select(); app.loadSlot(s.slot); } }, 'Load')),
         s.empty ? null : h('button.btn.small.ghost', { onclick: () => backupModal(s.slot, s.meta.name) }, 'Back up'),
+        listBackups(s.slot).length ? h('button.btn.small.ghost', { onclick: () => backupsModal(app, s.slot) }, `Auto-backups (${listBackups(s.slot).length})`) : null,
         s.empty ? h('button.btn.small.ghost', { onclick: () => restoreModal(app, s.slot) }, 'Restore')
           : h('button.btn.small.danger', { onclick: async () => {
             if (await confirmDialog('Delete save?', `This permanently deletes ${m.name}'s career.`, 'Delete')) { deleteSave(s.slot); app.render(); }
@@ -36,6 +37,24 @@ export function slotsScreen(app) {
   return h('div.screen',
     h('div.row.between', h('h1', creating ? 'Choose a Slot' : 'Load Career'), h('button.btn.small.ghost', { onclick: () => app.go('title') }, 'Back')),
     slots.map(card));
+}
+
+/** The automatic restore points of a slot (they survive deleting or overwriting the slot). */
+export function backupsModal(app, slot) {
+  const list = listBackups(slot);
+  const when = (t) => { try { return new Date(t).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch { return ''; } };
+  const m = openModal(h('div.col', { style: { gap: '10px' } },
+    h('h2', 'Automatic backups'),
+    h('p.small.muted', 'The game keeps your last 3 save points for this slot: every season review and every 4th week. They stay even if the slot is deleted or overwritten.'),
+    list.length ? h('div.list', list.map((b, i) => h('div.li',
+      h('div.grow', h('b', `${b.meta?.name ?? 'Career'} · ${b.label}`), h('div.tiny.muted', `${b.meta?.position ?? ''} · OVR ${b.meta?.ovr ?? '?'} · age ${b.meta?.age ?? '?'} · saved ${when(b.at)}`)),
+      h('button.btn.small', { onclick: async () => {
+        if (!(await confirmDialog('Restore this backup?', `Slot ${slot + 1} goes back to ${b.label}. Anything after that point in this slot is replaced.`, 'Restore'))) return;
+        if (await restoreBackup(slot, i)) { toast('Backup restored!'); m.close(); if (app.state && app.slot === slot) app.loadSlot(slot); else app.render(); } else toast('That backup could not be restored.');
+      } }, 'Restore'))))
+      : h('p.small', 'No automatic backups yet. One is made at the next season review or every 4th week.'),
+    h('button.btn.ghost.block', { onclick: () => m.close() }, 'Close')), { dismissable: true });
+  return m;
 }
 
 /** Back up a career: a code to copy somewhere safe (notes, a text to yourself) or a file. */

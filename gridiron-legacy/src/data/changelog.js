@@ -1,5 +1,10 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.66', date: 'Nov 26', title: 'Coach\'s notes, automatic backups, gameplay sliders', items: [
+    'Coach\'s notes: after every snap you play, your coach tells you one specific thing to fix or keep doing, based on what really happened ("You held it 3.4s. Get it out by about 2.5s." / "The slot receiver was open by 4 yards. Look there next time." / "You pressed CATCH 0.2s early."). You see it right after the play and again in the game report.',
+    'Automatic backups: the game now keeps your last 3 save points for every slot (each season review and every 4th week). They stay even if a slot gets deleted or overwritten. Find them in Settings, then Automatic backups, or on the Load Career screen.',
+    'Gameplay sliders (Settings): Opponent smarts (Relaxed to Ruthless) controls how fast and sharp the other team is, and Timing windows (Wide to Pinpoint) controls how forgiving every throw, catch, kick and tackle is. Tune the challenge exactly how you like it.',
+  ] },
   { v: '0.65', date: 'Nov 25', title: 'A real run defense, college logos, a smarter camera', items: [
     'Running is no longer a free touchdown: defenders take real pursuit angles and stay between you and the end zone. Drop back behind the line or loop around the outside and the whole defense chases you down at full speed (and blocks fall apart). Quarterbacks who wander far from the pocket get the same treatment.',
     'Sprint has limits now: hold it for about two seconds and your legs start to fade. Let go for a moment to get it back.',
