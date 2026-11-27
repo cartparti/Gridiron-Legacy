@@ -896,3 +896,19 @@ Built in one pass covering most of the brief's milestones 1-7 at a first-version
 - config.js SLIDER_OPP (relaxed -0.8 / smart +0.6 / ruthless +1.2 added to matchup k -> engine oppStrength, engine clamp now +-2) and
   SLIDER_TIMING (wide 1.15 / tight 0.88 / pinpoint 0.76 in game.js tolerance). state.sliders per career; Settings card. Bots never set
   them (balance unchanged). Tests: round26.
+
+## v0.67: pro logos, unique jerseys, bigger playbook, signature shoes
+- crest.js `proCrestURL` (pro teams only): 136x160 vector badge (PRO_SHAPES by hash: shield/round/hex/badge/heater/roundel), dark rim,
+  secondary ring, primary gradient + sheen, glyph as rounded cells with outline/shadow/two-tone, club-name banner, city tag; `img.crest.hd`
+  renders smooth. Non-pro crests unchanged (34x40 pixel art).
+- kits.js JERSEY_PATTERNS + sash/hoops/chevron/split/bolt/checker/panel/raglan (drawn in actors.js jerseyMat); teams.js pro kit patterns
+  are now all unique (CHI bolt, DET checker, MIA split, NOL sash, NSH chevron, KCY hoops, MSP raglan, STL panel).
+- playbook.js: R + zig/outUp/shallow/stutter/bench/option/deepOut/seamBend/arrow, RBR + texas/angleL/seamRB/screenL; `MEGA` pools for every
+  mode; names already in the book get a formation/technique tag (TAGS) so both stay. 381 plays total. RED: Slant In, Out Pylon, QB Wedge.
+  Engine hot routes: 9 (Slant always + 3 random of Go/Quick Out/Curl/Fade/Post/Hitch/Corner/Zig).
+- `src/sim/shoes.js`: offer (`shoeOfferCheck` beginWeek: pro fame >= 55 / college fame >= 75; declined -> back next season), `acceptShoe`
+  (upfront, royalty 6% pro / 3% college), `designShoe(state, design, name)` (base/accent from SHOE_COLORS, sole, pattern incl. new 'sig'
+  swoosh, cut; name cleaned; first save releases the edition), `designScore` (contrast, sole, bold pattern, team colors), `applyShoeLook`
+  -> look.cleats/cleatAccent/cleatDesign/cleatCut/cleatSole (cleatDesignTex takes an optional sole color), `setWearShoe`, `shoeWeekly`
+  (beginWeek royalties -> state.week.shoeSales), `shoeSeasonEnd` (review.shoe, edition++). UI `src/ui/screens/shoes.js` (shoeSVG preview,
+  shoeCard in Life > Deals, shoeNudge on the Week tab, shoeReviewCard). Tests: round27.

@@ -6,6 +6,7 @@ import { dealsOpen } from '../../sim/nil.js';
 import { mediaPersona } from '../../sim/presser.js';
 import { captainCard, tradeCard, scoutCard, previewCard, recordChaseCard, rivalryChip, powerView, extensionCard, mentorCard, familyView, givingView, rehabCard, farewellCard } from './pregame.js';
 import { draftStockPage, draftTabOpen } from './draftStock.js';
+import { shoeNudge } from './shoes.js';
 import { fitCard, predictionCard, cardShowCard, dishCard, streaksCard } from './flair.js';
 import { fantasyCard, jerseyCard, bucketCard, birthdayCard } from './traditions.js';
 import { ratingRevealCard, homecomingCard, seniorNightCard, mailCard, ritualCard, ringDesigner, incentiveCard, coachStyleChip, petCard, collectionPage } from './traditions.js';
@@ -212,6 +213,7 @@ function weekView(app) {
   if (st.week?.petNote) container.append(h('div.card.flat', h('p.small', `🐾 ${st.week.petNote}`)));
   { const gc = goalsCard(app); if (gc) container.append(gc); }
   { const dn = dealsNudge(app); if (dn) container.append(dn); }
+  { const sn = shoeNudge(app); if (sn) container.append(sn); }
   { const rh = rehabCard(app); if (rh) container.append(rh); }
   { const pv = previewCard(app); if (pv) container.append(pv); }
   { const rc = recordChaseCard(app); if (rc) container.append(rc); }

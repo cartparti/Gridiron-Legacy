@@ -16,7 +16,7 @@ const ALT_STYLES = ['black', 'secondary', 'gray', 'cream', 'dark'];
 
 // Team identity: every team gets its own uniform design (same on all three kits, colors change), picked from its id
 // so it never changes: helmet logo / stripe / finish / facemask, jersey pattern, number font, sleeve and pants stripes.
-export const JERSEY_PATTERNS = ['plain', 'shoulders', 'chestBand', 'sidePanels', 'yoke', 'pinstripe', 'fade', 'claws', 'tvStripe'];
+export const JERSEY_PATTERNS = ['plain', 'shoulders', 'chestBand', 'sidePanels', 'yoke', 'pinstripe', 'fade', 'claws', 'tvStripe', 'sash', 'hoops', 'chevron', 'split', 'bolt', 'checker', 'panel', 'raglan'];
 export const NUMBER_FONTS = ['block', 'varsity', 'rounded', 'serif', 'italic', 'stencil'];
 export const HELMET_STRIPES = ['single', 'double', 'triple', 'wide', 'none', 'tri'];
 export const HELMET_FINISHES = ['gloss', 'gloss', 'matte', 'metallic', 'chrome', 'satin'];

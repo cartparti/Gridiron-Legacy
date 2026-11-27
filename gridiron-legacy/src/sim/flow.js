@@ -53,6 +53,7 @@ import { teamCulture } from '../data/culture.js';
 import { homecomingCheck, seniorNightCheck, ratingRevealCheck, isHomecomingWeek, isSeniorNight, traditionsAfterGame, ringEarned } from './seasonal.js';
 import { printCard, gameBallsAfterGame } from './collectibles.js';
 import { mailWeek } from './mailbag.js';
+import { shoeOfferCheck, shoeWeekly, shoeSeasonEnd } from './shoes.js';
 import { predictionAfterGame, settlePrediction, dishCheck, streaksAfterGame } from './flair.js';
 import { fantasyPoints, fantasyRank, trackJerseySales, bucketCheck, birthdayCheck, birthdayAfterGame } from './moments.js';
 import { petWeekly } from './pets.js';
@@ -169,6 +170,8 @@ export function beginWeek(state) {
   trackJerseySales(state);
   birthdayCheck(state);
   dishCheck(state);
+  shoeOfferCheck(state);
+  state.week.shoeSales = shoeWeekly(state);
   state.week.nilNotes = nilWeek(state);
   trackDraftWatch(state);
   {
@@ -513,6 +516,7 @@ export function endSeason(state) {
     incentive,
     coachChange,
     prediction,
+    shoe: shoeSeasonEnd(state),
     standings: standings(league).map((t) => ({ id: t.id, w: t.w, l: t.l })),
   };
   journalSeason(state, state.review, { teamName: `${team.city} ${team.name}`, titleName: STAGES[c.stage].titleName, awardLabel: (n) => awardLabel(n, p.position) });

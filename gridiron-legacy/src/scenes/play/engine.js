@@ -452,8 +452,12 @@ export function freePlay(ctx) {
       opts2 = [{ label: 'Flip it', desc: 'Same play to the other side.', apply: () => ({ ...play, name: `${play.name} (flipped)`, hole: play.hole.map((x) => -x) }) },
         inside && { label: `Check to ${inside.name}`, desc: 'Safer inside run.', apply: () => inside }].filter(Boolean);
     } else if (mode === 'route') {
-      const HOT = [['Slant', [[0, -3], [-6, -9]]], ['Go', [[0, -40]]], ['Quick Out', [[0, -5], [6, -5]]], ['Curl', [[0, -10], [-1, -8]], true]];
-      opts2 = HOT.map(([n, r, sit]) => ({ label: n, desc: n === 'Go' ? 'Beat press man deep.' : n === 'Slant' ? 'Hot vs the blitz.' : n === 'Curl' ? 'Sit in the zone hole.' : 'Quick to the sideline.', apply: () => ({ ...play, name: n, route: r, sit: !!sit }) }));
+      // nine hot routes; four of them are offered each play (the slant always, it beats the blitz)
+      const HOT = [['Slant', [[0, -3], [-6, -9]], false, 'Hot vs the blitz.'], ['Go', [[0, -40]], false, 'Beat press man deep.'], ['Quick Out', [[0, -5], [6, -5]], false, 'Quick to the sideline.'],
+        ['Curl', [[0, -10], [-1, -8]], true, 'Sit in the zone hole.'], ['Fade', [[2, -14], [2, -36]], false, 'Back-shoulder or over the top.'], ['Post', [[0, -10], [-6, -24]], false, 'Split the safeties.'],
+        ['Hitch', [[0, -5], [0, -4]], true, 'Free yards vs soft coverage.'], ['Corner', [[0, -10], [6, -20]], false, 'Beat the cornerback outside.'], ['Zig', [[0, -5], [-3, -7], [3, -9]], false, 'Shake man coverage.']];
+      const pool = HOT.slice(1).sort(() => Math.random() - 0.5).slice(0, 3);
+      opts2 = [HOT[0], ...pool].map(([n, r, sit, d]) => ({ label: n, desc: d, apply: () => ({ ...play, name: n, route: r, sit: !!sit }) }));
     }
     const box = document.createElement('div');
     box.className = 'fc-plays audible-box';

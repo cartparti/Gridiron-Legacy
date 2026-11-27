@@ -1,5 +1,11 @@
 // "What's new" notes shown every time the game opens (newest first). Keep them short and plain.
 export const CHANGELOG = [
+  { v: '0.67', date: 'Nov 27', title: 'New pro logos, unique jerseys, a bigger playbook, signature shoes', items: [
+    'Every pro team has a brand new, detailed logo: a sharp badge in its own shape with the mascot, a club name banner and the city tag.',
+    'Jerseys: 8 new designs (sash, hoops, chevron, two-tone split, lightning bolt, checker shoulders, number panel, raglan), and now every pro team wears a jersey nobody else has.',
+    'Bigger playbook: 9 new routes (zig, out and up, shallow, stutter go, bench, option, deep out, seam bender, arrow) and about 50 more plays across every position: pass concepts like Mesh, Levels and Four Verticals, new runs (Iso, Split Zone, Jet Sweep, Reverse), new receiver routes, coverages and pass-rush and run-stop moves. More red-zone plays too, and the hot route menu now deals 4 from 9 options.',
+    'Signature shoe deals: get famous enough and a brand builds a shoe around you. Design it yourself (main and accent colors, pattern, sole, cut, name), see what the critics think, wear them in your games, earn royalties every week, and drop a new edition every season. Find it in Life, then Deals.',
+  ] },
   { v: '0.66', date: 'Nov 26', title: 'Coach\'s notes, automatic backups, gameplay sliders', items: [
     'Coach\'s notes: after every snap you play, your coach tells you one specific thing to fix or keep doing, based on what really happened ("You held it 3.4s. Get it out by about 2.5s." / "The slot receiver was open by 4 yards. Look there next time." / "You pressed CATCH 0.2s early."). You see it right after the play and again in the game report.',
     'Automatic backups: the game now keeps your last 3 save points for every slot (each season review and every 4th week). They stay even if a slot gets deleted or overwritten. Find them in Settings, then Automatic backups, or on the Load Career screen.',

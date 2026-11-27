@@ -6,6 +6,7 @@ import { toast, confirmDialog } from '../components.js';
 import { commercialDeals, canShoot, shootCommercial, scriptFor } from '../../sim/commercial.js';
 import { openCommercial } from './combineGames.js';
 import { sfx } from '../../audio/sfx.js';
+import { shoeCard } from './shoes.js';
 import { DEAL_KINDS, MAX_DEALS, nilValue, nilEarnings, offerTotal, offerBlock, acceptOffer, declineOffer, negotiateOffer, hireNilAgent, dealsTitle, nilWorkload } from '../../sim/nil.js';
 
 const payLine = (o) => {
@@ -75,6 +76,7 @@ export function dealsView(app) {
       commercialDeals(st).includes(d) ? h('button.btn.small', { style: { marginTop: '4px' }, disabled: !canShoot(st), title: canShoot(st) ? '' : 'Needs a free day this week', onclick: () => { sfx.click(); openCommercial(d.brand, scriptFor(d), (perf) => { const r = shootCommercial(st, d.brand, perf); if (r?.text) toast(r.text); if (r?.ok) sfx.cash(); app.commit(); }); } }, '🎬 Shoot ad') : null));
 
   return h('div.col', { style: { gap: '14px' } },
+    shoeCard(app),
     h('div.card.hero',
       h('div.card-title', h('h2', dealsTitle(st)), h('span.chip.pix', `${p.sponsors.length}/${MAX_DEALS} DEALS`)),
       h('div.deal-stats',

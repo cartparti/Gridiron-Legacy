@@ -4,6 +4,7 @@ import { achUnlockRows, goalsReview } from './achievements.js';
 import { challengeChip, pressCard, allStarCard, rivalryResultCard, potwCard, offFieldReview, awardNightCard } from './pregame.js';
 import { injuryInfo, injuryNote } from '../../sim/injury.js';
 import { streakNote, predictionReview } from './flair.js';
+import { shoeReviewCard } from './shoes.js';
 import { postgameExtras, reviewExtras, fantasyCard, handshakeCard } from './traditions.js';
 import { h } from '../dom.js';
 import { backupModal } from './slots.js';
@@ -124,6 +125,7 @@ export function reviewScreen(app) {
       h('p.tiny.muted', { style: { marginTop: '6px' } }, `${r.seasonStats.games} games played`)),
     goalsReview(r.goals),
     predictionReview(r),
+    shoeReviewCard(r),
     ...reviewExtras(app),
     awardNightCard(app),
     allStarCard(app),

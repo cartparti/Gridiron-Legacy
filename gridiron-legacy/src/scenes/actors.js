@@ -852,6 +852,17 @@ function jerseyMat(un, number, side) {
       px(g, 0, 3.6, shade(T, -0.3), 22, 0.35);
     }
     if (P === 'stars' && side === 'side') { px(g, 0, 0, T, 22, 3.6); }
+    // v0.67 patterns
+    if (P === 'sash' && side !== 'side') { const d = side === 'front' ? 1 : -1; poly([[11 - d * 13, 2], [11 - d * 7, 2], [11 + d * 13, 24], [11 + d * 7, 24]], T); g.strokeStyle = shade(T, -0.3); g.lineWidth = 0.35; g.beginPath(); g.moveTo(11 - d * 13, 2); g.lineTo(11 + d * 7, 24); g.stroke(); }
+    if (P === 'hoops') { for (let y = 3; y < 24; y += 5) px(g, 0, y, T, 22, 2.2); }
+    if (P === 'chevron' && side !== 'side') { poly([[0, 9], [11, 15], [22, 9], [22, 12.5], [11, 18.5], [0, 12.5]], T); poly([[0, 13.6], [11, 19.6], [22, 13.6], [22, 14.6], [11, 20.6], [0, 14.6]], shade(T, -0.25)); }
+    if (P === 'split' && side !== 'side') { px(g, side === 'front' ? 11 : 0, 0, shade(J, luma(J) > 0.5 ? -0.18 : 0.16), 11, 26); px(g, 10.8, 0, T, 0.4, 26); }
+    if (P === 'split' && side === 'side') px(g, 0, 0, shade(J, luma(J) > 0.5 ? -0.18 : 0.16), 22, 26);
+    if (P === 'bolt' && side === 'side') poly([[13, 0], [8, 11], [12, 11], [7, 26], [16, 9], [11.5, 9], [16, 0]], T);
+    if (P === 'bolt' && side !== 'side') { poly([[0, 3], [2.4, 3], [1.2, 12], [3, 12], [0.8, 26], [0, 26]], T); poly([[22, 3], [19.6, 3], [20.8, 12], [19, 12], [21.2, 26], [22, 26]], T); }
+    if (P === 'checker') { for (let x = 0; x < 22; x += 2) for (let y = 0; y < 4; y += 2) if (((x + y) / 2) % 2 === 0) px(g, x, y, T, 2, 2); px(g, 0, 4, shade(J, -0.3), 22, 0.35); }
+    if (P === 'panel' && side !== 'side') { g.fillStyle = shade(J, luma(J) > 0.5 ? -0.14 : 0.14); g.beginPath(); g.roundRect?.(4, side === 'front' ? 5.5 : 4.5, 14, side === 'front' ? 10 : 14, 1.6); g.fill(); g.strokeStyle = T; g.lineWidth = 0.4; g.beginPath(); g.roundRect?.(4, side === 'front' ? 5.5 : 4.5, 14, side === 'front' ? 10 : 14, 1.6); g.stroke(); }
+    if (P === 'raglan') { if (side === 'side') px(g, 0, 0, T, 22, 8); else { poly([[0, 0], [5, 0], [0, 8]], T); poly([[22, 0], [17, 0], [22, 8]], T); } }
     if (side === 'side') {
       if (P === 'sidePanels' || P === 'claws') px(g, 7, 0, T, 8, 26);
       if (P === 'shoulders' || P === 'yoke') px(g, 0, 0, T, 22, 4);
@@ -969,8 +980,8 @@ function cleatTex(base, accent) {
     px(g, 0, 7, shade(base, -0.35), 8, 1);
   });
 }
-function cleatDesignTex(base, accent, design) {
-  return pixMat(`cleat2|${base}|${accent}|${design}`, 8, 8, (g) => {
+function cleatDesignTex(base, accent, design, sole = null) {
+  return pixMat(`cleat2|${base}|${accent}|${design}|${sole ?? ''}`, 8, 8, (g) => {
     px(g, 0, 0, base, 8, 8);
     if (design === 'stripe') px(g, 0, 3, accent, 8, 2);
     else if (design === 'twotone') px(g, 0, 0, accent, 8, 4);
@@ -979,7 +990,8 @@ function cleatDesignTex(base, accent, design) {
     else if (design === 'flames') { for (let x = 0; x < 8; x++) px(g, x, 2 + ((x * 5) % 3), accent, 1, 6 - ((x * 5) % 3)); px(g, 1, 5, '#ffcf3f', 2, 1); px(g, 5, 4, '#ffcf3f', 2, 1); }
     else if (design === 'bolt') { px(g, 5, 0, accent, 2, 2); px(g, 3, 2, accent, 3, 2); px(g, 2, 4, accent, 2, 2); px(g, 1, 6, accent, 1, 1); }
     else if (design === 'speckle') { for (let i = 0; i < 12; i++) px(g, (i * 5) % 8, (i * 3) % 7, accent); }
-    px(g, 0, 7, shade(base, -0.35), 8, 1);
+    else if (design === 'sig') { g.fillStyle = accent; g.beginPath(); g.moveTo(0.5, 5.2); g.quadraticCurveTo(3.5, 6.6, 7.6, 2.2); g.quadraticCurveTo(4.2, 4.6, 1.2, 4.2); g.closePath(); g.fill(); px(g, 6, 5, accent, 1.4, 1.4); }
+    px(g, 0, 7, sole ?? shade(base, -0.35), 8, 1);
   });
 }
 function sockTex(style, team, trim) {
@@ -1069,7 +1081,7 @@ function buildRig(o) {
 
   const onSide = (v, side) => v === 'both' || v === (side < 0 ? 'left' : 'right');
   const teamOr = (v, white = '#f4f4f4', black = '#16181c') => (v === 'white' ? white : v === 'black' ? black : football ? un.trim : '#c0392b');
-  const cleatMat = football ? cleatDesignTex(L.cleats ?? '#16181c', L.cleatAccent ?? '#f2f2f2', L.cleatDesign ?? 'stripe') : shoe;
+  const cleatMat = football ? cleatDesignTex(L.cleats ?? '#16181c', L.cleatAccent ?? '#f2f2f2', L.cleatDesign ?? 'stripe', L.cleatSole ?? null) : shoe;
   const mkLeg = (side) => {
     const hip = new THREE.Group();
     hip.position.set(side * 0.1, -0.04, 0);

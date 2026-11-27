@@ -1359,3 +1359,11 @@ body.cine .world-hud, body.cine .joy { display: none !important; }
 .inc-card .statbar span:first-child { min-width: 52px; }
 
 .coach-tip { margin-top: 4px; padding: 6px 8px; border-radius: 8px; background: rgba(96, 165, 250, 0.1); border-left: 3px solid #60a5fa; text-transform: none; letter-spacing: 0; }
+
+img.crest.hd { image-rendering: auto; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.35)); }
+
+.shoe-stage { display: flex; justify-content: center; padding: 10px 0; margin: 6px 0; border-radius: 14px; background: radial-gradient(circle at 50% 40%, #2b3140, #12151b); }
+.shoe-swatches { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.shoe-swatches .sw { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line2); cursor: pointer; }
+.shoe-swatches .sw.on { outline: 3px solid var(--good); outline-offset: 2px; }
+.shoe-card .subtab { text-transform: none; }

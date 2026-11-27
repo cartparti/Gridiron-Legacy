@@ -503,6 +503,127 @@ for (const [mode, calls] of Object.entries(EXTRA)) for (const [call, list] of Ob
   for (const pl of list) if (!have.has(pl.name)) PLAYS[mode][call].push(pl);
 }
 
+// ---------------- v0.67: an even bigger playbook (new routes + concepts for every position)
+Object.assign(R, {
+  zig: [[0, -5], [3, -7], [-3, -9]], outUp: [[0, -5], [-4, -5], [-4, -30]], shallow: [[0, -1], [16, -3]], stutter: [[0, -6], [0, -5], [0, -36]],
+  bench: [[0, -7], [-5, -4]], option: [[0, -6], [-2, -7]], deepOut: [[0, -14], [-6, -14]], seamBend: [[0, -14], [4, -28]], arrow: [[-6, -4]],
+});
+Object.assign(RBR, { texas: [[3, -1], [0, -6]], angleL: [[-3, -2], [2, -6]], seamRB: [[1, -2], [1, -18]], screenL: [[-5, 1], [-7, -2]] });
+const MEGA = {
+  pass: {
+    safe: [
+      concept('Snag', 'Corner, snag and flat: a triangle on one side.', 'corner', 'hitch', 'spot', 'flat', 'flatL'),
+      concept('Spacing', 'Five short routes spread across the field.', 'hitch', 'hitch', 'option', 'spot', 'check'),
+      concept('Shallow Cross', 'Shallow crosser under a dig.', 'dig', 'shallow', 'curl', 'hitch', 'flatR'),
+      concept('Arrow Under', 'Arrows to the flat, curls behind.', 'curl', 'curl', 'arrow', 'arrow', 'check'),
+      concept('Texas', 'The back runs a Texas route over the middle.', 'hitch', 'out5', 'drag', 'spot', 'texas'),
+      concept('Bench Combo', 'Comebacks to the sideline, drag inside.', 'bench', 'bench', 'drag', 'flat', 'swingL'),
+    ],
+    balanced: [
+      concept('Mesh', 'Two crossers meet in the middle. Pick their man.', 'shallow', 'curl', 'drag', 'seam', 'flatR'),
+      concept('Levels', 'Dig over a drag, same side.', 'dig', 'out10', 'drag', 'curl', 'check'),
+      concept('Y-Cross', 'The tight end crosses deep, everyone else clears.', 'go', 'curl', 'flat', 'cross', 'flatL'),
+      concept('Zig Out', 'Zig inside, then out. Beats man.', 'zig', 'out10', 'option', 'drag', 'check'),
+      concept('Deep Out', 'Fourteen-yard outs, seam in the slot.', 'deepOut', 'deepOut', 'seam', 'spot', 'angle'),
+      concept('Drive', 'Shallow under a dig: the coverage has to choose.', 'dig', 'shallow', 'curl', 'drag', 'angleL'),
+    ],
+    risky: [
+      concept('Four Verticals', 'Four deep routes. Find the hole.', 'go', 'go', 'seamBend', 'seam', 'check'),
+      concept('Double Move', 'Stutter-go outside, out-and-up inside.', 'stutter', 'outUp', 'post', 'curl', 'check'),
+      concept('Scissors', 'Post and corner crossing paths.', 'post', 'corner', 'corner', 'post', 'flatR'),
+      concept('Leak Shot', 'The back leaks up the seam behind everyone.', 'dig', 'curl', 'drag', 'flat', 'seamRB'),
+      concept('Out & Up', 'Sell the out, take off up the sideline.', 'outUp', 'outUp', 'skinny', 'drag', 'check'),
+    ],
+  },
+  run: {
+    safe: [
+      { name: 'Iso', desc: 'Fullback leads straight into the hole.', form: 'pistol', hole: [0.8, 1] },
+      { name: 'Duo', desc: 'Double-team blocks, read the linebacker.', form: 'pistol', hole: [-0.6, 0.6] },
+      { name: 'Quick Trap', desc: 'Pull the guard, hit it fast.', form: 'pistol', hole: [1.4, 1] },
+      { name: 'Cutback Dive', desc: 'Start right, cut back left.', form: 'pistol', hole: [-1.8, -0.6] },
+    ],
+    balanced: [
+      { name: 'Split Zone', desc: 'Zone one way, the H-back kicks out the other.', form: 'pistol', hole: [-2.2, -3] },
+      { name: 'Pin & Pull', desc: 'Pin inside, linemen pull outside.', form: 'pistol', hole: [3.8, 5] },
+      { name: 'Delay', desc: 'Sell pass, then hit the middle.', form: 'shotgun', hole: [0.4, 1.2], draw: true },
+      { name: 'G Lead', desc: 'Guard kicks out, you turn it up.', form: 'pistol', hole: [3, 3.8] },
+    ],
+    risky: [
+      { name: 'Jet Sweep', desc: 'Full-speed motion, hand off on the run.', form: 'pistol', hole: [10, 12], pitch: true },
+      { name: 'Reverse', desc: 'Hand it back the other way. Boom or bust.', form: 'pistol', hole: [-9, -11.5], pitch: true },
+      { name: 'Stretch Bounce', desc: 'Press the edge, bounce outside.', form: 'pistol', hole: [6.5, 8.5] },
+      { name: 'Speed Option', desc: 'Pitch at the last moment off the edge.', form: 'pistol', hole: [-7.5, -9.5], pitch: true },
+    ],
+  },
+  route: {
+    safe: [
+      { name: 'Quick Hitch', desc: 'Three steps and turn around.', route: [[0, -5], [0, -4]], sit: true },
+      { name: 'Arrow', desc: 'Angle straight to the flat.', route: [[5, -3]] },
+      { name: 'Option', desc: 'Sit in the open hole or break away from your man.', route: [[0, -6], [2, -7]], sit: true },
+      { name: 'Shallow', desc: 'Two yards deep, across the whole field.', route: [[0, -1.5], [-16, -3]] },
+    ],
+    balanced: [
+      { name: 'Zig', desc: 'Push inside, snap back out.', route: [[0, -5], [-3, -7], [3, -9]] },
+      { name: 'Deep Out', desc: 'Fourteen yards, flat to the sideline.', route: [[0, -14], [6, -14]] },
+      { name: 'Bench', desc: 'Push seven, come back to the sideline.', route: [[0, -7], [5, -4]], sit: true },
+      { name: 'Dagger Dig', desc: 'Big dig behind the linebackers.', route: [[0, -15], [-12, -16]] },
+    ],
+    risky: [
+      { name: 'Stutter Go', desc: 'Stutter at six, then fly.', route: [[0, -6], [0, -5], [0, -38]] },
+      { name: 'Out & Up', desc: 'Sell the out hard, then go.', route: [[0, -5], [4, -5], [4, -32]] },
+      { name: 'Seam Bender', desc: 'Up the seam, bend away from the safety.', route: [[0, -14], [-4, -30]] },
+      { name: 'Double Post', desc: 'Two posts in one route.', route: [[0, -8], [-3, -12], [0, -16], [-4, -30]] },
+    ],
+  },
+  cover: {
+    safe: [
+      { name: 'Cover 3 Cloud', desc: 'Squat on the flat, deep third behind you.', coverage: 'zone', user: 'flat' },
+      { name: 'Bail', desc: 'Show press, then bail deep at the snap.', coverage: 'zone', user: 'deep' },
+      { name: 'Robber', desc: 'Read the QB, jump the middle.', coverage: 'zone', user: 'flat' },
+    ],
+    balanced: [
+      { name: 'Pattern Match', desc: 'Zone that turns into man on his route.', coverage: 'man', user: 'man' },
+      { name: 'Trail Technique', desc: 'Follow him from behind, undercut the throw.', coverage: 'man', user: 'man', twoDeep: true },
+      { name: 'Banjo', desc: 'Swap men with the safety on crossers.', coverage: 'man', user: 'man' },
+    ],
+    risky: [
+      { name: 'Bump & Run', desc: 'Jam him off the line and run with him.', coverage: 'man', user: 'man', press: true },
+      { name: 'Corner Fire', desc: 'Blitz off the edge, the safety rotates down.', coverage: 'man', user: 'blitz', blitz: true },
+      { name: 'Jump the Route', desc: 'Gamble on the first break. Pick or burnt.', coverage: 'man', user: 'man', press: true },
+    ],
+  },
+  runD: {
+    safe: [{ name: 'Contain Edge', desc: 'Keep everything inside you.', lev: 1, win: 0.04 }, { name: 'Box In', desc: 'Squeeze the runner back to help.', lev: 0.95, win: 0.05 }],
+    balanced: [{ name: 'Scrape', desc: 'Scrape over the top of the trash.', lev: 1.15, win: 0.01 }, { name: 'Shed & Fill', desc: 'Get off the block, fill the alley.', lev: 1.2 }],
+    risky: [{ name: 'Crack Replace', desc: 'Crash inside, the safety replaces you.', lev: 1.3, win: -0.02 }, { name: 'Edge Fire', desc: 'Shoot the edge at the snap.', lev: 1.4, win: -0.04 }],
+  },
+  rush: {
+    safe: [{ name: 'Power Rush', desc: 'Low hands, drive through his chest.', lev: 1.05, win: 0.03 }, { name: 'Contain Rush', desc: 'Rush, but keep the QB in the pocket.', lev: 0.95, win: 0.05 }],
+    balanced: [{ name: 'Swim Move', desc: 'Swat his hands, swim over the top.', lev: 1.15, win: 0.03 }, { name: 'Club Rip', desc: 'Club his arm away, rip under.', lev: 1.2, win: 0.01 }],
+    risky: [{ name: 'Inside Spin', desc: 'Sell outside, spin back inside.', lev: 1.3, win: 0.02 }, { name: 'Double A-Gap', desc: 'Both A-gaps blitz. Somebody is free.', lev: 1.4, win: -0.03, blitz: true }],
+  },
+  runStop: {
+    safe: [{ name: 'Read & React', desc: 'Find the ball before you commit.', lev: 0.95, win: 0.05 }, { name: 'Anchor Down', desc: 'Sit low; nobody moves you.', lev: 1, win: 0.04 }],
+    balanced: [{ name: 'Rip Through', desc: 'Rip past the guard into the gap.', lev: 1.15, win: 0.01 }, { name: 'Club Shed', desc: 'Club his arm and get off.', lev: 1.2 }],
+    risky: [{ name: 'Gap Shoot', desc: 'Read the snap count and explode.', lev: 1.4, win: -0.04 }, { name: 'Stunt Loop', desc: 'Loop behind the end into the open gap.', lev: 1.3, blitz: true }],
+  },
+};
+// a name already in the book gets a formation / technique tag so both versions stay (they are different plays)
+const TAGS = { pass: ['Bunch', 'Trips', 'Empty', 'Twins', 'Stack', 'Spread'], run: ['Heavy', 'Wing', 'Unbalanced', 'Diamond'], route: ['Stack', 'Tight-Split', 'Wide', 'Motion'],
+  cover: ['Disguised', 'Rolled', 'Late'], runD: ['Late', 'Walk-Up'], rush: ['Twist', 'Wide-9'], runStop: ['Heavy', 'Shade'] };
+const allNames = new Set(Object.values(PLAYS).flatMap((calls) => Object.values(calls).flatMap((l) => l.map((x) => x.name))));
+for (const [mode, calls] of Object.entries(MEGA)) {
+  let k = 0;
+  for (const [call, list] of Object.entries(calls)) for (const pl of list) {
+    let name = pl.name;
+    for (let i = 0; allNames.has(name) && i < 8; i++) name = `${TAGS[mode][(k + i) % TAGS[mode].length]} ${pl.name}`;
+    k++;
+    if (allNames.has(name)) continue;
+    allNames.add(name);
+    PLAYS[mode][call].push({ ...pl, name });
+  }
+}
+
 // ---------------- situational football: the plays you're offered fit where you are on the field
 // Red-zone / goal-line concepts (red: true) only show up near the end zone; routes are built for ~10-15 yards.
 const RED = {
@@ -515,6 +636,8 @@ const RED = {
     { name: 'TE Leak', desc: 'Tight end blocks, then leaks to the back line.', form: 'pistol', red: true, routes: { X: [[0, -6], [1, -5]], Z: [[0, -6], [-1, -5]], S: [[0, -1], [-6, -2]], TE: [[0, -2], [-2, -3], [2, -11]], RB: [[4, -1]] } },
   ],
   route: [
+    { name: 'Slant In', desc: 'Two steps and slant across the goal line.', route: [[0, -2], [-5, -6]], red: true },
+    { name: 'Out Pylon', desc: 'Quick out at the goal line, reach for the pylon.', route: [[0, -4], [5, -4]], red: true },
     { name: 'Fade', desc: 'Win the corner of the end zone.', route: [[2, -12]], red: true },
     { name: 'Back Shoulder', desc: 'Stop late; the ball comes to your back shoulder.', route: [[1.5, -10], [2, -9]], sit: true, red: true },
     { name: 'Corner', desc: 'Push inside, break to the pylon.', route: [[0, -5], [6, -11]], red: true },
@@ -522,6 +645,7 @@ const RED = {
     { name: 'Whip', desc: 'Fake in, whip back out.', route: [[0, -4], [-3, -5], [3, -5]], red: true },
   ],
   run: [
+    { name: 'QB Wedge', desc: 'Everyone blocks in, pound it behind them.', form: 'pistol', hole: [0.2, -0.2], red: true },
     { name: 'Goal Line Dive', desc: 'Behind the center. Push the pile.', form: 'pistol', hole: [0, 0], red: true },
     { name: 'Power O', desc: 'Guard pulls. Hit it off tackle.', form: 'pistol', hole: [2.4, 2.4], red: true },
     { name: 'Pylon Toss', desc: 'Pitch it and race the corner to the pylon.', form: 'pistol', hole: [8, 10], pitch: true, red: true },
